@@ -29,6 +29,7 @@ from skaters.transform import (
     grouped_ar,
     drift,
     holt_linear,
+    theta,
 )
 
 
@@ -54,6 +55,8 @@ TRANSFORM_FACTORIES = [
     ("drift(0.01,0.002)", lambda: drift(alpha=0.01, shrinkage=0.002)),
     ("holt_linear(0.1,0.05)", lambda: holt_linear(0.1, 0.05)),
     ("holt_linear(0.3,0.1)", lambda: holt_linear(0.3, 0.1)),
+    ("theta(0.1)", lambda: theta(0.1)),
+    ("theta(0.3)", lambda: theta(0.3)),
 ]
 
 

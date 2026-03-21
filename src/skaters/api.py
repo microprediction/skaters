@@ -20,7 +20,7 @@ from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
-    garch, power_transform, drift, holt_linear, ar,
+    garch, power_transform, drift, holt_linear, ar, theta,
 )
 from skaters.search import search as adaptive_search
 from skaters.bayesian import bayesian_ensemble
@@ -58,6 +58,11 @@ def _build_candidates(k: int):
     # Multiple speeds: fast drift detection vs long-memory drift
     for a, s in [(0.05, 0.01), (0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
         candidates.append(conjugate(leaf(k=k), drift(alpha=a, shrinkage=s), k=k))
+        depths.append(1)
+
+    # Depth 1: Theta method (SES + half OLS slope)
+    for a in [0.05, 0.1, 0.3]:
+        candidates.append(conjugate(leaf(k=k), theta(alpha=a), k=k))
         depths.append(1)
 
     # Depth 1: AR at depth 1 (captures mean reversion, persistence)

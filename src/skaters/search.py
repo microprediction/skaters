@@ -32,7 +32,7 @@ from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
-    garch, seasonal_difference, power_transform, ar, grouped_ar, drift, holt_linear,
+    garch, seasonal_difference, power_transform, ar, grouped_ar, drift, holt_linear, theta,
 )
 from skaters.periodicity import period_detector, top_periods
 
@@ -54,6 +54,8 @@ TRANSFORMS = [
     ("ar(2)", lambda: ar(2), 2),
     ("ar(5)", lambda: ar(5, decay=1), 3),
     ("gar(16)", lambda: grouped_ar(16), 2),
+    ("theta(0.1)", lambda: theta(0.1), 1),
+    ("theta(0.3)", lambda: theta(0.3), 1),
     ("drift", lambda: drift(), 1),
     ("drift(0.01)", lambda: drift(alpha=0.01, shrinkage=0.002), 1),
     ("holt(0.1,0.05)", lambda: holt_linear(0.1, 0.05), 1),

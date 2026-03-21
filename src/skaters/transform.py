@@ -196,6 +196,82 @@ def ema_transform(alpha: float = 0.05):
 
 
 # ---------------------------------------------------------------------------
+# Theta method (Assimakopoulos & Nikolopoulos, 2000)
+# ---------------------------------------------------------------------------
+
+def theta(alpha: float = 0.1):
+    """Theta method as a transform: SES + half the OLS slope.
+
+    The Theta method decomposes the series into two "theta lines" and
+    combines their forecasts. The standard version (theta=2) is
+    equivalent to SES with a drift correction of half the OLS slope.
+
+    Forward:   y'_t = y_t - (ses_t + b_t/2)   (residual from theta forecast)
+    Inverse:   y_{t+h} = ses_t + h * b_t/2 + residual
+
+    The OLS slope is estimated online via running regression of y on t.
+
+    This was the best simple method in M3 and near-best in M4.
+
+    Args:
+        alpha: SES smoothing factor in (0, 1).
+    """
+    assert 0 < alpha < 1
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            return 0.0, {
+                "ses": y,
+                "t": 1,
+                "sum_t": 1.0,
+                "sum_t2": 1.0,
+                "sum_y": y,
+                "sum_ty": y,
+            }
+
+        s = state
+        s["t"] += 1
+        t = s["t"]
+
+        # Update SES
+        s["ses"] = alpha * y + (1 - alpha) * s["ses"]
+
+        # Update running OLS: y = a + b*t
+        s["sum_t"] += t
+        s["sum_t2"] += t * t
+        s["sum_y"] += y
+        s["sum_ty"] += t * y
+
+        n = t
+        denom = n * s["sum_t2"] - s["sum_t"] ** 2
+        if abs(denom) > 1e-12:
+            slope = (n * s["sum_ty"] - s["sum_t"] * s["sum_y"]) / denom
+        else:
+            slope = 0.0
+
+        s["slope"] = slope
+
+        # One-step-ahead theta forecast: SES + slope/2
+        forecast = s["ses"] + slope / 2
+        residual = y - forecast
+        return residual, s
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        ses = state["ses"]
+        slope = state.get("slope", 0.0)
+        result = []
+        cumsum_var = 0.0
+        for h, d in enumerate(dists):
+            cumsum_var += d.var
+            forecast = ses + (h + 1) * slope / 2 + d.mean
+            std = math.sqrt(cumsum_var) if cumsum_var > 0 else max(d.std, 1e-12)
+            result.append(Dist.gaussian(forecast, std))
+        return result
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
 # Random walk with drift: careful long-memory drift estimation
 # ---------------------------------------------------------------------------
 
