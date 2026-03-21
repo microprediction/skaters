@@ -23,6 +23,7 @@ from skaters.transform import (
     garch, power_transform, drift, holt_linear, ar,
 )
 from skaters.search import search as adaptive_search
+from skaters.portfolio import portfolio
 from skaters.bayesian import bayesian_ensemble
 
 
@@ -425,4 +426,27 @@ def yule(k: int = 1):
         max_components=15,
     )
     f.__name__ = f"yule(k={k})"
+    return f
+
+
+def markowitz(k: int = 1):
+    """Markowitz's policy: diversified portfolio of policies.
+
+    After Harry Markowitz (1952), who showed that diversification
+    across uncorrelated assets reduces risk. Runs multiple policies
+    in parallel and weights them by inverse correlation — policies
+    that are more unique get more weight.
+
+    This is the meta-policy: it doesn't compete with the others,
+    it combines them. Bachelier's rigid random walk prior becomes
+    valuable diversification rather than a liability.
+    """
+    f = portfolio(
+        policy_factories=[bachelier, samuelson, yule, brown,
+                          holt, hosking, laplace, wald],
+        k=k,
+        window=200,
+        rebalance_interval=100,
+    )
+    f.__name__ = f"markowitz(k={k})"
     return f
