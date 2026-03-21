@@ -2,12 +2,12 @@
 
 import math
 import random
-from skaters.api import skater, brown, holt, hosking, laplace, wald
+from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig
 from skaters.conventions import Skater
 from skaters.dist import Dist
 
 
-ALL_POLICIES = [brown, holt, hosking, laplace, wald]
+ALL_POLICIES = [brown, holt, hosking, laplace, wald, dantzig]
 
 
 def test_all_policies_return_skaters():
@@ -73,3 +73,26 @@ def test_skater_aggressiveness():
         for _ in range(50):
             x, state = f(random.gauss(0, 1), state)
         assert math.isfinite(x[0].mean)
+
+
+def test_dantzig_excludes_expensive():
+    """Dantzig should not include fractional differencing (cost=30)."""
+    f = dantzig(k=1)
+    state = None
+    random.seed(42)
+    for _ in range(200):
+        x, state = f(random.gauss(0, 1), state)
+    # Check that all candidates are cheap
+    for entry in state["pool"]:
+        assert entry["cost"] <= 5.0, f"expensive candidate in dantzig: cost={entry['cost']}, recipe={entry['recipe']}"
+
+
+def test_cost_budget_limits_search():
+    from skaters.search import search
+    f = search(k=1, cost_budget=3.0, expand_interval=30, max_pool=20)
+    state = None
+    random.seed(42)
+    for _ in range(100):
+        _, state = f(random.gauss(0, 1), state)
+    for entry in state["pool"]:
+        assert entry["cost"] <= 3.0

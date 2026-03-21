@@ -22,6 +22,7 @@ from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
     garch, power_transform,
 )
+from skaters.search import search as adaptive_search
 from skaters.bayesian import bayesian_ensemble
 
 
@@ -243,4 +244,25 @@ def wald(k: int = 1):
         max_components=10,
     )
     f.__name__ = f"wald(k={k})"
+    return f
+
+
+def dantzig(k: int = 1):
+    """Dantzig's policy: optimize under constraints.
+
+    After George Dantzig (1947). Uses adaptive search with a tight
+    compute budget — only cheap transforms (cost <= 5 per candidate).
+    Excludes fractional differencing and other expensive operations.
+    Best when you need fast predictions on high-frequency data.
+    """
+    f = adaptive_search(
+        k=k,
+        learning_rate=0.5,
+        complexity_penalty=0.02,
+        max_pool=15,
+        expand_interval=100,
+        max_depth=2,
+        cost_budget=5.0,
+    )
+    f.__name__ = f"dantzig(k={k})"
     return f

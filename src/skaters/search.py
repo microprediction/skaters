@@ -38,15 +38,17 @@ from skaters.periodicity import period_detector, top_periods
 
 
 # The grammar: available transforms for expansion
+# Each entry: (name, factory, cost_per_obs)
+# Cost is relative: 1 = O(1) arithmetic, higher = more work
 TRANSFORMS = [
-    ("ema_t(0.05)", lambda: ema_transform(0.05)),
-    ("ema_t(0.1)", lambda: ema_transform(0.1)),
-    ("ema_t(0.3)", lambda: ema_transform(0.3)),
-    ("diff", lambda: difference()),
-    ("std(0.05)", lambda: standardize(0.05)),
-    ("frac(0.3)", lambda: fractional_difference(0.3, 30)),
-    ("garch", lambda: garch()),
-    ("pow(0.5)", lambda: power_transform(0.5)),
+    ("ema_t(0.05)", lambda: ema_transform(0.05), 1),
+    ("ema_t(0.1)", lambda: ema_transform(0.1), 1),
+    ("ema_t(0.3)", lambda: ema_transform(0.3), 1),
+    ("diff", lambda: difference(), 1),
+    ("std(0.05)", lambda: standardize(0.05), 2),
+    ("frac(0.3)", lambda: fractional_difference(0.3, 30), 30),
+    ("garch", lambda: garch(), 2),
+    ("pow(0.5)", lambda: power_transform(0.5), 3),
 ]
 
 
@@ -61,6 +63,7 @@ def search(
     replay_buffer: int = 500,
     prune_threshold: float = -50.0,
     max_components: int = 20,
+    cost_budget: float = float("inf"),
 ):
     """Create an adaptive-search skater.
 
@@ -78,6 +81,10 @@ def search(
         prune_threshold: kill candidates whose log-weight relative to
             the leader falls below this
         max_components: prune combined Dist to this many components
+        cost_budget: maximum per-candidate cost (sum of transform costs).
+            Candidates exceeding this budget are not created. Use
+            float("inf") for no limit. Low values (e.g. 5) restrict
+            to cheap transforms only.
     """
 
     _pd_func = period_detector()
@@ -85,7 +92,7 @@ def search(
     def _search(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
             state = {
-                "pool": _init_pool(k),
+                "pool": _init_pool(k, cost_budget=cost_budget),
                 "n_obs": 0,
                 "buffer": deque(maxlen=replay_buffer),
                 "pd_state": None,
@@ -134,11 +141,12 @@ def search(
                     state["detected_periods"].add(period)
                     t_name = f"seas({period})"
                     state["transforms"].append(
-                        (t_name, lambda p=period: seasonal_difference(p))
+                        (t_name, lambda p=period: seasonal_difference(p), 2)
                     )
 
             new_children = _expand(pool, k, expand_top_n, max_depth,
-                                   transforms=state["transforms"])
+                                   transforms=state["transforms"],
+                                   cost_budget=cost_budget)
             # Replay history through new children so they join warm
             for child in new_children:
                 _warmup(child, state["buffer"], k)
@@ -167,13 +175,14 @@ def search(
     return _search
 
 
-def _make_entry(skater_fn, depth: int, recipe: list[str], k: int) -> dict:
+def _make_entry(skater_fn, depth: int, recipe: list[str], k: int, cost: float = 0.0) -> dict:
     """Create a pool entry for a candidate."""
     return {
         "f": skater_fn,
         "s": None,           # skater state
         "depth": depth,
         "recipe": recipe,    # list of transform names (for building children)
+        "cost": cost,        # total cost per observation (sum of transform costs)
         "age": 0,
         "warmed": False,     # becomes True after warmup/initial burn-in
         "log_w": [0.0] * k,
@@ -203,20 +212,23 @@ def _warmup(entry: dict, buffer: deque, k: int):
     entry["warmed"] = True
 
 
-def _init_pool(k: int) -> list[dict]:
-    """Seed the pool with depth-0 and depth-1 candidates."""
+def _init_pool(k: int, cost_budget: float = float("inf")) -> list[dict]:
+    """Seed the pool with depth-0 and depth-1 candidates within budget."""
     pool = []
 
-    # Depth 0: just a leaf
-    entry = _make_entry(leaf(k=k), depth=0, recipe=[], k=k)
-    entry["warmed"] = True  # initial candidates score from the start
+    # Depth 0: just a leaf (cost = 1 for the leaf itself)
+    entry = _make_entry(leaf(k=k), depth=0, recipe=[], k=k, cost=1.0)
+    entry["warmed"] = True
     pool.append(entry)
 
     # Depth 1: each single transform applied to leaf
-    for t_name, t_factory in TRANSFORMS:
+    for t_name, t_factory, t_cost in TRANSFORMS:
+        candidate_cost = 1.0 + t_cost  # leaf + transform
+        if candidate_cost > cost_budget:
+            continue
         f = conjugate(leaf(k=k), t_factory(), k=k)
         f.__name__ = f"{t_name}|leaf"
-        entry = _make_entry(f, depth=1, recipe=[t_name], k=k)
+        entry = _make_entry(f, depth=1, recipe=[t_name], k=k, cost=candidate_cost)
         entry["warmed"] = True
         pool.append(entry)
 
@@ -224,13 +236,17 @@ def _init_pool(k: int) -> list[dict]:
 
 
 def _expand(pool: list[dict], k: int, top_n: int, max_depth: int,
-            transforms: list | None = None) -> list[dict]:
+            transforms: list | None = None,
+            cost_budget: float = float("inf")) -> list[dict]:
     """Take the top performers and create children.
 
     Returns the new children (not yet added to pool).
     """
     if transforms is None:
         transforms = TRANSFORMS
+
+    # Build cost lookup
+    cost_lookup = {name: cost for name, _, cost in transforms}
 
     scored = [(sum(e["log_w"]) / k, i, e) for i, e in enumerate(pool)]
     scored.sort(reverse=True)
@@ -242,7 +258,12 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int,
         if parent["depth"] >= max_depth:
             continue
 
-        for t_name, t_factory in transforms:
+        for t_name, t_factory, t_cost in transforms:
+            # Check cost budget
+            child_cost = parent["cost"] + t_cost
+            if child_cost > cost_budget:
+                continue
+
             if parent["recipe"] and parent["recipe"][-1] == t_name:
                 continue
 
@@ -254,7 +275,8 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int,
             child_fn = _build_from_recipe(new_recipe, k, transforms)
             child_fn.__name__ = "|".join(new_recipe) + "|leaf"
             children.append(_make_entry(
-                child_fn, depth=len(new_recipe), recipe=new_recipe, k=k
+                child_fn, depth=len(new_recipe), recipe=new_recipe, k=k,
+                cost=child_cost,
             ))
 
     return children
@@ -264,7 +286,7 @@ def _build_from_recipe(recipe: list[str], k: int, transforms: list | None = None
     """Reconstruct a skater from its transform recipe."""
     if transforms is None:
         transforms = TRANSFORMS
-    t_lookup = {name: factory for name, factory in transforms}
+    t_lookup = {name: factory for name, factory, *_ in transforms}
     f = leaf(k=k)
     for t_name in recipe:
         f = conjugate(f, t_lookup[t_name](), k=k)

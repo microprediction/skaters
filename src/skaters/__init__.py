@@ -17,7 +17,8 @@ from skaters.transform import (
     garch, seasonal_difference, power_transform,
 )
 from skaters.search import search
-from skaters.api import skater, brown, holt, hosking, laplace, wald
+from skaters.periodicity import period_detector, top_periods
+from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
     ema_spec, ensemble_spec, conjugate_spec,
@@ -35,6 +36,9 @@ __all__ = [
     "hosking",
     "laplace",
     "wald",
+    "dantzig",
+    "period_detector",
+    "top_periods",
     # Building blocks
     "leaf",
     "ema",
