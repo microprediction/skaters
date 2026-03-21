@@ -1,6 +1,6 @@
 [project]
 name = "skaters"
-version = "0.3.1"
+version = "0.3.2"
 description = "Fast univariate time series models that run in Pyodide"
 readme = "README.md"
 license = "MIT"
