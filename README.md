@@ -31,22 +31,26 @@ Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horiz
 Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models.
 
 ```python
-from skaters import brown, holt, hosking, laplace, wald
+from skaters import bachelier, brown, holt, hosking, laplace, wald, dantzig
 
-f = brown(k=1)     # trust simplicity
-f = holt(k=1)      # expect trends
-f = hosking(k=1)   # expect long memory
-f = laplace(k=1)   # maximum ignorance — let the data decide
-f = wald(k=1)      # minimax caution
+f = bachelier(k=1)  # it's a random walk until proven otherwise
+f = brown(k=1)      # trust simplicity
+f = holt(k=1)       # expect trends
+f = hosking(k=1)    # expect long memory
+f = laplace(k=1)    # maximum ignorance — let the data decide
+f = wald(k=1)       # minimax caution
+f = dantzig(k=1)    # optimize under compute constraints
 ```
 
-| Policy | Prior | Learning rate $\eta$ | Complexity penalty $\lambda$ | Philosophy |
-|--------|-------|---------------------|----------------------------|------------|
-| `brown` | Favors depth 0–1 | Low | High | Simplicity until proven otherwise |
-| `holt` | Favors differencing | Moderate | Moderate | Trends are likely |
-| `hosking` | Favors frac diff | Moderate | Low | Long memory is likely |
-| `laplace` | Uniform | High | Minimal | No opinion, let data speak |
-| `wald` | Favors depth 0 | Very low | Very high | Assume adversarial |
+| Policy | Prior | $\eta$ | $\lambda$ | Philosophy |
+|--------|-------|--------|-----------|------------|
+| `bachelier` | diff\|leaf (random walk) | 0.05 | 0.10 | Random walk until proven otherwise |
+| `brown` | Favors depth 0–1 | 0.30 | 0.05 | Simplicity until proven otherwise |
+| `holt` | Favors differencing | 0.50 | 0.02 | Trends are likely |
+| `hosking` | Favors frac diff | 0.50 | 0.01 | Long memory is likely |
+| `laplace` | Uniform | 0.80 | 0.005 | No opinion, let data speak |
+| `wald` | Favors depth 0 | 0.15 | 0.08 | Assume adversarial |
+| `dantzig` | Adaptive search | 0.50 | 0.02 | Optimize under compute constraints |
 
 Or tune directly:
 
@@ -107,9 +111,16 @@ Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inve
 | Transform | Forward | Inverse | Use case |
 |-----------|---------|---------|----------|
 | `ema_transform(`$\alpha$`)` | $y'_t = y_t - \ell_t$ | $D \mapsto D + \ell_t$ | Remove level |
-| `difference()` | $y'_t = y_t - y_{t-1}$ | Cumsum with $\text{Var}$ growing as $\sum \sigma_h^2$ | Remove trend |
-| `fractional_difference(`$d$`)` | $y'_t = (1-B)^d \, y_t$ | Apply $(1-B)^{-d}$ | Remove long memory |
+| `difference()` | $y'_t = y_t - y_{t-1}$ | Cumsum with $\text{Var}$ growing as $\sum \sigma_h^2$ | Random walk |
+| `drift(`$\alpha, \lambda$`)` | $y'_t = \Delta y_t - \hat\mu_t$ | $y_t + h\hat\mu + \sum\varepsilon$ | Random walk + drift |
+| `holt_linear(`$\alpha, \beta$`)` | $y'_t = y_t - (\ell_t + b_t)$ | $\ell_t + h \cdot b_t + \varepsilon$ | Level + trend (Holt 1957) |
+| `ar(`$p$`)` | $y'_t = y_t - \sum \hat\phi_j y_{t-j}$ | AR reconstruction with variance propagation | Autoregression (online RLS) |
+| `grouped_ar(`$L$`)` | Same, grouped coefficients | Same | Long-lag AR with $O(\log L)$ params |
+| `fractional_difference(`$d$`)` | $y'_t = (1-B)^d \, y_t$ | $(1-B)^{-d}$ | Long memory |
 | `standardize(`$\alpha$`)` | $y'_t = (y_t - \hat\mu_t) / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D + \hat\mu_t$ | Remove scale |
+| `garch(`$\omega, \alpha, \beta$`)` | $y'_t = y_t / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D$ | Volatility clustering |
+| `seasonal_difference(`$s$`)` | $y'_t = y_t - y_{t-s}$ | Shift by lagged value | Periodicity |
+| `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method | Tail compression |
 
 ## Conjugation
 

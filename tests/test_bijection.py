@@ -26,6 +26,9 @@ from skaters.transform import (
     seasonal_difference,
     power_transform,
     ar,
+    grouped_ar,
+    drift,
+    holt_linear,
 )
 
 
@@ -45,6 +48,12 @@ TRANSFORM_FACTORIES = [
     ("power_transform(0.3)", lambda: power_transform(0.3)),
     ("ar(2)", lambda: ar(2)),
     ("ar(5)", lambda: ar(5)),
+    ("grouped_ar(8)", lambda: grouped_ar(8)),
+    ("grouped_ar(16)", lambda: grouped_ar(16)),
+    ("drift", lambda: drift()),
+    ("drift(0.01,0.002)", lambda: drift(alpha=0.01, shrinkage=0.002)),
+    ("holt_linear(0.1,0.05)", lambda: holt_linear(0.1, 0.05)),
+    ("holt_linear(0.3,0.1)", lambda: holt_linear(0.3, 0.1)),
 ]
 
 
