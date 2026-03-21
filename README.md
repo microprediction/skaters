@@ -31,9 +31,11 @@ Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horiz
 Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models.
 
 ```python
-from skaters import bachelier, brown, holt, hosking, laplace, wald, dantzig
+from skaters import bachelier, samuelson, yule, brown, holt, hosking, laplace, wald, dantzig
 
 f = bachelier(k=1)  # it's a random walk until proven otherwise
+f = samuelson(k=1)  # there's a drift, find it carefully
+f = yule(k=1)       # anchor to AR(1) — captures mean reversion
 f = brown(k=1)      # trust simplicity
 f = holt(k=1)       # expect trends
 f = hosking(k=1)    # expect long memory
@@ -42,15 +44,17 @@ f = wald(k=1)       # minimax caution
 f = dantzig(k=1)    # optimize under compute constraints
 ```
 
-| Policy | Prior | $\eta$ | $\lambda$ | Philosophy |
-|--------|-------|--------|-----------|------------|
-| `bachelier` | diff\|leaf (random walk) | 0.05 | 0.10 | Random walk until proven otherwise |
-| `brown` | Favors depth 0–1 | 0.30 | 0.05 | Simplicity until proven otherwise |
-| `holt` | Favors differencing | 0.50 | 0.02 | Trends are likely |
-| `hosking` | Favors frac diff | 0.50 | 0.01 | Long memory is likely |
-| `laplace` | Uniform | 0.80 | 0.005 | No opinion, let data speak |
-| `wald` | Favors depth 0 | 0.15 | 0.08 | Assume adversarial |
-| `dantzig` | Adaptive search | 0.50 | 0.02 | Optimize under compute constraints |
+| Policy | After | Prior | $\eta$ | $\lambda$ | Best for |
+|--------|-------|-------|--------|-----------|----------|
+| `bachelier` | Bachelier 1900 | Random walk | 0.05 | 0.10 | Efficient markets, pure noise |
+| `samuelson` | Samuelson 1965 | Drift + Holt | 0.40 | 0.01 | Persistent drift (GDP, prices) |
+| `yule` | Yule 1927 | AR(1), AR(2) | 0.50 | 0.015 | Mean-reverting series |
+| `brown` | Brown 1956 | Depth 0–1 | 0.30 | 0.05 | Stationary series |
+| `holt` | Holt 1957 | Differencing | 0.50 | 0.02 | Trending data |
+| `hosking` | Hosking 1981 | Frac diff | 0.50 | 0.01 | Long memory |
+| `laplace` | Laplace | Uniform | 0.80 | 0.005 | General purpose |
+| `wald` | Wald | Depth 0 | 0.15 | 0.08 | Adversarial, non-stationary |
+| `dantzig` | Dantzig 1947 | Adaptive search | 0.50 | 0.02 | Compute-constrained |
 
 Or tune directly:
 
