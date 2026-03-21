@@ -56,7 +56,7 @@ def _build_candidates(k: int):
 
     # Depth 1: drift + leaf (random walk with adaptive drift)
     # Multiple speeds: fast drift detection vs long-memory drift
-    for a, s in [(0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
+    for a, s in [(0.05, 0.01), (0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
         candidates.append(conjugate(leaf(k=k), drift(alpha=a, shrinkage=s), k=k))
         depths.append(1)
 
@@ -344,30 +344,35 @@ def samuelson(k: int = 1):
     """Samuelson's policy: there's a drift, find it carefully.
 
     After Paul Samuelson (1965), who extended Bachelier's random walk
-    with geometric drift for asset pricing. Strong prior on transforms
-    that include drift removal (drift, holt_linear) at any depth.
-    Low learning rate so the drift estimate is long-memory.
+    with geometric drift for asset pricing. Strong prior on Holt
+    linear and drift transforms. Moderate learning rate so the
+    ensemble concentrates on the best drift tracker reasonably fast.
 
     Best for series with persistent but slowly varying drift — GDP,
-    population, prices with inflation. The long-memory drift at the
-    top of the tree removes the dominant trend, then the inner
-    transforms handle whatever structure remains.
+    population, prices with inflation.
     """
     candidates, depths = _build_candidates(k)
 
-    # Boost any candidate containing drift or holt_linear
-    prior = [0.0] * len(candidates)
-    for i, c in enumerate(candidates):
-        name = getattr(c, '__name__', '')
-        if 'drift' in name or 'holt' in name:
+    # Build prior: strongly boost drift and holt_linear candidates
+    # We identify them by their position in the candidate pool
+    # (see _build_candidates for the layout)
+    n = len(candidates)
+    prior = [0.0] * n
+    for i in range(n):
+        d = depths[i]
+        # Depth-1 drift and holt_linear candidates get a big boost
+        # Depth-2 drift-containing candidates get a moderate boost
+        # Everything else gets no boost
+        if d == 1 and i >= 6:
+            # drift|leaf and holt|leaf candidates (after diff|leaf at index 5)
             prior[i] = 5.0
-        elif 'diff' in name:
-            prior[i] = 2.0  # differencing is a weaker version of drift
+        elif d == 2:
+            prior[i] = 2.0  # depth-2 candidates that may contain drift
 
     f = bayesian_ensemble(
         candidates, k=k,
-        learning_rate=0.1,          # slow — let drift estimates stabilize
-        complexity_penalty=0.01,    # mild — willing to go deep if drift helps
+        learning_rate=0.4,          # moderate — fast enough to find drift
+        complexity_penalty=0.01,    # mild — willing to use drift+ema
         depths=depths,
         prior_log_weights=prior,
         max_components=15,
