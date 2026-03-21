@@ -71,27 +71,22 @@ def _run_model(f, series, burn=100):
 
 
 # ---------------------------------------------------------------------------
-# The oracle: diff|leaf should be nearly optimal on Brownian motion
+# Bachelier should be near-optimal on Brownian motion
 # ---------------------------------------------------------------------------
 
-class TestOracleOnBrownian:
+class TestBachelierOnBrownian:
 
-    def test_diff_leaf_is_near_optimal(self):
-        """diff|leaf should estimate sigma correctly and not overfit."""
+    def test_bachelier_near_optimal(self):
+        """Bachelier (heavy prior on diff|leaf) should estimate sigma correctly."""
         series = _brownian(sigma=1.0)
-        f = conjugate(leaf(k=1), difference(), k=1)
-        r = _run_model(f, series)
-        # MAE should be close to sigma * sqrt(2/pi) ≈ 0.798
+        r = _run_model(bachelier(k=1), series)
         assert 0.5 < r["mae"] < 1.2, f"MAE={r['mae']:.3f}"
-        # Estimated std should be close to true sigma
         assert 0.5 < r["mean_std"] < 2.0, f"std={r['mean_std']:.3f}"
 
-    def test_diff_leaf_logpdf_near_true(self):
-        """diff|leaf should achieve logpdf close to the true model."""
+    def test_bachelier_logpdf_near_true(self):
+        """Bachelier should achieve logpdf close to the true model."""
         series = _brownian(sigma=1.0)
-        f = conjugate(leaf(k=1), difference(), k=1)
-        r = _run_model(f, series)
-        # True logpdf for N(0,1) increments: -0.5*log(2*pi) - 0.5 ≈ -1.42
+        r = _run_model(bachelier(k=1), series)
         true_logpdf = -0.5 * math.log(2 * math.pi) - 0.5
         assert r["mean_logpdf"] > true_logpdf - 0.5, (
             f"logpdf={r['mean_logpdf']:.3f}, true≈{true_logpdf:.3f}"
@@ -119,10 +114,10 @@ ALL_SINGLE_TRANSFORMS = [
 
 class TestNoOverfitOnBrownian:
 
-    def test_no_model_beats_diff_leaf_by_much(self):
-        """No single transform should significantly beat diff|leaf on Brownian."""
+    def test_no_transform_beats_bachelier_by_much(self):
+        """No single transform should significantly beat bachelier on Brownian."""
         series = _brownian(sigma=1.0, n=2000)
-        baseline = _run_model(conjugate(leaf(k=1), difference(), k=1), series)
+        baseline = _run_model(bachelier(k=1), series)
 
         for name, f in ALL_SINGLE_TRANSFORMS:
             r = _run_model(f, series)
@@ -217,13 +212,12 @@ class TestPoliciesOnBrownian:
         assert r["mean_std"] > 0
 
     def test_bachelier_is_best_on_brownian(self):
-        """Bachelier should be the least overfit policy on Brownian motion."""
+        """Bachelier should be the best policy on pure Brownian motion."""
         series = _brownian(sigma=1.0, n=1000)
-        oracle = _run_model(conjugate(leaf(k=1), difference(), k=1), series)
         bach = _run_model(bachelier(k=1), series)
-        # Bachelier should not be much worse than oracle
-        assert bach["mean_logpdf"] > oracle["mean_logpdf"] - 1.0, (
-            f"bachelier logpdf={bach['mean_logpdf']:.3f} vs oracle={oracle['mean_logpdf']:.3f}"
+        true_logpdf = -0.5 * math.log(2 * math.pi) - 0.5
+        assert bach["mean_logpdf"] > true_logpdf - 0.5, (
+            f"bachelier logpdf={bach['mean_logpdf']:.3f}, true≈{true_logpdf:.3f}"
         )
 
 

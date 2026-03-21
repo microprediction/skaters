@@ -20,7 +20,7 @@ from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
-    garch, power_transform, drift, holt_linear,
+    garch, power_transform, drift, holt_linear, ar,
 )
 from skaters.search import search as adaptive_search
 from skaters.bayesian import bayesian_ensemble
@@ -59,6 +59,12 @@ def _build_candidates(k: int):
     for a, s in [(0.05, 0.01), (0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
         candidates.append(conjugate(leaf(k=k), drift(alpha=a, shrinkage=s), k=k))
         depths.append(1)
+
+    # Depth 1: AR at depth 1 (captures mean reversion, persistence)
+    candidates.append(conjugate(leaf(k=k), ar(1), k=k))
+    depths.append(1)
+    candidates.append(conjugate(leaf(k=k), ar(2, decay=1), k=k))
+    depths.append(1)
 
     # Depth 1: Holt linear (level + trend, single transform)
     for a, b in [(0.1, 0.02), (0.1, 0.05), (0.3, 0.1)]:
@@ -378,4 +384,45 @@ def samuelson(k: int = 1):
         max_components=15,
     )
     f.__name__ = f"samuelson(k={k})"
+    return f
+
+
+def yule(k: int = 1):
+    """Yule's policy: anchor to AR.
+
+    After G. Udny Yule (1927), who first applied autoregressive models
+    to time series (sunspot data). Strong prior on AR(1) and AR(2)
+    transforms, which capture mean reversion, persistence, and the
+    unit root (random walk) as special cases.
+
+    AR(1) nests the random walk (phi=1) and mean reversion (phi<1).
+    AR(2) adds oscillatory behavior. The online RLS estimates phi
+    from data. This policy gives AR the benefit of the doubt.
+
+    Best for series that might be mean-reverting or have short-range
+    autoregressive structure.
+    """
+    candidates, depths = _build_candidates(k)
+    n = len(candidates)
+    prior = [0.0] * n
+
+    # Strongly boost AR candidates (indices 10-11 in standard pool)
+    # and mildly boost diff|leaf (which AR(1) with phi=1 reproduces)
+    for i in range(n):
+        if i in (10, 11):
+            prior[i] = 6.0  # AR(1) and AR(2) get biggest boost
+        elif i == 5:
+            prior[i] = 3.0  # diff|leaf (the phi=1 special case)
+        elif depths[i] == 2:
+            prior[i] = 1.0  # mild boost for depth-2 (diff|ar etc)
+
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.5,
+        complexity_penalty=0.015,
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=15,
+    )
+    f.__name__ = f"yule(k={k})"
     return f

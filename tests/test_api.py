@@ -2,12 +2,12 @@
 
 import math
 import random
-from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson
+from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson, yule
 from skaters.conventions import Skater
 from skaters.dist import Dist
 
 
-ALL_POLICIES = [brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson]
+ALL_POLICIES = [brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson, yule]
 
 
 def test_all_policies_return_skaters():

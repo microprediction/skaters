@@ -18,7 +18,7 @@ from skaters.transform import (
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson
+from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson, yule
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
     ema_spec, ensemble_spec, conjugate_spec,
@@ -39,6 +39,7 @@ __all__ = [
     "dantzig",
     "bachelier",
     "samuelson",
+    "yule",
     "period_detector",
     "top_periods",
     # Building blocks
