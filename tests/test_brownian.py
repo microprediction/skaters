@@ -21,7 +21,7 @@ from skaters.transform import (
 )
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
-from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier
+from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson
 from skaters.search import search
 from skaters.dist import Dist
 
@@ -190,6 +190,7 @@ class TestPoliciesOnBrownian:
             ("brown", brown), ("holt", holt), ("hosking", hosking),
             ("laplace", laplace), ("wald", wald), ("dantzig", dantzig),
             ("bachelier", bachelier),
+            ("samuelson", samuelson),
             ("skater(0.5)", lambda k: skater(k=k, aggressiveness=0.5)),
         ]:
             f = factory(k=1)
@@ -204,6 +205,16 @@ class TestPoliciesOnBrownian:
         series = _brownian(sigma=1.0, n=500)
         r = _run_model(wald(k=1), series)
         assert r["mean_std"] > 0.3, f"wald overconfident: std={r['mean_std']:.3f}"
+
+    def test_samuelson_handles_drift(self):
+        """Samuelson should do well on random walk with drift."""
+        random.seed(42)
+        y = [0.0]
+        for _ in range(999):
+            y.append(y[-1] + 0.3 + random.gauss(0, 1))
+        r = _run_model(samuelson(k=1), y)
+        assert math.isfinite(r["mean_logpdf"])
+        assert r["mean_std"] > 0
 
     def test_bachelier_is_best_on_brownian(self):
         """Bachelier should be the least overfit policy on Brownian motion."""

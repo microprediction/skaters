@@ -87,6 +87,22 @@ def _build_candidates(k: int):
         )
         depths.append(2)
 
+    # Depth 2: drift + EMA (drift removal then level tracking)
+    for a_drift, s_drift in [(0.002, 0.001), (0.0005, 0.0002)]:
+        for a_ema in [0.05, 0.1]:
+            candidates.append(
+                conjugate(conjugate(leaf(k=k), ema_transform(a_ema), k=k),
+                          drift(alpha=a_drift, shrinkage=s_drift), k=k)
+            )
+            depths.append(2)
+
+    # Depth 2: drift + Holt linear (drift on top of level+trend)
+    candidates.append(
+        conjugate(conjugate(leaf(k=k), holt_linear(0.1, 0.05), k=k),
+                  drift(alpha=0.001, shrinkage=0.0005), k=k)
+    )
+    depths.append(2)
+
     # Depth 2: GARCH + EMA (volatility-adapted)
     candidates.append(
         conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k), garch(), k=k)
@@ -105,6 +121,15 @@ def _build_candidates(k: int):
 def _prior_favoring_depths(depths: list[int], favored: set[int], boost: float = 2.0) -> list[float]:
     """Compute prior log-weights that boost candidates at certain depths."""
     return [boost if d in favored else 0.0 for d in depths]
+
+
+def _prior_favoring_transform(candidates: list, transform_name: str, boost: float = 3.0) -> list[float]:
+    """Boost candidates that contain a specific transform in their name."""
+    prior = []
+    for c in candidates:
+        name = getattr(c, '__name__', '')
+        prior.append(boost if transform_name in name else 0.0)
+    return prior
 
 
 def _prior_favoring_indices(n: int, favored: set[int], boost: float = 2.0) -> list[float]:
@@ -312,4 +337,40 @@ def bachelier(k: int = 1):
         max_components=10,
     )
     f.__name__ = f"bachelier(k={k})"
+    return f
+
+
+def samuelson(k: int = 1):
+    """Samuelson's policy: there's a drift, find it carefully.
+
+    After Paul Samuelson (1965), who extended Bachelier's random walk
+    with geometric drift for asset pricing. Strong prior on transforms
+    that include drift removal (drift, holt_linear) at any depth.
+    Low learning rate so the drift estimate is long-memory.
+
+    Best for series with persistent but slowly varying drift — GDP,
+    population, prices with inflation. The long-memory drift at the
+    top of the tree removes the dominant trend, then the inner
+    transforms handle whatever structure remains.
+    """
+    candidates, depths = _build_candidates(k)
+
+    # Boost any candidate containing drift or holt_linear
+    prior = [0.0] * len(candidates)
+    for i, c in enumerate(candidates):
+        name = getattr(c, '__name__', '')
+        if 'drift' in name or 'holt' in name:
+            prior[i] = 5.0
+        elif 'diff' in name:
+            prior[i] = 2.0  # differencing is a weaker version of drift
+
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.1,          # slow — let drift estimates stabilize
+        complexity_penalty=0.01,    # mild — willing to go deep if drift helps
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=15,
+    )
+    f.__name__ = f"samuelson(k={k})"
     return f
