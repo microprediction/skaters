@@ -10,14 +10,10 @@ from skaters.conventions import Skater
 from skaters.leaf import leaf
 from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
+from skaters.bayesian import bayesian_ensemble
 from skaters.conjugate import conjugate
 from skaters.transform import difference, fractional_difference, standardize, ema_transform
-from skaters.bayesian import bayesian_ensemble
-from skaters.api import (
-    skater,
-    brown, holt, hosking, gauss, laplace,
-    quickly, slowly, sluggishly, rapidly, ensemble,
-)
+from skaters.api import skater, brown, holt, hosking, laplace, wald
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
     ema_spec, ensemble_spec, conjugate_spec,
@@ -25,28 +21,28 @@ from skaters.spec import (
 )
 
 __all__ = [
+    # Types
     "Dist",
     "Skater",
+    # Search policies (the main user API)
+    "skater",
+    "brown",
+    "holt",
+    "hosking",
+    "laplace",
+    "wald",
+    # Building blocks
     "leaf",
     "ema",
-    "precision_weighted_ensemble",
     "conjugate",
     "difference",
     "fractional_difference",
     "standardize",
     "ema_transform",
-    "quickly",
-    "slowly",
-    "sluggishly",
-    "rapidly",
-    "ensemble",
+    # Ensembles
+    "precision_weighted_ensemble",
     "bayesian_ensemble",
-    "skater",
-    "brown",
-    "holt",
-    "hosking",
-    "gauss",
-    "laplace",
+    # Spec system
     "build",
     "spec_name",
     "to_json",

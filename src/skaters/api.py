@@ -1,6 +1,9 @@
 """User-facing API.
 
-Most users should just use `skater()`:
+Every named function builds a Bayesian ensemble over the SAME full
+candidate population. The names represent different search policies —
+different priors, learning rates, and complexity penalties — not
+different models.
 
     from skaters import skater
 
@@ -9,82 +12,27 @@ Most users should just use `skater()`:
     for y in observations:
         dists, state = f(y, state)
         print(dists[0].mean, dists[0].std)
-
-Under the hood this builds a Bayesian ensemble of candidates at
-various depths, with XGBoost-inspired regularization. The right
-model complexity emerges from the data.
 """
 
 from __future__ import annotations
-from skaters.ema import ema
+import math
 from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 from skaters.transform import difference, fractional_difference, standardize, ema_transform
-from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
 
 
 # ---------------------------------------------------------------------------
-# The default: one function, good defaults
+# Candidate population (shared by all search policies)
 # ---------------------------------------------------------------------------
 
-def skater(k: int = 1, aggressiveness: float = 0.5) -> object:
-    """Create a general-purpose online forecaster.
-
-    This is the recommended entry point. It builds a Bayesian ensemble
-    of models at different depths and lets the data decide which
-    complexity is appropriate.
-
-    Args:
-        k: forecast horizon (steps ahead). Default 1.
-        aggressiveness: float in (0, 1). Controls adaptation speed.
-            - 0.1: very conservative, slow to change, robust to noise
-            - 0.5: balanced (default)
-            - 0.9: aggressive, adapts fast, risks overfitting short-term
-
-    Returns:
-        A skater callable: (y, state) -> (list[Dist], state)
-
-    Usage:
-        from skaters import skater
-
-        f = skater(k=3)
-        state = None
-        for y in observations:
-            dists, state = f(y, state)
-            # Point forecast
-            print(dists[0].mean)
-            # Uncertainty band
-            print(dists[0].quantile(0.025), dists[0].quantile(0.975))
-            # Log-likelihood
-            print(dists[0].logpdf(y))
-    """
-    assert 0 < aggressiveness < 1
-
-    # Map aggressiveness to learning rate and complexity penalty
-    # Higher aggressiveness → higher learning rate (faster to concentrate)
-    # Higher aggressiveness → lower complexity penalty (willing to go deep)
-    learning_rate = 0.1 + 0.8 * aggressiveness  # [0.18, 0.82]
-    complexity_penalty = 0.05 * (1 - aggressiveness)  # [0.025, 0.0]
-
-    candidates, depths = _build_candidates(k)
-
-    f = bayesian_ensemble(
-        candidates, k=k,
-        learning_rate=learning_rate,
-        complexity_penalty=complexity_penalty,
-        depths=depths,
-        max_components=20,
-    )
-    f.__name__ = f"skater(k={k}, aggressiveness={aggressiveness})"
-    return f
-
-
 def _build_candidates(k: int):
-    """Generate a diverse population of candidate models.
+    """Generate the full candidate population.
 
-    Returns (candidates, depths) where depth is the number of
-    transform layers in each candidate's chain.
+    Every search policy considers ALL of these. The policy only
+    affects how they are weighted, not which ones are included.
+
+    Returns (candidates, depths).
     """
     candidates = []
     depths = []
@@ -98,11 +46,11 @@ def _build_candidates(k: int):
         candidates.append(conjugate(leaf(k=k), ema_transform(alpha), k=k))
         depths.append(1)
 
-    # Depth 1: differencing + leaf (predicts changes are ~zero)
+    # Depth 1: differencing + leaf
     candidates.append(conjugate(leaf(k=k), difference(), k=k))
     depths.append(1)
 
-    # Depth 2: differencing + EMA (predicts trend in changes)
+    # Depth 2: differencing + EMA
     for alpha in [0.05, 0.1, 0.3]:
         candidates.append(
             conjugate(conjugate(leaf(k=k), ema_transform(alpha), k=k), difference(), k=k)
@@ -119,79 +67,165 @@ def _build_candidates(k: int):
     # Depth 2: fractional diff + EMA
     for d in [0.2, 0.4]:
         candidates.append(
-            conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k), fractional_difference(d=d, window=30), k=k)
+            conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k),
+                      fractional_difference(d=d, window=30), k=k)
         )
         depths.append(2)
 
     return candidates, depths
 
 
+def _prior_favoring_depths(depths: list[int], favored: set[int], boost: float = 2.0) -> list[float]:
+    """Compute prior log-weights that boost candidates at certain depths."""
+    return [boost if d in favored else 0.0 for d in depths]
+
+
+def _prior_favoring_indices(n: int, favored: set[int], boost: float = 2.0) -> list[float]:
+    """Compute prior log-weights that boost specific candidate indices."""
+    return [boost if i in favored else 0.0 for i in range(n)]
+
+
 # ---------------------------------------------------------------------------
-# Named models (after the ideas they embody)
+# The default entry point
+# ---------------------------------------------------------------------------
+
+def skater(k: int = 1, aggressiveness: float = 0.5):
+    """Create a general-purpose online forecaster.
+
+    Builds a Bayesian ensemble over a diverse candidate population
+    and lets the data decide which complexity is appropriate.
+
+    Args:
+        k: forecast horizon (steps ahead).
+        aggressiveness: float in (0, 1). Controls adaptation speed.
+            Low = conservative (slow to change, penalizes complexity).
+            High = aggressive (adapts fast, tolerates complexity).
+    """
+    assert 0 < aggressiveness < 1
+    learning_rate = 0.1 + 0.8 * aggressiveness
+    complexity_penalty = 0.05 * (1 - aggressiveness)
+
+    candidates, depths = _build_candidates(k)
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=learning_rate,
+        complexity_penalty=complexity_penalty,
+        depths=depths,
+        max_components=20,
+    )
+    f.__name__ = f"skater(k={k})"
+    return f
+
+
+# ---------------------------------------------------------------------------
+# Named search policies
+#
+# All consider the same candidates. They differ in prior, learning
+# rate, and complexity penalty — i.e., the search strategy.
 # ---------------------------------------------------------------------------
 
 def brown(k: int = 1):
-    """Robert G. Brown's exponential smoothing (1956). Fast-adapting EMA."""
-    f = ema(alpha=0.3, k=k)
+    """Brown's policy: trust simplicity.
+
+    After Robert G. Brown (1956). Strong prior on smooth, simple models
+    (depth 0-1). High complexity penalty. Slow to adapt. Best when you
+    believe the series is stationary or nearly so.
+    """
+    candidates, depths = _build_candidates(k)
+    prior = _prior_favoring_depths(depths, favored={0, 1}, boost=3.0)
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.3,
+        complexity_penalty=0.05,
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=15,
+    )
     f.__name__ = f"brown(k={k})"
     return f
 
 
 def holt(k: int = 1):
-    """Charles Holt's trend-following via differencing + EMA (1957)."""
-    f = conjugate(ema(alpha=0.1, k=k), difference(), k=k)
+    """Holt's policy: expect trends.
+
+    After Charles Holt (1957). Prior favoring differencing-based models
+    that capture trends. Moderate complexity penalty. Best when the
+    series has persistent drift or momentum.
+    """
+    candidates, depths = _build_candidates(k)
+    # Boost differencing models (indices 5-8: diff+leaf and diff+EMA variants)
+    prior = _prior_favoring_indices(len(candidates), favored={5, 6, 7, 8}, boost=3.0)
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.5,
+        complexity_penalty=0.02,
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=15,
+    )
     f.__name__ = f"holt(k={k})"
     return f
 
 
 def hosking(k: int = 1):
-    """Jonathan Hosking's fractional differencing + EMA (1981)."""
-    f = conjugate(ema(alpha=0.1, k=k), fractional_difference(d=0.3, window=30), k=k)
+    """Hosking's policy: expect long memory.
+
+    After Jonathan Hosking (1981). Prior favoring fractional differencing
+    models that capture long-range dependence. Tolerates depth-2
+    complexity. Best for series with slowly decaying autocorrelation.
+    """
+    candidates, depths = _build_candidates(k)
+    # Boost fractional diff models (last 2 candidates)
+    n = len(candidates)
+    prior = _prior_favoring_indices(n, favored={n - 2, n - 1}, boost=3.0)
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.5,
+        complexity_penalty=0.01,
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=15,
+    )
     f.__name__ = f"hosking(k={k})"
     return f
 
 
-def gauss(k: int = 1):
-    """Carl Friedrich Gauss — standardize then predict in z-score space."""
-    f = conjugate(ema(alpha=0.1, k=k), standardize(), k=k)
-    f.__name__ = f"gauss(k={k})"
-    return f
-
-
 def laplace(k: int = 1):
-    """Pierre-Simon Laplace — Bayesian ensemble, lets the data decide."""
-    f = skater(k=k, aggressiveness=0.5)
+    """Laplace's policy: maximum ignorance.
+
+    After Pierre-Simon Laplace. Uniform prior — no preference for any
+    model class. Pure Bayesian updating. Learning rate close to 1 for
+    fast convergence. Minimal complexity penalty. Let the data speak.
+    """
+    candidates, depths = _build_candidates(k)
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.8,
+        complexity_penalty=0.005,
+        depths=depths,
+        max_components=20,
+    )
     f.__name__ = f"laplace(k={k})"
     return f
 
 
-# ---------------------------------------------------------------------------
-# Speed-named aliases (backward compatibility)
-# ---------------------------------------------------------------------------
+def wald(k: int = 1):
+    """Wald's policy: minimax caution.
 
-def rapidly(k: int = 1):
-    """EMA with alpha=0.3 — reacts fast to changes."""
-    return ema(alpha=0.3, k=k)
-
-
-def quickly(k: int = 1):
-    """EMA with alpha=0.1 — moderate reactivity."""
-    return ema(alpha=0.1, k=k)
-
-
-def slowly(k: int = 1):
-    """EMA with alpha=0.05 — smooth, slow-moving."""
-    return ema(alpha=0.05, k=k)
-
-
-def sluggishly(k: int = 1):
-    """EMA with alpha=0.01 — very slow adaptation."""
-    return ema(alpha=0.01, k=k)
-
-
-def ensemble(k: int = 1):
-    """Precision-weighted ensemble of EMA models at different speeds."""
-    return precision_weighted_ensemble(
-        skaters=[rapidly(k), quickly(k), slowly(k), sluggishly(k)],
-        k=k,
+    After Abraham Wald. Very conservative — high complexity penalty,
+    low learning rate. Slow to commit to any model, resistant to being
+    fooled by short-term patterns. Best in adversarial or highly
+    non-stationary environments.
+    """
+    candidates, depths = _build_candidates(k)
+    prior = _prior_favoring_depths(depths, favored={0}, boost=2.0)
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.15,
+        complexity_penalty=0.08,
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=10,
     )
+    f.__name__ = f"wald(k={k})"
+    return f

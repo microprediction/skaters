@@ -31,6 +31,7 @@ def bayesian_ensemble(
     learning_rate: float = 0.5,
     complexity_penalty: float = 0.0,
     depths: list[int] | None = None,
+    prior_log_weights: list[float] | None = None,
     max_components: int = 20,
 ):
     """Create a Bayesian model-averaging ensemble.
@@ -46,6 +47,9 @@ def bayesian_ensemble(
             models more aggressively.
         depths: optional list of model depths (one per skater). If not
             provided, all depths are assumed 0 (no penalty).
+        prior_log_weights: optional initial log-weights for each model.
+            Expresses a prior belief about which models are more likely
+            to be useful. None = uniform prior (all zeros).
         max_components: prune the combined Dist to this many components
             to prevent unbounded growth.
 
@@ -59,6 +63,8 @@ def bayesian_ensemble(
 
     if depths is None:
         depths = [0] * n
+    if prior_log_weights is None:
+        prior_log_weights = [0.0] * n
 
     def _skater(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
@@ -67,7 +73,7 @@ def bayesian_ensemble(
                 # Per-model, per-horizon: queued Dist predictions awaiting resolution
                 "queues": [[deque() for _ in range(k)] for _ in range(n)],
                 # Per-model, per-horizon: cumulative log-weight
-                "log_w": [[0.0] * k for _ in range(n)],
+                "log_w": [[prior_log_weights[i]] * k for i in range(n)],
                 "n_obs": 0,
             }
 
