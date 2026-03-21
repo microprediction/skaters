@@ -24,11 +24,11 @@ for y in observations:
     dists[0].cdf(y)            # CDF at y
 ```
 
-Every skater returns `list[Dist]` -- a Gaussian mixture for each horizon. Point forecasts, uncertainty, density evaluation, and quantiles are all part of the same object.
+Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
 ## Named search policies
 
-Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** -- different priors, learning rates, and complexity penalties -- not different models.
+Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models.
 
 ```python
 from skaters import brown, holt, hosking, laplace, wald
@@ -36,13 +36,13 @@ from skaters import brown, holt, hosking, laplace, wald
 f = brown(k=1)     # trust simplicity
 f = holt(k=1)      # expect trends
 f = hosking(k=1)   # expect long memory
-f = laplace(k=1)   # maximum ignorance -- let the data decide
+f = laplace(k=1)   # maximum ignorance — let the data decide
 f = wald(k=1)      # minimax caution
 ```
 
-| Policy | Prior | Learning rate | Complexity penalty | Philosophy |
-|--------|-------|---------------|-------------------|------------|
-| `brown` | Favors depth 0-1 | Low | High | Simplicity until proven otherwise |
+| Policy | Prior | Learning rate $\eta$ | Complexity penalty $\lambda$ | Philosophy |
+|--------|-------|---------------------|----------------------------|------------|
+| `brown` | Favors depth 0–1 | Low | High | Simplicity until proven otherwise |
 | `holt` | Favors differencing | Moderate | Moderate | Trends are likely |
 | `hosking` | Favors frac diff | Moderate | Low | Long memory is likely |
 | `laplace` | Uniform | High | Minimal | No opinion, let data speak |
@@ -59,24 +59,23 @@ f = skater(k=3, aggressiveness=0.1)  # conservative
 
 ## Architecture
 
-Everything is transforms all the way down, with a distributional leaf at the bottom.
+Everything is transforms all the way down, with a distributional leaf at the bottom:
 
-```
-observation
-  -> Transform (diff, frac, standardize, ema_transform)
-    -> Transform (...)
-      -> leaf()  <- estimates N(0, sigma) from residuals via Welford's
-```
+$$y \;\xrightarrow{T_1}\; y' \;\xrightarrow{T_2}\; y'' \;\xrightarrow{\cdots}\; \text{leaf} \;\rightarrow\; \hat{D}$$
 
-Every node returns `list[Dist]`. There is no separate "point forecast" vs "uncertainty" -- both are aspects of the same `Dist`.
+The leaf estimates $\hat{D} = \mathcal{N}(0, \hat\sigma^2)$ from residuals via Welford's algorithm. The prediction in the original space is obtained by inverting the transform chain:
+
+$$\hat{D}_{\text{original}} = T_1^{-1}\bigl(T_2^{-1}\bigl(\cdots\bigl(\hat{D}\bigr)\bigr)\bigr)$$
+
+Every node returns `list[Dist]`. There is no separate "point forecast" vs "uncertainty" — both are aspects of the same $\hat{D}$.
 
 ### The key insight
 
-Every "model" is really a transform. An EMA doesn't "predict" -- it subtracts a running level, leaving simpler residuals. The prediction comes from inverting the transform chain applied to the leaf's distributional estimate.
+Every "model" is really a transform. An EMA doesn't "predict" — it subtracts a running level $\ell_t$, leaving simpler residuals $\varepsilon_t = y_t - \ell_t$. The prediction comes from inverting the transform chain applied to the leaf's distributional estimate.
 
 ## The Dist type
 
-A weighted Gaussian mixture. Pure Python (`math.erf`, `math.exp`).
+A weighted mixture of Gaussians $\sum_{i} w_i \,\mathcal{N}(\mu_i, \sigma_i^2)$. Pure Python (`math.erf`, `math.exp`).
 
 ```python
 from skaters import Dist
@@ -93,8 +92,8 @@ d.quantile(0.975)       # inverse CDF
 mix = Dist.combine([d1, d2, d3], weights=[0.5, 0.3, 0.2])
 
 # Propagate through transform inverses
-d.shift(10.0)           # translate
-d.scale(2.0)            # scale location and spread
+d.shift(10.0)           # translate: mu -> mu + 10
+d.scale(2.0)            # scale: mu -> 2*mu, sigma -> 2*sigma
 d.affine(2.0, 3.0)      # x -> 2x + 3
 
 # Bound component growth
@@ -103,18 +102,22 @@ d.prune(max_components=10)
 
 ## Transforms
 
-Online bijective maps with `forward` (scalar) and `inverse_k` (Dist-aware).
+Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inverse_k` that propagates $\text{Dist}$ objects back through the inverse.
 
 | Transform | Forward | Inverse | Use case |
 |-----------|---------|---------|----------|
-| `ema_transform(a)` | Subtract running level | Shift Dist by level | Remove level |
-| `difference()` | y - y\_{t-1} | Cumulative sum with growing variance | Remove trend |
-| `fractional_difference(d)` | (1-B)^d filter | Invert filter | Remove long memory |
-| `standardize(a)` | (y - mu) / sigma | Affine: sigma * x + mu | Remove scale |
+| `ema_transform(`$\alpha$`)` | $y'_t = y_t - \ell_t$ | $D \mapsto D + \ell_t$ | Remove level |
+| `difference()` | $y'_t = y_t - y_{t-1}$ | Cumsum with $\text{Var}$ growing as $\sum \sigma_h^2$ | Remove trend |
+| `fractional_difference(`$d$`)` | $y'_t = (1-B)^d \, y_t$ | Apply $(1-B)^{-d}$ | Remove long memory |
+| `standardize(`$\alpha$`)` | $y'_t = (y_t - \hat\mu_t) / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D + \hat\mu_t$ | Remove scale |
 
 ## Conjugation
 
-Transforms compose via conjugation. The pipe `|` reads left-to-right (outermost transform first):
+Transforms compose via conjugation. Given a transform $T$ and a skater $f$:
+
+$$f_{\text{conjugated}}(y) = T^{-1}\!\bigl(f\bigl(T(y)\bigr)\bigr)$$
+
+The pipe `|` notation reads left-to-right (outermost transform first):
 
 ```python
 from skaters import conjugate, ema, difference, standardize
@@ -128,11 +131,14 @@ f = conjugate(
     standardize(),
     k=3,
 )
+# canonical name: std|diff|ema_t|leaf
 ```
 
 ## Ensembles
 
 ### Precision-weighted (MSE)
+
+Weights by $w_i \propto 1/\text{MSE}_i$ where $\text{MSE} = \text{bias}^2 + \text{variance}$.
 
 ```python
 from skaters import precision_weighted_ensemble, ema
@@ -143,7 +149,13 @@ f = precision_weighted_ensemble([
 ], k=1)
 ```
 
-### Bayesian (log-likelihood with XGBoost-inspired regularization)
+### Bayesian (log-likelihood, XGBoost-inspired regularization)
+
+Each model $i$ accumulates a log-weight updated at every observation:
+
+$$\log w_i \;\mathrel{+}=\; \eta \cdot \log p_i(y_t) \;-\; \lambda \cdot d_i$$
+
+where $\eta$ is the learning rate (shrinkage), $\lambda$ is the complexity penalty, and $d_i$ is the model's depth. Predictions are combined via $\text{Dist.combine}$ with softmax weights.
 
 ```python
 from skaters import bayesian_ensemble, ema
@@ -151,13 +163,15 @@ from skaters import bayesian_ensemble, ema
 f = bayesian_ensemble(
     [ema(alpha=0.05, k=1), ema(alpha=0.2, k=1)],
     k=1,
-    learning_rate=0.5,       # shrinkage: prevents over-concentrating
-    complexity_penalty=0.02, # penalizes deeper transform chains
-    depths=[1, 1],           # declared depth of each model
+    learning_rate=0.5,       # eta: prevents over-concentrating
+    complexity_penalty=0.02, # lambda: penalizes deeper chains
+    depths=[1, 1],
 )
 ```
 
 ### Adaptive search (beam search over transform grammar)
+
+Grows the candidate population online: expand top performers with new transforms, replay recent history to warm-start, prune losers.
 
 ```python
 from skaters import search
@@ -170,8 +184,6 @@ f = search(
     max_pool=30,          # cap active candidates
 )
 ```
-
-The search starts with simple models, expands winners by conjugating with new transforms, and prunes losers. New candidates are replayed through recent history so they compete immediately.
 
 ## Spec system
 
@@ -196,6 +208,8 @@ f = build(from_json(j))  # live skater
 
 ## Writing a custom transform
 
+Any $(T, T^{-1})$ pair where `forward` is scalar and `inverse_k` maps `list[Dist]`:
+
 ```python
 def my_transform():
     def forward(y, state):
@@ -212,11 +226,11 @@ def my_transform():
 
 ## Design
 
-- **Online only** -- O(1) per observation, no batch recomputation
-- **Distributional** -- every prediction is a `Dist`, not a point estimate
-- **Composable** -- transforms chain, ensembles nest, everything returns `Dist`
-- **Pure Python** -- zero dependencies, only `math.erf` and `math.exp`
-- **Pyodide compatible** -- runs in the browser via WebAssembly
+- **Online only** — $O(1)$ per observation, no batch recomputation
+- **Distributional** — every prediction is a $\text{Dist}$, not a point estimate
+- **Composable** — transforms chain, ensembles nest, everything returns $\text{Dist}$
+- **Pure Python** — zero dependencies, only `math.erf` and `math.exp`
+- **Pyodide compatible** — works in the browser via WebAssembly
 
 ## Lineage
 
