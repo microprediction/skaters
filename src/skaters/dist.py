@@ -192,9 +192,13 @@ class Dist:
 # ---------------------------------------------------------------------------
 
 def _gaussian_pdf(x: float, mean: float, std: float) -> float:
+    if std <= 0:
+        return float("inf") if x == mean else 0.0
     z = (x - mean) / std
     return math.exp(-0.5 * z * z) / (std * _SQRT2PI)
 
 
 def _gaussian_cdf(x: float, mean: float, std: float) -> float:
+    if std <= 0:
+        return 1.0 if x >= mean else 0.0
     return 0.5 * (1.0 + math.erf((x - mean) / (std * _SQRT2)))
