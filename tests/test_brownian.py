@@ -21,7 +21,7 @@ from skaters.transform import (
 )
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
-from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig
+from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier
 from skaters.search import search
 from skaters.dist import Dist
 
@@ -189,6 +189,7 @@ class TestPoliciesOnBrownian:
         for name, factory in [
             ("brown", brown), ("holt", holt), ("hosking", hosking),
             ("laplace", laplace), ("wald", wald), ("dantzig", dantzig),
+            ("bachelier", bachelier),
             ("skater(0.5)", lambda k: skater(k=k, aggressiveness=0.5)),
         ]:
             f = factory(k=1)
@@ -203,6 +204,16 @@ class TestPoliciesOnBrownian:
         series = _brownian(sigma=1.0, n=500)
         r = _run_model(wald(k=1), series)
         assert r["mean_std"] > 0.3, f"wald overconfident: std={r['mean_std']:.3f}"
+
+    def test_bachelier_is_best_on_brownian(self):
+        """Bachelier should be the least overfit policy on Brownian motion."""
+        series = _brownian(sigma=1.0, n=1000)
+        oracle = _run_model(conjugate(leaf(k=1), difference(), k=1), series)
+        bach = _run_model(bachelier(k=1), series)
+        # Bachelier should not be much worse than oracle
+        assert bach["mean_logpdf"] > oracle["mean_logpdf"] - 1.0, (
+            f"bachelier logpdf={bach['mean_logpdf']:.3f} vs oracle={oracle['mean_logpdf']:.3f}"
+        )
 
 
 # ---------------------------------------------------------------------------

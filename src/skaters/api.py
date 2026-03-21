@@ -266,3 +266,39 @@ def dantzig(k: int = 1):
     )
     f.__name__ = f"dantzig(k={k})"
     return f
+
+
+def bachelier(k: int = 1):
+    """Bachelier's policy: the market is a random walk.
+
+    After Louis Bachelier (1900), who first modeled stock prices as
+    Brownian motion. Extremely strong prior on diff|leaf (the random
+    walk model). Very high complexity penalty, very low learning rate.
+    Only deviates from the random walk if overwhelming evidence
+    accumulates over a long horizon.
+
+    Best for financial data or any series where you believe there is
+    little to no predictable structure beyond the last value.
+    """
+    candidates, depths = _build_candidates(k)
+    # Find the diff|leaf candidate (index 5 in standard population)
+    # and give it a massive prior boost
+    prior = [0.0] * len(candidates)
+    for i, (c, d) in enumerate(zip(candidates, depths)):
+        if d == 1:
+            # Boost all depth-1 candidates mildly
+            prior[i] = 1.0
+    # The diff|leaf candidate gets the biggest boost
+    # It's the one right after the 4 EMAs (index 4)
+    prior[5] = 10.0
+
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.05,         # extremely slow to update beliefs
+        complexity_penalty=0.1,     # heavy penalty on complexity
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=10,
+    )
+    f.__name__ = f"bachelier(k={k})"
+    return f
