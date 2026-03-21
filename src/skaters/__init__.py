@@ -5,6 +5,8 @@ from skaters.ema import ema
 from skaters.envelope import envelope
 from skaters.calibrated import calibrated_envelope
 from skaters.ensemble import precision_weighted_ensemble
+from skaters.conjugate import conjugate
+from skaters.transform import difference, fractional_difference, standardize
 from skaters.api import (
     quickly, slowly, sluggishly, rapidly,
     ensemble, ensemble_with_envelope, ensemble_calibrated,
@@ -16,6 +18,10 @@ __all__ = [
     "envelope",
     "calibrated_envelope",
     "precision_weighted_ensemble",
+    "conjugate",
+    "difference",
+    "fractional_difference",
+    "standardize",
     "quickly",
     "slowly",
     "sluggishly",
