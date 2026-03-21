@@ -39,16 +39,18 @@ from skaters.periodicity import period_detector, top_periods
 
 # The grammar: available transforms for expansion
 # Each entry: (name, factory, cost_per_obs)
-# Cost is relative: 1 = O(1) arithmetic, higher = more work
+# Cost is empirically measured relative to leaf (~0.5μs/obs):
+#   1 = ~1μs/obs (ema, diff, std, garch, pow, seas)
+#   3 = ~3μs/obs (frac diff w=30)
 TRANSFORMS = [
     ("ema_t(0.05)", lambda: ema_transform(0.05), 1),
     ("ema_t(0.1)", lambda: ema_transform(0.1), 1),
     ("ema_t(0.3)", lambda: ema_transform(0.3), 1),
     ("diff", lambda: difference(), 1),
-    ("std(0.05)", lambda: standardize(0.05), 2),
-    ("frac(0.3)", lambda: fractional_difference(0.3, 30), 30),
-    ("garch", lambda: garch(), 2),
-    ("pow(0.5)", lambda: power_transform(0.5), 3),
+    ("std(0.05)", lambda: standardize(0.05), 1),
+    ("frac(0.3)", lambda: fractional_difference(0.3, 30), 3),
+    ("garch", lambda: garch(), 1),
+    ("pow(0.5)", lambda: power_transform(0.5), 1),
 ]
 
 
