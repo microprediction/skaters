@@ -1,0 +1,23 @@
+[project]
+name = "skaters"
+version = "0.1.0"
+description = "Fast univariate time series models that run in Pyodide"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Peter Cotton", email = "peter.cotton@microprediction.com" }
+]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[build-system]
+requires = ["uv_build>=0.10.12,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
