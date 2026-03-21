@@ -6,6 +6,9 @@ coverage — what fraction of resolved errors fall within ±1σ. The
 candidate whose coverage is closest to the target (default 68.27% for
 a Gaussian 1σ band) gets the most weight.
 
+Everything is online: the coverage itself is tracked with an EMA so
+it adapts to regime changes rather than averaging over all history.
+
 The skater only runs once per observation. The overhead is proportional
 to the number of candidates, not the number of observations.
 """
@@ -22,12 +25,16 @@ DEFAULT_DECAYS = [None, 0.995, 0.99, 0.95, 0.9, 0.8]
 # 1σ Gaussian coverage
 GAUSSIAN_1SIGMA = 0.6827
 
+# Decay rate for the coverage EMA itself
+COVERAGE_DECAY = 0.99
+
 
 def calibrated_envelope(
     skater,
     k: int = 1,
     target: float = GAUSSIAN_1SIGMA,
     decays: list[float | None] | None = None,
+    coverage_decay: float = COVERAGE_DECAY,
 ):
     """Wrap a skater with a self-calibrating envelope.
 
@@ -36,11 +43,13 @@ def calibrated_envelope(
         k: forecast horizon
         target: desired fraction of errors within ±1σ (default 68.27%)
         decays: candidate decay rates to try. None entries use Welford's.
+        coverage_decay: EMA decay for the coverage tracker (0 < d < 1).
+            Controls how fast the calibration adapts. Smaller = faster
+            forgetting of old coverage history.
 
     Returns:
         A callable: (y, state) -> (x_dict, state) where x_dict contains
-        "mean", "std", and "coverage" (current empirical coverage of the
-        selected blend).
+        "mean" and "std".
     """
     if decays is None:
         decays = list(DEFAULT_DECAYS)
@@ -60,9 +69,13 @@ def calibrated_envelope(
                     if d is not None else None
                     for d in decays
                 ],
-                # Per-candidate, per-horizon: coverage tracking
-                "hits": [[0 for _ in range(k)] for _ in range(n_cand)],
-                "total": [[0 for _ in range(k)] for _ in range(n_cand)],
+                # Per-candidate, per-horizon: online coverage EMA
+                # Each is {"value": float, "n": int} where value is the
+                # exponentially weighted running mean of the hit indicator.
+                "coverage": [
+                    [{"value": target, "n": 0} for _ in range(k)]
+                    for _ in range(n_cand)
+                ],
             }
 
         # Run the skater once
@@ -86,11 +99,18 @@ def calibrated_envelope(
                             state["welford"][c][h], error
                         )
 
-                    # Update coverage: was |error| within ±1σ?
+                    # Update coverage EMA: was |error| within ±1σ?
                     if math.isfinite(std_at_pred) and std_at_pred > 0:
-                        state["total"][c][h] += 1
-                        if abs(error) <= std_at_pred:
-                            state["hits"][c][h] += 1
+                        hit = 1.0 if abs(error) <= std_at_pred else 0.0
+                        cov = state["coverage"][c][h]
+                        cov["n"] += 1
+                        if cov["n"] == 1:
+                            cov["value"] = hit
+                        else:
+                            cov["value"] = (
+                                coverage_decay * cov["value"]
+                                + (1 - coverage_decay) * hit
+                            )
 
         # Compute current std for each candidate
         cand_stds = []
@@ -112,15 +132,13 @@ def calibrated_envelope(
         for h in range(k):
             weights = []
             for c in range(n_cand):
-                total = state["total"][c][h]
-                if total < 2 or not math.isfinite(cand_stds[c][h]):
+                cov = state["coverage"][c][h]
+                if cov["n"] < 2 or not math.isfinite(cand_stds[c][h]):
                     weights.append(1.0)  # equal weight during burn-in
                 else:
-                    coverage = state["hits"][c][h] / total
-                    gap = abs(coverage - target) + 1e-4
+                    gap = abs(cov["value"] - target) + 1e-4
                     weights.append(1.0 / gap)
 
-            w_total = sum(weights)
             s = sum(
                 w * cand_stds[c][h]
                 for c, w in enumerate(weights)
