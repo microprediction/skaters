@@ -154,9 +154,14 @@ class Dist:
             wi, mi, si = comps[best_i]
             wj, mj, sj = comps[best_j]
             w_new = wi + wj
-            m_new = (wi * mi + wj * mj) / w_new
-            v_new = (wi * (si * si + mi * mi) + wj * (sj * sj + mj * mj)) / w_new - m_new * m_new
-            s_new = math.sqrt(max(v_new, 0.0))
+            if w_new < 1e-300:
+                # Both weights are effectively zero — just average
+                m_new = 0.5 * (mi + mj)
+                s_new = max(si, sj, 1e-12)
+            else:
+                m_new = (wi * mi + wj * mj) / w_new
+                v_new = (wi * (si * si + mi * mi) + wj * (sj * sj + mj * mj)) / w_new - m_new * m_new
+                s_new = math.sqrt(max(v_new, 0.0))
             comps[best_i] = (w_new, m_new, s_new)
             comps.pop(best_j)
         return Dist(comps)

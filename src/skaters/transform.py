@@ -275,20 +275,29 @@ def seasonal_difference(period: int = 12):
         return y_prime, state
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        """Inverse: y_{t+h} = Delta_{t+h} + y_{t+h-s}.
+
+        For h < s, the anchor y_{t+h-s} is in the buffer.
+        For h >= s, the anchor is a previously recovered value.
+        """
         buf = list(state["buffer"])
+        recovered_means = []
         result = []
-        for h, d in enumerate(dists):
-            # The anchor for horizon h is y_{t-s+h+1}
-            # which is buf[-(period - h - 1)] if available
-            idx = len(buf) - period + h + 1
-            if 0 <= idx < len(buf):
-                anchor = buf[idx]
-            elif idx >= len(buf) and result:
-                # Use a previously recovered mean
-                anchor = result[idx - len(buf)].mean
+        for h in range(len(dists)):
+            lag_idx = h - period  # relative to "future" start
+            if lag_idx < 0:
+                # Anchor is in the buffer: y_{t+h+1-s} = buf[len(buf) - s + h + 1 - 1]
+                buf_idx = len(buf) - period + h
+                if 0 <= buf_idx < len(buf):
+                    anchor = buf[buf_idx]
+                else:
+                    anchor = 0.0
             else:
-                anchor = 0.0
-            result.append(d.shift(anchor))
+                # Anchor is a previously recovered value
+                anchor = recovered_means[lag_idx]
+            recovered_mean = dists[h].mean + anchor
+            recovered_means.append(recovered_mean)
+            result.append(dists[h].shift(anchor))
         return result
 
     return forward, inverse_k
