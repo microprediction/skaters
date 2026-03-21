@@ -21,7 +21,7 @@ from skaters.transform import (
 )
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
-from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson
+from skaters.api import skater, holt, hosking, laplace, wald, dantzig, samuelson
 from skaters.search import search
 from skaters.dist import Dist
 
@@ -74,19 +74,19 @@ def _run_model(f, series, burn=100):
 # Bachelier should be near-optimal on Brownian motion
 # ---------------------------------------------------------------------------
 
-class TestBachelierOnBrownian:
+class TestWaldOnBrownian:
 
-    def test_bachelier_near_optimal(self):
-        """Bachelier (heavy prior on diff|leaf) should estimate sigma correctly."""
+    def test_wald_near_optimal(self):
+        """Wald (conservative) should estimate sigma correctly on Brownian."""
         series = _brownian(sigma=1.0)
-        r = _run_model(bachelier(k=1), series)
+        r = _run_model(wald(k=1), series)
         assert 0.5 < r["mae"] < 1.2, f"MAE={r['mae']:.3f}"
         assert 0.5 < r["mean_std"] < 2.0, f"std={r['mean_std']:.3f}"
 
-    def test_bachelier_logpdf_near_true(self):
-        """Bachelier should achieve logpdf close to the true model."""
+    def test_wald_logpdf_near_true(self):
+        """Wald should achieve logpdf close to the true model on Brownian."""
         series = _brownian(sigma=1.0)
-        r = _run_model(bachelier(k=1), series)
+        r = _run_model(wald(k=1), series)
         true_logpdf = -0.5 * math.log(2 * math.pi) - 0.5
         assert r["mean_logpdf"] > true_logpdf - 0.5, (
             f"logpdf={r['mean_logpdf']:.3f}, true≈{true_logpdf:.3f}"
@@ -114,10 +114,10 @@ ALL_SINGLE_TRANSFORMS = [
 
 class TestNoOverfitOnBrownian:
 
-    def test_no_transform_beats_bachelier_by_much(self):
-        """No single transform should significantly beat bachelier on Brownian."""
+    def test_no_transform_beats_wald_by_much(self):
+        """No single transform should significantly beat wald on Brownian."""
         series = _brownian(sigma=1.0, n=2000)
-        baseline = _run_model(bachelier(k=1), series)
+        baseline = _run_model(wald(k=1), series)
 
         for name, f in ALL_SINGLE_TRANSFORMS:
             r = _run_model(f, series)
@@ -182,9 +182,8 @@ class TestPoliciesOnBrownian:
         """Every policy should run without crashing on Brownian motion."""
         series = _brownian(sigma=1.0, n=500)
         for name, factory in [
-            ("brown", brown), ("holt", holt), ("hosking", hosking),
+            ("holt", holt), ("hosking", hosking),
             ("laplace", laplace), ("wald", wald), ("dantzig", dantzig),
-            ("bachelier", bachelier),
             ("samuelson", samuelson),
             ("skater(0.5)", lambda k: skater(k=k, aggressiveness=0.5)),
         ]:
@@ -211,14 +210,12 @@ class TestPoliciesOnBrownian:
         assert math.isfinite(r["mean_logpdf"])
         assert r["mean_std"] > 0
 
-    def test_bachelier_is_best_on_brownian(self):
-        """Bachelier should be the best policy on pure Brownian motion."""
+    def test_wald_is_good_on_brownian(self):
+        """Wald (most conservative) should do well on pure Brownian."""
         series = _brownian(sigma=1.0, n=1000)
-        bach = _run_model(bachelier(k=1), series)
+        r = _run_model(wald(k=1), series)
         true_logpdf = -0.5 * math.log(2 * math.pi) - 0.5
-        assert bach["mean_logpdf"] > true_logpdf - 0.5, (
-            f"bachelier logpdf={bach['mean_logpdf']:.3f}, true≈{true_logpdf:.3f}"
-        )
+        assert r["mean_logpdf"] > true_logpdf - 0.5
 
 
 # ---------------------------------------------------------------------------

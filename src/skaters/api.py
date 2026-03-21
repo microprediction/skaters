@@ -182,27 +182,6 @@ def skater(k: int = 1, aggressiveness: float = 0.5):
 # rate, and complexity penalty — i.e., the search strategy.
 # ---------------------------------------------------------------------------
 
-def brown(k: int = 1):
-    """Brown's policy: trust simplicity.
-
-    After Robert G. Brown (1956). Strong prior on smooth, simple models
-    (depth 0-1). High complexity penalty. Slow to adapt. Best when you
-    believe the series is stationary or nearly so.
-    """
-    candidates, depths = _build_candidates(k)
-    prior = _prior_favoring_depths(depths, favored={0, 1}, boost=3.0)
-    f = bayesian_ensemble(
-        candidates, k=k,
-        learning_rate=0.3,
-        complexity_penalty=0.05,
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=15,
-    )
-    f.__name__ = f"brown(k={k})"
-    return f
-
-
 def holt(k: int = 1):
     """Holt's policy: expect trends.
 
@@ -310,42 +289,6 @@ def dantzig(k: int = 1):
     return f
 
 
-def bachelier(k: int = 1):
-    """Bachelier's policy: the market is a random walk.
-
-    After Louis Bachelier (1900), who first modeled stock prices as
-    Brownian motion. Extremely strong prior on diff|leaf (the random
-    walk model). Very high complexity penalty, very low learning rate.
-    Only deviates from the random walk if overwhelming evidence
-    accumulates over a long horizon.
-
-    Best for financial data or any series where you believe there is
-    little to no predictable structure beyond the last value.
-    """
-    candidates, depths = _build_candidates(k)
-    # Find the diff|leaf candidate (index 5 in standard population)
-    # and give it a massive prior boost
-    prior = [0.0] * len(candidates)
-    for i, (c, d) in enumerate(zip(candidates, depths)):
-        if d == 1:
-            # Boost all depth-1 candidates mildly
-            prior[i] = 1.0
-    # The diff|leaf candidate gets the biggest boost
-    # It's the one right after the 4 EMAs (index 4)
-    prior[5] = 10.0
-
-    f = bayesian_ensemble(
-        candidates, k=k,
-        learning_rate=0.05,         # extremely slow to update beliefs
-        complexity_penalty=0.1,     # heavy penalty on complexity
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=10,
-    )
-    f.__name__ = f"bachelier(k={k})"
-    return f
-
-
 def samuelson(k: int = 1):
     """Samuelson's policy: there's a drift, find it carefully.
 
@@ -387,43 +330,4 @@ def samuelson(k: int = 1):
     return f
 
 
-def yule(k: int = 1):
-    """Yule's policy: anchor to AR.
-
-    After G. Udny Yule (1927), who first applied autoregressive models
-    to time series (sunspot data). Strong prior on AR(1) and AR(2)
-    transforms, which capture mean reversion, persistence, and the
-    unit root (random walk) as special cases.
-
-    AR(1) nests the random walk (phi=1) and mean reversion (phi<1).
-    AR(2) adds oscillatory behavior. The online RLS estimates phi
-    from data. This policy gives AR the benefit of the doubt.
-
-    Best for series that might be mean-reverting or have short-range
-    autoregressive structure.
-    """
-    candidates, depths = _build_candidates(k)
-    n = len(candidates)
-    prior = [0.0] * n
-
-    # Strongly boost AR candidates (indices 10-11 in standard pool)
-    # and mildly boost diff|leaf (which AR(1) with phi=1 reproduces)
-    for i in range(n):
-        if i in (10, 11):
-            prior[i] = 6.0  # AR(1) and AR(2) get biggest boost
-        elif i == 5:
-            prior[i] = 3.0  # diff|leaf (the phi=1 special case)
-        elif depths[i] == 2:
-            prior[i] = 1.0  # mild boost for depth-2 (diff|ar etc)
-
-    f = bayesian_ensemble(
-        candidates, k=k,
-        learning_rate=0.5,
-        complexity_penalty=0.015,
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=15,
-    )
-    f.__name__ = f"yule(k={k})"
-    return f
 

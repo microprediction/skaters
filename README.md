@@ -31,28 +31,22 @@ Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horiz
 Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models.
 
 ```python
-from skaters import bachelier, samuelson, yule, brown, holt, hosking, laplace, wald, dantzig
+from skaters import holt, hosking, laplace, samuelson, wald, dantzig
 
-f = bachelier(k=1)  # it's a random walk until proven otherwise
-f = samuelson(k=1)  # there's a drift, find it carefully
-f = yule(k=1)       # anchor to AR(1) — captures mean reversion
-f = brown(k=1)      # trust simplicity
-f = holt(k=1)       # expect trends
-f = hosking(k=1)    # expect long memory
-f = laplace(k=1)    # maximum ignorance — let the data decide
-f = wald(k=1)       # minimax caution
-f = dantzig(k=1)    # optimize under compute constraints
+f = holt(k=1)       # expect trends (Holt 1957)
+f = hosking(k=1)    # expect long memory (Hosking 1981)
+f = laplace(k=1)    # no opinion — let the data decide
+f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
+f = wald(k=1)       # minimax caution (Wald)
+f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
 ```
 
 | Policy | After | Prior | $\eta$ | $\lambda$ | Best for |
 |--------|-------|-------|--------|-----------|----------|
-| `bachelier` | Bachelier 1900 | Random walk | 0.05 | 0.10 | Efficient markets, pure noise |
-| `samuelson` | Samuelson 1965 | Drift + Holt | 0.40 | 0.01 | Persistent drift (GDP, prices) |
-| `yule` | Yule 1927 | AR(1), AR(2) | 0.50 | 0.015 | Mean-reverting series |
-| `brown` | Brown 1956 | Depth 0–1 | 0.30 | 0.05 | Stationary series |
-| `holt` | Holt 1957 | Differencing | 0.50 | 0.02 | Trending data |
-| `hosking` | Hosking 1981 | Frac diff | 0.50 | 0.01 | Long memory |
+| `holt` | Holt 1957 | Differencing + Holt linear | 0.50 | 0.02 | Trending data |
+| `hosking` | Hosking 1981 | Fractional differencing | 0.50 | 0.01 | Long memory |
 | `laplace` | Laplace | Uniform | 0.80 | 0.005 | General purpose |
+| `samuelson` | Samuelson 1965 | Drift + Holt | 0.40 | 0.01 | Persistent drift (GDP, prices) |
 | `wald` | Wald | Depth 0 | 0.15 | 0.08 | Adversarial, non-stationary |
 | `dantzig` | Dantzig 1947 | Adaptive search | 0.50 | 0.02 | Compute-constrained |
 

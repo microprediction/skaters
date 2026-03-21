@@ -18,7 +18,7 @@ from skaters.ema import ema
 from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 from skaters.transform import difference, ar, drift, holt_linear, ema_transform
-from skaters.api import bachelier, samuelson, yule, brown, holt, laplace, skater
+from skaters.api import samuelson, holt, laplace, wald, skater
 from skaters.dist import Dist
 
 
@@ -71,10 +71,10 @@ class TestConstantPlusCorrelatedNoise:
         # AR should have better logpdf (exploits noise correlation)
         assert r_ar["mean_logpdf"] > r_ema["mean_logpdf"] - 0.1
 
-    def test_yule_does_well(self):
-        """Yule (AR prior) should handle correlated noise well."""
+    def test_laplace_handles_correlated_noise(self):
+        """Laplace should handle correlated noise well."""
         series = self._series(rho=0.8)
-        r = _run_model(yule(k=1), series)
+        r = _run_model(laplace(k=1), series)
         assert math.isfinite(r["mean_logpdf"])
         assert r["mae"] < 2.0
 
@@ -110,11 +110,9 @@ class TestRandomWalkPlusCorrelatedNoise:
         """Every policy should handle this without crashing."""
         series = self._series()
         for name, factory in [
-            ("bachelier", bachelier),
-            ("yule", yule),
             ("samuelson", samuelson),
             ("laplace", laplace),
-            ("brown", brown),
+            ("wald", wald),
         ]:
             f = factory(k=1)
             state = None
@@ -140,7 +138,7 @@ class TestRandomWalkPlusCorrelatedNoise:
         for name, f in [
             ("diff|leaf", conjugate(leaf(k=1), difference(), k=1)),
             ("diff|ar(1)|leaf", conjugate(conjugate(leaf(k=1), ar(1), k=1), difference(), k=1)),
-            ("yule", yule(k=1)),
+            ("laplace", laplace(k=1)),
         ]:
             r = _run_model(f, series)
             # Std should be reasonable — not collapsed
