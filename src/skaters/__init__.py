@@ -19,6 +19,7 @@ from skaters.transform import (
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
 from skaters.portfolio import portfolio
+from skaters.cov_ensemble import cov_ensemble
 from skaters.api import skater, brown, holt, hosking, laplace, wald, dantzig, bachelier, samuelson, yule, markowitz
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -43,6 +44,7 @@ __all__ = [
     "yule",
     "markowitz",
     "portfolio",
+    "cov_ensemble",
     "period_detector",
     "top_periods",
     # Building blocks
