@@ -2,7 +2,7 @@
 
 import math
 import random
-from skaters.cov_ensemble import cov_ensemble, _hrp_from_corr
+from skaters.hrp_ensemble import hrp_ensemble, _hrp_from_corr
 from skaters.ema import ema
 from skaters.conjugate import conjugate
 from skaters.leaf import leaf
@@ -11,7 +11,7 @@ from skaters.dist import Dist
 
 
 def test_returns_dist():
-    f = cov_ensemble([ema(alpha=0.1, k=1), ema(alpha=0.3, k=1)], k=1)
+    f = hrp_ensemble([ema(alpha=0.1, k=1), ema(alpha=0.3, k=1)], k=1)
     state = None
     random.seed(42)
     for _ in range(50):
@@ -21,7 +21,7 @@ def test_returns_dist():
 
 
 def test_multistep():
-    f = cov_ensemble([ema(alpha=0.1, k=3), ema(alpha=0.3, k=3)], k=3)
+    f = hrp_ensemble([ema(alpha=0.1, k=3), ema(alpha=0.3, k=3)], k=3)
     state = None
     random.seed(42)
     for _ in range(50):
@@ -30,7 +30,7 @@ def test_multistep():
 
 
 def test_weights_update():
-    f = cov_ensemble(
+    f = hrp_ensemble(
         [ema(alpha=0.1, k=1), ema(alpha=0.3, k=1),
          conjugate(leaf(k=1), difference(), k=1)],
         k=1,
@@ -47,7 +47,7 @@ def test_weights_update():
 def test_correlated_models_share_weight():
     """Two identical models should share weight, leaving room for a different one."""
     # Two identical EMAs + one diff model
-    f = cov_ensemble(
+    f = hrp_ensemble(
         [ema(alpha=0.1, k=1), ema(alpha=0.1, k=1),
          conjugate(leaf(k=1), difference(), k=1)],
         k=1,
@@ -64,7 +64,7 @@ def test_correlated_models_share_weight():
 
 
 def test_single_model():
-    f = cov_ensemble([ema(alpha=0.1, k=1)], k=1)
+    f = hrp_ensemble([ema(alpha=0.1, k=1)], k=1)
     state = None
     random.seed(42)
     for _ in range(50):
@@ -73,7 +73,7 @@ def test_single_model():
 
 
 def test_on_trending():
-    f = cov_ensemble(
+    f = hrp_ensemble(
         [ema(alpha=0.1, k=1), conjugate(leaf(k=1), drift(), k=1)],
         k=1,
     )
@@ -106,7 +106,7 @@ def test_hrp_favors_uncorrelated():
 
 
 def test_long_run_stable():
-    f = cov_ensemble(
+    f = hrp_ensemble(
         [ema(alpha=0.05, k=1), ema(alpha=0.2, k=1)], k=1
     )
     state = None

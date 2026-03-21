@@ -21,7 +21,7 @@ from skaters.dist import Dist
 from skaters.cov.shrinkage import ledoit_wolf_cov
 
 
-def cov_ensemble(
+def hrp_ensemble(
     skaters: list,
     k: int = 1,
     alpha: float = 0.02,
@@ -102,7 +102,7 @@ def cov_ensemble(
 
         return combined, state
 
-    _skater.__name__ = f"cov_ensemble(n={n}, k={k})"
+    _skater.__name__ = f"hrp_ensemble(n={n}, k={k})"
     return _skater
 
 
