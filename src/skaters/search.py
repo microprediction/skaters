@@ -30,7 +30,10 @@ from collections import deque
 from skaters.dist import Dist
 from skaters.leaf import leaf
 from skaters.conjugate import conjugate
-from skaters.transform import difference, fractional_difference, standardize, ema_transform
+from skaters.transform import (
+    difference, fractional_difference, standardize, ema_transform,
+    garch, seasonal_difference, power_transform,
+)
 
 
 # The grammar: available transforms for expansion
@@ -41,6 +44,8 @@ TRANSFORMS = [
     ("diff", lambda: difference()),
     ("std(0.05)", lambda: standardize(0.05)),
     ("frac(0.3)", lambda: fractional_difference(0.3, 30)),
+    ("garch", lambda: garch()),
+    ("pow(0.5)", lambda: power_transform(0.5)),
 ]
 
 

@@ -12,7 +12,10 @@ from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
 from skaters.conjugate import conjugate
-from skaters.transform import difference, fractional_difference, standardize, ema_transform
+from skaters.transform import (
+    difference, fractional_difference, standardize, ema_transform,
+    garch, seasonal_difference, power_transform,
+)
 from skaters.search import search
 from skaters.api import skater, brown, holt, hosking, laplace, wald
 from skaters.spec import (
@@ -40,6 +43,9 @@ __all__ = [
     "fractional_difference",
     "standardize",
     "ema_transform",
+    "garch",
+    "seasonal_difference",
+    "power_transform",
     # Ensembles and search
     "precision_weighted_ensemble",
     "bayesian_ensemble",

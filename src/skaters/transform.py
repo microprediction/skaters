@@ -193,3 +193,157 @@ def ema_transform(alpha: float = 0.05):
         return [d.shift(level) for d in dists]
 
     return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# GARCH(1,1) volatility scaling
+# ---------------------------------------------------------------------------
+
+def garch(omega: float = 0.01, alpha: float = 0.1, beta: float = 0.85, eps: float = 1e-8):
+    """GARCH(1,1) volatility transform.
+
+    Divides by the conditional standard deviation, producing
+    approximately unit-variance residuals when the series has
+    volatility clustering.
+
+    Forward:   y'_t = y_t / sigma_t
+               sigma_t^2 = omega + alpha * y_{t-1}^2 + beta * sigma_{t-1}^2
+    Inverse:   D -> sigma_t * D
+
+    Args:
+        omega: baseline variance (intercept).
+        alpha: weight on lagged squared observation (ARCH term).
+        beta:  weight on lagged conditional variance (GARCH term).
+        eps:   floor for sigma to avoid division by zero.
+
+    Stationarity requires alpha + beta < 1. The unconditional variance
+    is omega / (1 - alpha - beta).
+    """
+    assert omega > 0
+    assert alpha >= 0
+    assert beta >= 0
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            # Initialize conditional variance at the unconditional level
+            # (or a sensible default if not stationary)
+            persist = alpha + beta
+            var0 = omega / (1 - persist) if persist < 1 else omega / eps
+            return y / max(math.sqrt(var0), eps), {"var": var0, "last_y": y}
+
+        var = omega + alpha * state["last_y"] ** 2 + beta * state["var"]
+        sigma = math.sqrt(var) if var > eps * eps else eps
+        y_prime = y / sigma
+        return y_prime, {"var": var, "last_y": y}
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        sigma = math.sqrt(state["var"]) if state["var"] > 1e-16 else 1e-8
+        return [d.scale(sigma) for d in dists]
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# Seasonal differencing:  y'_t = y_t - y_{t-s}
+# ---------------------------------------------------------------------------
+
+def seasonal_difference(period: int = 12):
+    """Seasonal differencing transform.
+
+    Forward:   y'_t = y_t - y_{t-s}   (difference with lag s)
+    Inverse:   Shift each horizon's Dist by the appropriate
+               lagged value from the buffer.
+
+    Args:
+        period: seasonal period s (e.g. 12 for monthly, 7 for daily-weekly).
+    """
+    assert period >= 1
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            return 0.0, {"buffer": [y]}
+        buf = state["buffer"]
+        if len(buf) >= period:
+            y_prime = y - buf[-period]
+        else:
+            y_prime = 0.0
+        buf.append(y)
+        # Keep buffer bounded: need at most period + max_k values
+        # but we don't know k here; keep 2*period to be safe
+        if len(buf) > 2 * period:
+            buf.pop(0)
+        return y_prime, state
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        buf = list(state["buffer"])
+        result = []
+        for h, d in enumerate(dists):
+            # The anchor for horizon h is y_{t-s+h+1}
+            # which is buf[-(period - h - 1)] if available
+            idx = len(buf) - period + h + 1
+            if 0 <= idx < len(buf):
+                anchor = buf[idx]
+            elif idx >= len(buf) and result:
+                # Use a previously recovered mean
+                anchor = result[idx - len(buf)].mean
+            else:
+                anchor = 0.0
+            result.append(d.shift(anchor))
+        return result
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# Signed power transform (works on any real value)
+# ---------------------------------------------------------------------------
+
+def power_transform(p: float = 0.5):
+    """Signed power transform: compresses large values, handles negatives.
+
+    Forward:   y'_t = sign(y_t) * |y_t|^p
+    Inverse:   y_t  = sign(y') * |y'|^(1/p)
+
+    For 0 < p < 1, this compresses the tails (like log) but works on
+    all reals — no explosion on negatives.
+
+    The inverse is nonlinear, so we linearize around the Dist mean
+    for each component: if y' ~ N(mu, sigma^2) in transformed space,
+    the inverse is approximately:
+        mean_orig = sign(mu) * |mu|^(1/p)
+        std_orig  = sigma * (1/p) * |mu|^(1/p - 1)   (delta method)
+
+    Args:
+        p: power in (0, 1). Smaller = more compression.
+           p=0.5 is the signed square root.
+    """
+    assert 0 < p < 1
+    inv_p = 1.0 / p
+
+    def _fwd(y: float) -> float:
+        return math.copysign(abs(y) ** p, y)
+
+    def _inv(y_prime: float) -> float:
+        return math.copysign(abs(y_prime) ** inv_p, y_prime)
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        return _fwd(y), state or {}
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        result = []
+        for d in dists:
+            components = []
+            for w, mu, sigma in d.components:
+                orig_mean = _inv(mu)
+                # Delta method: d/dy'[inv(y')] = (1/p) * |y'|^(1/p - 1)
+                abs_mu = abs(mu)
+                if abs_mu > 1e-12:
+                    deriv = inv_p * abs_mu ** (inv_p - 1)
+                else:
+                    deriv = inv_p  # near zero, |y|^(1/p-1) ≈ 1 for p<1
+                orig_std = max(sigma * deriv, 1e-12)
+                components.append((w, orig_mean, orig_std))
+            result.append(Dist(components))
+        return result
+
+    return forward, inverse_k

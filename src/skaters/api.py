@@ -18,7 +18,10 @@ from __future__ import annotations
 import math
 from skaters.leaf import leaf
 from skaters.conjugate import conjugate
-from skaters.transform import difference, fractional_difference, standardize, ema_transform
+from skaters.transform import (
+    difference, fractional_difference, standardize, ema_transform,
+    garch, power_transform,
+)
 from skaters.bayesian import bayesian_ensemble
 
 
@@ -71,6 +74,18 @@ def _build_candidates(k: int):
                       fractional_difference(d=d, window=30), k=k)
         )
         depths.append(2)
+
+    # Depth 2: GARCH + EMA (volatility-adapted)
+    candidates.append(
+        conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k), garch(), k=k)
+    )
+    depths.append(2)
+
+    # Depth 2: power transform + EMA (tail compression)
+    candidates.append(
+        conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k), power_transform(0.5), k=k)
+    )
+    depths.append(2)
 
     return candidates, depths
 
