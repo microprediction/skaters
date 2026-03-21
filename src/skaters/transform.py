@@ -356,3 +356,149 @@ def power_transform(p: float = 0.5):
         return result
 
     return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# AR(p) transform with online recursive least squares
+# ---------------------------------------------------------------------------
+
+def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0):
+    """Autoregressive transform with online coefficient estimation.
+
+    Subtracts the AR(p) prediction from each observation, leaving
+    residuals. Coefficients are estimated via recursive least squares
+    (RLS) with exponential forgetting.
+
+    Forward:   y'_t = y_t - (phi_1 * y_{t-1} + ... + phi_p * y_{t-p})
+    Inverse:   y_{t+h} = eps_{t+h} + phi_1 * y_{t+h-1} + ... + phi_p * y_{t+h-p}
+               where past y values come from the buffer (known) or
+               from previously recovered predictions (uncertain).
+
+    Combined with other transforms:
+        diff|ar(2)|leaf  ≈  ARIMA(2,1,0)
+        frac(0.4)|ar(3)|leaf  ≈  ARFIMA(3,0.4,0)
+        seas(12)|ar(2)|leaf  =  seasonal AR(2)
+
+    Args:
+        order: number of AR lags (p).
+        lam: RLS forgetting factor in (0, 1]. 1.0 = no forgetting
+             (OLS limit). 0.99 = slowly forgets old data.
+        ridge: initial diagonal of the P matrix (regularization).
+               Larger = more regularized initial estimates.
+    """
+    assert order >= 1
+    assert 0 < lam <= 1
+    p = order
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            state = {
+                "buffer": [],
+                "phi": [0.0] * p,
+                # P matrix stored as flat list (p x p), row-major
+                "P": _eye(p, ridge),
+                "n": 0,
+            }
+
+        buf = state["buffer"]
+        phi = state["phi"]
+        state["n"] += 1
+
+        if len(buf) >= p:
+            # Regressor: [y_{t-1}, y_{t-2}, ..., y_{t-p}]
+            x = [buf[-(i + 1)] for i in range(p)]
+            prediction = sum(phi[i] * x[i] for i in range(p))
+            residual = y - prediction
+
+            # RLS update
+            P = state["P"]
+            Px = _mat_vec(P, x, p)
+            denom = lam + _dot(x, Px, p)
+            if abs(denom) > 1e-15:
+                K = [px / denom for px in Px]
+                # Update phi
+                for i in range(p):
+                    phi[i] += K[i] * residual
+                # Update P: P = (P - K * x' * P) / lam
+                for i in range(p):
+                    for j in range(p):
+                        P[i * p + j] = (P[i * p + j] - K[i] * Px[j]) / lam
+        else:
+            residual = y
+
+        buf.append(y)
+        # Keep buffer bounded
+        if len(buf) > 2 * p + 10:
+            buf.pop(0)
+
+        return residual, state
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        """Recover original-space predictions from residual predictions.
+
+        At horizon h:
+            y_{t+h} = eps_{t+h} + sum_{j=1}^{p} phi_j * y_{t+h-j}
+
+        For j > h, y_{t+h-j} is known from the buffer.
+        For j <= h, y_{t+h-j} is a previously recovered prediction.
+        Variance propagates: ar_var += phi_j^2 * var of uncertain lags.
+        """
+        buf = list(state["buffer"])
+        phi = state["phi"]
+        recovered_means = []
+        recovered_vars = []
+        result = []
+
+        for h in range(len(dists)):
+            ar_mean = 0.0
+            ar_var = 0.0
+            for j in range(p):
+                lag_h = h - j - 1  # which previous horizon provides this lag
+                if lag_h < 0:
+                    # Known value from buffer
+                    buf_idx = len(buf) + lag_h
+                    if 0 <= buf_idx < len(buf):
+                        ar_mean += phi[j] * buf[buf_idx]
+                else:
+                    # Previously recovered prediction
+                    if lag_h < len(recovered_means):
+                        ar_mean += phi[j] * recovered_means[lag_h]
+                        ar_var += phi[j] ** 2 * recovered_vars[lag_h]
+
+            total_mean = dists[h].mean + ar_mean
+            total_var = dists[h].var + ar_var
+            total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
+
+            recovered_means.append(total_mean)
+            recovered_vars.append(total_var)
+            result.append(Dist.gaussian(total_mean, total_std))
+
+        return result
+
+    return forward, inverse_k
+
+
+# --- Small matrix helpers for RLS (pure Python, no numpy) ---
+
+def _eye(n: int, scale: float = 1.0) -> list[float]:
+    """n x n identity matrix as flat list, scaled."""
+    m = [0.0] * (n * n)
+    for i in range(n):
+        m[i * n + i] = scale
+    return m
+
+
+def _mat_vec(M: list[float], v: list[float], n: int) -> list[float]:
+    """Matrix-vector product for n x n flat matrix."""
+    result = [0.0] * n
+    for i in range(n):
+        s = 0.0
+        for j in range(n):
+            s += M[i * n + j] * v[j]
+        result[i] = s
+    return result
+
+
+def _dot(a: list[float], b: list[float], n: int) -> float:
+    """Dot product."""
+    return sum(a[i] * b[i] for i in range(n))

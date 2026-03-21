@@ -32,7 +32,7 @@ from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
-    garch, seasonal_difference, power_transform,
+    garch, seasonal_difference, power_transform, ar,
 )
 from skaters.periodicity import period_detector, top_periods
 
@@ -51,6 +51,8 @@ TRANSFORMS = [
     ("frac(0.3)", lambda: fractional_difference(0.3, 30), 3),
     ("garch", lambda: garch(), 1),
     ("pow(0.5)", lambda: power_transform(0.5), 1),
+    ("ar(2)", lambda: ar(2), 2),
+    ("ar(5)", lambda: ar(5), 3),
 ]
 
 

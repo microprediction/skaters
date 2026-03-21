@@ -25,6 +25,7 @@ from skaters.transform import (
     garch,
     seasonal_difference,
     power_transform,
+    ar,
 )
 
 
@@ -42,6 +43,8 @@ TRANSFORM_FACTORIES = [
     ("seasonal_difference(3)", lambda: seasonal_difference(3)),
     ("power_transform(0.5)", lambda: power_transform(0.5)),
     ("power_transform(0.3)", lambda: power_transform(0.3)),
+    ("ar(2)", lambda: ar(2)),
+    ("ar(5)", lambda: ar(5)),
 ]
 
 
