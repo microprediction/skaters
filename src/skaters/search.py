@@ -34,6 +34,7 @@ from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
     garch, seasonal_difference, power_transform,
 )
+from skaters.periodicity import period_detector, top_periods
 
 
 # The grammar: available transforms for expansion
@@ -79,12 +80,17 @@ def search(
         max_components: prune combined Dist to this many components
     """
 
+    _pd_func = period_detector()
+
     def _search(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
             state = {
                 "pool": _init_pool(k),
                 "n_obs": 0,
                 "buffer": deque(maxlen=replay_buffer),
+                "pd_state": None,
+                "detected_periods": set(),
+                "transforms": list(TRANSFORMS),  # per-instance copy
             }
 
         state["n_obs"] += 1
@@ -116,9 +122,23 @@ def search(
             for h in range(k):
                 entry["queues"][h].append(entry["dists"][h])
 
+        # 3b. Run period detector
+        scores, state["pd_state"] = _pd_func(y, state["pd_state"])
+
         # 4. Periodically expand and prune
         if state["n_obs"] % expand_interval == 0 and state["n_obs"] > 10:
-            new_children = _expand(pool, k, expand_top_n, max_depth)
+            # Inject seasonal transforms for newly detected periods
+            detected = top_periods(scores, threshold=0.3, max_periods=3)
+            for period in detected:
+                if period not in state["detected_periods"]:
+                    state["detected_periods"].add(period)
+                    t_name = f"seas({period})"
+                    state["transforms"].append(
+                        (t_name, lambda p=period: seasonal_difference(p))
+                    )
+
+            new_children = _expand(pool, k, expand_top_n, max_depth,
+                                   transforms=state["transforms"])
             # Replay history through new children so they join warm
             for child in new_children:
                 _warmup(child, state["buffer"], k)
@@ -203,11 +223,15 @@ def _init_pool(k: int) -> list[dict]:
     return pool
 
 
-def _expand(pool: list[dict], k: int, top_n: int, max_depth: int) -> list[dict]:
+def _expand(pool: list[dict], k: int, top_n: int, max_depth: int,
+            transforms: list | None = None) -> list[dict]:
     """Take the top performers and create children.
 
     Returns the new children (not yet added to pool).
     """
+    if transforms is None:
+        transforms = TRANSFORMS
+
     scored = [(sum(e["log_w"]) / k, i, e) for i, e in enumerate(pool)]
     scored.sort(reverse=True)
 
@@ -218,7 +242,7 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int) -> list[dict]:
         if parent["depth"] >= max_depth:
             continue
 
-        for t_name, t_factory in TRANSFORMS:
+        for t_name, t_factory in transforms:
             if parent["recipe"] and parent["recipe"][-1] == t_name:
                 continue
 
@@ -227,7 +251,7 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int) -> list[dict]:
                 continue
             existing.add(tuple(new_recipe))
 
-            child_fn = _build_from_recipe(new_recipe, k)
+            child_fn = _build_from_recipe(new_recipe, k, transforms)
             child_fn.__name__ = "|".join(new_recipe) + "|leaf"
             children.append(_make_entry(
                 child_fn, depth=len(new_recipe), recipe=new_recipe, k=k
@@ -236,9 +260,11 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int) -> list[dict]:
     return children
 
 
-def _build_from_recipe(recipe: list[str], k: int):
+def _build_from_recipe(recipe: list[str], k: int, transforms: list | None = None):
     """Reconstruct a skater from its transform recipe."""
-    t_lookup = {name: factory for name, factory in TRANSFORMS}
+    if transforms is None:
+        transforms = TRANSFORMS
+    t_lookup = {name: factory for name, factory in transforms}
     f = leaf(k=k)
     for t_name in recipe:
         f = conjugate(f, t_lookup[t_name](), k=k)
