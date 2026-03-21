@@ -5,12 +5,13 @@ import random
 import pytest
 from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
+from skaters.dist import Dist
 
 
 def _offset_skater(offset: float, k: int):
-    """A skater that predicts a fixed offset (ignores input)."""
-    def f(y: float, state: dict | None) -> tuple[list[float], dict]:
-        return [offset] * k, {}
+    """A skater that predicts a fixed offset (ignores input), returning list[Dist]."""
+    def f(y: float, state: dict | None) -> tuple[list[Dist], dict]:
+        return [Dist.gaussian(offset, 1.0)] * k, {}
     f.__name__ = f"offset({offset})"
     return f
 
@@ -30,8 +31,14 @@ def test_returns_k_predictions():
         assert len(x) == k
 
 
+def test_returns_dist_objects():
+    f = precision_weighted_ensemble([ema(alpha=0.1, k=1)], k=1)
+    x, _ = f(1.0, None)
+    assert isinstance(x[0], Dist)
+
+
 def test_single_model_ensemble_equals_model():
-    """Ensemble of one should match the underlying model."""
+    """Ensemble of one should match the underlying model's mean."""
     inner = ema(alpha=0.2, k=2)
     ens = precision_weighted_ensemble([ema(alpha=0.2, k=2)], k=2)
     s_inner = s_ens = None
@@ -41,7 +48,7 @@ def test_single_model_ensemble_equals_model():
         x_inner, s_inner = inner(y, s_inner)
         x_ens, s_ens = ens(y, s_ens)
     for h in range(2):
-        assert abs(x_inner[h] - x_ens[h]) < 1e-10
+        assert abs(x_inner[h].mean - x_ens[h].mean) < 1e-10
 
 
 def test_favors_better_model():
@@ -60,7 +67,7 @@ def test_favors_better_model():
         x, state = f(y, state)
 
     # Should be much closer to ~5.0 than to 100.0
-    assert abs(x[0] - 5.0) < 5.0
+    assert abs(x[0].mean - 5.0) < 5.0
 
 
 def test_equal_models_equal_weight():
@@ -74,7 +81,7 @@ def test_equal_models_equal_weight():
         y = random.gauss(0, 1)
         x1, s1 = f1(y, s1)
         x2, s2 = f2(y, s2)
-    assert abs(x1[0] - x2[0]) < 1e-10
+    assert abs(x1[0].mean - x2[0].mean) < 1e-10
 
 
 def test_competitive_with_best_individual():
@@ -99,12 +106,11 @@ def test_competitive_with_best_individual():
         for i, f in enumerate(individuals):
             x_i, states[i] = f(level, states[i])
             if step > 50:
-                errors[i].append(abs(x_i[0] - level))
+                errors[i].append(abs(x_i[0].mean - level))
         if step > 50:
-            errors_ens.append(abs(x_ens[0] - level))
+            errors_ens.append(abs(x_ens[0].mean - level))
 
     mae_ens = sum(errors_ens) / len(errors_ens)
-    best_mae = min(sum(v) / len(v) for v in errors.values())
     worst_mae = max(sum(v) / len(v) for v in errors.values())
     # Ensemble should be better than the worst individual
     assert mae_ens < worst_mae
@@ -118,7 +124,7 @@ def test_many_models():
     random.seed(42)
     for _ in range(100):
         x, state = f(random.gauss(0, 1), state)
-    assert math.isfinite(x[0])
+    assert math.isfinite(x[0].mean)
 
 
 def test_floor_prevents_zero_weight():
@@ -131,7 +137,7 @@ def test_floor_prevents_zero_weight():
     state = None
     for _ in range(200):
         x, state = f(random.gauss(0, 1), state)
-    assert math.isfinite(x[0])
+    assert math.isfinite(x[0].mean)
 
 
 def test_multihorizon():
@@ -144,7 +150,7 @@ def test_multihorizon():
     for _ in range(50):
         x, state = f(random.gauss(0, 1), state)
     assert len(x) == 4
-    assert all(math.isfinite(v) for v in x)
+    assert all(math.isfinite(v.mean) for v in x)
 
 
 def test_empty_skaters_raises():

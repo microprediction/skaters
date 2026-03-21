@@ -2,20 +2,21 @@
 
 A Transform is a pair of online functions:
 
-    y', state = forward(y, state)     # transform one observation
-    x = inverse_k(x', state)          # map k predictions back to original space
+    y', state = forward(y, state)           # transform one observation
+    dists = inverse_k(dists', state)        # map k distributional predictions back
 
-The forward function runs on every observation. The inverse_k function
-takes k-step-ahead predictions in the transformed space and maps them
-back to the original space using whatever anchor information the
-forward pass has accumulated in state.
+The forward function runs on every observation (scalar in, scalar out).
+The inverse_k function takes k Dist objects in the transformed space
+and maps them back to the original space.
 
-Transforms compose: you can chain them. And they conjugate with any
-skater: transform the series, predict the simpler series, invert.
+For linear transforms (diff, standardize, ema), the inverse is exact:
+just shift/scale/affine the Dist components. For multi-step predictions,
+the cumulative uncertainty is propagated correctly.
 """
 
 from __future__ import annotations
 import math
+from skaters.dist import Dist
 
 
 # ---------------------------------------------------------------------------
@@ -26,10 +27,12 @@ def difference():
     """First-order differencing transform.
 
     Forward:   y'_t = y_t - y_{t-1}
-    Inverse:   x_j  = y_t + x'_1 + x'_2 + ... + x'_j   for j = 1..k
+    Inverse:   Shift and accumulate variance across horizons.
 
-    The inner model predicts *changes*; the inverse cumsums them back
-    anchored at the last observation.
+    At horizon h, the prediction is:
+        y_{t+h} = y_t + Δ_{t+1} + ... + Δ_{t+h}
+    where each Δ is a Dist. The mean cumsums, and the variance
+    accumulates (assuming independence across horizons).
     """
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
@@ -38,13 +41,16 @@ def difference():
         dy = y - state["last"]
         return dy, {"last": y}
 
-    def inverse_k(x_prime: list[float], state: dict) -> list[float]:
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         anchor = state["last"]
         result = []
-        cumsum = 0.0
-        for dx in x_prime:
-            cumsum += dx
-            result.append(anchor + cumsum)
+        cumsum_mean = 0.0
+        cumsum_var = 0.0
+        for d in dists:
+            cumsum_mean += d.mean
+            cumsum_var += d.var
+            std = math.sqrt(cumsum_var) if cumsum_var > 0 else max(d.std, 1e-12)
+            result.append(Dist.gaussian(anchor + cumsum_mean, std))
         return result
 
     return forward, inverse_k
@@ -77,17 +83,11 @@ def fractional_difference(d: float = 0.4, window: int = 50):
     Inverse:   applies (1-B)^{-d} to the k predictions, anchored at the
                recent history.
 
-    Args:
-        d: differencing order, typically in (0, 0.5). Larger d removes
-           more memory. d=1 is ordinary differencing.
-        window: truncation length for the filter. Longer = more accurate
-                but more memory.
-
-    The transform is stable and invertible for any d. For d in (0, 0.5),
-    the transformed series is stationary while preserving long memory.
+    The inverse propagates Dist objects: the mean is recovered exactly,
+    and the variance is propagated assuming the inverse is locally linear
+    (which it is — it's a weighted sum with known past values).
     """
     w_fwd = _frac_diff_weights(d, window)
-    w_inv = _frac_int_weights(d, window)
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
         if state is None:
@@ -97,33 +97,36 @@ def fractional_difference(d: float = 0.4, window: int = 50):
         if len(buf) > window:
             buf.pop(0)
 
-        # Apply (1-B)^d: y'_t = sum w_j * y_{t-j}
         n = len(buf)
         y_prime = sum(w_fwd[j] * buf[n - 1 - j] for j in range(n))
         return y_prime, state
 
-    def inverse_k(x_prime: list[float], state: dict) -> list[float]:
-        """Apply (1-B)^{-d} to map predictions back to original space.
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        """Apply (1-B)^{-d} to map Dist predictions back to original space.
 
-        We extend the buffer with each predicted transformed value,
-        then apply the inverse filter to recover the original-space
-        prediction.
+        For each horizon, the recovered value is:
+            y_t = y'_t - sum_{j=1}^{W-1} w_fwd[j] * y_{t-j}
+        where y_{t-j} are known (from buffer) for j >= h, and are the
+        recovered means for j < h (previous horizons).
+
+        The shift is deterministic (known past), so it just shifts the Dist.
+        The variance passes through unchanged (linear operation with unit
+        coefficient on y'_t).
         """
-        buf = list(state["buffer"])  # copy so we don't mutate
+        buf = list(state["buffer"])
         result = []
-        for x_p in x_prime:
-            # Append the transformed prediction
-            buf.append(0.0)  # placeholder
+        for d_in in dists:
+            buf.append(0.0)  # placeholder for recovered mean
             n = len(buf)
-            # Solve for y_t given y'_t = sum w_fwd[j] * y_{t-j}:
-            #   y_t = y'_t - sum_{j=1}^{W-1} w_fwd[j] * y_{t-j}
-            #   (since w_fwd[0] = 1)
-            y_recovered = x_p
+            # The deterministic shift from known/recovered past values
+            shift = 0.0
             for j in range(1, min(n, window)):
-                y_recovered -= w_fwd[j] * buf[n - 1 - j]
-            buf[-1] = y_recovered
-            result.append(y_recovered)
-            # Trim buffer
+                shift -= w_fwd[j] * buf[n - 1 - j]
+            # Recovered mean: x_prime_mean + shift (since w_fwd[0] = 1)
+            recovered_mean = d_in.mean + shift
+            buf[-1] = recovered_mean
+            # Variance passes through (linear op with unit coeff on x')
+            result.append(Dist.gaussian(recovered_mean, d_in.std))
             if len(buf) > window:
                 buf.pop(0)
         return result
@@ -139,15 +142,7 @@ def standardize(alpha: float = 0.05, eps: float = 1e-8):
     """Running standardization transform.
 
     Forward:   y'_t = (y_t - mu_t) / sigma_t
-    Inverse:   x_j  = x'_j * sigma_t + mu_t
-
-    Uses exponential moving averages for mean and variance, so it
-    adapts online. The inverse uses the *current* mu and sigma
-    (at prediction time), which is the best estimate for the near future.
-
-    Args:
-        alpha: EMA smoothing for mean and variance.
-        eps: floor for sigma to avoid division by zero.
+    Inverse:   Apply affine x -> sigma * x + mu to each Dist.
     """
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
@@ -155,7 +150,6 @@ def standardize(alpha: float = 0.05, eps: float = 1e-8):
             return 0.0, {"mu": y, "var": 0.0}
         mu = state["mu"]
         var = state["var"]
-        # Update mean and variance
         diff = y - mu
         mu = mu + alpha * diff
         var = (1 - alpha) * (var + alpha * diff * diff)
@@ -163,10 +157,39 @@ def standardize(alpha: float = 0.05, eps: float = 1e-8):
         y_prime = (y - mu) / sigma
         return y_prime, {"mu": mu, "var": var}
 
-    def inverse_k(x_prime: list[float], state: dict) -> list[float]:
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         mu = state["mu"]
         var = state["var"]
         sigma = math.sqrt(var) if var > 1e-16 else 1e-8
-        return [x_p * sigma + mu for x_p in x_prime]
+        return [d.affine(sigma, mu) for d in dists]
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# EMA as a transform: subtract the running level
+# ---------------------------------------------------------------------------
+
+def ema_transform(alpha: float = 0.05):
+    """Exponential moving average as a bijective transform.
+
+    Forward:   y'_t = y_t - level_t   (residual from EMA)
+    Inverse:   Shift each Dist by the current level.
+
+    This reframes EMA as a change of reference frame: the inner model
+    predicts centered residuals, and the inverse adds back the level.
+    """
+    assert 0 < alpha < 1
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            return 0.0, {"level": y}
+        level = state["level"] + alpha * (y - state["level"])
+        residual = y - level
+        return residual, {"level": level}
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        level = state["level"]
+        return [d.shift(level) for d in dists]
 
     return forward, inverse_k

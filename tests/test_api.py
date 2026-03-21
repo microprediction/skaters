@@ -8,9 +8,9 @@ from skaters.api import (
     slowly,
     sluggishly,
     ensemble,
-    ensemble_with_envelope,
 )
 from skaters.conventions import Skater
+from skaters.dist import Dist
 
 
 def test_all_factories_return_skaters():
@@ -25,6 +25,13 @@ def test_all_factories_accept_k():
             f = factory(k=k)
             x, state = f(1.0, None)
             assert len(x) == k
+
+
+def test_all_factories_return_dist():
+    for factory in [rapidly, quickly, slowly, sluggishly, ensemble]:
+        f = factory(k=1)
+        x, _ = f(1.0, None)
+        assert isinstance(x[0], Dist)
 
 
 def test_speed_ordering():
@@ -43,33 +50,11 @@ def test_speed_ordering():
         xs = []
         for i, f in enumerate(models):
             x, states[i] = f(100.0, states[i])
-            xs.append(x[0])
+            xs.append(x[0].mean)
 
     # rapidly > quickly > slowly > sluggishly in tracking
     for i in range(len(xs) - 1):
         assert xs[i] < xs[i + 1], f"{factories[i].__name__} should be slower than {factories[i+1].__name__}"
-
-
-def test_ensemble_with_envelope_returns_dict():
-    f = ensemble_with_envelope(k=3)
-    state = None
-    random.seed(42)
-    for _ in range(50):
-        out, state = f(random.gauss(0, 1), state)
-    assert "mean" in out
-    assert "std" in out
-    assert len(out["mean"]) == 3
-    assert len(out["std"]) == 3
-    assert all(math.isfinite(s) for s in out["std"])
-
-
-def test_ensemble_with_envelope_decay():
-    f = ensemble_with_envelope(k=1, decay=0.9)
-    state = None
-    random.seed(42)
-    for _ in range(50):
-        out, state = f(random.gauss(0, 1), state)
-    assert math.isfinite(out["std"][0])
 
 
 def test_default_k():
@@ -80,7 +65,12 @@ def test_default_k():
         assert len(x) == 1
 
 
-def test_ensemble_with_envelope_default_k():
-    f = ensemble_with_envelope()
-    out, _ = f(1.0, None)
-    assert len(out["mean"]) == 1
+def test_dist_has_std():
+    """The returned Dist should carry uncertainty information."""
+    f = ensemble(k=1)
+    state = None
+    random.seed(42)
+    for _ in range(50):
+        x, state = f(random.gauss(0, 1), state)
+    assert x[0].std > 0
+    assert math.isfinite(x[0].std)

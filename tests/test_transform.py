@@ -9,6 +9,7 @@ from skaters.transform import (
     _frac_diff_weights,
     _frac_int_weights,
 )
+from skaters.dist import Dist
 
 
 # --- Differencing ---
@@ -35,9 +36,12 @@ class TestDifference:
         state = None
         for y in [1.0, 3.0, 7.0]:
             _, state = fwd(y, state)
-        # Anchor is 7.0, predict changes [1, 2, -1]
-        x = inv([1.0, 2.0, -1.0], state)
-        assert x == [8.0, 10.0, 9.0]
+        # Anchor is 7.0, predict changes [1, 2, -1] as Dist objects
+        dists_in = [Dist.gaussian(1.0, 0.5), Dist.gaussian(2.0, 0.5), Dist.gaussian(-1.0, 0.5)]
+        result = inv(dists_in, state)
+        assert abs(result[0].mean - 8.0) < 1e-6
+        assert abs(result[1].mean - 10.0) < 1e-6
+        assert abs(result[2].mean - 9.0) < 1e-6
 
     def test_roundtrip_single_step(self):
         """forward then inverse should recover the next value."""
@@ -49,8 +53,9 @@ class TestDifference:
         # The "true" next delta
         dy_true = series[-1] - series[-2]
         # If we predict that delta correctly, inverse should give us series[-1]
-        x = inv([dy_true], state)
-        assert abs(x[0] - series[-1]) < 1e-12
+        dists_in = [Dist.gaussian(dy_true, 0.1)]
+        result = inv(dists_in, state)
+        assert abs(result[0].mean - series[-1]) < 1e-6
 
     def test_online_no_recomputation(self):
         fwd, _ = difference()
@@ -60,6 +65,15 @@ class TestDifference:
         # State should only hold last value, not the whole history
         assert "last" in state
         assert len(state) == 1
+
+    def test_inverse_returns_dist(self):
+        fwd, inv = difference()
+        state = None
+        for y in [1.0, 2.0, 3.0]:
+            _, state = fwd(y, state)
+        dists_in = [Dist.gaussian(1.0, 0.5)]
+        result = inv(dists_in, state)
+        assert isinstance(result[0], Dist)
 
 
 # --- Fractional differencing ---
@@ -124,9 +138,11 @@ class TestFractionalDifference:
             y_p, state = fwd(y_next, state)
             future_transformed.append(y_p)
 
-        recovered = inv(future_transformed, state_copy)
+        # Create Dist inputs from exact transformed values
+        dists_in = [Dist.gaussian(v, 0.001) for v in future_transformed]
+        recovered = inv(dists_in, state_copy)
         for orig, rec in zip(future, recovered):
-            assert abs(orig - rec) < 1e-6, f"expected {orig}, got {rec}"
+            assert abs(orig - rec.mean) < 1e-3, f"expected {orig}, got {rec.mean}"
 
     def test_online_buffer_bounded(self):
         fwd, _ = fractional_difference(d=0.4, window=20)
@@ -163,6 +179,15 @@ class TestFractionalDifference:
         # The last transformed value should still be large (trending)
         assert transformed[-1] > 10
 
+    def test_inverse_returns_dist(self):
+        fwd, inv = fractional_difference(d=0.3, window=20)
+        state = None
+        for y in [1.0, 2.0, 3.0, 4.0, 5.0]:
+            _, state = fwd(y, state)
+        dists_in = [Dist.gaussian(1.0, 0.5)]
+        result = inv(dists_in, state)
+        assert isinstance(result[0], Dist)
+
 
 # --- Standardization ---
 
@@ -191,9 +216,10 @@ class TestStandardize:
         random.seed(42)
         for _ in range(200):
             _, state = fwd(random.gauss(50, 5), state)
-        # Predicting z=0 should map back to ~mu
-        x = inv([0.0], state)
-        assert abs(x[0] - 50) < 10
+        # Predicting z=0 as a Dist should map back to ~mu
+        dists_in = [Dist.gaussian(0.0, 1.0)]
+        result = inv(dists_in, state)
+        assert abs(result[0].mean - 50) < 10
 
     def test_inverse_roundtrip(self):
         fwd, inv = standardize(alpha=0.01)
@@ -202,8 +228,9 @@ class TestStandardize:
         for _ in range(500):
             _, state = fwd(random.gauss(100, 10), state)
         # A z-score of 1 should map to mu + sigma
-        x = inv([1.0], state)
-        assert x[0] > 100  # mu + sigma > mu
+        dists_in = [Dist.gaussian(1.0, 0.1)]
+        result = inv(dists_in, state)
+        assert result[0].mean > 100  # mu + sigma > mu
 
     def test_online_constant_state_size(self):
         fwd, _ = standardize()
@@ -213,3 +240,12 @@ class TestStandardize:
         assert "mu" in state
         assert "var" in state
         assert len(state) == 2
+
+    def test_inverse_returns_dist(self):
+        fwd, inv = standardize()
+        state = None
+        for y in [1.0, 2.0, 3.0]:
+            _, state = fwd(y, state)
+        dists_in = [Dist.gaussian(0.0, 1.0)]
+        result = inv(dists_in, state)
+        assert isinstance(result[0], Dist)

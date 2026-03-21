@@ -1,9 +1,18 @@
 """Exponential moving average skater.
 
-Pure online, O(1) per observation. Returns only point forecasts.
+EMA is implemented as conjugation of a leaf (residual distribution
+estimator) with the EMA transform (subtracts running level).
+
+Under the hood:  ema(alpha, k) = conjugate(leaf(k), ema_transform(alpha))
+
+This means every EMA skater returns full distributional predictions:
+the mean is the EMA level, and the std is the empirical residual std.
 """
 
 from __future__ import annotations
+from skaters.leaf import leaf
+from skaters.transform import ema_transform
+from skaters.conjugate import conjugate
 
 
 def ema(alpha: float = 0.05, k: int = 1):
@@ -14,15 +23,8 @@ def ema(alpha: float = 0.05, k: int = 1):
         k: forecast horizon (number of steps ahead).
 
     Returns:
-        A skater callable: (y, state) -> (list[float], state)
+        A skater callable: (y, state) -> (list[Dist], state)
     """
-    assert 0 < alpha < 1
-
-    def _skater(y: float, state: dict | None) -> tuple[list[float], dict]:
-        if state is None:
-            return [y] * k, {"level": y}
-        level = state["level"] + alpha * (y - state["level"])
-        return [level] * k, {"level": level}
-
-    _skater.__name__ = f"ema(alpha={alpha}, k={k})"
-    return _skater
+    f = conjugate(leaf(k=k), ema_transform(alpha), k=k)
+    f.__name__ = f"ema(alpha={alpha}, k={k})"
+    return f

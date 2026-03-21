@@ -6,36 +6,33 @@ into a live skater via `build(spec)`.
 
 Every spec has an "op" key. The grammar:
 
-    spec := {"op": "ema", "alpha": float, "k": int}
+    spec := {"op": "leaf", "k": int}
+          | {"op": "ema", "alpha": float, "k": int}
           | {"op": "ensemble", "k": int, "skaters": [spec, ...]}
           | {"op": "conjugate", "skater": spec, "transform": transform_spec}
-          | {"op": "envelope", "skater": spec, "k": int, "decay": float|null}
-          | {"op": "calibrated", "skater": spec, "k": int, "target": float}
 
     transform_spec := {"op": "diff"}
                     | {"op": "frac", "d": float, "window": int}
                     | {"op": "std", "alpha": float}
+                    | {"op": "ema_t", "alpha": float}
 
-Canonical names are derived from specs deterministically:
+Canonical names:
 
-    ema(0.1)
-    diff|ema(0.1)                        # conjugation: transform|skater
-    std(0.05)|diff|ema(0.1)              # chains read left-to-right
-    ensemble(ema(0.01),ema(0.1),ema(0.3))
+    leaf
+    ema_t(0.1)|leaf                      # conjugation: transform|skater
+    diff|ema_t(0.1)|leaf                 # chains read left-to-right
+    ensemble(ema(0.01),ema(0.1))         # ema is shorthand for ema_t|leaf
     diff|ensemble(ema(0.01),ema(0.1))
-    calibrated[diff|ensemble(ema(0.01),ema(0.1))]
-    envelope[ema(0.1),decay=0.95]
 """
 
 from __future__ import annotations
 import json
 
+from skaters.leaf import leaf
 from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.conjugate import conjugate
-from skaters.transform import difference, fractional_difference, standardize
-from skaters.envelope import envelope
-from skaters.calibrated import calibrated_envelope
+from skaters.transform import difference, fractional_difference, standardize, ema_transform
 
 
 # ---------------------------------------------------------------------------
@@ -43,13 +40,13 @@ from skaters.calibrated import calibrated_envelope
 # ---------------------------------------------------------------------------
 
 def build(spec: dict):
-    """Materialize a spec dict into a live skater callable.
-
-    The returned skater's __name__ is set to the canonical name.
-    """
+    """Materialize a spec dict into a live skater callable."""
     op = spec["op"]
 
-    if op == "ema":
+    if op == "leaf":
+        f = leaf(k=spec["k"])
+
+    elif op == "ema":
         f = ema(alpha=spec["alpha"], k=spec["k"])
 
     elif op == "ensemble":
@@ -60,18 +57,8 @@ def build(spec: dict):
     elif op == "conjugate":
         inner = build(spec["skater"])
         t = _build_transform(spec["transform"])
-        k = spec["skater"]["k"] if "k" in spec["skater"] else _infer_k(spec["skater"])
+        k = _infer_k(spec["skater"])
         f = conjugate(inner, t, k=k)
-
-    elif op == "envelope":
-        inner = build(spec["skater"])
-        k = spec["k"]
-        f = envelope(inner, k=k, decay=spec.get("decay"))
-
-    elif op == "calibrated":
-        inner = build(spec["skater"])
-        k = spec["k"]
-        f = calibrated_envelope(inner, k=k, target=spec.get("target", 0.6827))
 
     else:
         raise ValueError(f"Unknown op: {op}")
@@ -89,6 +76,8 @@ def _build_transform(spec: dict):
         return fractional_difference(d=spec["d"], window=spec.get("window", 50))
     elif op == "std":
         return standardize(alpha=spec.get("alpha", 0.05))
+    elif op == "ema_t":
+        return ema_transform(alpha=spec["alpha"])
     else:
         raise ValueError(f"Unknown transform op: {op}")
 
@@ -112,7 +101,10 @@ def name(spec: dict) -> str:
     """Derive a canonical, deterministic name from a spec."""
     op = spec["op"]
 
-    if op == "ema":
+    if op == "leaf":
+        return "leaf"
+
+    elif op == "ema":
         return f"ema({_fmt(spec['alpha'])})"
 
     elif op == "ensemble":
@@ -123,20 +115,6 @@ def name(spec: dict) -> str:
         t = _transform_name(spec["transform"])
         s = name(spec["skater"])
         return f"{t}|{s}"
-
-    elif op == "envelope":
-        s = name(spec["skater"])
-        decay = spec.get("decay")
-        if decay is not None:
-            return f"envelope[{s},decay={_fmt(decay)}]"
-        return f"envelope[{s}]"
-
-    elif op == "calibrated":
-        s = name(spec["skater"])
-        target = spec.get("target", 0.6827)
-        if abs(target - 0.6827) < 1e-4:
-            return f"calibrated[{s}]"
-        return f"calibrated[{s},target={_fmt(target)}]"
 
     else:
         raise ValueError(f"Unknown op: {op}")
@@ -153,6 +131,8 @@ def _transform_name(spec: dict) -> str:
         return f"frac({_fmt(spec['d'])},w={w})"
     elif op == "std":
         return f"std({_fmt(spec.get('alpha', 0.05))})"
+    elif op == "ema_t":
+        return f"ema_t({_fmt(spec['alpha'])})"
     else:
         raise ValueError(f"Unknown transform op: {op}")
 
@@ -161,12 +141,11 @@ def _fmt(x: float) -> str:
     """Format a float compactly."""
     if x == int(x):
         return str(int(x))
-    s = f"{x:.6g}"
-    return s
+    return f"{x:.6g}"
 
 
 # ---------------------------------------------------------------------------
-# Parse: canonical name -> spec (roundtrip)
+# Serialization
 # ---------------------------------------------------------------------------
 
 def to_json(spec: dict) -> str:
@@ -183,6 +162,10 @@ def from_json(s: str) -> dict:
 # Spec constructors (convenience)
 # ---------------------------------------------------------------------------
 
+def leaf_spec(k: int = 1) -> dict:
+    return {"op": "leaf", "k": k}
+
+
 def ema_spec(alpha: float = 0.05, k: int = 1) -> dict:
     return {"op": "ema", "alpha": alpha, "k": k}
 
@@ -195,14 +178,6 @@ def conjugate_spec(skater_spec: dict, transform_spec: dict) -> dict:
     return {"op": "conjugate", "skater": skater_spec, "transform": transform_spec}
 
 
-def envelope_spec(skater_spec: dict, k: int = 1, decay: float | None = None) -> dict:
-    return {"op": "envelope", "skater": skater_spec, "k": k, "decay": decay}
-
-
-def calibrated_spec(skater_spec: dict, k: int = 1, target: float = 0.6827) -> dict:
-    return {"op": "calibrated", "skater": skater_spec, "k": k, "target": target}
-
-
 def diff_spec() -> dict:
     return {"op": "diff"}
 
@@ -213,3 +188,7 @@ def frac_spec(d: float = 0.4, window: int = 50) -> dict:
 
 def std_spec(alpha: float = 0.05) -> dict:
     return {"op": "std", "alpha": alpha}
+
+
+def ema_t_spec(alpha: float = 0.05) -> dict:
+    return {"op": "ema_t", "alpha": alpha}

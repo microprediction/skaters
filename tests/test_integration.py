@@ -9,14 +9,13 @@ from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.conjugate import conjugate
 from skaters.transform import difference, fractional_difference, standardize
-from skaters.envelope import envelope
-from skaters.calibrated import calibrated_envelope
 from skaters.spec import (
     build, name, to_json, from_json,
-    ema_spec, ensemble_spec, conjugate_spec, envelope_spec, calibrated_spec,
+    ema_spec, ensemble_spec, conjugate_spec,
     diff_spec, frac_spec, std_spec,
 )
 from skaters.conventions import Skater
+from skaters.dist import Dist
 
 
 # ---------------------------------------------------------------------------
@@ -33,10 +32,10 @@ class TestTransformChains:
         random.seed(42)
         for _ in range(200):
             x, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
     def test_std_then_diff(self):
-        """std|diff|ema — standardize, then difference the z-scores."""
+        """std|diff|ema -- standardize, then difference the z-scores."""
         k = 1
         inner = conjugate(ema(alpha=0.1, k=k), difference(), k=k)
         f = conjugate(inner, standardize(), k=k)
@@ -44,11 +43,11 @@ class TestTransformChains:
         random.seed(42)
         for _ in range(200):
             x, state = f(random.gauss(100, 10), state)
-        assert math.isfinite(x[0])
-        assert abs(x[0] - 100) < 50  # should be in original scale
+        assert math.isfinite(x[0].mean)
+        assert abs(x[0].mean - 100) < 50  # should be in original scale
 
     def test_diff_then_frac(self):
-        """diff|frac|ema — fractional diff the differences."""
+        """diff|frac|ema -- fractional diff the differences."""
         k = 1
         inner = conjugate(ema(alpha=0.1, k=k), fractional_difference(d=0.3), k=k)
         f = conjugate(inner, difference(), k=k)
@@ -56,10 +55,10 @@ class TestTransformChains:
         random.seed(42)
         for _ in range(200):
             x, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
     def test_triple_chain(self):
-        """std|diff|frac|ema — three transforms deep."""
+        """std|diff|frac|ema -- three transforms deep."""
         k = 1
         f = ema(alpha=0.1, k=k)
         f = conjugate(f, fractional_difference(d=0.2, window=20), k=k)
@@ -69,7 +68,7 @@ class TestTransformChains:
         random.seed(42)
         for _ in range(300):
             x, state = f(random.gauss(50, 5), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
     def test_chain_multistep(self):
         """Chained transforms with k=5."""
@@ -83,7 +82,7 @@ class TestTransformChains:
         for _ in range(200):
             x, state = f(random.gauss(0, 1), state)
         assert len(x) == k
-        assert all(math.isfinite(v) for v in x)
+        assert all(math.isfinite(v.mean) for v in x)
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +104,7 @@ class TestEnsembleOfConjugates:
         random.seed(42)
         for _ in range(200):
             x, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
         assert isinstance(f, Skater)
 
     def test_ensemble_of_chains(self):
@@ -120,7 +119,7 @@ class TestEnsembleOfConjugates:
         random.seed(42)
         for _ in range(200):
             x, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
     def test_nested_ensembles(self):
         """Ensemble of ensembles."""
@@ -137,81 +136,53 @@ class TestEnsembleOfConjugates:
         random.seed(42)
         for _ in range(200):
             x, state = outer(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
 
 # ---------------------------------------------------------------------------
-# Envelope and calibration on composed models
+# Dist carries uncertainty natively
 # ---------------------------------------------------------------------------
 
-class TestEnvelopeOnCompositions:
+class TestDistUncertainty:
 
-    def test_envelope_on_conjugate(self):
+    def test_dist_on_conjugate(self):
+        """Conjugated model should return Dist with uncertainty."""
         k = 2
         inner = conjugate(ema(alpha=0.1, k=k), difference(), k=k)
-        f = envelope(inner, k=k)
         state = None
         random.seed(42)
         for _ in range(100):
-            out, state = f(random.gauss(0, 1), state)
-        assert all(math.isfinite(s) for s in out["std"])
+            x, state = inner(random.gauss(0, 1), state)
+        assert all(isinstance(d, Dist) for d in x)
+        assert all(d.std > 0 for d in x)
 
-    def test_envelope_on_ensemble_of_conjugates(self):
+    def test_dist_on_ensemble(self):
+        """Ensemble should return Dist with uncertainty."""
         k = 1
         inner = precision_weighted_ensemble([
             conjugate(ema(alpha=0.1, k=k), difference(), k=k),
             ema(alpha=0.2, k=k),
         ], k=k)
-        f = envelope(inner, k=k, decay=0.95)
         state = None
         random.seed(42)
         for _ in range(100):
-            out, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(out["std"][0])
+            x, state = inner(random.gauss(0, 1), state)
+        assert isinstance(x[0], Dist)
+        assert x[0].std > 0
 
-    def test_calibrated_on_chain(self):
+    def test_dist_on_chain(self):
+        """Chained transforms should return Dist with uncertainty."""
         k = 1
         inner = conjugate(
             conjugate(ema(alpha=0.1, k=k), difference(), k=k),
             standardize(), k=k,
         )
-        f = calibrated_envelope(inner, k=k)
         state = None
         random.seed(42)
         for _ in range(200):
-            out, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(out["std"][0])
-
-    def test_calibrated_coverage_on_mixed_ensemble(self):
-        """Calibrated envelope on a meta-ensemble should have reasonable coverage."""
-        random.seed(123)
-        k = 1
-        inner = precision_weighted_ensemble([
-            ema(alpha=0.1, k=k),
-            conjugate(ema(alpha=0.1, k=k), difference(), k=k),
-            conjugate(ema(alpha=0.2, k=k), fractional_difference(d=0.3), k=k),
-        ], k=k)
-        f = calibrated_envelope(inner, k=k)
-        state = None
-        preds, stds = [], []
-        for i in range(1000):
-            y = random.gauss(0, 1)
-            out, state = f(y, state)
-            if preds:
-                preds.append((preds_last, stds_last, y))
-            preds_last = out["mean"][0]
-            stds_last = out["std"][0]
-        # Check coverage over last 500
-        hits = 0
-        total = 0
-        for pred, std, actual in preds[-500:]:
-            if math.isfinite(std) and std > 0:
-                total += 1
-                if abs(actual - pred) <= std:
-                    hits += 1
-        if total > 100:
-            coverage = hits / total
-            assert 0.4 < coverage < 0.95, f"coverage={coverage:.2%}"
+            x, state = inner(random.gauss(0, 1), state)
+        assert isinstance(x[0], Dist)
+        assert math.isfinite(x[0].std)
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +203,7 @@ class TestSpecCompositions:
         state = None
         for _ in range(50):
             x, state = f(1.0, state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
     def test_meta_ensemble_spec(self):
         s = ensemble_spec(
@@ -252,39 +223,19 @@ class TestSpecCompositions:
         random.seed(42)
         for _ in range(100):
             x, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
-
-    def test_calibrated_chain_spec(self):
-        s = calibrated_spec(
-            conjugate_spec(
-                conjugate_spec(ema_spec(0.1, k=3), diff_spec()),
-                std_spec(0.02),
-            ),
-            k=3,
-        )
-        n = name(s)
-        assert n == "calibrated[std(0.02)|diff|ema(0.1)]"
-        f = build(s)
-        state = None
-        random.seed(42)
-        for _ in range(100):
-            out, state = f(random.gauss(0, 1), state)
-        assert len(out["mean"]) == 3
+        assert math.isfinite(x[0].mean)
 
     def test_deeply_nested_spec(self):
-        """calibrated[ensemble(diff|ema, frac|ensemble(ema,ema), std|diff|ema)]"""
-        s = calibrated_spec(
-            ensemble_spec(
-                conjugate_spec(ema_spec(0.1, k=1), diff_spec()),
-                conjugate_spec(
-                    ensemble_spec(ema_spec(0.05, k=1), ema_spec(0.2, k=1), k=1),
-                    frac_spec(0.3),
-                ),
-                conjugate_spec(
-                    conjugate_spec(ema_spec(0.15, k=1), diff_spec()),
-                    std_spec(0.05),
-                ),
-                k=1,
+        """ensemble(diff|ema, frac|ensemble(ema,ema), std|diff|ema)"""
+        s = ensemble_spec(
+            conjugate_spec(ema_spec(0.1, k=1), diff_spec()),
+            conjugate_spec(
+                ensemble_spec(ema_spec(0.05, k=1), ema_spec(0.2, k=1), k=1),
+                frac_spec(0.3),
+            ),
+            conjugate_spec(
+                conjugate_spec(ema_spec(0.15, k=1), diff_spec()),
+                std_spec(0.05),
             ),
             k=1,
         )
@@ -295,8 +246,8 @@ class TestSpecCompositions:
         state = None
         random.seed(42)
         for _ in range(200):
-            out, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(out["std"][0])
+            x, state = f(random.gauss(0, 1), state)
+        assert math.isfinite(x[0].mean)
 
     def test_two_builds_from_same_spec_are_independent(self):
         """Two skaters built from the same spec should not share state."""
@@ -312,7 +263,7 @@ class TestSpecCompositions:
         for _ in range(50):
             x2, s2 = f2(random.gauss(100, 1), s2)
         # f2 should be near 100, not near 0
-        assert x2[0] > 50
+        assert x2[0].mean > 50
 
 
 # ---------------------------------------------------------------------------
@@ -335,7 +286,7 @@ class TestEdgeCases:
             state = None
             for _ in range(100):
                 x, state = f(0.0, state)
-            assert all(math.isfinite(v) for v in x)
+            assert all(math.isfinite(v.mean) for v in x)
 
     def test_large_values(self):
         """Very large values should not cause overflow."""
@@ -344,7 +295,7 @@ class TestEdgeCases:
         state = None
         for _ in range(100):
             x, state = f(1e15, state)
-        assert all(math.isfinite(v) for v in x)
+        assert all(math.isfinite(v.mean) for v in x)
 
     def test_tiny_values(self):
         """Very small values should not cause underflow issues."""
@@ -353,19 +304,17 @@ class TestEdgeCases:
         state = None
         for _ in range(100):
             x, state = f(1e-15, state)
-        assert all(math.isfinite(v) for v in x)
+        assert all(math.isfinite(v.mean) for v in x)
 
     def test_alternating_extreme_values(self):
         k = 1
-        f = envelope(
-            conjugate(ema(alpha=0.3, k=k), difference(), k=k), k=k
-        )
+        f = conjugate(ema(alpha=0.3, k=k), difference(), k=k)
         state = None
         for i in range(200):
             y = 1000.0 if i % 2 == 0 else -1000.0
-            out, state = f(y, state)
-        assert math.isfinite(out["mean"][0])
-        assert math.isfinite(out["std"][0])
+            x, state = f(y, state)
+        assert math.isfinite(x[0].mean)
+        assert math.isfinite(x[0].std)
 
     def test_single_observation(self):
         """Everything should handle a single observation without crashing."""
@@ -373,26 +322,23 @@ class TestEdgeCases:
         for factory in [
             lambda: ema(alpha=0.1, k=k),
             lambda: conjugate(ema(alpha=0.1, k=k), difference(), k=k),
-            lambda: envelope(ema(alpha=0.1, k=k), k=k),
-            lambda: calibrated_envelope(ema(alpha=0.1, k=k), k=k),
         ]:
             f = factory()
-            out, state = f(42.0, None)
-            # Should not crash
+            x, state = f(42.0, None)
+            assert isinstance(x[0], Dist)
 
     def test_k_equals_1(self):
-        f = build(calibrated_spec(
-            ensemble_spec(
-                conjugate_spec(ema_spec(0.1, k=1), diff_spec()),
-                ema_spec(0.3, k=1),
-                k=1,
-            ), k=1,
+        f = build(ensemble_spec(
+            conjugate_spec(ema_spec(0.1, k=1), diff_spec()),
+            ema_spec(0.3, k=1),
+            k=1,
         ))
         state = None
         random.seed(42)
         for _ in range(50):
-            out, state = f(random.gauss(0, 1), state)
-        assert len(out["mean"]) == 1
+            x, state = f(random.gauss(0, 1), state)
+        assert len(x) == 1
+        assert isinstance(x[0], Dist)
 
     def test_large_k(self):
         k = 20
@@ -402,7 +348,7 @@ class TestEdgeCases:
         for _ in range(100):
             x, state = f(random.gauss(0, 1), state)
         assert len(x) == 20
-        assert all(math.isfinite(v) for v in x)
+        assert all(math.isfinite(v.mean) for v in x)
 
 
 # ---------------------------------------------------------------------------
@@ -425,16 +371,14 @@ class TestDeterminism:
             random.seed(42)
             for _ in range(100):
                 x, state = f(random.gauss(0, 1), state)
-            results.append(x[0])
+            results.append(x[0].mean)
         assert results[0] == results[1]
 
     def test_spec_name_stable_across_builds(self):
-        s = calibrated_spec(
-            ensemble_spec(
-                conjugate_spec(ema_spec(0.1, k=2), diff_spec()),
-                conjugate_spec(ema_spec(0.05, k=2), frac_spec(0.3)),
-                k=2,
-            ), k=2,
+        s = ensemble_spec(
+            conjugate_spec(ema_spec(0.1, k=2), diff_spec()),
+            conjugate_spec(ema_spec(0.05, k=2), frac_spec(0.3)),
+            k=2,
         )
         f = build(s)
         assert f.__name__ == name(s)

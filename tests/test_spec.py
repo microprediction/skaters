@@ -5,10 +5,11 @@ import math
 import random
 from skaters.spec import (
     build, name, to_json, from_json,
-    ema_spec, ensemble_spec, conjugate_spec, envelope_spec, calibrated_spec,
+    ema_spec, ensemble_spec, conjugate_spec, leaf_spec, ema_t_spec,
     diff_spec, frac_spec, std_spec,
 )
 from skaters.conventions import Skater
+from skaters.dist import Dist
 
 
 # --- Naming ---
@@ -61,25 +62,13 @@ class TestNaming:
         )
         assert name(s) == "ensemble(diff|ema(0.1),ema(0.3))"
 
-    def test_envelope_name(self):
-        s = envelope_spec(ema_spec(0.1, k=1), k=1)
-        assert name(s) == "envelope[ema(0.1)]"
+    def test_leaf_name(self):
+        s = leaf_spec(k=1)
+        assert name(s) == "leaf"
 
-    def test_envelope_with_decay_name(self):
-        s = envelope_spec(ema_spec(0.1, k=1), k=1, decay=0.95)
-        assert name(s) == "envelope[ema(0.1),decay=0.95]"
-
-    def test_calibrated_name(self):
-        s = calibrated_spec(ema_spec(0.1, k=1), k=1)
-        assert name(s) == "calibrated[ema(0.1)]"
-
-    def test_calibrated_custom_target_name(self):
-        s = calibrated_spec(ema_spec(0.1, k=1), k=1, target=0.95)
-        assert name(s) == "calibrated[ema(0.1),target=0.95]"
-
-    def test_calibrated_default_target_omitted(self):
-        s = calibrated_spec(ema_spec(0.1, k=1), k=1, target=0.6827)
-        assert "target=" not in name(s)
+    def test_ema_t_conjugate_name(self):
+        s = conjugate_spec(leaf_spec(k=1), ema_t_spec(0.1))
+        assert name(s) == "ema_t(0.1)|leaf"
 
     def test_name_is_deterministic(self):
         s = ensemble_spec(
@@ -113,11 +102,8 @@ class TestSerialization:
         )
         assert from_json(to_json(s)) == s
 
-    def test_json_roundtrip_calibrated(self):
-        s = calibrated_spec(
-            ensemble_spec(ema_spec(0.1, k=1), ema_spec(0.3, k=1), k=1),
-            k=1, target=0.95,
-        )
+    def test_json_roundtrip_leaf(self):
+        s = leaf_spec(k=3)
         assert from_json(to_json(s)) == s
 
     def test_json_is_valid_json(self):
@@ -139,6 +125,7 @@ class TestBuild:
         x, state = f(1.0, None)
         assert isinstance(x, list)
         assert len(x) == 1
+        assert isinstance(x[0], Dist)
 
     def test_build_ensemble(self):
         s = ensemble_spec(ema_spec(0.01, k=2), ema_spec(0.1, k=2), k=2)
@@ -152,7 +139,7 @@ class TestBuild:
         state = None
         for y in [1.0, 2.0, 3.0, 4.0, 5.0]:
             x, state = f(y, state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
     def test_build_conjugate_frac(self):
         s = conjugate_spec(ema_spec(0.1, k=1), frac_spec(0.3))
@@ -161,7 +148,7 @@ class TestBuild:
         random.seed(42)
         for _ in range(100):
             x, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
     def test_build_chain(self):
         s = conjugate_spec(
@@ -173,27 +160,14 @@ class TestBuild:
         random.seed(42)
         for _ in range(100):
             x, state = f(random.gauss(0, 1), state)
-        assert math.isfinite(x[0])
+        assert math.isfinite(x[0].mean)
 
-    def test_build_envelope(self):
-        s = envelope_spec(ema_spec(0.1, k=1), k=1, decay=0.95)
+    def test_build_leaf(self):
+        s = leaf_spec(k=2)
         f = build(s)
-        state = None
-        random.seed(42)
-        for _ in range(50):
-            out, state = f(random.gauss(0, 1), state)
-        assert "mean" in out
-        assert "std" in out
-
-    def test_build_calibrated(self):
-        s = calibrated_spec(ema_spec(0.1, k=1), k=1)
-        f = build(s)
-        state = None
-        random.seed(42)
-        for _ in range(50):
-            out, state = f(random.gauss(0, 1), state)
-        assert "mean" in out
-        assert "std" in out
+        x, state = f(1.0, None)
+        assert len(x) == 2
+        assert isinstance(x[0], Dist)
 
     def test_build_satisfies_protocol(self):
         s = conjugate_spec(ema_spec(0.1, k=1), diff_spec())
@@ -223,13 +197,10 @@ class TestFullRoundtrip:
 
     def test_complex_roundtrip(self):
         """Build a complex spec, serialize, deserialize, build, run."""
-        s = calibrated_spec(
-            ensemble_spec(
-                conjugate_spec(ema_spec(0.1, k=2), diff_spec()),
-                conjugate_spec(ema_spec(0.05, k=2), frac_spec(0.3)),
-                ema_spec(0.2, k=2),
-                k=2,
-            ),
+        s = ensemble_spec(
+            conjugate_spec(ema_spec(0.1, k=2), diff_spec()),
+            conjugate_spec(ema_spec(0.05, k=2), frac_spec(0.3)),
+            ema_spec(0.2, k=2),
             k=2,
         )
         j = to_json(s)
@@ -241,7 +212,6 @@ class TestFullRoundtrip:
         state = None
         random.seed(42)
         for _ in range(100):
-            out, state = f(random.gauss(0, 1), state)
-        assert "mean" in out
-        assert len(out["mean"]) == 2
-        assert all(math.isfinite(v) for v in out["mean"])
+            x, state = f(random.gauss(0, 1), state)
+        assert len(x) == 2
+        assert all(math.isfinite(v.mean) for v in x)
