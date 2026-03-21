@@ -3,16 +3,18 @@
 from skaters.conventions import Skater
 from skaters.ema import ema
 from skaters.envelope import envelope
+from skaters.calibrated import calibrated_envelope
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.api import (
     quickly, slowly, sluggishly, rapidly,
-    ensemble, ensemble_with_envelope,
+    ensemble, ensemble_with_envelope, ensemble_calibrated,
 )
 
 __all__ = [
     "Skater",
     "ema",
     "envelope",
+    "calibrated_envelope",
     "precision_weighted_ensemble",
     "quickly",
     "slowly",
@@ -20,4 +22,5 @@ __all__ = [
     "rapidly",
     "ensemble",
     "ensemble_with_envelope",
+    "ensemble_calibrated",
 ]
