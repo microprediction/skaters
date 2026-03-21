@@ -362,7 +362,8 @@ def power_transform(p: float = 0.5):
 # AR(p) transform with online recursive least squares
 # ---------------------------------------------------------------------------
 
-def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0):
+def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
+       decay: float = 0.0):
     """Autoregressive transform with online coefficient estimation.
 
     Subtracts the AR(p) prediction from each observation, leaving
@@ -371,8 +372,6 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0):
 
     Forward:   y'_t = y_t - (phi_1 * y_{t-1} + ... + phi_p * y_{t-p})
     Inverse:   y_{t+h} = eps_{t+h} + phi_1 * y_{t+h-1} + ... + phi_p * y_{t+h-p}
-               where past y values come from the buffer (known) or
-               from previously recovered predictions (uncertain).
 
     Combined with other transforms:
         diff|ar(2)|leaf  ≈  ARIMA(2,1,0)
@@ -381,22 +380,33 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0):
 
     Args:
         order: number of AR lags (p).
-        lam: RLS forgetting factor in (0, 1]. 1.0 = no forgetting
-             (OLS limit). 0.99 = slowly forgets old data.
-        ridge: initial diagonal of the P matrix (regularization).
-               Larger = more regularized initial estimates.
+        lam: RLS forgetting factor in (0, 1]. 1.0 = no forgetting.
+        ridge: baseline diagonal of the P matrix (regularization).
+        decay: Minnesota prior strength. If > 0, the initial prior
+               variance for lag j is ridge / (j+1)^decay. This shrinks
+               distant lags more aggressively toward zero (Litterman 1986).
+               decay=0 is uniform prior (standard ridge).
+               decay=1 is the standard Minnesota prior.
+               decay=2 is aggressive shrinkage.
     """
     assert order >= 1
     assert 0 < lam <= 1
+    assert decay >= 0
     p = order
+
+    def _init_P() -> list[float]:
+        """Build initial P matrix with optional Minnesota-style decay."""
+        P = [0.0] * (p * p)
+        for j in range(p):
+            P[j * p + j] = ridge / ((j + 1) ** decay) if decay > 0 else ridge
+        return P
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
         if state is None:
             state = {
                 "buffer": [],
                 "phi": [0.0] * p,
-                # P matrix stored as flat list (p x p), row-major
-                "P": _eye(p, ridge),
+                "P": _init_P(),
                 "n": 0,
             }
 
@@ -476,6 +486,146 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0):
         return result
 
     return forward, inverse_k
+
+
+def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
+    """AR transform with geometrically grouped coefficients.
+
+    Instead of estimating one coefficient per lag (p parameters),
+    lags are grouped into geometrically growing bins:
+        group 0: lag 1       (1 lag)
+        group 1: lags 2-3    (2 lags, shared coefficient)
+        group 2: lags 4-7    (4 lags, shared coefficient)
+        group 3: lags 8-15   (8 lags, shared coefficient)
+        ...
+
+    This gives O(log2(max_lag)) parameters for max_lag lags.
+    Motivated by the MDL principle: the number of effective
+    parameters should grow logarithmically with the model order.
+
+    The RLS estimates the group-level coefficients. At prediction
+    time, each lag uses its group's coefficient.
+
+    Args:
+        max_lag: maximum lag to include.
+        lam: RLS forgetting factor.
+        ridge: initial regularization.
+    """
+    assert max_lag >= 1
+
+    # Build the grouping: which group does each lag belong to?
+    groups = _build_groups(max_lag)
+    n_groups = max(groups) + 1
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            state = {
+                "buffer": [],
+                "theta": [0.0] * n_groups,  # group-level coefficients
+                "P": _eye(n_groups, ridge),
+                "n": 0,
+            }
+
+        buf = state["buffer"]
+        theta = state["theta"]
+        state["n"] += 1
+
+        if len(buf) >= max_lag:
+            # Build group-aggregated regressor
+            x = _group_regressor(buf, groups, n_groups, max_lag)
+            prediction = sum(theta[g] * x[g] for g in range(n_groups))
+            residual = y - prediction
+
+            # RLS update on group-level coefficients
+            P = state["P"]
+            Px = _mat_vec(P, x, n_groups)
+            denom = lam + _dot(x, Px, n_groups)
+            if abs(denom) > 1e-15:
+                K = [px / denom for px in Px]
+                for g in range(n_groups):
+                    theta[g] += K[g] * residual
+                for i in range(n_groups):
+                    for j in range(n_groups):
+                        P[i * n_groups + j] = (
+                            P[i * n_groups + j] - K[i] * Px[j]
+                        ) / lam
+        else:
+            residual = y
+
+        buf.append(y)
+        if len(buf) > max_lag + 10:
+            buf.pop(0)
+
+        return residual, state
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        buf = list(state["buffer"])
+        theta = state["theta"]
+        # Expand group coefficients to per-lag coefficients
+        phi = [theta[groups[j]] for j in range(max_lag)]
+
+        recovered_means = []
+        recovered_vars = []
+        result = []
+
+        for h in range(len(dists)):
+            ar_mean = 0.0
+            ar_var = 0.0
+            for j in range(max_lag):
+                lag_h = h - j - 1
+                if lag_h < 0:
+                    buf_idx = len(buf) + lag_h
+                    if 0 <= buf_idx < len(buf):
+                        ar_mean += phi[j] * buf[buf_idx]
+                else:
+                    if lag_h < len(recovered_means):
+                        ar_mean += phi[j] * recovered_means[lag_h]
+                        ar_var += phi[j] ** 2 * recovered_vars[lag_h]
+
+            total_mean = dists[h].mean + ar_mean
+            total_var = dists[h].var + ar_var
+            total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
+
+            recovered_means.append(total_mean)
+            recovered_vars.append(total_var)
+            result.append(Dist.gaussian(total_mean, total_std))
+
+        return result
+
+    return forward, inverse_k
+
+
+def _build_groups(max_lag: int) -> list[int]:
+    """Assign each lag index to a geometric group.
+
+    Lag 0 → group 0 (size 1)
+    Lags 1-2 → group 1 (size 2)
+    Lags 3-6 → group 2 (size 4)
+    Lags 7-14 → group 3 (size 8)
+    ...
+    """
+    groups = []
+    g = 0
+    size = 1
+    assigned = 0
+    while assigned < max_lag:
+        for _ in range(size):
+            if assigned >= max_lag:
+                break
+            groups.append(g)
+            assigned += 1
+        g += 1
+        size *= 2
+    return groups
+
+
+def _group_regressor(buf: list[float], groups: list[int],
+                     n_groups: int, max_lag: int) -> list[float]:
+    """Aggregate lagged values by group (sum within each group)."""
+    x = [0.0] * n_groups
+    for j in range(max_lag):
+        x[groups[j]] += buf[-(j + 1)]
+    return x
 
 
 # --- Small matrix helpers for RLS (pure Python, no numpy) ---

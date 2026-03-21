@@ -14,7 +14,7 @@ from skaters.bayesian import bayesian_ensemble
 from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
-    garch, seasonal_difference, power_transform, ar,
+    garch, seasonal_difference, power_transform, ar, grouped_ar,
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
@@ -51,6 +51,7 @@ __all__ = [
     "seasonal_difference",
     "power_transform",
     "ar",
+    "grouped_ar",
     # Ensembles and search
     "precision_weighted_ensemble",
     "bayesian_ensemble",
