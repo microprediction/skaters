@@ -20,7 +20,7 @@ from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
-    garch, power_transform,
+    garch, power_transform, drift, holt_linear,
 )
 from skaters.search import search as adaptive_search
 from skaters.bayesian import bayesian_ensemble
@@ -50,9 +50,20 @@ def _build_candidates(k: int):
         candidates.append(conjugate(leaf(k=k), ema_transform(alpha), k=k))
         depths.append(1)
 
-    # Depth 1: differencing + leaf
+    # Depth 1: differencing + leaf (pure random walk)
     candidates.append(conjugate(leaf(k=k), difference(), k=k))
     depths.append(1)
+
+    # Depth 1: drift + leaf (random walk with adaptive drift)
+    # Multiple speeds: fast drift detection vs long-memory drift
+    for a, s in [(0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
+        candidates.append(conjugate(leaf(k=k), drift(alpha=a, shrinkage=s), k=k))
+        depths.append(1)
+
+    # Depth 1: Holt linear (level + trend, single transform)
+    for a, b in [(0.1, 0.02), (0.1, 0.05), (0.3, 0.1)]:
+        candidates.append(conjugate(leaf(k=k), holt_linear(alpha=a, beta=b), k=k))
+        depths.append(1)
 
     # Depth 2: differencing + EMA
     for alpha in [0.05, 0.1, 0.3]:

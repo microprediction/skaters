@@ -196,6 +196,127 @@ def ema_transform(alpha: float = 0.05):
 
 
 # ---------------------------------------------------------------------------
+# Random walk with drift: careful long-memory drift estimation
+# ---------------------------------------------------------------------------
+
+def drift(alpha: float = 0.002, shrinkage: float = 0.001):
+    """Random walk with adaptive drift removal.
+
+    Differences the series AND subtracts an estimated drift, leaving
+    centered residuals. The drift is estimated as a heavily smoothed
+    mean of increments, with shrinkage toward zero.
+
+    Forward:   dy_t = y_t - y_{t-1}
+               mu_t = (1 - alpha - shrinkage) * mu_{t-1} + alpha * dy_t
+               y'_t = dy_t - mu_t
+
+    Inverse:   y_{t+h} = y_t + h * mu_t + sum(residuals_1..h)
+
+    The drift estimator has two forces:
+    - alpha pulls toward the latest increment (adaptation)
+    - shrinkage pulls toward zero (regularization / Bachelier prior)
+
+    With the defaults (alpha=0.002, shrinkage=0.001), the effective
+    half-life is ~230 observations, and the drift decays to zero in
+    ~1000 observations without reinforcement.
+
+    Args:
+        alpha: learning rate for drift estimate. Smaller = longer memory.
+        shrinkage: per-step pull toward zero. Encodes the prior that
+            drift is unlikely / temporary. Set to 0 for no shrinkage.
+    """
+    assert 0 < alpha < 1
+    assert 0 <= shrinkage < 1
+    decay = 1 - alpha - shrinkage
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            return 0.0, {"last": y, "mu": 0.0}
+        dy = y - state["last"]
+        mu = decay * state["mu"] + alpha * dy
+        residual = dy - mu
+        return residual, {"last": y, "mu": mu}
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        """Multi-step inverse: y_{t+h} = y_t + h * mu + cumulative residuals.
+
+        The drift contributes a deterministic shift of h * mu per horizon.
+        The residual uncertainty accumulates as with difference().
+        """
+        anchor = state["last"]
+        mu = state["mu"]
+        result = []
+        cumsum_mean = 0.0
+        cumsum_var = 0.0
+        for h, d in enumerate(dists):
+            cumsum_mean += d.mean
+            cumsum_var += d.var
+            # Total prediction: anchor + (h+1)*drift + cumulative residual
+            total_mean = anchor + (h + 1) * mu + cumsum_mean
+            total_std = math.sqrt(cumsum_var) if cumsum_var > 0 else max(d.std, 1e-12)
+            result.append(Dist.gaussian(total_mean, total_std))
+        return result
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# Holt linear: coupled level + trend (Holt 1957)
+# ---------------------------------------------------------------------------
+
+def holt_linear(alpha: float = 0.1, beta: float = 0.05):
+    """Holt's linear exponential smoothing as a transform.
+
+    Maintains coupled level and trend estimates:
+        l_t = alpha * y_t + (1 - alpha) * (l_{t-1} + b_{t-1})
+        b_t = beta * (l_t - l_{t-1}) + (1 - beta) * b_{t-1}
+
+    Forward:   y'_t = y_t - (l_t + b_t)   (one-step-ahead residual)
+    Inverse:   y_{t+h} = l_t + h * b_t + residual
+
+    This is the classic Holt (1957) method. Unlike our drift() transform
+    which estimates drift from differences, Holt's method couples the
+    level and trend updates, which is better at tracking accelerating or
+    decelerating trends.
+
+    Args:
+        alpha: level smoothing in (0, 1). Higher = more reactive level.
+        beta:  trend smoothing in (0, 1). Higher = more reactive trend.
+    """
+    assert 0 < alpha < 1
+    assert 0 < beta < 1
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            return 0.0, {"level": y, "trend": 0.0}
+        l_prev = state["level"]
+        b_prev = state["trend"]
+        l_new = alpha * y + (1 - alpha) * (l_prev + b_prev)
+        b_new = beta * (l_new - l_prev) + (1 - beta) * b_prev
+        # One-step-ahead prediction was l_prev + b_prev
+        residual = y - (l_prev + b_prev)
+        return residual, {"level": l_new, "trend": b_new}
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        """Inverse: forecast is level + h * trend + residual.
+
+        Variance accumulates across horizons (independent residuals).
+        """
+        level = state["level"]
+        trend = state["trend"]
+        result = []
+        cumsum_var = 0.0
+        for h, d in enumerate(dists):
+            cumsum_var += d.var
+            forecast = level + (h + 1) * trend + d.mean
+            std = math.sqrt(cumsum_var) if cumsum_var > 0 else max(d.std, 1e-12)
+            result.append(Dist.gaussian(forecast, std))
+        return result
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
 # GARCH(1,1) volatility scaling
 # ---------------------------------------------------------------------------
 
