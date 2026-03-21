@@ -16,11 +16,12 @@ At each expansion step:
     2. Kill candidates below a weight threshold
     3. Take the top performers and conjugate them with each available
        transform to produce children
-    4. Add children to the pool (with a burn-in grace period)
+    4. Replay recent history through the children so they join warm
     5. Cap pool size by pruning the weakest
 
-This is closer to genetic programming or MCTS than the fixed-menu
-approach of bayesian_ensemble.
+A rolling buffer of recent observations is maintained so that new
+candidates can be replayed through history and start competing
+immediately instead of wasting burn-in time.
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ def search(
     expand_interval: int = 100,
     expand_top_n: int = 3,
     max_depth: int = 3,
-    grace_period: int = 20,
+    replay_buffer: int = 500,
     prune_threshold: float = -50.0,
     max_components: int = 20,
 ):
@@ -65,7 +66,9 @@ def search(
         expand_interval: expand every N observations
         expand_top_n: how many top candidates to expand
         max_depth: maximum transform chain depth
-        grace_period: observations before a new candidate is scored
+        replay_buffer: number of recent observations to keep. New
+            candidates are replayed through this buffer so they join
+            the pool warm (with meaningful state) instead of cold.
         prune_threshold: kill candidates whose log-weight relative to
             the leader falls below this
         max_components: prune combined Dist to this many components
@@ -76,9 +79,11 @@ def search(
             state = {
                 "pool": _init_pool(k),
                 "n_obs": 0,
+                "buffer": deque(maxlen=replay_buffer),
             }
 
         state["n_obs"] += 1
+        state["buffer"].append(y)
 
         pool = state["pool"]
 
@@ -94,7 +99,7 @@ def search(
                 q = entry["queues"][h]
                 if q:
                     past_dist = q.popleft()
-                    if entry["age"] > grace_period:
+                    if entry["warmed"]:
                         lp = max(past_dist.logpdf(y), -20.0)
                         entry["log_w"][h] += (
                             learning_rate * lp
@@ -107,16 +112,12 @@ def search(
                 entry["queues"][h].append(entry["dists"][h])
 
         # 4. Periodically expand and prune
-        if state["n_obs"] % expand_interval == 0 and state["n_obs"] > grace_period:
-            _expand(pool, k, expand_top_n, max_depth)
-            # Run newly added candidates on this observation so they have dists
-            for entry in pool:
-                if entry["dists"] is None:
-                    dists, entry["s"] = entry["f"](y, entry["s"])
-                    entry["dists"] = dists
-                    entry["age"] += 1
-                    for h in range(k):
-                        entry["queues"][h].append(entry["dists"][h])
+        if state["n_obs"] % expand_interval == 0 and state["n_obs"] > 10:
+            new_children = _expand(pool, k, expand_top_n, max_depth)
+            # Replay history through new children so they join warm
+            for child in new_children:
+                _warmup(child, state["buffer"], k)
+            pool.extend(new_children)
             _prune(pool, prune_threshold, max_pool, k)
 
         # 5. Combine predictions via softmax weights
@@ -149,10 +150,32 @@ def _make_entry(skater_fn, depth: int, recipe: list[str], k: int) -> dict:
         "depth": depth,
         "recipe": recipe,    # list of transform names (for building children)
         "age": 0,
+        "warmed": False,     # becomes True after warmup/initial burn-in
         "log_w": [0.0] * k,
         "queues": [deque() for _ in range(k)],
         "dists": None,
     }
+
+
+def _warmup(entry: dict, buffer: deque, k: int):
+    """Replay a history buffer through a candidate to warm up its state.
+
+    Runs silently — no scoring, just state building. After warmup the
+    candidate has meaningful internal state and its last prediction
+    is queued for scoring on the next real observation.
+    """
+    for y in buffer:
+        dists, entry["s"] = entry["f"](y, entry["s"])
+        entry["dists"] = dists
+        entry["age"] += 1
+
+    # Queue the last prediction for scoring
+    if entry["dists"] is not None:
+        for h in range(k):
+            entry["queues"][h].clear()
+            entry["queues"][h].append(entry["dists"][h])
+
+    entry["warmed"] = True
 
 
 def _init_pool(k: int) -> list[dict]:
@@ -160,24 +183,29 @@ def _init_pool(k: int) -> list[dict]:
     pool = []
 
     # Depth 0: just a leaf
-    pool.append(_make_entry(leaf(k=k), depth=0, recipe=[], k=k))
+    entry = _make_entry(leaf(k=k), depth=0, recipe=[], k=k)
+    entry["warmed"] = True  # initial candidates score from the start
+    pool.append(entry)
 
     # Depth 1: each single transform applied to leaf
     for t_name, t_factory in TRANSFORMS:
         f = conjugate(leaf(k=k), t_factory(), k=k)
         f.__name__ = f"{t_name}|leaf"
-        pool.append(_make_entry(f, depth=1, recipe=[t_name], k=k))
+        entry = _make_entry(f, depth=1, recipe=[t_name], k=k)
+        entry["warmed"] = True
+        pool.append(entry)
 
     return pool
 
 
-def _expand(pool: list[dict], k: int, top_n: int, max_depth: int):
-    """Take the top performers and create children by conjugating with each transform."""
-    # Score by average log-weight across horizons
+def _expand(pool: list[dict], k: int, top_n: int, max_depth: int) -> list[dict]:
+    """Take the top performers and create children.
+
+    Returns the new children (not yet added to pool).
+    """
     scored = [(sum(e["log_w"]) / k, i, e) for i, e in enumerate(pool)]
     scored.sort(reverse=True)
 
-    # Track existing recipes to avoid duplicates
     existing = {tuple(e["recipe"]) for e in pool}
 
     children = []
@@ -186,7 +214,6 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int):
             continue
 
         for t_name, t_factory in TRANSFORMS:
-            # Don't apply the same transform twice in a row
             if parent["recipe"] and parent["recipe"][-1] == t_name:
                 continue
 
@@ -195,16 +222,13 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int):
                 continue
             existing.add(tuple(new_recipe))
 
-            # Build the child: conjugate the parent's architecture with the new transform
-            # We need to rebuild from the recipe since we can't retroactively
-            # wrap a running skater
             child_fn = _build_from_recipe(new_recipe, k)
             child_fn.__name__ = "|".join(new_recipe) + "|leaf"
             children.append(_make_entry(
                 child_fn, depth=len(new_recipe), recipe=new_recipe, k=k
             ))
 
-    pool.extend(children)
+    return children
 
 
 def _build_from_recipe(recipe: list[str], k: int):
@@ -221,10 +245,8 @@ def _prune(pool: list[dict], threshold: float, max_pool: int, k: int):
     if len(pool) <= 1:
         return
 
-    # Find the leader's log-weight (average across horizons)
     best = max(sum(e["log_w"]) / k for e in pool)
 
-    # Remove entries far behind the leader
     i = 0
     while i < len(pool):
         avg_w = sum(pool[i]["log_w"]) / k
@@ -233,7 +255,6 @@ def _prune(pool: list[dict], threshold: float, max_pool: int, k: int):
         else:
             i += 1
 
-    # If still over budget, remove the weakest
     while len(pool) > max_pool:
         worst_idx = min(range(len(pool)), key=lambda i: sum(pool[i]["log_w"]) / k)
         pool.pop(worst_idx)
