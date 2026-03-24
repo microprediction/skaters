@@ -45,10 +45,10 @@ f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
 |--------|-------|-------|--------|-----------|----------|
 | `holt` | Holt 1957 | Differencing + Holt linear | 0.50 | 0.02 | Trending data |
 | `hosking` | Hosking 1981 | Fractional differencing | 0.50 | 0.01 | Long memory |
-| `laplace` | Laplace | Uniform | 0.80 | 0.005 | General purpose |
+| `laplace` | Laplace | Uniform | 0.80 | 0.005 | **General purpose (recommended default)** |
 | `samuelson` | Samuelson 1965 | Drift + Holt | 0.40 | 0.01 | Persistent drift (GDP, prices) |
 | `wald` | Wald | Depth 0 | 0.15 | 0.08 | Adversarial, non-stationary |
-| `dantzig` | Dantzig 1947 | Adaptive search | 0.50 | 0.02 | Compute-constrained |
+| `dantzig` | Dantzig 1947 | Adaptive search | 0.30 | 0.01 | Adaptive (grows pool online) |
 
 Or tune directly:
 

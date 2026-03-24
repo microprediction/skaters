@@ -21,6 +21,7 @@ from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
     garch, power_transform, drift, holt_linear, ar, theta,
+    seasonal_difference,
 )
 from skaters.search import search as adaptive_search
 from skaters.bayesian import bayesian_ensemble
@@ -75,6 +76,20 @@ def _build_candidates(k: int):
     for a, b in [(0.1, 0.02), (0.1, 0.05), (0.3, 0.1)]:
         candidates.append(conjugate(leaf(k=k), holt_linear(alpha=a, beta=b), k=k))
         depths.append(1)
+
+    # Depth 1: Seasonal differencing (common periods)
+    for period in [7, 12, 24]:
+        candidates.append(conjugate(leaf(k=k), seasonal_difference(period), k=k))
+        depths.append(1)
+
+    # Depth 2: Seasonal differencing + EMA
+    for period in [7, 12, 24]:
+        for alpha in [0.05, 0.1]:
+            candidates.append(
+                conjugate(conjugate(leaf(k=k), ema_transform(alpha), k=k),
+                          seasonal_difference(period), k=k)
+            )
+            depths.append(2)
 
     # Depth 2: differencing + EMA
     for alpha in [0.05, 0.1, 0.3]:
@@ -274,21 +289,20 @@ def wald(k: int = 1):
 
 
 def dantzig(k: int = 1):
-    """Dantzig's policy: optimize under constraints.
+    """Dantzig's policy: adaptive search over the transform grammar.
 
-    After George Dantzig (1947). Uses adaptive search with a tight
-    compute budget — only cheap transforms (cost <= 5 per candidate).
-    Excludes fractional differencing and other expensive operations.
-    Best when you need fast predictions on high-frequency data.
+    After George Dantzig (1947). Uses adaptive search that grows the
+    candidate pool online — expanding top performers and pruning losers.
     """
     f = adaptive_search(
         k=k,
-        learning_rate=0.5,
-        complexity_penalty=0.02,
-        max_pool=15,
-        expand_interval=100,
-        max_depth=2,
-        cost_budget=5.0,
+        learning_rate=0.3,
+        complexity_penalty=0.01,
+        max_pool=40,
+        expand_interval=50,
+        expand_top_n=5,
+        max_depth=3,
+        cost_budget=10.0,
     )
     f.__name__ = f"dantzig(k={k})"
     return f

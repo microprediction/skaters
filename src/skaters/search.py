@@ -60,6 +60,9 @@ TRANSFORMS = [
     ("drift(0.01)", lambda: drift(alpha=0.01, shrinkage=0.002), 1),
     ("holt(0.1,0.05)", lambda: holt_linear(0.1, 0.05), 1),
     ("holt(0.3,0.1)", lambda: holt_linear(0.3, 0.1), 1),
+    ("seas(7)", lambda: seasonal_difference(7), 1),
+    ("seas(12)", lambda: seasonal_difference(12), 1),
+    ("seas(24)", lambda: seasonal_difference(24), 1),
 ]
 
 

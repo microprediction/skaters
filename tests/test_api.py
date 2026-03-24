@@ -84,7 +84,7 @@ def test_dantzig_excludes_expensive():
         x, state = f(random.gauss(0, 1), state)
     # Check that all candidates are cheap
     for entry in state["pool"]:
-        assert entry["cost"] <= 5.0, f"expensive candidate in dantzig: cost={entry['cost']}, recipe={entry['recipe']}"
+        assert entry["cost"] <= 10.0, f"expensive candidate in dantzig: cost={entry['cost']}, recipe={entry['recipe']}"
 
 
 def test_cost_budget_limits_search():
