@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — fast online univariate time series</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+    onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+  <style>
+    :root {
+      --bg: #fafafa; --panel: #fff; --text: #1a1a1a; --muted: #5a5a5a;
+      --accent: #4a3aff; --border: #e2e2e2; --code-bg: #f3f3f7;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.55; font-size: 17px;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header.site-header { background: #1f1d3d; color: #fff; padding: 14px 24px; border-bottom: 1px solid #15132a; }
+    header.site-header .nav-inner { max-width: 860px; margin: 0 auto; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    header.site-header .brand { font-weight: 600; font-size: 1.1rem; color: #fff; }
+    header.site-header nav { display: flex; flex-wrap: wrap; gap: 0 18px; }
+    header.site-header nav a { color: #fff; opacity: 0.85; font-size: 0.95rem; }
+    header.site-header nav a:hover { opacity: 1; }
+    main { max-width: 860px; margin: 32px auto; padding: 0 24px 60px; }
+    h1 { font-size: 2.1rem; margin: 0 0 4px; line-height: 1.2; }
+    .subtitle { color: var(--muted); font-size: 1.1rem; margin: 0 0 28px; }
+    h2 { font-size: 1.35rem; margin: 2.2em 0 0.6em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    h3 { font-size: 1.08rem; margin: 1.6em 0 0.4em; }
+    p, ul, ol { font-size: 1rem; }
+    ul, ol { padding-left: 1.4em; }
+    li { margin-bottom: 6px; }
+    code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-size: 0.92em; font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
+    pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+    pre code { background: none; padding: 0; }
+    .callout { background: #f1f0fb; border-left: 3px solid var(--accent); padding: 12px 18px; border-radius: 4px; margin: 18px 0; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+    .tag { background: #ece9ff; color: var(--accent); border-radius: 3px; padding: 2px 8px; font-size: 0.8rem; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.92rem; margin: 14px 0; }
+    table th, table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+    table th { background: #efeefa; font-weight: 600; }
+    table td code { font-size: 0.86em; }
+    footer { max-width: 860px; margin: 40px auto 24px; padding: 16px 24px; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="./">skaters</a>
+      <nav>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+        <a href="https://github.com/microprediction/skaters/tree/main/examples">Examples</a>
+        <a href="https://github.com/microprediction/timemachines">timemachines</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>skaters</h1>
+    <p class="subtitle">Fast online univariate time series. Zero dependencies. Runs in <a href="https://pyodide.org/">Pyodide</a>.</p>
+
+    <div class="tag-row">
+      <span class="tag">distributional</span>
+      <span class="tag">O(1) per observation</span>
+      <span class="tag">pure Python</span>
+      <span class="tag">browser-compatible</span>
+      <span class="tag">composable</span>
+    </div>
+
+    <p>
+      <code>pip install skaters</code>. Every prediction is a <code>Dist</code> — a weighted
+      Gaussian mixture — not a point estimate. Transforms compose, ensembles nest, and the whole
+      stack runs in the browser via WebAssembly.
+    </p>
+
+    <h2>Quick start</h2>
+<pre><code>from skaters import skater
+
+f = skater(k=3)
+state = None
+for y in observations:
+    dists, state = f(y, state)
+    dists[0].mean              # point forecast
+    dists[0].std               # uncertainty
+    dists[0].quantile(0.975)   # 95th percentile
+    dists[0].logpdf(y)         # log-likelihood
+    dists[0].cdf(y)            # CDF at y</code></pre>
+    <p>
+      Every skater returns <code>list[Dist]</code> &mdash; one weighted mixture per horizon
+      $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all
+      facets of the same object.
+    </p>
+
+    <h2>Named search policies</h2>
+    <p>
+      Every named function builds a Bayesian ensemble over the same full candidate population.
+      The names represent different <em>search strategies</em> &mdash; different priors, learning
+      rates, and complexity penalties &mdash; not different models.
+    </p>
+<pre><code>from skaters import holt, hosking, laplace, samuelson, wald, dantzig
+
+f = holt(k=1)       # expect trends (Holt 1957)
+f = hosking(k=1)    # expect long memory (Hosking 1981)
+f = laplace(k=1)    # no opinion — let the data decide
+f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
+f = wald(k=1)       # minimax caution (Wald)
+f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)</code></pre>
+
+    <table>
+      <thead><tr><th>Policy</th><th>After</th><th>Prior</th><th>$\eta$</th><th>$\lambda$</th><th>Best for</th></tr></thead>
+      <tbody>
+        <tr><td><code>holt</code></td><td>Holt 1957</td><td>Differencing + Holt linear</td><td>0.50</td><td>0.02</td><td>Trending data</td></tr>
+        <tr><td><code>hosking</code></td><td>Hosking 1981</td><td>Fractional differencing</td><td>0.50</td><td>0.01</td><td>Long memory</td></tr>
+        <tr><td><code>laplace</code></td><td>Laplace</td><td>Uniform</td><td>0.80</td><td>0.005</td><td><strong>General purpose (default)</strong></td></tr>
+        <tr><td><code>samuelson</code></td><td>Samuelson 1965</td><td>Drift + Holt</td><td>0.40</td><td>0.01</td><td>Persistent drift (GDP, prices)</td></tr>
+        <tr><td><code>wald</code></td><td>Wald</td><td>Depth 0</td><td>0.15</td><td>0.08</td><td>Adversarial, non-stationary</td></tr>
+        <tr><td><code>dantzig</code></td><td>Dantzig 1947</td><td>Adaptive search</td><td>0.30</td><td>0.01</td><td>Adaptive (grows pool online)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Architecture: transforms all the way down</h2>
+    <p>
+      Every model in <code>skaters</code> is a chain of bijective transforms with a distributional
+      leaf at the bottom:
+    </p>
+    <p style="text-align:center">
+      $y \;\xrightarrow{T_1}\; y' \;\xrightarrow{T_2}\; y'' \;\xrightarrow{\cdots}\;
+       \text{leaf} \;\rightarrow\; \hat{D}$
+    </p>
+    <p>
+      The leaf estimates $\hat{D} = \mathcal{N}(0, \hat\sigma^2)$ from residuals via
+      Welford&apos;s algorithm. Predictions in the original space come from inverting the
+      transform chain:
+      $\hat{D}_{\text{original}} = T_1^{-1}\bigl(T_2^{-1}\bigl(\cdots(\hat{D})\bigr)\bigr).$
+    </p>
+    <p>
+      Every node returns a <code>list[Dist]</code>. There is no separate &ldquo;point
+      forecast&rdquo; vs &ldquo;uncertainty&rdquo; &mdash; both are aspects of the same
+      $\hat{D}$. An EMA doesn&apos;t &ldquo;predict&rdquo;; it strips off a running level
+      $\ell_t$, leaving simpler residuals $\varepsilon_t = y_t - \ell_t$, and the prediction is
+      whatever the leaf&apos;s estimate becomes when run back through the inverse.
+    </p>
+
+    <h3>Transforms</h3>
+    <table>
+      <thead><tr><th>Transform</th><th>Forward</th><th>Use case</th></tr></thead>
+      <tbody>
+        <tr><td><code>ema_transform(α)</code></td><td>$y'_t = y_t - \ell_t$</td><td>Remove level</td></tr>
+        <tr><td><code>difference()</code></td><td>$y'_t = y_t - y_{t-1}$</td><td>Random walk</td></tr>
+        <tr><td><code>drift(α, λ)</code></td><td>$y'_t = \Delta y_t - \hat\mu_t$</td><td>Random walk + drift</td></tr>
+        <tr><td><code>holt_linear(α, β)</code></td><td>$y'_t = y_t - (\ell_t + b_t)$</td><td>Level + trend (Holt 1957)</td></tr>
+        <tr><td><code>ar(p)</code></td><td>$y'_t = y_t - \sum \hat\phi_j y_{t-j}$</td><td>Autoregression (online RLS)</td></tr>
+        <tr><td><code>fractional_difference(d)</code></td><td>$y'_t = (1-B)^d y_t$</td><td>Long memory</td></tr>
+        <tr><td><code>standardize(α)</code></td><td>$y'_t = (y_t - \hat\mu_t)/\hat\sigma_t$</td><td>Remove scale</td></tr>
+        <tr><td><code>garch(ω, α, β)</code></td><td>$y'_t = y_t / \hat\sigma_t$</td><td>Volatility clustering</td></tr>
+        <tr><td><code>seasonal_difference(s)</code></td><td>$y'_t = y_t - y_{t-s}$</td><td>Periodicity</td></tr>
+        <tr><td><code>power_transform(p)</code></td><td>$y'_t = \mathrm{sgn}(y_t)|y_t|^p$</td><td>Tail compression</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Conjugation</h2>
+    <p>
+      Transforms compose via conjugation. Given a transform $T$ and a skater $f$,
+      $f_{\text{conj}}(y) = T^{-1}\bigl(f\bigl(T(y)\bigr)\bigr).$
+    </p>
+<pre><code>from skaters import conjugate, ema, difference, standardize
+
+# diff removes trend, then EMA predicts the differenced series
+f = conjugate(ema(alpha=0.1, k=3), difference(), k=3)
+
+# Chain: standardize, then difference, then EMA
+f = conjugate(
+    conjugate(ema(alpha=0.1, k=3), difference(), k=3),
+    standardize(),
+    k=3,
+)
+# canonical name: std|diff|ema_t|leaf</code></pre>
+
+    <h2>Ensembles</h2>
+    <h3>Precision-weighted (MSE)</h3>
+    <p>Weights by $w_i \propto 1/\text{MSE}_i$ where $\text{MSE} = \text{bias}^2 + \text{variance}$.</p>
+<pre><code>from skaters import precision_weighted_ensemble, ema
+
+f = precision_weighted_ensemble([
+    ema(alpha=0.05, k=1),
+    ema(alpha=0.2, k=1),
+], k=1)</code></pre>
+
+    <h3>Bayesian (log-likelihood with XGBoost-inspired regularisation)</h3>
+    <p>
+      Each model accumulates a log-weight updated at every observation:
+      $\log w_i \mathrel{+}= \eta \cdot \log p_i(y_t) - \lambda \cdot d_i,$
+      where $\eta$ is the learning rate (shrinkage), $\lambda$ is the complexity penalty, and
+      $d_i$ is the model&apos;s depth. Predictions are combined via
+      <code>Dist.combine</code> with softmax weights.
+    </p>
+<pre><code>from skaters import bayesian_ensemble, ema
+
+f = bayesian_ensemble(
+    [ema(alpha=0.05, k=1), ema(alpha=0.2, k=1)],
+    k=1,
+    learning_rate=0.5,       # eta: prevents over-concentrating
+    complexity_penalty=0.02, # lambda: penalises deeper chains
+    depths=[1, 1],
+)</code></pre>
+
+    <h3>Adaptive search</h3>
+    <p>Beam search over the transform grammar. Grows the candidate population online:
+    expand top performers with new transforms, replay recent history to warm-start, prune losers.</p>
+<pre><code>from skaters import search
+
+f = search(
+    k=1,
+    expand_interval=100,   # expand top performers every 100 obs
+    max_depth=3,           # max transform chain depth
+    replay_buffer=500,     # warm-start new candidates on recent history
+    max_pool=30,
+)</code></pre>
+
+    <h2>Design</h2>
+    <ul>
+      <li><strong>Online only</strong> &mdash; $O(1)$ per observation, no batch recomputation.</li>
+      <li><strong>Distributional</strong> &mdash; every prediction is a <code>Dist</code>, not a
+        point estimate.</li>
+      <li><strong>Composable</strong> &mdash; transforms chain, ensembles nest, everything returns
+        <code>Dist</code>.</li>
+      <li><strong>Pure Python</strong> &mdash; zero dependencies. Only <code>math.erf</code> and
+        <code>math.exp</code>.</li>
+      <li><strong>Pyodide compatible</strong> &mdash; works in the browser via WebAssembly.</li>
+    </ul>
+
+    <h2>Lineage</h2>
+    <p>
+      This package distills ideas from
+      <a href="https://github.com/microprediction/timemachines"><code>timemachines</code></a>, which
+      provided a common skater interface for dozens of time series packages. <code>skaters</code>
+      is a from-scratch rewrite focused on speed, distributional predictions, and browser
+      compatibility.
+    </p>
+
+    <h2>Get the source</h2>
+    <p>
+      <a href="https://github.com/microprediction/skaters">github.com/microprediction/skaters</a>
+      &middot;
+      <a href="https://pypi.org/project/skaters/"><code>pip install skaters</code></a>
+      &middot;
+      <a href="https://github.com/microprediction/skaters/tree/main/examples">Examples</a>
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>
