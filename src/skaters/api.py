@@ -37,10 +37,13 @@ def _build_candidates(k: int):
     Every search policy considers ALL of these. The policy only
     affects how they are weighted, not which ones are included.
 
-    Returns (candidates, depths).
+    Returns (candidates, depths, groups), where groups maps a logical
+    block name to the list of candidate indices in that block. Policies
+    express priors by boosting a named group instead of magic indices.
     """
     candidates = []
     depths = []
+    groups: dict[str, list[int]] = {}
 
     # Depth 0: just noise (baseline)
     candidates.append(leaf(k=k))
@@ -52,14 +55,18 @@ def _build_candidates(k: int):
         depths.append(1)
 
     # Depth 1: differencing + leaf (pure random walk)
+    groups["diff"] = []
     candidates.append(conjugate(leaf(k=k), difference(), k=k))
     depths.append(1)
+    groups["diff"].append(len(candidates) - 1)
 
     # Depth 1: drift + leaf (random walk with adaptive drift)
     # Multiple speeds: fast drift detection vs long-memory drift
+    groups["drift"] = []
     for a, s in [(0.05, 0.01), (0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
         candidates.append(conjugate(leaf(k=k), drift(alpha=a, shrinkage=s), k=k))
         depths.append(1)
+        groups["drift"].append(len(candidates) - 1)
 
     # Depth 1: Theta method (SES + half OLS slope)
     for a in [0.05, 0.1, 0.3]:
@@ -73,9 +80,11 @@ def _build_candidates(k: int):
     depths.append(1)
 
     # Depth 1: Holt linear (level + trend, single transform)
+    groups["holt"] = []
     for a, b in [(0.1, 0.02), (0.1, 0.05), (0.3, 0.1)]:
         candidates.append(conjugate(leaf(k=k), holt_linear(alpha=a, beta=b), k=k))
         depths.append(1)
+        groups["holt"].append(len(candidates) - 1)
 
     # Depth 1: Seasonal differencing (common periods)
     for period in [7, 12, 24]:
@@ -97,6 +106,7 @@ def _build_candidates(k: int):
             conjugate(conjugate(leaf(k=k), ema_transform(alpha), k=k), difference(), k=k)
         )
         depths.append(2)
+        groups["diff"].append(len(candidates) - 1)
 
     # Depth 2: standardize + EMA
     for alpha in [0.05, 0.1]:
@@ -106,12 +116,14 @@ def _build_candidates(k: int):
         depths.append(2)
 
     # Depth 2: fractional diff + EMA
+    groups["frac"] = []
     for d in [0.2, 0.4]:
         candidates.append(
             conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k),
                       fractional_difference(d=d, window=30), k=k)
         )
         depths.append(2)
+        groups["frac"].append(len(candidates) - 1)
 
     # Depth 2: drift + EMA (drift removal then level tracking)
     for a_drift, s_drift in [(0.002, 0.001), (0.0005, 0.0002)]:
@@ -121,6 +133,7 @@ def _build_candidates(k: int):
                           drift(alpha=a_drift, shrinkage=s_drift), k=k)
             )
             depths.append(2)
+            groups["drift"].append(len(candidates) - 1)
 
     # Depth 2: drift + Holt linear (drift on top of level+trend)
     candidates.append(
@@ -128,6 +141,8 @@ def _build_candidates(k: int):
                   drift(alpha=0.001, shrinkage=0.0005), k=k)
     )
     depths.append(2)
+    groups["drift"].append(len(candidates) - 1)
+    groups["holt"].append(len(candidates) - 1)
 
     # Depth 2: GARCH + EMA (volatility-adapted)
     candidates.append(
@@ -141,21 +156,43 @@ def _build_candidates(k: int):
     )
     depths.append(2)
 
-    return candidates, depths
+    # Depth 2: "thinking fast and slow" — a fast process tracker on the
+    # OUTSIDE, a slowly-varying residual scale (standardize) on the INSIDE,
+    # the plain Gaussian leaf at the bottom.
+    #
+    #     y --[fast tracker]--> residual --[slow standardize]--> z --> leaf
+    #
+    # The mean reacts to every observation; the residual *distribution*
+    # drifts slowly — at a timescale an order of magnitude slower than the
+    # mean. The scale half-life is spread over two values so the ensemble
+    # can match how fast the noise actually drifts. No new primitive is
+    # needed — this is purely a composition of existing transforms.
+    def _fast_trackers():
+        return [
+            ema_transform(0.3),
+            ema_transform(0.5),
+            holt_linear(alpha=0.4, beta=0.2),
+            ar(1),
+            drift(alpha=0.05, shrinkage=0.01),
+            difference(),
+        ]
+
+    groups["fast_slow"] = []
+    for scale_alpha in [0.02, 0.05]:  # slow residual scale, two timescales
+        for tracker in _fast_trackers():
+            slow_scale = standardize(alpha=scale_alpha)
+            candidates.append(
+                conjugate(conjugate(leaf(k=k), slow_scale, k=k), tracker, k=k)
+            )
+            depths.append(2)
+            groups["fast_slow"].append(len(candidates) - 1)
+
+    return candidates, depths, groups
 
 
 def _prior_favoring_depths(depths: list[int], favored: set[int], boost: float = 2.0) -> list[float]:
     """Compute prior log-weights that boost candidates at certain depths."""
     return [boost if d in favored else 0.0 for d in depths]
-
-
-def _prior_favoring_transform(candidates: list, transform_name: str, boost: float = 3.0) -> list[float]:
-    """Boost candidates that contain a specific transform in their name."""
-    prior = []
-    for c in candidates:
-        name = getattr(c, '__name__', '')
-        prior.append(boost if transform_name in name else 0.0)
-    return prior
 
 
 def _prior_favoring_indices(n: int, favored: set[int], boost: float = 2.0) -> list[float]:
@@ -183,7 +220,7 @@ def skater(k: int = 1, aggressiveness: float = 0.5):
     learning_rate = 0.1 + 0.8 * aggressiveness
     complexity_penalty = 0.05 * (1 - aggressiveness)
 
-    candidates, depths = _build_candidates(k)
+    candidates, depths, _ = _build_candidates(k)
     f = bayesian_ensemble(
         candidates, k=k,
         learning_rate=learning_rate,
@@ -209,9 +246,10 @@ def holt(k: int = 1):
     that capture trends. Moderate complexity penalty. Best when the
     series has persistent drift or momentum.
     """
-    candidates, depths = _build_candidates(k)
-    # Boost differencing models (indices 5-8: diff+leaf and diff+EMA variants)
-    prior = _prior_favoring_indices(len(candidates), favored={5, 6, 7, 8}, boost=3.0)
+    candidates, depths, groups = _build_candidates(k)
+    # Boost the trend-capturing families: differencing, drift, Holt linear.
+    trend = set(groups["diff"]) | set(groups["drift"]) | set(groups["holt"])
+    prior = _prior_favoring_indices(len(candidates), favored=trend, boost=3.0)
     f = bayesian_ensemble(
         candidates, k=k,
         learning_rate=0.5,
@@ -231,10 +269,9 @@ def hosking(k: int = 1):
     models that capture long-range dependence. Tolerates depth-2
     complexity. Best for series with slowly decaying autocorrelation.
     """
-    candidates, depths = _build_candidates(k)
-    # Boost fractional diff models (last 2 candidates)
-    n = len(candidates)
-    prior = _prior_favoring_indices(n, favored={n - 2, n - 1}, boost=3.0)
+    candidates, depths, groups = _build_candidates(k)
+    # Boost the fractional-differencing models (by name, not magic index)
+    prior = _prior_favoring_indices(len(candidates), favored=set(groups["frac"]), boost=3.0)
     f = bayesian_ensemble(
         candidates, k=k,
         learning_rate=0.5,
@@ -254,7 +291,7 @@ def laplace(k: int = 1):
     model class. Pure Bayesian updating. Learning rate close to 1 for
     fast convergence. Minimal complexity penalty. Let the data speak.
     """
-    candidates, depths = _build_candidates(k)
+    candidates, depths, _ = _build_candidates(k)
     f = bayesian_ensemble(
         candidates, k=k,
         learning_rate=0.8,
@@ -274,7 +311,7 @@ def wald(k: int = 1):
     fooled by short-term patterns. Best in adversarial or highly
     non-stationary environments.
     """
-    candidates, depths = _build_candidates(k)
+    candidates, depths, _ = _build_candidates(k)
     prior = _prior_favoring_depths(depths, favored={0}, boost=2.0)
     f = bayesian_ensemble(
         candidates, k=k,
@@ -319,23 +356,14 @@ def samuelson(k: int = 1):
     Best for series with persistent but slowly varying drift — GDP,
     population, prices with inflation.
     """
-    candidates, depths = _build_candidates(k)
+    candidates, depths, groups = _build_candidates(k)
 
-    # Build prior: strongly boost drift and holt_linear candidates
-    # We identify them by their position in the candidate pool
-    # (see _build_candidates for the layout)
-    n = len(candidates)
-    prior = [0.0] * n
-    for i in range(n):
-        d = depths[i]
-        # Depth-1 drift and holt_linear candidates get a big boost
-        # Depth-2 drift-containing candidates get a moderate boost
-        # Everything else gets no boost
-        if d == 1 and i >= 6:
-            # drift|leaf and holt|leaf candidates (after diff|leaf at index 5)
-            prior[i] = 5.0
-        elif d == 2:
-            prior[i] = 2.0  # depth-2 candidates that may contain drift
+    # Strong prior on the drift and Holt-linear families (Samuelson's
+    # geometric-drift random walk); a moderate prior on the remaining
+    # depth-2 chains, which may compose drift with smoothing.
+    prior = _prior_favoring_depths(depths, favored={2}, boost=2.0)
+    for i in set(groups["drift"]) | set(groups["holt"]):
+        prior[i] = 5.0
 
     f = bayesian_ensemble(
         candidates, k=k,
@@ -349,4 +377,49 @@ def samuelson(k: int = 1):
     return f
 
 
+# ---------------------------------------------------------------------------
+# Kahneman's policy: think fast and slow
+# ---------------------------------------------------------------------------
+
+def kahneman(k: int = 1, strength: float = 8.0):
+    """Kahneman's policy: think fast and slow.
+
+    After Daniel Kahneman's *Thinking, Fast and Slow*. This is a prior,
+    not a new model — it draws on the same shared candidate population as
+    every other policy. It simply places a strong prior on the candidates
+    that embody the two-systems structure: a **fast** underlying-process
+    tracker (System 1: reactive EMA, Holt, AR, drift) on the outside, and
+    a **slowly-varying** residual scale (System 2: ``standardize`` with a
+    long half-life) on the inside, over the plain Gaussian leaf.
+
+    The point forecast reacts to every observation; the predicted
+    *distribution* of the residuals drifts slowly. Because these
+    candidates live in the shared pool, any policy (e.g. ``laplace``) can
+    discover the pattern on its own — Kahneman just bets on it up front.
+
+    Args:
+        k: forecast horizon.
+        strength: prior log-weight boost on the fast/slow candidates.
+            Larger = a more committed bet on the two-systems structure. On
+            slowly-varying-noise data a strong bet adapts faster than a
+            uniform prior; on stationary data it costs a little early. The
+            default trades these off (see examples/benchmark_kahneman.py).
+
+    Best for series whose signal moves quickly but whose noise level is
+    persistent — most financial and operational series.
+    """
+    candidates, depths, groups = _build_candidates(k)
+    prior = _prior_favoring_indices(
+        len(candidates), favored=set(groups["fast_slow"]), boost=strength
+    )
+    f = bayesian_ensemble(
+        candidates, k=k,
+        learning_rate=0.5,
+        complexity_penalty=0.01,
+        depths=depths,
+        prior_log_weights=prior,
+        max_components=15,
+    )
+    f.__name__ = f"kahneman(k={k})"
+    return f
 
