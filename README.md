@@ -28,7 +28,7 @@ Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horiz
 
 ## Named search policies
 
-Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models. They are nmenomics in some instances (e.g. Kahneman is an homage but sourced from timemachines package (Cotton)). 
+Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models. 
 
 ```python
 from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman
@@ -52,11 +52,10 @@ f = kahneman(k=1)   # think fast and slow (after timemachines)
 | `dantzig` | Dantzig 1947 | Adaptive search | 0.30 | 0.01 | Adaptive (grows pool online) |
 | `kahneman` | timemachines | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
 
-`kahneman` (a nod to `thinking_fast_and_slow` in
-[timemachines](https://github.com/microprediction/timemachines)) puts a strong
+They are nmenomics in some instances. For example `kahneman` (a nod to `thinking_fast_and_slow` in
+[timemachines](https://github.com/microprediction/timemachines)) and puts a strong
 prior on candidates with a **fast** process tracker outside and a **slowly-varying**
-residual scale inside — the mean reacts every step, the noise law drifts slowly.
-Tune the bet with `kahneman(k=1, strength=8)`; see `examples/benchmark_kahneman.py`.
+residual scale inside. Tune the bet with `kahneman(k=1, strength=8)`; see `examples/benchmark_kahneman.py`.
 
 Or tune directly:
 
