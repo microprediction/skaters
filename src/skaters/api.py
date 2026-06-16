@@ -185,15 +185,6 @@ def _prior_favoring_depths(depths: list[int], favored: set[int], boost: float = 
     return [boost if d in favored else 0.0 for d in depths]
 
 
-def _prior_favoring_transform(candidates: list, transform_name: str, boost: float = 3.0) -> list[float]:
-    """Boost candidates that contain a specific transform in their name."""
-    prior = []
-    for c in candidates:
-        name = getattr(c, '__name__', '')
-        prior.append(boost if transform_name in name else 0.0)
-    return prior
-
-
 def _prior_favoring_indices(n: int, favored: set[int], boost: float = 2.0) -> list[float]:
     """Compute prior log-weights that boost specific candidate indices."""
     return [boost if i in favored else 0.0 for i in range(n)]

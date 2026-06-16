@@ -126,6 +126,30 @@ f = kahneman(k=1)   # think fast and slow (Kahneman 2011)</code></pre>
       </tbody>
     </table>
 
+    <h3>Kahneman: thinking fast and slow</h3>
+    <p>
+      <code>kahneman</code> is a <em>prior</em>, not a new model. The architecture already
+      factors every skater into a fast part (the transform chain, which tracks the process)
+      and a slow part (the leaf, which estimates the residual law). So &ldquo;thinking fast and
+      slow&rdquo; is just a strong prior on the shared-pool candidates that put a
+      <strong>fast</strong> tracker (reactive EMA, Holt, AR, drift) on the outside and a
+      <strong>slowly-varying</strong> residual scale (<code>standardize</code> with a long
+      half-life) on the inside:
+    </p>
+    <p style="text-align:center">
+      $y \;\xrightarrow{\text{fast tracker}}\; \text{residual}
+        \;\xrightarrow{\text{slow standardize}}\; z \;\rightarrow\; \text{leaf}$
+    </p>
+    <p>
+      The point forecast reacts to every observation; the residual <em>distribution</em>
+      drifts slowly. Because these candidates live in the shared pool, any policy can discover
+      the structure on its own &mdash; Kahneman just bets on it up front, with a tunable
+      <code>strength</code>. When the noise really is slowly varying, tracking the residual
+      scale beats a constant variance by a wide margin, and the prior adapts faster than a
+      uniform one in the first few hundred observations; on stationary data the same bet costs
+      a little. See <code>examples/benchmark_kahneman.py</code>.
+    </p>
+
     <h2>Architecture: transforms all the way down</h2>
     <p>
       Every model in <code>skaters</code> is a chain of bijective transforms with a distributional
