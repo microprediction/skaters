@@ -1,6 +1,16 @@
 # skaters
 
-Fast univariate online time series models. Zero dependencies. Runs in [Pyodide](https://pyodide.org/).
+Fast univariate online time series models — in **Python _and_ JavaScript**. Zero dependencies. Runs natively in the browser or in [Pyodide](https://pyodide.org/).
+
+<p align="center">
+  <a href="https://skaters.microprediction.org/"><img src="https://img.shields.io/badge/docs%20%26%20live%20demos-skaters.microprediction.org-4a3aff?style=for-the-badge" alt="Documentation and live demos"></a>
+  <a href="#javascript--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript-1a8c4a?style=for-the-badge" alt="Python and JavaScript"></a>
+</p>
+
+> **Python and JavaScript, verified identical.** The full library is ported to zero-dependency
+> JavaScript and checked against the Python reference to 1e-6. Use it [natively in the
+> browser](#javascript--the-browser) or via Pyodide — see the
+> [live demos](https://skaters.microprediction.org/demos/).
 
 ## Install
 
