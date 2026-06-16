@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — running in Pyodide</title>
+  <link rel="stylesheet" href="../academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="../">skaters</a>
+      <nav>
+        <a href="./">Demos</a>
+        <a href="./playground.html">Playground (JS)</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Running in Pyodide</h1>
+    <p class="subtitle">
+      The actual Python <code>skaters</code> package, compiled to WebAssembly and
+      executed in your browser — no server, no install. Pure Python, zero dependencies.
+    </p>
+
+    <div class="callout">
+      The JavaScript port on the <a href="./playground.html">playground</a> is fast and
+      offline. This page instead runs the <em>real Python</em> package via Pyodide — proof
+      that the same library you <code>pip install</code> runs unmodified in the browser. The
+      two are verified to agree to 1e-6 by the parity test suite.
+    </div>
+
+    <div class="panel">
+      <div class="controls">
+        <div class="control">
+          <label for="policy">Policy</label>
+          <select id="policy">
+            <option value="skater">skater</option>
+            <option value="laplace">laplace</option>
+          </select>
+        </div>
+        <button class="btn" id="run">Load Pyodide &amp; run</button>
+      </div>
+      <p class="status" id="status">Pyodide is ~10&nbsp;MB; the first run downloads it.</p>
+      <canvas class="plot" id="plot" width="940" height="400"></canvas>
+      <div class="legend">
+        <span><span class="swatch" style="background:#1a1a1a"></span>observation</span>
+        <span><span class="swatch" style="background:#4a3aff"></span>forecast mean</span>
+        <span><span class="swatch" style="background:#cdc7ff"></span>±2σ</span>
+      </div>
+    </div>
+
+    <h2>The code that runs</h2>
+    <pre><code>import micropip
+await micropip.install("skaters")
+
+import random, math
+from skaters import skater
+
+f = skater(k=1)
+state = None
+for y in series:           # one observation at a time
+    dists, state = f(y, state)
+    mean = dists[0].mean   # point forecast
+    std  = dists[0].std    # uncertainty</code></pre>
+  </main>
+
+  <footer>
+    skaters · <a href="https://github.com/microprediction/skaters">GitHub</a> ·
+    <a href="https://pyodide.org/">Pyodide</a>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+  <script>
+    const canvas = document.getElementById("plot");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height, PAD = 36;
+    const statusEl = document.getElementById("status");
+    let pyodide = null;
+
+    function draw(rows) {
+      ctx.clearRect(0, 0, W, H);
+      let ymin = Infinity, ymax = -Infinity;
+      for (const r of rows) {
+        ymin = Math.min(ymin, r.y, r.mean - 2 * r.std);
+        ymax = Math.max(ymax, r.y, r.mean + 2 * r.std);
+      }
+      const pad = (ymax - ymin) * 0.08 + 1e-9; ymin -= pad; ymax += pad;
+      const n = rows.length;
+      const X = (i) => PAD + (i / (n - 1)) * (W - 2 * PAD);
+      const Y = (v) => H - PAD - ((v - ymin) / (ymax - ymin)) * (H - 2 * PAD);
+
+      ctx.fillStyle = "rgba(74,58,255,0.16)";
+      ctx.beginPath();
+      for (let i = 1; i < n; i++) { const x = X(i), y = Y(rows[i].mean + 2 * rows[i].std); if (i === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      for (let i = n - 1; i >= 1; i--) ctx.lineTo(X(i), Y(rows[i].mean - 2 * rows[i].std));
+      ctx.closePath(); ctx.fill();
+
+      ctx.strokeStyle = "#4a3aff"; ctx.lineWidth = 1.8; ctx.beginPath();
+      for (let i = 1; i < n; i++) { const x = X(i), y = Y(rows[i].mean); if (i === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      ctx.stroke();
+
+      ctx.fillStyle = "#1a1a1a";
+      for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(X(i), Y(rows[i].y), 1.7, 0, 2 * Math.PI); ctx.fill(); }
+    }
+
+    async function run() {
+      const btn = document.getElementById("run");
+      btn.disabled = true;
+      try {
+        if (!pyodide) {
+          statusEl.textContent = "Loading Pyodide…";
+          pyodide = await loadPyodide();
+          statusEl.textContent = "Installing skaters (micropip)…";
+          await pyodide.loadPackage("micropip");
+          await pyodide.runPythonAsync(`import micropip\nawait micropip.install("skaters")`);
+        }
+        const policy = document.getElementById("policy").value;
+        statusEl.textContent = "Running the Python package…";
+        const json = await pyodide.runPythonAsync(`
+import random, math, json
+from skaters import ${policy}
+random.seed(7)
+series, lvl = [], 0.0
+for t in range(180):
+    lvl += random.gauss(0, 0.25)
+    series.append(lvl + 2.0*math.sin(2*math.pi*t/12) + random.gauss(0, 1.0))
+f = ${policy}(k=1)
+state, pending, rows = None, None, []
+for y in series:
+    if pending is not None:
+        d = pending[0]
+        rows.append({"y": y, "mean": d.mean, "std": d.std})
+    dists, state = f(y, state)
+    pending = dists
+json.dumps(rows)
+`);
+        draw(JSON.parse(json));
+        statusEl.textContent = "Done — this ran the real Python skaters package in your browser.";
+      } catch (e) {
+        statusEl.textContent = "Error: " + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+    document.getElementById("run").addEventListener("click", run);
+  </script>
+</body>
+</html>
