@@ -241,6 +241,30 @@ def my_transform():
     return forward, inverse_k
 ```
 
+## JavaScript & the browser
+
+The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
+transform, ensemble, and named policy. It is verified against the Python reference by a parity
+suite that checks 76,000+ values to 1e-6 (`parity/`, run in the test suite via
+`tests/test_js_parity.py`).
+
+```html
+<script type="module">
+  import { kahneman } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  const f = kahneman(1);
+  let state = null;
+  for (const y of observations) {
+    const [dists, st] = f(y, state); state = st;
+    dists[0].mean;            // point forecast
+    dists[0].quantile(0.975); // 97.5th percentile
+  }
+</script>
+```
+
+Interactive demos (forecasting playground in native JS, and the real Python package running in
+[Pyodide](https://pyodide.org/)) live at
+[skaters.microprediction.org/demos](https://skaters.microprediction.org/demos/).
+
 ## Design
 
 - **Online only** — $O(1)$ per observation, no batch recomputation
