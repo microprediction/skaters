@@ -9,6 +9,9 @@ import {
   difference, fractionalDifference, standardize, emaTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr,
 } from "../docs/js/skaters/transform.mjs";
+import {
+  skater, holt, hosking, laplace, wald, samuelson, kahneman,
+} from "../docs/js/skaters/api.mjs";
 
 export function buildScenarios() {
   const s = [];
@@ -35,5 +38,11 @@ export function buildScenarios() {
       [ema(0.05, k), conjugate(leaf(k), difference(), k)],
       { k, learningRate: 0.5, complexityPenalty: 0.02, depths: [1, 1] })]);
   }
+
+  // Named policies
+  const pols = { skater, holt, hosking, laplace, wald, samuelson, kahneman };
+  for (const [nm, fac] of Object.entries(pols)) s.push([`pol_${nm}`, 1, fac(1)]);
+  s.push(["pol_skater_k2", 2, skater(2)]);
+  s.push(["pol_kahneman_k2", 2, kahneman(2)]);
   return s;
 }
