@@ -13,13 +13,13 @@
 <body>
   <header class="site-header">
     <div class="nav-inner">
-      <a class="brand" href="./">skaters</a>
+      <a class="brand" href="/">skaters</a>
       <nav>
-        <a href="./demos/">Demos</a>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/#literature">Literature</a>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
         <a href="https://pypi.org/project/skaters/">PyPI</a>
-        <a href="https://github.com/microprediction/skaters/tree/main/examples">Examples</a>
-        <a href="https://github.com/microprediction/timemachines">timemachines</a>
       </nav>
     </div>
   </header>
@@ -242,13 +242,27 @@ f = search(
       <li><strong>Pyodide compatible</strong> &mdash; works in the browser via WebAssembly.</li>
     </ul>
 
-    <h2>Lineage</h2>
+    <h2 id="literature">Papers &amp; literature</h2>
     <p>
-      This package distills ideas from
-      <a href="https://github.com/microprediction/timemachines"><code>timemachines</code></a>, which
-      provided a common skater interface for dozens of time series packages. <code>skaters</code>
-      is a from-scratch rewrite focused on speed, distributional predictions, and browser
-      compatibility.
+      <code>skaters</code> has no dependencies and no papers of its own — each named policy and
+      transform is a faithful online, distributional take on a classical method. The primary
+      sources, one per idea:
+    </p>
+    <ul>
+      <li><strong>Holt</strong> — C. C. Holt, <em>Forecasting trends and seasonals by exponentially weighted moving averages</em> (1957).</li>
+      <li><strong>Theta</strong> — V. Assimakopoulos &amp; K. Nikolopoulos, <em>The theta model</em>, Int. J. Forecasting (2000).</li>
+      <li><strong>Fractional differencing</strong> — J. R. M. Hosking, <em>Fractional differencing</em>, Biometrika (1981).</li>
+      <li><strong>Geometric random walk / drift</strong> — P. A. Samuelson, <em>Rational theory of warrant pricing</em> (1965).</li>
+      <li><strong>Volatility (GARCH)</strong> — R. F. Engle (1982); T. Bollerslev (1986).</li>
+      <li><strong>Online variance</strong> — B. P. Welford, <em>Note on a method for calculating corrected sums of squares</em> (1962).</li>
+      <li><strong>Covariance shrinkage</strong> — O. Ledoit &amp; M. Wolf, <em>A well-conditioned estimator for large-dimensional covariance matrices</em> (2004).</li>
+      <li><strong>AR priors</strong> — R. Litterman, the Minnesota prior (1986), for the autoregressive transforms.</li>
+      <li><strong>Minimax &amp; linear programming</strong> — A. Wald and G. Dantzig (1947) name the cautious and adaptive-search policies.</li>
+    </ul>
+    <p>
+      Sibling streaming-prediction packages in the same ecosystem:
+      <a href="https://github.com/microprediction/precise">precise</a> (online covariance) and
+      <a href="https://github.com/microprediction/humpday">humpday</a> (global optimizers).
     </p>
 
     <h2>Get the source</h2>
