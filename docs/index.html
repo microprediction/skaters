@@ -110,7 +110,7 @@ f = laplace(k=1)    # no opinion — let the data decide
 f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (after timemachines)</code></pre>
+f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)</code></pre>
 
     <table>
       <thead><tr><th>Policy</th><th>After</th><th>Prior</th><th>$\eta$</th><th>$\lambda$</th><th>Best for</th></tr></thead>
@@ -125,28 +125,10 @@ f = kahneman(k=1)   # think fast and slow (after timemachines)</code></pre>
       </tbody>
     </table>
 
-    <h3>Kahneman: thinking fast and slow</h3>
     <p>
-      <code>kahneman</code> is a <em>prior</em>, not a new model. The architecture already
-      factors every skater into a fast part (the transform chain, which tracks the process)
-      and a slow part (the leaf, which estimates the residual law). So &ldquo;thinking fast and
-      slow&rdquo; is just a strong prior on the shared-pool candidates that put a
-      <strong>fast</strong> tracker (reactive EMA, Holt, AR, drift) on the outside and a
-      <strong>slowly-varying</strong> residual scale (<code>standardize</code> with a long
-      half-life) on the inside:
-    </p>
-    <p style="text-align:center">
-      $y \;\xrightarrow{\text{fast tracker}}\; \text{residual}
-        \;\xrightarrow{\text{slow standardize}}\; z \;\rightarrow\; \text{leaf}$
-    </p>
-    <p>
-      The point forecast reacts to every observation; the residual <em>distribution</em>
-      drifts slowly. Because these candidates live in the shared pool, any policy can discover
-      the structure on its own &mdash; Kahneman just bets on it up front, with a tunable
-      <code>strength</code>. When the noise really is slowly varying, tracking the residual
-      scale beats a constant variance by a wide margin, and the prior adapts faster than a
-      uniform one in the first few hundred observations; on stationary data the same bet costs
-      a little. See <code>examples/benchmark_kahneman.py</code>.
+      The names are mnemonics for the search strategy, not different models — every policy draws
+      on the same candidate population. Tune any of them directly, or reach for
+      <code>skater(k, aggressiveness)</code> when you have no prior.
     </p>
 
     <h2>Architecture: transforms all the way down</h2>

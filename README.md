@@ -49,7 +49,7 @@ f = laplace(k=1)    # no opinion — let the data decide
 f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (after timemachines)
+f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
 ```
 
 They are nmenomics in some instances.
