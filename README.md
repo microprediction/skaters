@@ -42,6 +42,8 @@ f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
 f = kahneman(k=1)   # think fast and slow (after timemachines)
 ```
 
+They are nmenomics in some instances.
+
 | Policy | After | Prior | $\eta$ | $\lambda$ | Best for |
 |--------|-------|-------|--------|-----------|----------|
 | `holt` | Holt 1957 | Differencing + Holt linear | 0.50 | 0.02 | Trending data |
@@ -52,8 +54,8 @@ f = kahneman(k=1)   # think fast and slow (after timemachines)
 | `dantzig` | Dantzig 1947 | Adaptive search | 0.30 | 0.01 | Adaptive (grows pool online) |
 | `kahneman` | timemachines | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
 
-They are nmenomics in some instances. For example `kahneman` (a nod to `thinking_fast_and_slow` in
-[timemachines](https://github.com/microprediction/timemachines)) and puts a strong
+For example `kahneman` is a nod to `thinking_fast_and_slow` in
+[timemachines](https://github.com/microprediction/timemachines) and puts a strong
 prior on candidates with a **fast** process tracker outside and a **slowly-varying**
 residual scale inside. Tune the bet with `kahneman(k=1, strength=8)`; see `examples/benchmark_kahneman.py`.
 
