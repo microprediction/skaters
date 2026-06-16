@@ -5,6 +5,8 @@
 
 import { readFileSync } from "fs";
 import { buildScenarios } from "./scenarios.mjs";
+import { periodDetector } from "../docs/js/skaters/periodicity.mjs";
+import { runningCov, emaCov, ledoitWolfCov } from "../docs/js/skaters/cov.mjs";
 
 const ATOL = 1e-6;
 const RTOL = 1e-6;
@@ -84,6 +86,68 @@ function main() {
   if (missing.length) {
     console.error(`\nScenarios in vectors but missing from JS registry: ${missing.join(", ")}`);
     failures += missing.length;
+  }
+
+  // --- periodicity ---
+  if (vectors.periodicity) {
+    const pd = periodDetector();
+    let pdState = null;
+    const got = [];
+    for (let i = 0; i < series.length; i++) {
+      const [scores, st] = pd(series[i], pdState);
+      pdState = st;
+      if (i >= burn) got.push(scores);
+    }
+    let pdFails = 0;
+    for (let step = 0; step < vectors.periodicity.length; step++) {
+      const exp = vectors.periodicity[step];
+      const g = got[step];
+      if (g.length !== exp.length) {
+        pdFails++;
+        continue;
+      }
+      for (let r = 0; r < exp.length; r++) {
+        checked += 2;
+        if (g[r][0] !== exp[r][0] || !close(g[r][1], exp[r][1])) pdFails++;
+      }
+    }
+    if (pdFails) {
+      failures += pdFails;
+      console.error(`FAIL periodicity: ${pdFails} mismatches`);
+    } else console.log("ok   periodicity");
+  }
+
+  // --- covariance estimators ---
+  if (vectors.cov) {
+    const vec = vectors.vec_series;
+    const estimators = {
+      running: (y, st) => runningCov(y, st),
+      ema: (y, st) => emaCov(y, st),
+      ledoit: (y, st) => ledoitWolfCov(y, st),
+    };
+    for (const [nm, fn] of Object.entries(estimators)) {
+      const exp = vectors.cov[nm];
+      let st = null;
+      const got = [];
+      for (let i = 0; i < vec.length; i++) {
+        const [mean, cmat, s2] = fn(vec[i], st);
+        st = s2;
+        if (i >= burn) got.push([mean, cmat]);
+      }
+      let covFails = 0;
+      for (let step = 0; step < exp.length; step++) {
+        for (let part = 0; part < 2; part++) {
+          for (let j = 0; j < exp[step][part].length; j++) {
+            checked++;
+            if (!close(got[step][part][j], exp[step][part][j])) covFails++;
+          }
+        }
+      }
+      if (covFails) {
+        failures += covFails;
+        console.error(`FAIL cov:${nm}: ${covFails} mismatches`);
+      } else console.log(`ok   cov:${nm}`);
+    }
   }
 
   console.log(`\n${checked} values checked across ${Object.keys(vectors.scenarios).length} scenarios`);

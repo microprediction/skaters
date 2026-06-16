@@ -8,6 +8,7 @@
 import { leaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
+import { search } from "./search.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, drift,
   holtLinear, ar, theta, seasonalDifference, garch, powerTransform,
@@ -188,6 +189,15 @@ export function samuelson(k = 1) {
     k, learningRate: 0.4, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
   });
   f.skaterName = `samuelson(k=${k})`;
+  return f;
+}
+
+export function dantzig(k = 1) {
+  const f = search({
+    k, learningRate: 0.3, complexityPenalty: 0.01, maxPool: 40,
+    expandInterval: 50, expandTopN: 5, maxDepth: 3, costBudget: 10.0,
+  });
+  f.skaterName = `dantzig(k=${k})`;
   return f;
 }
 

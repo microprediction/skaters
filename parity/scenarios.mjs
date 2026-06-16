@@ -10,8 +10,12 @@ import {
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr,
 } from "../docs/js/skaters/transform.mjs";
 import {
-  skater, holt, hosking, laplace, wald, samuelson, kahneman,
+  skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig,
 } from "../docs/js/skaters/api.mjs";
+import { search } from "../docs/js/skaters/search.mjs";
+import {
+  build as specBuild, emaSpec, ensembleSpec, conjugateSpec, diffSpec,
+} from "../docs/js/skaters/spec.mjs";
 
 export function buildScenarios() {
   const s = [];
@@ -44,5 +48,15 @@ export function buildScenarios() {
   for (const [nm, fac] of Object.entries(pols)) s.push([`pol_${nm}`, 1, fac(1)]);
   s.push(["pol_skater_k2", 2, skater(2)]);
   s.push(["pol_kahneman_k2", 2, kahneman(2)]);
+
+  // Adaptive search and direct search
+  s.push(["pol_dantzig", 1, dantzig(1)]);
+  s.push(["search_default", 1, search({ k: 1, expandInterval: 50 })]);
+
+  // Spec-built skaters
+  const specConj = conjugateSpec(ensembleSpec([emaSpec(0.01, 1), emaSpec(0.1, 1)], 1), diffSpec());
+  s.push(["spec_diff_ensemble", 1, specBuild(specConj)]);
+  s.push(["spec_ema", 1, specBuild(emaSpec(0.05, 1))]);
   return s;
 }
+

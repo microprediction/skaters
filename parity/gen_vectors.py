@@ -26,7 +26,11 @@ from skaters.transform import (
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
     grouped_ar,
 )
-from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman
+from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig
+from skaters.search import search as adaptive_search
+from skaters import spec as S
+from skaters.periodicity import period_detector
+from skaters.cov import running_cov, ema_cov, ledoit_wolf_cov
 
 BURN = 10
 PROBE = 0.3
@@ -78,7 +82,28 @@ def build_scenarios():
         s.append((f"pol_{nm}", 1, fac(k=1)))
     s.append(("pol_skater_k2", 2, skater(k=2)))
     s.append(("pol_kahneman_k2", 2, kahneman(k=2)))
+
+    # Adaptive search (dantzig) and direct search
+    s.append(("pol_dantzig", 1, dantzig(k=1)))
+    s.append(("search_default", 1, adaptive_search(k=1, expand_interval=50)))
+
+    # Spec-built skaters (exercise the spec/build path)
+    spec_conj = S.conjugate_spec(
+        S.ensemble_spec(S.ema_spec(0.01, 1), S.ema_spec(0.1, 1), k=1), S.diff_spec())
+    s.append(("spec_diff_ensemble", 1, S.build(spec_conj)))
+    s.append(("spec_ema", 1, S.build(S.ema_spec(0.05, 1))))
     return s
+
+
+def make_vec_series(n=120, seed=7):
+    random.seed(seed)
+    out = []
+    for _ in range(n):
+        a = random.gauss(0, 1)
+        b = 0.5 * a + random.gauss(0, 1)
+        c = random.gauss(0, 1) + 0.2 * b
+        out.append([a, b, c])
+    return out
 
 
 def clean(x):
@@ -114,6 +139,33 @@ def main():
                "q_lo": Q_LO, "q_hi": Q_HI, "scenarios": {}}
     for name, k, skater in build_scenarios():
         vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series)}
+
+    # Periodicity detector: dump the ranked (lag, acf) scores per step.
+    pd = period_detector()
+    pd_state = None
+    pd_out = []
+    for i, y in enumerate(series):
+        scores, pd_state = pd(y, pd_state)
+        if i >= BURN:
+            pd_out.append([[L, clean(acf)] for L, acf in scores])
+    vectors["periodicity"] = pd_out
+
+    # Covariance estimators on a fixed multivariate series.
+    vec_series = make_vec_series()
+    vectors["vec_series"] = vec_series
+    cov = {}
+    for nm, fn in [("running", lambda y, st: running_cov(y, st)),
+                   ("ema", lambda y, st: ema_cov(y, st)),
+                   ("ledoit", lambda y, st: ledoit_wolf_cov(y, st))]:
+        st = None
+        out = []
+        for i, y in enumerate(vec_series):
+            mean, cmat, st = fn(y, st)
+            if i >= BURN:
+                out.append([[clean(v) for v in mean], [clean(v) for v in cmat]])
+        cov[nm] = out
+    vectors["cov"] = cov
+
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "vectors.json")
     with open(path, "w") as f:
