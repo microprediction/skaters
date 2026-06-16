@@ -28,7 +28,7 @@ Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horiz
 
 ## Named search policies
 
-Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models.
+Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models. They are nmenomics in some instances (e.g. Kahneman is an homage but sourced from timemachines package (Cotton)). 
 
 ```python
 from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman
