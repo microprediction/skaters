@@ -49,7 +49,7 @@ f = laplace(k=1)    # no opinion — let the data decide
 f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (after timemachines)
+f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
 ```
 
 They are nmenomics in some instances.
@@ -65,7 +65,7 @@ They are nmenomics in some instances.
 | `kahneman` | timemachines | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
 
 For example `kahneman` is a nod to `thinking_fast_and_slow` in
-[timemachines](https://github.com/microprediction/timemachines) and puts a strong
+timemachines and puts a strong
 prior on candidates with a **fast** process tracker outside and a **slowly-varying**
 residual scale inside. Tune the bet with `kahneman(k=1, strength=8)`; see `examples/benchmark_kahneman.py`.
 
@@ -286,4 +286,4 @@ Interactive demos (forecasting playground in native JS, and the real Python pack
 
 ## Lineage
 
-This package distills ideas from [timemachines](https://github.com/microprediction/timemachines), which provided a common skater interface for dozens of time series packages. This is a from-scratch rewrite focused on speed, distributional predictions, and browser compatibility.
+This package distills ideas from timemachines, which provided a common skater interface for dozens of time series packages. This is a from-scratch rewrite focused on speed, distributional predictions, and browser compatibility.
