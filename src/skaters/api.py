@@ -55,14 +55,18 @@ def _build_candidates(k: int):
         depths.append(1)
 
     # Depth 1: differencing + leaf (pure random walk)
+    groups["diff"] = []
     candidates.append(conjugate(leaf(k=k), difference(), k=k))
     depths.append(1)
+    groups["diff"].append(len(candidates) - 1)
 
     # Depth 1: drift + leaf (random walk with adaptive drift)
     # Multiple speeds: fast drift detection vs long-memory drift
+    groups["drift"] = []
     for a, s in [(0.05, 0.01), (0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
         candidates.append(conjugate(leaf(k=k), drift(alpha=a, shrinkage=s), k=k))
         depths.append(1)
+        groups["drift"].append(len(candidates) - 1)
 
     # Depth 1: Theta method (SES + half OLS slope)
     for a in [0.05, 0.1, 0.3]:
@@ -76,9 +80,11 @@ def _build_candidates(k: int):
     depths.append(1)
 
     # Depth 1: Holt linear (level + trend, single transform)
+    groups["holt"] = []
     for a, b in [(0.1, 0.02), (0.1, 0.05), (0.3, 0.1)]:
         candidates.append(conjugate(leaf(k=k), holt_linear(alpha=a, beta=b), k=k))
         depths.append(1)
+        groups["holt"].append(len(candidates) - 1)
 
     # Depth 1: Seasonal differencing (common periods)
     for period in [7, 12, 24]:
@@ -100,6 +106,7 @@ def _build_candidates(k: int):
             conjugate(conjugate(leaf(k=k), ema_transform(alpha), k=k), difference(), k=k)
         )
         depths.append(2)
+        groups["diff"].append(len(candidates) - 1)
 
     # Depth 2: standardize + EMA
     for alpha in [0.05, 0.1]:
@@ -126,6 +133,7 @@ def _build_candidates(k: int):
                           drift(alpha=a_drift, shrinkage=s_drift), k=k)
             )
             depths.append(2)
+            groups["drift"].append(len(candidates) - 1)
 
     # Depth 2: drift + Holt linear (drift on top of level+trend)
     candidates.append(
@@ -133,6 +141,8 @@ def _build_candidates(k: int):
                   drift(alpha=0.001, shrinkage=0.0005), k=k)
     )
     depths.append(2)
+    groups["drift"].append(len(candidates) - 1)
+    groups["holt"].append(len(candidates) - 1)
 
     # Depth 2: GARCH + EMA (volatility-adapted)
     candidates.append(
@@ -236,9 +246,10 @@ def holt(k: int = 1):
     that capture trends. Moderate complexity penalty. Best when the
     series has persistent drift or momentum.
     """
-    candidates, depths, _ = _build_candidates(k)
-    # Boost differencing models (indices 5-8: diff+leaf and diff+EMA variants)
-    prior = _prior_favoring_indices(len(candidates), favored={5, 6, 7, 8}, boost=3.0)
+    candidates, depths, groups = _build_candidates(k)
+    # Boost the trend-capturing families: differencing, drift, Holt linear.
+    trend = set(groups["diff"]) | set(groups["drift"]) | set(groups["holt"])
+    prior = _prior_favoring_indices(len(candidates), favored=trend, boost=3.0)
     f = bayesian_ensemble(
         candidates, k=k,
         learning_rate=0.5,
@@ -345,23 +356,14 @@ def samuelson(k: int = 1):
     Best for series with persistent but slowly varying drift — GDP,
     population, prices with inflation.
     """
-    candidates, depths, _ = _build_candidates(k)
+    candidates, depths, groups = _build_candidates(k)
 
-    # Build prior: strongly boost drift and holt_linear candidates
-    # We identify them by their position in the candidate pool
-    # (see _build_candidates for the layout)
-    n = len(candidates)
-    prior = [0.0] * n
-    for i in range(n):
-        d = depths[i]
-        # Depth-1 drift and holt_linear candidates get a big boost
-        # Depth-2 drift-containing candidates get a moderate boost
-        # Everything else gets no boost
-        if d == 1 and i >= 6:
-            # drift|leaf and holt|leaf candidates (after diff|leaf at index 5)
-            prior[i] = 5.0
-        elif d == 2:
-            prior[i] = 2.0  # depth-2 candidates that may contain drift
+    # Strong prior on the drift and Holt-linear families (Samuelson's
+    # geometric-drift random walk); a moderate prior on the remaining
+    # depth-2 chains, which may compose drift with smoothing.
+    prior = _prior_favoring_depths(depths, favored={2}, boost=2.0)
+    for i in set(groups["drift"]) | set(groups["holt"]):
+        prior[i] = 5.0
 
     f = bayesian_ensemble(
         candidates, k=k,
