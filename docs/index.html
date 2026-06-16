@@ -26,14 +26,22 @@
 
   <main>
     <h1>skaters</h1>
-    <p class="subtitle">Fast online univariate time series. Zero dependencies. Runs in <a href="https://pyodide.org/">Pyodide</a>.</p>
+    <p class="subtitle">Fast online univariate time series, in <strong>Python <em>and</em> JavaScript</strong>. Zero dependencies. Runs natively in the browser or in <a href="https://pyodide.org/">Pyodide</a>.</p>
 
     <div class="tag-row">
+      <span class="tag">Python + JavaScript</span>
       <span class="tag">distributional</span>
       <span class="tag">O(1) per observation</span>
-      <span class="tag">pure Python</span>
-      <span class="tag">browser-compatible</span>
+      <span class="tag">zero dependencies</span>
+      <span class="tag">browser-native</span>
       <span class="tag">composable</span>
+    </div>
+
+    <div class="callout">
+      <strong>Two implementations, verified identical.</strong> The whole library is also a
+      zero-dependency <a href="#javascript">JavaScript port</a> — checked against the Python
+      reference to 1e-6. Use it natively in the browser, try the
+      <a href="./demos/">live demos</a>, or <code>pip install skaters</code> for Python.
     </div>
 
     <p>
@@ -60,7 +68,7 @@ for y in observations:
       facets of the same object.
     </p>
 
-    <h2>JavaScript &amp; the browser</h2>
+    <h2 id="javascript">JavaScript &amp; the browser</h2>
     <p>
       The whole library is also a zero-dependency <strong>JavaScript port</strong> — every
       transform, ensemble, and named policy. A parity suite checks 76,000+ values against the
