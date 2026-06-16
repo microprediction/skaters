@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — interactive demos</title>
+  <link rel="stylesheet" href="../academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="../">skaters</a>
+      <nav>
+        <a href="../">Home</a>
+        <a href="./">Demos</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Interactive demos</h1>
+    <p class="subtitle">
+      Everything below runs entirely in your browser — no server. The forecasting
+      code is a faithful JavaScript port of the Python package, verified to agree
+      to 1e-6 by the parity suite.
+    </p>
+
+    <div class="card-grid">
+      <a class="card" href="./playground.html">
+        <h3>Forecasting playground →</h3>
+        <p>Pick a policy and a data regime; watch the one-step-ahead forecast and its
+          uncertainty band update live, with rolling log-likelihood and coverage.
+          Native JavaScript — instant and offline.</p>
+      </a>
+      <a class="card" href="./pyodide.html">
+        <h3>Running in Pyodide →</h3>
+        <p>The actual Python package, compiled to WebAssembly, running unmodified in
+          the browser. Proof that what you <code>pip install</code> runs client-side.</p>
+      </a>
+    </div>
+
+    <h2>Use the port yourself</h2>
+    <p>The JavaScript port is a zero-dependency ES module. Drop it into any page:</p>
+    <pre><code>&lt;script type="module"&gt;
+  import { skater } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+
+  const f = skater(1);
+  let state = null;
+  for (const y of observations) {
+    const [dists, st] = f(y, state); state = st;
+    dists[0].mean;            // point forecast
+    dists[0].std;             // uncertainty
+    dists[0].quantile(0.975); // 97.5th percentile
+  }
+&lt;/script&gt;</code></pre>
+  </main>
+
+  <footer>
+    skaters · <a href="https://github.com/microprediction/skaters">GitHub</a> ·
+    distilled from <a href="https://github.com/microprediction/timemachines">timemachines</a>
+  </footer>
+</body>
+</html>

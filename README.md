@@ -39,7 +39,7 @@ f = laplace(k=1)    # no opinion — let the data decide
 f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (Kahneman 2011)
+f = kahneman(k=1)   # think fast and slow (after timemachines)
 ```
 
 | Policy | After | Prior | $\eta$ | $\lambda$ | Best for |
@@ -50,43 +50,13 @@ f = kahneman(k=1)   # think fast and slow (Kahneman 2011)
 | `samuelson` | Samuelson 1965 | Drift + Holt | 0.40 | 0.01 | Persistent drift (GDP, prices) |
 | `wald` | Wald | Depth 0 | 0.15 | 0.08 | Adversarial, non-stationary |
 | `dantzig` | Dantzig 1947 | Adaptive search | 0.30 | 0.01 | Adaptive (grows pool online) |
-| `kahneman` | Kahneman 2011 | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
+| `kahneman` | timemachines | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
 
-### Kahneman: thinking fast and slow
-
-`kahneman` is a **prior, not a new model**. The architecture already factors
-every skater into a fast part (the transform chain, which tracks the process)
-and a slow part (the leaf, which estimates the residual law). So "thinking fast
-and slow" needs no new primitive — it is simply a strong prior on the shared-pool
-candidates that put a **fast** tracker (reactive EMA, Holt, AR, drift) on the
-outside and a **slowly-varying** residual scale (`standardize` with a long
-half-life) on the inside:
-
-$$y \;\xrightarrow{\text{fast tracker}}\; \text{residual} \;\xrightarrow{\text{slow standardize}}\; z \;\rightarrow\; \text{leaf}$$
-
-The point forecast reacts to every observation; the residual *distribution*
-drifts slowly. Because these candidates live in the shared pool, any policy
-(e.g. `laplace`) can discover the structure on its own — Kahneman just bets on
-it up front, with a tunable `strength`:
-
-```python
-from skaters import kahneman
-
-f = kahneman(k=1)               # bets on the fast/slow structure (strength=8)
-f = kahneman(k=1, strength=2)   # a gentler bet, closer to laplace
-```
-
-**What the benchmark says** (`examples/benchmark_kahneman.py`): when the noise is
-slowly varying, tracking the residual scale is a large win over a constant
-variance — e.g. mean logpdf −1.85 (constant) → −1.40 (scale-tracking) on a
-flat-mean / slow-noise series, and −3.4 → −1.5 with a drifting mean. Those
-scale-tracking candidates now live in the shared pool, so every policy benefits
-asymptotically (priors wash out — textbook Bayes). Where Kahneman's *prior*
-earns its keep is **early adaptation**: on slowly-varying-noise data it commits
-to the right structure immediately and beats the uniform `laplace` prior in the
-first few hundred observations; on stationary data the same bet costs a little.
-That trade-off — faster when the noise really does drift, slightly worse when it
-doesn't — is the whole point of a named prior.
+`kahneman` (a nod to `thinking_fast_and_slow` in
+[timemachines](https://github.com/microprediction/timemachines)) puts a strong
+prior on candidates with a **fast** process tracker outside and a **slowly-varying**
+residual scale inside — the mean reacts every step, the noise law drifts slowly.
+Tune the bet with `kahneman(k=1, strength=8)`; see `examples/benchmark_kahneman.py`.
 
 Or tune directly:
 
@@ -270,6 +240,30 @@ def my_transform():
 
     return forward, inverse_k
 ```
+
+## JavaScript & the browser
+
+The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
+transform, ensemble, and named policy. It is verified against the Python reference by a parity
+suite that checks 76,000+ values to 1e-6 (`parity/`, run in the test suite via
+`tests/test_js_parity.py`).
+
+```html
+<script type="module">
+  import { kahneman } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  const f = kahneman(1);
+  let state = null;
+  for (const y of observations) {
+    const [dists, st] = f(y, state); state = st;
+    dists[0].mean;            // point forecast
+    dists[0].quantile(0.975); // 97.5th percentile
+  }
+</script>
+```
+
+Interactive demos (forecasting playground in native JS, and the real Python package running in
+[Pyodide](https://pyodide.org/)) live at
+[skaters.microprediction.org/demos](https://skaters.microprediction.org/demos/).
 
 ## Design
 

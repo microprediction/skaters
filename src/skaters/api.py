@@ -384,7 +384,8 @@ def samuelson(k: int = 1):
 def kahneman(k: int = 1, strength: float = 8.0):
     """Kahneman's policy: think fast and slow.
 
-    After Daniel Kahneman's *Thinking, Fast and Slow*. This is a prior,
+    A nod to the ``thinking_fast_and_slow`` skater in Cotton's
+    timemachines package. This is a prior,
     not a new model — it draws on the same shared candidate population as
     every other policy. It simply places a strong prior on the candidates
     that embody the two-systems structure: a **fast** underlying-process

@@ -8,51 +8,14 @@
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"
     onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
-  <style>
-    :root {
-      --bg: #fafafa; --panel: #fff; --text: #1a1a1a; --muted: #5a5a5a;
-      --accent: #4a3aff; --border: #e2e2e2; --code-bg: #f3f3f7;
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0; background: var(--bg); color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.55; font-size: 17px;
-    }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    header.site-header { background: #1f1d3d; color: #fff; padding: 14px 24px; border-bottom: 1px solid #15132a; }
-    header.site-header .nav-inner { max-width: 860px; margin: 0 auto; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-    header.site-header .brand { font-weight: 600; font-size: 1.1rem; color: #fff; }
-    header.site-header nav { display: flex; flex-wrap: wrap; gap: 0 18px; }
-    header.site-header nav a { color: #fff; opacity: 0.85; font-size: 0.95rem; }
-    header.site-header nav a:hover { opacity: 1; }
-    main { max-width: 860px; margin: 32px auto; padding: 0 24px 60px; }
-    h1 { font-size: 2.1rem; margin: 0 0 4px; line-height: 1.2; }
-    .subtitle { color: var(--muted); font-size: 1.1rem; margin: 0 0 28px; }
-    h2 { font-size: 1.35rem; margin: 2.2em 0 0.6em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-    h3 { font-size: 1.08rem; margin: 1.6em 0 0.4em; }
-    p, ul, ol { font-size: 1rem; }
-    ul, ol { padding-left: 1.4em; }
-    li { margin-bottom: 6px; }
-    code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-size: 0.92em; font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
-    pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
-    pre code { background: none; padding: 0; }
-    .callout { background: #f1f0fb; border-left: 3px solid var(--accent); padding: 12px 18px; border-radius: 4px; margin: 18px 0; }
-    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
-    .tag { background: #ece9ff; color: var(--accent); border-radius: 3px; padding: 2px 8px; font-size: 0.8rem; }
-    table { border-collapse: collapse; width: 100%; font-size: 0.92rem; margin: 14px 0; }
-    table th, table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
-    table th { background: #efeefa; font-weight: 600; }
-    table td code { font-size: 0.86em; }
-    footer { max-width: 860px; margin: 40px auto 24px; padding: 16px 24px; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--border); }
-  </style>
+  <link rel="stylesheet" href="./academic.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="nav-inner">
       <a class="brand" href="./">skaters</a>
       <nav>
+        <a href="./demos/">Demos</a>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
         <a href="https://pypi.org/project/skaters/">PyPI</a>
         <a href="https://github.com/microprediction/skaters/tree/main/examples">Examples</a>
@@ -97,6 +60,34 @@ for y in observations:
       facets of the same object.
     </p>
 
+    <h2>JavaScript &amp; the browser</h2>
+    <p>
+      The whole library is also a zero-dependency <strong>JavaScript port</strong> — every
+      transform, ensemble, and named policy. A parity suite checks 76,000+ values against the
+      Python reference on every run, so the two agree to 1e-6. Use it natively for speed, or run
+      the actual Python package in the browser via <a href="https://pyodide.org/">Pyodide</a>.
+    </p>
+<pre><code>&lt;script type="module"&gt;
+  import { kahneman } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  const f = kahneman(1);
+  let state = null;
+  for (const y of observations) {
+    const [dists, st] = f(y, state); state = st;
+    dists[0].mean;            // point forecast
+    dists[0].quantile(0.975); // 97.5th percentile
+  }
+&lt;/script&gt;</code></pre>
+    <div class="card-grid">
+      <a class="card" href="./demos/playground.html">
+        <h3>Forecasting playground →</h3>
+        <p>Watch any policy forecast live, with its uncertainty band, on data you choose.</p>
+      </a>
+      <a class="card" href="./demos/pyodide.html">
+        <h3>Running in Pyodide →</h3>
+        <p>The real Python package, compiled to WebAssembly, running in your browser.</p>
+      </a>
+    </div>
+
     <h2>Named search policies</h2>
     <p>
       Every named function builds a Bayesian ensemble over the same full candidate population.
@@ -111,7 +102,7 @@ f = laplace(k=1)    # no opinion — let the data decide
 f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (Kahneman 2011)</code></pre>
+f = kahneman(k=1)   # think fast and slow (after timemachines)</code></pre>
 
     <table>
       <thead><tr><th>Policy</th><th>After</th><th>Prior</th><th>$\eta$</th><th>$\lambda$</th><th>Best for</th></tr></thead>
@@ -122,7 +113,7 @@ f = kahneman(k=1)   # think fast and slow (Kahneman 2011)</code></pre>
         <tr><td><code>samuelson</code></td><td>Samuelson 1965</td><td>Drift + Holt</td><td>0.40</td><td>0.01</td><td>Persistent drift (GDP, prices)</td></tr>
         <tr><td><code>wald</code></td><td>Wald</td><td>Depth 0</td><td>0.15</td><td>0.08</td><td>Adversarial, non-stationary</td></tr>
         <tr><td><code>dantzig</code></td><td>Dantzig 1947</td><td>Adaptive search</td><td>0.30</td><td>0.01</td><td>Adaptive (grows pool online)</td></tr>
-        <tr><td><code>kahneman</code></td><td>Kahneman 2011</td><td>Fast tracker + slow residual scale</td><td>0.50</td><td>0.01</td><td>Fast signal, persistent noise</td></tr>
+        <tr><td><code>kahneman</code></td><td>timemachines</td><td>Fast tracker + slow residual scale</td><td>0.50</td><td>0.01</td><td>Fast signal, persistent noise</td></tr>
       </tbody>
     </table>
 

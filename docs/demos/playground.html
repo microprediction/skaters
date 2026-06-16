@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — forecasting playground</title>
+  <link rel="stylesheet" href="../academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="../">skaters</a>
+      <nav>
+        <a href="./">Demos</a>
+        <a href="./pyodide.html">Pyodide</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Forecasting playground</h1>
+    <p class="subtitle">
+      The real JavaScript port, running live in your browser. Every number here is
+      produced by the same code that matches the Python package to 1e-6.
+    </p>
+
+    <div class="panel">
+      <div class="controls">
+        <div class="control">
+          <label for="policy">Policy</label>
+          <select id="policy">
+            <option value="skater">skater (default)</option>
+            <option value="laplace">laplace</option>
+            <option value="holt">holt</option>
+            <option value="hosking">hosking</option>
+            <option value="samuelson">samuelson</option>
+            <option value="wald">wald</option>
+            <option value="dantzig">dantzig</option>
+            <option value="kahneman">kahneman</option>
+            <option value="ema05">ema(0.05)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="regime">Data</label>
+          <select id="regime">
+            <option value="trend">trend + noise</option>
+            <option value="seasonal">seasonal (period 7)</option>
+            <option value="rw">random walk</option>
+            <option value="hetero">slowly-varying noise</option>
+            <option value="jumps">level jumps</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="speed">Speed <span class="val" id="speedVal">4</span></label>
+          <input type="range" id="speed" min="1" max="20" value="4" />
+        </div>
+        <button class="btn" id="run">Regenerate</button>
+        <button class="btn secondary" id="pause">Pause</button>
+      </div>
+
+      <canvas class="plot" id="plot" width="940" height="420"></canvas>
+      <div class="legend">
+        <span><span class="swatch" style="background:#1a1a1a"></span>observation</span>
+        <span><span class="swatch" style="background:#4a3aff"></span>forecast mean</span>
+        <span><span class="swatch" style="background:#cdc7ff"></span>95% interval</span>
+      </div>
+      <p class="status" id="status">—</p>
+    </div>
+
+    <p>
+      The model sees one observation at a time. At each step it emits a full
+      predictive distribution for the next step; we score it against what actually
+      happens. <span class="metric" id="metrics"></span>
+    </p>
+    <p>
+      Open the console and <code>import</code> from
+      <code>../js/skaters/index.mjs</code> to drive it yourself — it is a zero-dependency ES module.
+    </p>
+  </main>
+
+  <footer>
+    skaters · <a href="https://github.com/microprediction/skaters">GitHub</a> ·
+    a from-scratch rewrite distilling <a href="https://github.com/microprediction/timemachines">timemachines</a>
+  </footer>
+
+  <script type="module">
+    import { skater, laplace, holt, hosking, samuelson, wald, dantzig, kahneman, ema }
+      from "../js/skaters/index.mjs";
+
+    const POLICIES = {
+      skater: () => skater(1),
+      laplace: () => laplace(1),
+      holt: () => holt(1),
+      hosking: () => hosking(1),
+      samuelson: () => samuelson(1),
+      wald: () => wald(1),
+      dantzig: () => dantzig(1),
+      kahneman: () => kahneman(1),
+      ema05: () => ema(0.05, 1),
+    };
+
+    // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
+    function rng(seed) {
+      return function () {
+        seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function gauss(r) {
+      let u = 0, v = 0;
+      while (u === 0) u = r();
+      while (v === 0) v = r();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    }
+
+    function makeSeries(regime, seed, n = 240) {
+      const r = rng(seed);
+      const s = [];
+      let lvl = 0;
+      for (let t = 0; t < n; t++) {
+        if (regime === "trend") s.push(0.06 * t + 2 * gauss(r));
+        else if (regime === "seasonal") s.push(5 * Math.sin((2 * Math.PI * t) / 7) + gauss(r));
+        else if (regime === "rw") { lvl += gauss(r); s.push(lvl); }
+        else if (regime === "hetero") {
+          const sigma = Math.exp(Math.log(0.3) + (Math.log(3) - Math.log(0.3)) * (0.5 + 0.5 * Math.sin((2 * Math.PI * t) / 120)));
+          s.push(gauss(r) * sigma);
+        } else if (regime === "jumps") {
+          if (t % 60 === 0) lvl += 12 * (r() - 0.5);
+          s.push(lvl + gauss(r));
+        }
+      }
+      return s;
+    }
+
+    const canvas = document.getElementById("plot");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height, PAD = 36;
+
+    let rows = [], cursor = 0, timer = null, seed = 1, paused = false;
+
+    function compute() {
+      const policy = POLICIES[document.getElementById("policy").value]();
+      const regime = document.getElementById("regime").value;
+      const series = makeSeries(regime, seed);
+      let state = null, pending = null;
+      rows = [];
+      for (let t = 0; t < series.length; t++) {
+        const y = series[t];
+        let mean = NaN, lo = NaN, hi = NaN, lp = NaN;
+        if (pending) {
+          const d = pending[0];
+          mean = d.mean; lo = d.quantile(0.025); hi = d.quantile(0.975); lp = d.logpdf(y);
+        }
+        rows.push({ y, mean, lo, hi, lp });
+        const [dists, st] = policy(y, state);
+        state = st; pending = dists;
+      }
+      cursor = 1;
+    }
+
+    function draw(upto) {
+      ctx.clearRect(0, 0, W, H);
+      const view = rows.slice(0, upto);
+      let ymin = Infinity, ymax = -Infinity;
+      for (const r of view) {
+        ymin = Math.min(ymin, r.y, isFinite(r.lo) ? r.lo : r.y);
+        ymax = Math.max(ymax, r.y, isFinite(r.hi) ? r.hi : r.y);
+      }
+      if (!isFinite(ymin)) { ymin = -1; ymax = 1; }
+      const pad = (ymax - ymin) * 0.08 + 1e-9;
+      ymin -= pad; ymax += pad;
+      const n = rows.length;
+      const X = (i) => PAD + (i / (n - 1)) * (W - 2 * PAD);
+      const Y = (v) => H - PAD - ((v - ymin) / (ymax - ymin)) * (H - 2 * PAD);
+
+      // axes
+      ctx.strokeStyle = "#e2e2e2"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(PAD, H - PAD); ctx.lineTo(W - PAD, H - PAD); ctx.stroke();
+
+      // interval band
+      ctx.fillStyle = "rgba(74,58,255,0.16)";
+      ctx.beginPath();
+      let started = false;
+      for (let i = 1; i < view.length; i++) {
+        if (!isFinite(view[i].hi)) continue;
+        const x = X(i), y = Y(view[i].hi);
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      }
+      for (let i = view.length - 1; i >= 1; i--) {
+        if (!isFinite(view[i].lo)) continue;
+        ctx.lineTo(X(i), Y(view[i].lo));
+      }
+      ctx.closePath(); ctx.fill();
+
+      // mean line
+      ctx.strokeStyle = "#4a3aff"; ctx.lineWidth = 1.8;
+      ctx.beginPath(); started = false;
+      for (let i = 1; i < view.length; i++) {
+        if (!isFinite(view[i].mean)) continue;
+        const x = X(i), y = Y(view[i].mean);
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // observations
+      ctx.fillStyle = "#1a1a1a";
+      for (let i = 0; i < view.length; i++) {
+        ctx.beginPath(); ctx.arc(X(i), Y(view[i].y), 1.7, 0, 2 * Math.PI); ctx.fill();
+      }
+    }
+
+    function updateMetrics(upto) {
+      let sumLp = 0, nLp = 0, cov = 0, se = 0;
+      for (let i = 10; i < upto; i++) {
+        const r = rows[i];
+        if (isFinite(r.lp)) { sumLp += r.lp; nLp++; se += (r.mean - r.y) ** 2; if (r.y >= r.lo && r.y <= r.hi) cov++; }
+      }
+      if (nLp === 0) { document.getElementById("metrics").textContent = ""; return; }
+      const ll = (sumLp / nLp).toFixed(3);
+      const rmse = Math.sqrt(se / nLp).toFixed(2);
+      const c = ((cov / nLp) * 100).toFixed(0);
+      document.getElementById("metrics").innerHTML =
+        `Mean log-likelihood <b>${ll}</b> · RMSE <b>${rmse}</b> · 95% coverage <b>${c}%</b> over ${nLp} steps.`;
+      document.getElementById("status").textContent = `step ${upto} / ${rows.length}`;
+    }
+
+    function tick() {
+      if (paused) return;
+      const step = parseInt(document.getElementById("speed").value, 10);
+      cursor = Math.min(rows.length, cursor + step);
+      draw(cursor);
+      updateMetrics(cursor);
+      if (cursor < rows.length) timer = requestAnimationFrame(tick);
+    }
+
+    function start() {
+      if (timer) cancelAnimationFrame(timer);
+      compute();
+      paused = false;
+      document.getElementById("pause").textContent = "Pause";
+      timer = requestAnimationFrame(tick);
+    }
+
+    document.getElementById("run").addEventListener("click", () => { seed++; start(); });
+    document.getElementById("policy").addEventListener("change", start);
+    document.getElementById("regime").addEventListener("change", start);
+    document.getElementById("speed").addEventListener("input", (e) => {
+      document.getElementById("speedVal").textContent = e.target.value;
+    });
+    document.getElementById("pause").addEventListener("click", (e) => {
+      paused = !paused;
+      e.target.textContent = paused ? "Resume" : "Pause";
+      if (!paused) timer = requestAnimationFrame(tick);
+    });
+
+    start();
+  </script>
+</body>
+</html>
