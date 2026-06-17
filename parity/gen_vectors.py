@@ -24,7 +24,7 @@ from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, theta,
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
-    grouped_ar,
+    grouped_ar, yeo_johnson,
 )
 from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac
 from skaters.sticky import sticky
@@ -69,6 +69,8 @@ def build_scenarios():
         s.append((f"ar2{suf}", k, conjugate(leaf(k=k), ar(2, decay=1), k=k)))
         s.append((f"frac{suf}", k, conjugate(leaf(k=k), fractional_difference(0.4, 30), k=k)))
         s.append((f"grouped_ar{suf}", k, conjugate(leaf(k=k), grouped_ar(8), k=k)))
+        s.append((f"yeojohnson_log{suf}", k, conjugate(leaf(k=k), yeo_johnson(0.0), k=k)))
+        s.append((f"yeojohnson_half{suf}", k, conjugate(leaf(k=k), yeo_johnson(0.5), k=k)))
         s.append((f"ema_skater{suf}", k, ema(0.05, k=k)))
         s.append((f"pw_ensemble{suf}", k,
                   precision_weighted_ensemble([ema(0.05, k=k), ema(0.2, k=k)], k=k)))

@@ -12,7 +12,7 @@ import { search } from "./search.mjs";
 import { sticky } from "./sticky.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, drift,
-  holtLinear, ar, theta, seasonalDifference, garch, powerTransform,
+  holtLinear, ar, theta, seasonalDifference, garch, powerTransform, yeoJohnson,
 } from "./transform.mjs";
 
 // ---------------------------------------------------------------------------
@@ -115,6 +115,14 @@ export function buildCandidates(k) {
     }
   }
 
+  // Coordinate prior (Yeo-Johnson): learn the coordinate the series is simple in.
+  groups.coordinate = [];
+  for (const L of [0.0, 0.5]) {
+    for (const innerTx of [difference(), emaTransform(0.1)]) {
+      groups.coordinate.push(push(conjugate(conjugate(leaf(k), innerTx, k), yeoJohnson(L), k), 2));
+    }
+  }
+
   return [candidates, depths, groups];
 }
 
@@ -213,6 +221,7 @@ export function kahneman(k = 1, strength = 8.0) {
 }
 
 export function dirac(k = 1, spikeFrac = 0.003) {
+  // projection = mean-preserving sticky atom; pull is left to the trunk.
   const f = sticky(skater(k), k, 0.05, spikeFrac);
   f.skaterName = `dirac(k=${k})`;
   return f;

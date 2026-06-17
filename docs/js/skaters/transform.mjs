@@ -336,6 +336,50 @@ export function powerTransform(p = 0.5) {
   return { forward, inverseK };
 }
 
+// Yeo-Johnson coordinate transform — signed Box-Cox family. JS port of
+// skaters/transform.py:yeo_johnson. Learns the coordinate the series is simple
+// in (lambda=0 -> log1p / non-negative, 1 -> identity, 0.5 -> compression).
+export function yeoJohnson(lmbda = 0.0) {
+  const L = lmbda;
+  const fwd = (y) => {
+    if (y >= 0.0) return L === 0.0 ? Math.log1p(y) : (Math.pow(y + 1.0, L) - 1.0) / L;
+    if (L === 2.0) return -Math.log1p(-y);
+    return -((Math.pow(-y + 1.0, 2.0 - L) - 1.0) / (2.0 - L));
+  };
+  const inv = (yp) => {
+    if (yp >= 0.0) {
+      if (L === 0.0) return Math.expm1(yp);
+      return Math.pow(Math.max(L * yp + 1.0, 1e-12), 1.0 / L) - 1.0;
+    }
+    if (L === 2.0) return 1.0 - Math.exp(-yp);
+    return 1.0 - Math.pow(Math.max(-(2.0 - L) * yp + 1.0, 1e-12), 1.0 / (2.0 - L));
+  };
+  const dinv = (yp) => {
+    if (yp >= 0.0) {
+      if (L === 0.0) return Math.exp(yp);
+      return Math.pow(Math.max(L * yp + 1.0, 1e-12), 1.0 / L - 1.0);
+    }
+    if (L === 2.0) return Math.exp(-yp);
+    return Math.pow(Math.max(-(2.0 - L) * yp + 1.0, 1e-12), 1.0 / (2.0 - L) - 1.0);
+  };
+
+  function forward(y, state) {
+    return [fwd(y), state || {}];
+  }
+  function inverseK(dists, state) {
+    const result = [];
+    for (const d of dists) {
+      const components = [];
+      for (const [w, mu, sigma] of d.components) {
+        components.push([w, inv(mu), Math.max(sigma * dinv(mu), 1e-12)]);
+      }
+      result.push(new Dist(components));
+    }
+    return result;
+  }
+  return { forward, inverseK };
+}
+
 // ---------------------------------------------------------------------------
 // AR(p) with online recursive least squares
 // ---------------------------------------------------------------------------

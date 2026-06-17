@@ -21,7 +21,7 @@ from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
     garch, power_transform, drift, holt_linear, ar, theta,
-    seasonal_difference,
+    seasonal_difference, yeo_johnson,
 )
 from skaters.search import search as adaptive_search
 from skaters.terminal import terminal_leaf_ensemble
@@ -191,6 +191,21 @@ def _build_candidates(k: int, leaf_fn=leaf):
             )
             depths.append(2)
             groups["fast_slow"].append(len(candidates) - 1)
+
+    # Coordinate prior (Yeo-Johnson): the same series is often simple in a
+    # transformed coordinate — multiplicative/non-negative (lambda=0, log1p) or
+    # mildly compressed (lambda=0.5). A coarse grid composed over the random
+    # walk and a slow EMA lets the ensemble *learn the coordinate* online.
+    # lambda=1 is the identity (already the rest of the pool), so we add 0 and
+    # 0.5 only. NFL-safe: a wrong coordinate is simply down-weighted.
+    groups["coordinate"] = []
+    for L in (0.0, 0.5):
+        for inner_tx in (difference(), ema_transform(0.1)):
+            candidates.append(
+                conjugate(conjugate(leaf_fn(k=k), inner_tx, k=k), yeo_johnson(L), k=k)
+            )
+            depths.append(2)
+            groups["coordinate"].append(len(candidates) - 1)
 
     return candidates, depths, groups
 
@@ -434,18 +449,28 @@ def kahneman(k: int = 1, strength: float = 8.0):
 def dirac(k: int = 1, spike_frac: float = 0.003):
     """Dirac's policy: bet on repetition.
 
-    After Paul Dirac (the delta it collapses toward). Wraps the general
-    skater with a :func:`sticky` near-Dirac spike at the last value, weighted
-    by the online probability that the series repeats exactly. On
-    administrative or grid-quoted series (policy rates, posted prices) that
-    stay unchanged for long stretches, the spike captures the point mass —
-    large likelihood and sharp intervals — while reducing to the ordinary
-    skater when the series actually moves.
+    After Paul Dirac (the delta it collapses toward). Repetition is two distinct
+    things, cleanly separated here:
+
+    * the **projection** — actual probability *mass* on the exact repeated
+      value — is handled at the terminal by :func:`sticky`, a mean-preserving
+      near-Dirac atom weighted by the online repeat probability, and
+    * the **pull** — the tendency of the mean to track the last value — is a
+      *mean* statement and is left to the trunk, where the random-walk
+      candidate earns its weight by likelihood on series that actually repeat.
+      (It needs no special prior: a prior boost is a one-time initialisation
+      and washes out after burn-in, so the ensemble must — and does — discover
+      persistence on its own.)
+
+    On administrative or grid-quoted series (policy rates, posted prices) that
+    stay unchanged for long stretches, the projection captures the point mass
+    (large likelihood, sharp intervals); on series that actually move it fades
+    and ``dirac`` reduces to the ordinary skater.
 
     Args:
         k: forecast horizon.
-        spike_frac: how hard it commits to the point mass (smaller = harder).
+        spike_frac: how hard the projection commits to the atom (smaller = harder).
     """
-    f = sticky(skater(k=k), k=k, spike_frac=spike_frac)
+    f = sticky(skater(k=k), k=k, spike_frac=spike_frac)   # mean-preserving projection
     f.__name__ = f"dirac(k={k})"
     return f
