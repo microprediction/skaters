@@ -40,7 +40,7 @@ import fred_universe
 from exhaustive_crps import FORECASTERS, crepes_crps, skater_scores
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(_HERE, "results_large.csv")
+RESULTS = os.environ.get("STUDY_RESULTS", os.path.join(_HERE, "results_large.csv"))
 
 N_CANDIDATES = int(os.environ.get("STUDY_N_CANDIDATES", 3500))  # consider (by popularity)
 MAX_QUALIFY = int(os.environ.get("STUDY_MAX_QUALIFY", 2500))    # stop once this many pass
@@ -59,8 +59,15 @@ def qualify_universe():
     """Resolve the universe and return [(sid, title)] for series that load and
     have >= MIN_CHANGES changes. Fetches missing series with light throttling."""
     if CACHED_ONLY:
+        # Score whatever is already cached (power-safe interim run). Pull titles
+        # from the resolved universe so the class breakdown still works.
+        tmap = {}
+        ujson = os.path.join(fred._CACHE, "universe_daily.json")
+        if os.path.exists(ujson):
+            import json
+            tmap = {s["id"]: s.get("title", "") for s in json.load(open(ujson))}
         ids = [f[:-4] for f in os.listdir(fred._CACHE) if f.endswith(".csv")]
-        universe = [{"id": s, "title": ""} for s in ids][:MAX_QUALIFY]
+        universe = [{"id": s, "title": tmap.get(s, "")} for s in ids][:MAX_QUALIFY]
     else:
         universe = fred_universe.enumerate_daily(N_CANDIDATES)
     qualified = []

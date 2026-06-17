@@ -60,6 +60,38 @@ so on the economically-grounded, tail-sensitive metric it cannot compete; on
 CRPS, the metric it is built for, it still loses 93% of the time once we aim at
 it. Run it yourself: `PYTHONPATH=src python benchmarks/exhaustive_crps.py`.
 
+## At scale: 498 systematically-selected series (`large_study.py`)
+
+The 42-series result invites one fair objection — *you picked the series*. So we
+re-ran it on a **bias-free universe**: the top-N FRED series tagged `daily`,
+ordered by FRED's own popularity ranking (`fred_universe.enumerate_daily`) — a
+fixed rule chosen independently of the forecasters. Transform is automatic
+(log-diff for positive levels, else first-diff); series need ≥500 changes.
+
+Scored on **498** such series (the run targets ~2.5k; FRED fetch latency capped
+this pass — it is crash-safe and resumes, so the cache keeps growing):
+
+> **A CRPS-targeted skater beats crepes on CRPS in 87.8% of series**
+> (95% bootstrap CI 84.9–90.6%, N=498).
+> **Family-clustered** — collapsing each correlated curve/panel (yields by
+> maturity, FX by counterparty) to one vote, 123 families — **76.6%**
+> (CI 69.4–83.8%). This is the honest, de-correlated headline.
+
+By asset class (keyword-approximate): credit 100%, commodity 100%, equity 96%,
+rates 94%, fx 76%, other 78%. The raw rate slips from the curated 93% exactly as
+expected — at scale more series are the degenerate near-point-mass kind where the
+empirical conformal CDF is CRPS-optimal — yet ours still win a large, CI-backed
+majority, and on **every** asset class.
+
+On **log-likelihood**, the package's actual metric, there is no contest: crepes
+emits CDFs, not densities, so it scores *nothing*. Among ours, `dirac` leads with
+mean logpdf **3.43** vs ~2.90 for the rest (a **+0.45-nat** lift over the best
+non-`dirac` policy, positive on 53% of series), because it alone places mass on
+the exact repeats that pervade administrative daily series.
+
+Run it: `PYTHONPATH=src python benchmarks/large_study.py` (needs the conda env
+with `crepes` + a FRED key).
+
 ## On the table
 
 - `naive-gauss` — last value + rolling Gaussian residual.
