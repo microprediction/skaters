@@ -102,7 +102,7 @@ for y in observations:
       The names represent different <em>search strategies</em> &mdash; different priors, learning
       rates, and complexity penalties &mdash; not different models.
     </p>
-<pre><code>from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac
+<pre><code>from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac, doob
 
 f = holt(k=1)       # expect trends (Holt 1957)
 f = hosking(k=1)    # expect long memory (Hosking 1981)
@@ -111,7 +111,8 @@ f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
 f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
-f = dirac(k=1)      # bet on repetition — atoms on the lattice it revisits (after Paul Dirac)</code></pre>
+f = dirac(k=1)      # bet on repetition — atoms on the lattice it revisits (after Paul Dirac)
+f = doob(k=1)       # martingale + learned volatility clock; feed levels (after Joseph Doob)</code></pre>
 
     <table>
       <thead><tr><th>Policy</th><th>After</th><th>Prior</th><th>$\eta$</th><th>$\lambda$</th><th>Best for</th></tr></thead>
@@ -124,6 +125,7 @@ f = dirac(k=1)      # bet on repetition — atoms on the lattice it revisits (af
         <tr><td><code>dantzig</code></td><td>Dantzig 1947</td><td>Adaptive search</td><td>0.30</td><td>0.01</td><td>Adaptive (grows pool online)</td></tr>
         <tr><td><code>kahneman</code></td><td>timemachines</td><td>Fast tracker + slow residual scale</td><td>0.50</td><td>0.01</td><td>Fast signal, persistent noise</td></tr>
         <tr><td><code>dirac</code></td><td>Paul Dirac</td><td>Lattice projection over <code>skater</code></td><td>&mdash;</td><td>&mdash;</td><td>Repeating / grid-quoted series (policy rates, posted prices)</td></tr>
+        <tr><td><code>doob</code></td><td>Joseph Doob</td><td>Martingale mean + learned volatility clock</td><td>&mdash;</td><td>&mdash;</td><td>Near-martingale <strong>levels</strong> (prices, indices)</td></tr>
       </tbody>
     </table>
 

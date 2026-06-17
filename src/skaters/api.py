@@ -16,8 +16,9 @@ different models.
 
 from __future__ import annotations
 import math
-from skaters.leaf import leaf
+from skaters.leaf import leaf, scale_mixture_leaf
 from skaters.conjugate import conjugate
+from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
     garch, power_transform, drift, holt_linear, ar, theta,
@@ -473,4 +474,39 @@ def dirac(k: int = 1, spike_frac: float = 0.003):
     """
     f = sticky(skater(k=k), k=k, spike_frac=spike_frac)   # mean-preserving projection
     f.__name__ = f"dirac(k={k})"
+    return f
+
+
+def doob(k: int = 1):
+    """Doob's policy: a driftless martingale with a stochastic volatility clock.
+
+    After Joseph Doob (martingale theory). A committed **level-domain** model:
+    the mean is pinned to the last value — a martingale, no drift and no mean
+    reversion — and the only thing learned is how the volatility *breathes*. By
+    the Dambis-Dubins-Schwarz theorem any continuous martingale is a
+    time-changed Brownian motion, so the bet is exactly "BM on a stochastic
+    clock".
+
+    It is a Bayesian average over several martingale predictives that differ
+    only in their volatility model (constant, GARCH, slowly-varying, and
+    heavy-tailed). Because every candidate shares the *same* mean, the average
+    does **not** wash out kurtosis (the usual BMA failure mode) — instead it
+    blends the volatility clocks into one scale mixture and lets likelihood pick.
+
+    Feed it the **level** series (prices, indices, rates), not pre-differenced
+    changes. When the martingale prior holds — near-martingale levels — it beats
+    the diffuse ``laplace`` ensemble by committing the mean and spending its
+    capacity on the clock; on genuinely mean-reverting series (e.g. the VIX) the
+    prior is wrong and it gives ground. A deliberately sharp instrument.
+    """
+    cands = [
+        conjugate(leaf(k=k), difference(), k=k),                                       # constant vol
+        conjugate(conjugate(leaf(k=k), garch(), k=k), difference(), k=k),              # GARCH clock
+        conjugate(conjugate(leaf(k=k), standardize(0.02), k=k), difference(), k=k),    # slow clock
+        conjugate(conjugate(scale_mixture_leaf(k=k), garch(), k=k), difference(), k=k),  # GARCH + heavy
+        conjugate(scale_mixture_leaf(k=k), difference(), k=k),                         # EWMA + heavy
+    ]
+    f = bayesian_ensemble(cands, k=k, learning_rate=0.5, depths=[1, 2, 2, 2, 1],
+                          max_components=30)
+    f.__name__ = f"doob(k={k})"
     return f
