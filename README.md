@@ -50,7 +50,7 @@ f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
 f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
-f = dirac(k=1)      # bet on repetition — spike at the last value (after Paul Dirac)
+f = dirac(k=1)      # bet on repetition — atoms on the lattice it revisits (after Paul Dirac)
 ```
 
 They are nmenomics in some instances.
@@ -64,20 +64,28 @@ They are nmenomics in some instances.
 | `wald` | Wald | Depth 0 | 0.15 | 0.08 | Adversarial, non-stationary |
 | `dantzig` | Dantzig 1947 | Adaptive search | 0.30 | 0.01 | Adaptive (grows pool online) |
 | `kahneman` | timemachines | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
-| `dirac` | Paul Dirac | Zero-inflation spike over `skater` | — | — | Repeating / grid-quoted series (policy rates, posted prices) |
+| `dirac` | Paul Dirac | Lattice projection over `skater` | — | — | Repeating / grid-quoted series (policy rates, posted prices) |
 
 For example `kahneman` is a nod to `thinking_fast_and_slow` in
 timemachines and puts a strong
 prior on candidates with a **fast** process tracker outside and a **slowly-varying**
 residual scale inside. Tune the bet with `kahneman(k=1, strength=8)`; see `examples/benchmark_kahneman.py`.
 
-`dirac` wraps `skater` in a **zero-inflation spike**: it tracks how often the
-series repeats its last value exactly and blends in a near-Dirac component at
-that value (still a plain `Dist` — one extra narrow Gaussian; on non-repeating
-data the spike weight decays to zero and it vanishes). Judged by
-**log-likelihood** — the package's metric — it dominates on administrative,
-grid-quoted series that sit unchanged for long stretches (policy rates, posted
-prices), where a continuous predictive cannot place mass on the exact repeat.
+`dirac` wraps `skater` in a **lattice projection**: it keeps a recency-weighted
+frequency table of the exact values the series takes and adds near-Dirac atoms on
+the ones it *revisits* (each carrying that value's frequency as probability),
+**mean-preserving** so the atoms add mass without moving the ensemble's mean.
+It's still a plain `Dist`. On continuous data nothing is revisited, no atom
+fires, and it vanishes; unlike a simple last-value spike it also captures values
+that recur often but never twice in a row. Judged by **log-likelihood** — the
+package's metric — it dominates on administrative, grid-quoted series that sit on
+a small set of values (policy rates, posted prices), where a continuous
+predictive cannot place mass on an exact value.
+
+Every policy also draws on a **Yeo-Johnson coordinate** candidate group (a coarse
+grid of the signed Box-Cox family), so the ensemble can *learn the coordinate* a
+series is simple in — log/multiplicative, sqrt, or linear — online, rather than
+committing to one up front.
 
 Or tune directly:
 
