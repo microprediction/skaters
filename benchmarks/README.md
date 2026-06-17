@@ -36,6 +36,30 @@ pip install statsforecast # AutoARIMA/ETS mean models to pair conformal with
 The script prints which it found. These need network + heavy deps, so they are
 intentionally absent from the package's `pyproject.toml`.
 
+## Headline result: skaters vs crepes, on CRPS (`exhaustive_crps.py`)
+
+The skater is a *pluggable proper-scoring-rule optimizer* — the leaf fits its
+scale-mixture weights, and the ensemble weights its candidates, by **a** score.
+Point it at log-likelihood and it dominates; point it at CRPS (`crps_leaf.py`,
+online CRPS-gradient on the simplex) and it beats the CRPS specialist on its own
+metric. Conformal has no density, so it is **metric-locked** to coverage/CRPS.
+
+Exhaustive run over **42 FRED series** (crepes given three calibration windows;
+scored on its own CDF via the pinball decomposition of CRPS):
+
+> **A CRPS-targeted skater beats crepes on CRPS in 39 / 42 series (93%).**
+
+The 3 losses — `DFEDTARU`, `DFF`, `DPRIME` (fed-funds target, effective fed
+funds, prime rate) — are administrative step-rates whose one-step change is a
+near **point mass at 0**: the empirical conformal CDF parks ~all its mass at 0,
+which a smooth mixture can't match. Conformal wins only where the distribution
+is degenerate, not where there's forecasting skill.
+
+And crepes produces no log-likelihood at all (its docs: a CPS outputs *CDFs*),
+so on the economically-grounded, tail-sensitive metric it cannot compete; on
+CRPS, the metric it is built for, it still loses 93% of the time once we aim at
+it. Run it yourself: `PYTHONPATH=src python benchmarks/exhaustive_crps.py`.
+
 ## On the table
 
 - `naive-gauss` — last value + rolling Gaussian residual.
