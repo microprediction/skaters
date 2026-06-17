@@ -19,8 +19,9 @@ export { terminalLeafEnsemble } from "./terminal.mjs";
 export { search, TRANSFORMS } from "./search.mjs";
 export { periodDetector, topPeriods, DEFAULT_LAGS } from "./periodicity.mjs";
 export {
-  buildCandidates, skater, holt, hosking, laplace, wald, samuelson, dantzig, kahneman,
+  buildCandidates, skater, holt, hosking, laplace, wald, samuelson, dantzig, kahneman, dirac,
 } from "./api.mjs";
+export { sticky } from "./sticky.mjs";
 export {
   build, name as specName, toJson, fromJson,
   leafSpec, emaSpec, ensembleSpec, conjugateSpec,

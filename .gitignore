@@ -213,3 +213,4 @@ parity/vectors.json
 benchmarks/data/
 benchmarks/results_crps.csv
 benchmarks/overnight.log
+benchmarks/*.log

@@ -26,7 +26,8 @@ from skaters.transform import (
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
     grouped_ar,
 )
-from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig
+from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac
+from skaters.sticky import sticky
 from skaters.search import search as adaptive_search
 from skaters import spec as S
 from skaters.periodicity import period_detector
@@ -111,6 +112,19 @@ def make_vec_series(n=120, seed=7):
     return out
 
 
+def make_repeat_series(n=150, seed=99):
+    # Exact repeats (sticky) plus 0.25-grid jumps (all exactly float-representable,
+    # so y == last matches bit-for-bit in Python and JS).
+    random.seed(seed)
+    out = []
+    v = 1.0
+    for _ in range(n):
+        if random.random() >= 0.7:
+            v += random.choice([-0.25, 0.25, 0.5])
+        out.append(v)
+    return out
+
+
 def clean(x):
     # JS JSON.parse rejects Infinity/NaN; encode them as string sentinels.
     if x != x:
@@ -170,6 +184,18 @@ def main():
                 out.append([[clean(v) for v in mean], [clean(v) for v in cmat]])
         cov[nm] = out
     vectors["cov"] = cov
+
+    # Sticky/dirac: a repeat-heavy series (exact repeats + grid jumps) so the
+    # near-Dirac spike path is exercised, not just pass-through.
+    rep = make_repeat_series()
+    vectors["repeat_series"] = rep
+    rep_scen = {
+        "sticky_ema": (1, sticky(conjugate(leaf(k=1), ema_transform(0.1), k=1), k=1)),
+        "dirac": (1, dirac(k=1)),
+    }
+    vectors["repeat_scenarios"] = {
+        name: {"k": k, "out": run_scenario(sk, rep)} for name, (k, sk) in rep_scen.items()
+    }
 
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "vectors.json")

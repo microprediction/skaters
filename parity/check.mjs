@@ -4,7 +4,7 @@
 // Exits non-zero if any scenario diverges beyond tolerance.
 
 import { readFileSync } from "fs";
-import { buildScenarios } from "./scenarios.mjs";
+import { buildScenarios, buildRepeatScenarios } from "./scenarios.mjs";
 import { periodDetector } from "../docs/js/skaters/periodicity.mjs";
 import { runningCov, emaCov, ledoitWolfCov } from "../docs/js/skaters/cov.mjs";
 
@@ -80,6 +80,31 @@ function main() {
       console.error(`FAIL ${name}: ${scenarioFails} mismatches`);
     } else {
       console.log(`ok   ${name}`);
+    }
+  }
+
+  // Sticky/dirac scenarios on the repeat-heavy series (exercise the spike).
+  if (vectors.repeat_scenarios) {
+    const rep = vectors.repeat_series;
+    const repScen = new Map(buildRepeatScenarios().map(([n, k, sk]) => [n, sk]));
+    for (const [name, expected] of Object.entries(vectors.repeat_scenarios)) {
+      const sk = repScen.get(name);
+      if (!sk) { missing.push(name); continue; }
+      const got = runScenario(sk, rep, burn, probe, qLo, qHi);
+      let f = 0;
+      for (let step = 0; step < expected.out.length; step++) {
+        for (let h = 0; h < expected.out[step].length; h++) {
+          for (let j = 0; j < 7; j++) {
+            checked++;
+            if (!close(got[step][h][j], expected.out[step][h][j])) {
+              f++;
+              if (f <= 3) console.error(`  MISMATCH ${name} step=${step + burn} h=${h} ${LABELS[j]}: js=${got[step][h][j]} py=${decode(expected.out[step][h][j])}`);
+            }
+          }
+        }
+      }
+      if (f > 0) { failures += f; console.error(`FAIL ${name}: ${f} mismatches`); }
+      else console.log(`ok   ${name}`);
     }
   }
 
