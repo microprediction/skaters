@@ -5,9 +5,10 @@
 // complexity penalty — i.e., the search strategy. (dantzig lives in
 // search.mjs because it uses adaptive search.)
 
-import { leaf } from "./leaf.mjs";
+import { leaf, scaleMixtureLeaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
+import { bayesianEnsemble } from "./bayesian.mjs";
 import { search } from "./search.mjs";
 import { sticky } from "./sticky.mjs";
 import {
@@ -224,5 +225,20 @@ export function dirac(k = 1, spikeFrac = 0.003) {
   // projection = mean-preserving sticky atom; pull is left to the trunk.
   const f = sticky(skater(k), k, 0.05, spikeFrac);
   f.skaterName = `dirac(k=${k})`;
+  return f;
+}
+
+export function doob(k = 1) {
+  // committed martingale mean + learned volatility clock (time-changed BM).
+  // Same mean across candidates -> BMA blends vol clocks without washing kurtosis.
+  const cands = [
+    conjugate(leaf(k), difference(), k),
+    conjugate(conjugate(leaf(k), garch(), k), difference(), k),
+    conjugate(conjugate(leaf(k), standardize(0.02), k), difference(), k),
+    conjugate(conjugate(scaleMixtureLeaf(k), garch(), k), difference(), k),
+    conjugate(scaleMixtureLeaf(k), difference(), k),
+  ];
+  const f = bayesianEnsemble(cands, { k, learningRate: 0.5, depths: [1, 2, 2, 2, 1], maxComponents: 30 });
+  f.skaterName = `doob(k=${k})`;
   return f;
 }

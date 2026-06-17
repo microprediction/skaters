@@ -41,7 +41,7 @@ Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horiz
 Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models. 
 
 ```python
-from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac
+from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac, doob
 
 f = holt(k=1)       # expect trends (Holt 1957)
 f = hosking(k=1)    # expect long memory (Hosking 1981)
@@ -51,6 +51,7 @@ f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
 f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
 f = dirac(k=1)      # bet on repetition — atoms on the lattice it revisits (after Paul Dirac)
+f = doob(k=1)       # martingale + learned volatility clock; feed levels (after Joseph Doob)
 ```
 
 They are nmenomics in some instances.
@@ -65,6 +66,7 @@ They are nmenomics in some instances.
 | `dantzig` | Dantzig 1947 | Adaptive search | 0.30 | 0.01 | Adaptive (grows pool online) |
 | `kahneman` | timemachines | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
 | `dirac` | Paul Dirac | Lattice projection over `skater` | — | — | Repeating / grid-quoted series (policy rates, posted prices) |
+| `doob` | Joseph Doob | Martingale mean + learned volatility clock | — | — | Near-martingale **levels** (prices, indices) |
 
 For example `kahneman` is a nod to `thinking_fast_and_slow` in
 timemachines and puts a strong
@@ -86,6 +88,17 @@ Every policy also draws on a **Yeo-Johnson coordinate** candidate group (a coars
 grid of the signed Box-Cox family), so the ensemble can *learn the coordinate* a
 series is simple in — log/multiplicative, sqrt, or linear — online, rather than
 committing to one up front.
+
+`doob` is the one **committed** policy (after Joseph Doob): it pins the mean to a
+**martingale** (the last value — no drift, no mean reversion) and only learns how
+the **volatility breathes**, Bayesian-averaging several martingale predictives
+that differ in their volatility clock (constant, GARCH, slowly-varying, heavy
+tailed). By Dambis–Dubins–Schwarz any continuous martingale is a *time-changed
+Brownian motion*, so the bet is exactly "BM on a stochastic clock". Feed it the
+**level** series (prices, indices, rates), not pre-differenced changes: when the
+martingale prior holds it beats the diffuse `laplace` ensemble by committing the
+mean and spending its capacity on the clock; on genuinely mean-reverting series
+(e.g. the VIX) the prior is wrong and it gives ground — a deliberately sharp tool.
 
 Or tune directly:
 
