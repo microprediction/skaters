@@ -168,10 +168,12 @@ export class Dist {
   }
 
   get var() {
+    // centered form: avoids catastrophic cancellation when means are large
+    // relative to spreads (which would otherwise yield var=0, std=0).
     const mu = this.mean;
     let total = 0.0;
-    for (const [w, m, s] of this.components) total += w * (s * s + m * m);
-    return total - mu * mu;
+    for (const [w, m, s] of this.components) total += w * (s * s + (m - mu) * (m - mu));
+    return total;
   }
 
   get std() {
@@ -199,6 +201,7 @@ export class Dist {
   // --- pruning ---
 
   prune(maxComponents = 20) {
+    maxComponents = Math.max(1, maxComponents);   // a Dist needs >=1 component
     let comps = this.components.map((c) => c.slice());
     while (comps.length > maxComponents) {
       let bestDist = Infinity;
@@ -224,7 +227,8 @@ export class Dist {
       } else {
         mNew = (wi * mi + wj * mj) / wNew;
         const vNew =
-          (wi * (si * si + mi * mi) + wj * (sj * sj + mj * mj)) / wNew - mNew * mNew;
+          (wi * (si * si + (mi - mNew) * (mi - mNew))
+            + wj * (sj * sj + (mj - mNew) * (mj - mNew))) / wNew;
         sNew = Math.sqrt(Math.max(vNew, 0.0));
       }
       comps[bestI] = [wNew, mNew, sNew];

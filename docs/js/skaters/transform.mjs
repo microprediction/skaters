@@ -346,20 +346,21 @@ export function yeoJohnson(lmbda = 0.0) {
     if (L === 2.0) return -Math.log1p(-y);
     return -((Math.pow(-y + 1.0, 2.0 - L) - 1.0) / (2.0 - L));
   };
+  // clamp exp args so squaring the result in var() stays finite (exp(350)~1e152).
   const inv = (yp) => {
     if (yp >= 0.0) {
-      if (L === 0.0) return Math.expm1(yp);
+      if (L === 0.0) return Math.expm1(Math.min(yp, 350.0));
       return Math.pow(Math.max(L * yp + 1.0, 1e-12), 1.0 / L) - 1.0;
     }
-    if (L === 2.0) return 1.0 - Math.exp(-yp);
+    if (L === 2.0) return 1.0 - Math.exp(Math.min(-yp, 350.0));
     return 1.0 - Math.pow(Math.max(-(2.0 - L) * yp + 1.0, 1e-12), 1.0 / (2.0 - L));
   };
   const dinv = (yp) => {
     if (yp >= 0.0) {
-      if (L === 0.0) return Math.exp(yp);
+      if (L === 0.0) return Math.exp(Math.min(yp, 350.0));
       return Math.pow(Math.max(L * yp + 1.0, 1e-12), 1.0 / L - 1.0);
     }
-    if (L === 2.0) return Math.exp(-yp);
+    if (L === 2.0) return Math.exp(Math.min(-yp, 350.0));
     return Math.pow(Math.max(-(2.0 - L) * yp + 1.0, 1e-12), 1.0 / (2.0 - L) - 1.0);
   };
 
