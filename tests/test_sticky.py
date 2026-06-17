@@ -51,6 +51,19 @@ def test_sticky_spike_on_repeats():
     assert s < 0.05                        # and it is narrow (near-Dirac)
 
 
+def test_sticky_anchors_at_modal_value_not_last():
+    # Mostly 0 with isolated nonzero jumps, ending on a jump. The atom must sit
+    # at the modal value (0) -- the lattice attractor -- not the raw last value
+    # (0.25), which right after a jump is the least likely value to recur.
+    series = [0.25 if i % 17 == 0 else 0.0 for i in range(200)]
+    series.append(0.25)                      # force the last value to be a jump
+    assert series[-1] == 0.25
+    d = _run(sticky(skater(1), 1), series)[-1]
+    w, m, s = max(d.components, key=lambda c: c[0])
+    assert s < 0.05                          # it is the narrow atom
+    assert abs(m - 0.0) < 1e-9               # anchored at the mode, not 0.25
+
+
 def test_sticky_is_mean_preserving():
     # The projection adds atom mass WITHOUT moving the base ensemble's mean.
     import random
