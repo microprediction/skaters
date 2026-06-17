@@ -83,6 +83,26 @@ def test_sticky_is_mean_preserving():
     assert worst < 1e-9                     # mean is untouched by the atom
 
 
+def test_sticky_captures_non_consecutive_lattice():
+    # A series that revisits {0,1,2} often but NEVER consecutively. A
+    # consecutive-repeat gate would see no repeats and vanish; the lattice puts
+    # atoms on all three revisited values and assigns the true value high mass.
+    random.seed(0)
+    vals, last, series = [0.0, 1.0, 2.0], None, []
+    for _ in range(400):
+        v = random.choice([x for x in [0.0, 1.0, 2.0] if x != last])
+        series.append(v)
+        last = v
+    d = _run(sticky(skater(1), 1), series)[-1]
+    atoms = [(w, m) for w, m, s in d.components if s < 0.05]
+    assert len(atoms) >= 3                       # an atom on each lattice value
+    on_lattice = sum(w for w, m in atoms
+                     if min(abs(m - v) for v in vals) < 1e-9)
+    assert on_lattice > 0.8                      # most mass sits on the lattice
+    # and it makes the lattice values far more likely than a continuous fit
+    assert d.logpdf(1.0) > math.log(0.2)
+
+
 def test_dirac_is_skater_and_runs():
     f = dirac(1)
     assert isinstance(f, Skater)
