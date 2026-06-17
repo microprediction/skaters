@@ -26,7 +26,7 @@ from skaters.transform import (
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
     grouped_ar, yeo_johnson,
 )
-from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac
+from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac, doob
 from skaters.sticky import sticky
 from skaters.search import search as adaptive_search
 from skaters import spec as S
@@ -81,7 +81,7 @@ def build_scenarios():
     # Named policies (the full shared-pool ensembles)
     for nm, fac in [("skater", skater), ("holt", holt), ("hosking", hosking),
                     ("laplace", laplace), ("wald", wald), ("samuelson", samuelson),
-                    ("kahneman", kahneman)]:
+                    ("kahneman", kahneman), ("doob", doob)]:
         s.append((f"pol_{nm}", 1, fac(k=1)))
     s.append(("pol_skater_k2", 2, skater(k=2)))
     s.append(("pol_kahneman_k2", 2, kahneman(k=2)))
