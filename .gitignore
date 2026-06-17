@@ -215,3 +215,4 @@ benchmarks/results_crps.csv
 benchmarks/overnight.log
 benchmarks/*.log
 benchmarks/results_large.csv
+benchmarks/results_refresh.csv
