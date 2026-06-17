@@ -82,6 +82,28 @@ class Dist:
             total += w * _gaussian_cdf(x, m, s)
         return total
 
+    def crps(self, x: float) -> float:
+        """Continuous Ranked Probability Score at observation x.
+
+        CRPS is a proper scoring rule (lower is better) with the same units
+        as the data — more robust than logpdf, which is dominated by tails.
+        Closed form for a Gaussian mixture (Grimit et al. 2006):
+
+            CRPS = Σ_i w_i A(μ_i - x, σ_i)
+                   - ½ Σ_i Σ_j w_i w_j A(μ_i - μ_j, √(σ_i²+σ_j²))
+
+        where A(m, s) = E|N(m, s²)| = m(2Φ(m/s) - 1) + 2s·φ(m/s).
+        """
+        comps = self.components
+        t1 = 0.0
+        for w, m, s in comps:
+            t1 += w * _abs_expectation(m - x, s)
+        t2 = 0.0
+        for wi, mi, si in comps:
+            for wj, mj, sj in comps:
+                t2 += wi * wj * _abs_expectation(mi - mj, math.sqrt(si * si + sj * sj))
+        return t1 - 0.5 * t2
+
     def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
         """Inverse CDF via bisection."""
         assert 0 < p < 1
@@ -207,3 +229,11 @@ def _gaussian_cdf(x: float, mean: float, std: float) -> float:
     if std <= 0:
         return 1.0 if x >= mean else 0.0
     return 0.5 * (1.0 + math.erf((x - mean) / (std * _SQRT2)))
+
+
+def _abs_expectation(m: float, s: float) -> float:
+    """E|N(m, s²)| = m(2Φ(m/s) - 1) + 2s·φ(m/s).  (Used by CRPS.)"""
+    if s <= 0:
+        return abs(m)
+    z = m / s
+    return m * (2.0 * _gaussian_cdf(z, 0.0, 1.0) - 1.0) + 2.0 * s * _gaussian_pdf(z, 0.0, 1.0)

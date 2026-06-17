@@ -1,6 +1,6 @@
 // JS scenario registry — must match parity/gen_vectors.py build_scenarios().
 
-import { leaf } from "../docs/js/skaters/leaf.mjs";
+import { leaf, scaleMixtureLeaf } from "../docs/js/skaters/leaf.mjs";
 import { conjugate } from "../docs/js/skaters/conjugate.mjs";
 import { ema } from "../docs/js/skaters/ema.mjs";
 import { precisionWeightedEnsemble } from "../docs/js/skaters/ensemble.mjs";
@@ -57,6 +57,10 @@ export function buildScenarios() {
   const specConj = conjugateSpec(ensembleSpec([emaSpec(0.01, 1), emaSpec(0.1, 1)], 1), diffSpec());
   s.push(["spec_diff_ensemble", 1, specBuild(specConj)]);
   s.push(["spec_ema", 1, specBuild(emaSpec(0.05, 1))]);
+
+  // Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
+  s.push(["scale_mixture_leaf", 1, scaleMixtureLeaf(1)]);
+  s.push(["scalemix_ema", 1, conjugate(scaleMixtureLeaf(1), emaTransform(0.1), 1)]);
   return s;
 }
 

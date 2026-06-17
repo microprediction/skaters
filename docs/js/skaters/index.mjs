@@ -6,7 +6,7 @@ export { Dist, erf } from "./dist.mjs";
 export {
   runningVarInit, runningVarUpdate, runningVarGet, runningStdGet, runningMseGet,
 } from "./runstats.mjs";
-export { leaf } from "./leaf.mjs";
+export { leaf, scaleMixtureLeaf } from "./leaf.mjs";
 export { ema } from "./ema.mjs";
 export { conjugate } from "./conjugate.mjs";
 export {
@@ -15,6 +15,7 @@ export {
 } from "./transform.mjs";
 export { precisionWeightedEnsemble } from "./ensemble.mjs";
 export { bayesianEnsemble } from "./bayesian.mjs";
+export { terminalLeafEnsemble } from "./terminal.mjs";
 export { search, TRANSFORMS } from "./search.mjs";
 export { periodDetector, topPeriods, DEFAULT_LAGS } from "./periodicity.mjs";
 export {

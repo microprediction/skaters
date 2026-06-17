@@ -73,6 +73,13 @@ function gaussianCdf(x, mean, std) {
   return 0.5 * (1.0 + erf((x - mean) / (std * SQRT2)));
 }
 
+function absExpectation(m, s) {
+  // E|N(m, s^2)| = m(2Φ(m/s) - 1) + 2s·φ(m/s).
+  if (s <= 0) return Math.abs(m);
+  const z = m / s;
+  return m * (2.0 * gaussianCdf(z, 0.0, 1.0) - 1.0) + 2.0 * s * gaussianPdf(z, 0.0, 1.0);
+}
+
 export class Dist {
   // components: array of [weight, mean, std]
   constructor(components) {
@@ -123,6 +130,20 @@ export class Dist {
     let total = 0.0;
     for (const [w, m, s] of this.components) total += w * gaussianCdf(x, m, s);
     return total;
+  }
+
+  crps(x) {
+    // Closed-form CRPS for a Gaussian mixture (Grimit et al. 2006).
+    const comps = this.components;
+    let t1 = 0.0;
+    for (const [w, m, s] of comps) t1 += w * absExpectation(m - x, s);
+    let t2 = 0.0;
+    for (const [wi, mi, si] of comps) {
+      for (const [wj, mj, sj] of comps) {
+        t2 += wi * wj * absExpectation(mi - mj, Math.sqrt(si * si + sj * sj));
+      }
+    }
+    return t1 - 0.5 * t2;
   }
 
   quantile(p, tol = 1e-9, maxIter = 100) {

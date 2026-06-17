@@ -213,6 +213,33 @@ f = search(
 )
 ```
 
+## Heavy tails: the scale-mixture leaf
+
+Everything here is judged by predictive **log-likelihood**. A plain Gaussian leaf
+gets the *location* and *scale* right but the *shape* wrong on heavy-tailed
+residuals (returns, macro data), and — crucially — Bayesian model averaging
+preserves the mean and variance but **washes the kurtosis out**, so adding heavy
+leaves to the candidate pool doesn't help.
+
+The fix is the **scale-mixture leaf**: a fixed dictionary of zero-mean Gaussians
+`N(0, aᵢ·σ)` with weights learned online (a Student-t *is* a Gaussian scale
+mixture, so this approximates it). It's a plain `Dist`; the weights are the
+"discrepancy from N(0,1)" — all on `a=1` is Gaussian, mass on larger `a` is fat
+tails. It matches the Gaussian leaf on Gaussian data and beats it as tails fatten.
+
+```python
+from skaters import scale_mixture_leaf, terminal_leaf_ensemble, leaf
+```
+
+Because mixing washes out shape, the named policies use a **terminal-leaf
+ensemble**: the candidates are combined for the *mean*, then one terminal
+scale-mixture leaf models the combined residual — so the leaf's shape reaches the
+output undiluted. On Student-t₃ this takes `laplace` from a logpdf of ≈ −2.07
+(Gaussian-collapsed) to ≈ −1.93, with no cost on Gaussian data.
+
+`Dist.crps(y)` (closed-form CRPS) is also available as a proper score for
+benchmarking.
+
 ## Spec system
 
 Serialize and rebuild any pipeline:

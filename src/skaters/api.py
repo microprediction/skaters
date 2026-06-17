@@ -24,18 +24,22 @@ from skaters.transform import (
     seasonal_difference,
 )
 from skaters.search import search as adaptive_search
-from skaters.bayesian import bayesian_ensemble
+from skaters.terminal import terminal_leaf_ensemble
 
 
 # ---------------------------------------------------------------------------
 # Candidate population (shared by all search policies)
 # ---------------------------------------------------------------------------
 
-def _build_candidates(k: int):
+def _build_candidates(k: int, leaf_fn=leaf):
     """Generate the full candidate population.
 
     Every search policy considers ALL of these. The policy only
     affects how they are weighted, not which ones are included.
+
+    The terminal distribution of every candidate is ``leaf_fn`` — by default
+    the Gaussian scale-mixture leaf, which models the residual's departure
+    from N(0,1). Pass ``leaf_fn=leaf`` for the plain Gaussian leaf.
 
     Returns (candidates, depths, groups), where groups maps a logical
     block name to the list of candidate indices in that block. Policies
@@ -46,17 +50,17 @@ def _build_candidates(k: int):
     groups: dict[str, list[int]] = {}
 
     # Depth 0: just noise (baseline)
-    candidates.append(leaf(k=k))
+    candidates.append(leaf_fn(k=k))
     depths.append(0)
 
     # Depth 1: single EMA at various speeds
     for alpha in [0.01, 0.05, 0.1, 0.3]:
-        candidates.append(conjugate(leaf(k=k), ema_transform(alpha), k=k))
+        candidates.append(conjugate(leaf_fn(k=k), ema_transform(alpha), k=k))
         depths.append(1)
 
     # Depth 1: differencing + leaf (pure random walk)
     groups["diff"] = []
-    candidates.append(conjugate(leaf(k=k), difference(), k=k))
+    candidates.append(conjugate(leaf_fn(k=k), difference(), k=k))
     depths.append(1)
     groups["diff"].append(len(candidates) - 1)
 
@@ -64,38 +68,38 @@ def _build_candidates(k: int):
     # Multiple speeds: fast drift detection vs long-memory drift
     groups["drift"] = []
     for a, s in [(0.05, 0.01), (0.01, 0.002), (0.002, 0.001), (0.0005, 0.0002)]:
-        candidates.append(conjugate(leaf(k=k), drift(alpha=a, shrinkage=s), k=k))
+        candidates.append(conjugate(leaf_fn(k=k), drift(alpha=a, shrinkage=s), k=k))
         depths.append(1)
         groups["drift"].append(len(candidates) - 1)
 
     # Depth 1: Theta method (SES + half OLS slope)
     for a in [0.05, 0.1, 0.3]:
-        candidates.append(conjugate(leaf(k=k), theta(alpha=a), k=k))
+        candidates.append(conjugate(leaf_fn(k=k), theta(alpha=a), k=k))
         depths.append(1)
 
     # Depth 1: AR at depth 1 (captures mean reversion, persistence)
-    candidates.append(conjugate(leaf(k=k), ar(1), k=k))
+    candidates.append(conjugate(leaf_fn(k=k), ar(1), k=k))
     depths.append(1)
-    candidates.append(conjugate(leaf(k=k), ar(2, decay=1), k=k))
+    candidates.append(conjugate(leaf_fn(k=k), ar(2, decay=1), k=k))
     depths.append(1)
 
     # Depth 1: Holt linear (level + trend, single transform)
     groups["holt"] = []
     for a, b in [(0.1, 0.02), (0.1, 0.05), (0.3, 0.1)]:
-        candidates.append(conjugate(leaf(k=k), holt_linear(alpha=a, beta=b), k=k))
+        candidates.append(conjugate(leaf_fn(k=k), holt_linear(alpha=a, beta=b), k=k))
         depths.append(1)
         groups["holt"].append(len(candidates) - 1)
 
     # Depth 1: Seasonal differencing (common periods)
     for period in [7, 12, 24]:
-        candidates.append(conjugate(leaf(k=k), seasonal_difference(period), k=k))
+        candidates.append(conjugate(leaf_fn(k=k), seasonal_difference(period), k=k))
         depths.append(1)
 
     # Depth 2: Seasonal differencing + EMA
     for period in [7, 12, 24]:
         for alpha in [0.05, 0.1]:
             candidates.append(
-                conjugate(conjugate(leaf(k=k), ema_transform(alpha), k=k),
+                conjugate(conjugate(leaf_fn(k=k), ema_transform(alpha), k=k),
                           seasonal_difference(period), k=k)
             )
             depths.append(2)
@@ -103,7 +107,7 @@ def _build_candidates(k: int):
     # Depth 2: differencing + EMA
     for alpha in [0.05, 0.1, 0.3]:
         candidates.append(
-            conjugate(conjugate(leaf(k=k), ema_transform(alpha), k=k), difference(), k=k)
+            conjugate(conjugate(leaf_fn(k=k), ema_transform(alpha), k=k), difference(), k=k)
         )
         depths.append(2)
         groups["diff"].append(len(candidates) - 1)
@@ -111,7 +115,7 @@ def _build_candidates(k: int):
     # Depth 2: standardize + EMA
     for alpha in [0.05, 0.1]:
         candidates.append(
-            conjugate(conjugate(leaf(k=k), ema_transform(alpha), k=k), standardize(), k=k)
+            conjugate(conjugate(leaf_fn(k=k), ema_transform(alpha), k=k), standardize(), k=k)
         )
         depths.append(2)
 
@@ -119,7 +123,7 @@ def _build_candidates(k: int):
     groups["frac"] = []
     for d in [0.2, 0.4]:
         candidates.append(
-            conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k),
+            conjugate(conjugate(leaf_fn(k=k), ema_transform(0.1), k=k),
                       fractional_difference(d=d, window=30), k=k)
         )
         depths.append(2)
@@ -129,7 +133,7 @@ def _build_candidates(k: int):
     for a_drift, s_drift in [(0.002, 0.001), (0.0005, 0.0002)]:
         for a_ema in [0.05, 0.1]:
             candidates.append(
-                conjugate(conjugate(leaf(k=k), ema_transform(a_ema), k=k),
+                conjugate(conjugate(leaf_fn(k=k), ema_transform(a_ema), k=k),
                           drift(alpha=a_drift, shrinkage=s_drift), k=k)
             )
             depths.append(2)
@@ -137,7 +141,7 @@ def _build_candidates(k: int):
 
     # Depth 2: drift + Holt linear (drift on top of level+trend)
     candidates.append(
-        conjugate(conjugate(leaf(k=k), holt_linear(0.1, 0.05), k=k),
+        conjugate(conjugate(leaf_fn(k=k), holt_linear(0.1, 0.05), k=k),
                   drift(alpha=0.001, shrinkage=0.0005), k=k)
     )
     depths.append(2)
@@ -146,13 +150,13 @@ def _build_candidates(k: int):
 
     # Depth 2: GARCH + EMA (volatility-adapted)
     candidates.append(
-        conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k), garch(), k=k)
+        conjugate(conjugate(leaf_fn(k=k), ema_transform(0.1), k=k), garch(), k=k)
     )
     depths.append(2)
 
     # Depth 2: power transform + EMA (tail compression)
     candidates.append(
-        conjugate(conjugate(leaf(k=k), ema_transform(0.1), k=k), power_transform(0.5), k=k)
+        conjugate(conjugate(leaf_fn(k=k), ema_transform(0.1), k=k), power_transform(0.5), k=k)
     )
     depths.append(2)
 
@@ -182,7 +186,7 @@ def _build_candidates(k: int):
         for tracker in _fast_trackers():
             slow_scale = standardize(alpha=scale_alpha)
             candidates.append(
-                conjugate(conjugate(leaf(k=k), slow_scale, k=k), tracker, k=k)
+                conjugate(conjugate(leaf_fn(k=k), slow_scale, k=k), tracker, k=k)
             )
             depths.append(2)
             groups["fast_slow"].append(len(candidates) - 1)
@@ -221,7 +225,7 @@ def skater(k: int = 1, aggressiveness: float = 0.5):
     complexity_penalty = 0.05 * (1 - aggressiveness)
 
     candidates, depths, _ = _build_candidates(k)
-    f = bayesian_ensemble(
+    f = terminal_leaf_ensemble(
         candidates, k=k,
         learning_rate=learning_rate,
         complexity_penalty=complexity_penalty,
@@ -250,7 +254,7 @@ def holt(k: int = 1):
     # Boost the trend-capturing families: differencing, drift, Holt linear.
     trend = set(groups["diff"]) | set(groups["drift"]) | set(groups["holt"])
     prior = _prior_favoring_indices(len(candidates), favored=trend, boost=3.0)
-    f = bayesian_ensemble(
+    f = terminal_leaf_ensemble(
         candidates, k=k,
         learning_rate=0.5,
         complexity_penalty=0.02,
@@ -272,7 +276,7 @@ def hosking(k: int = 1):
     candidates, depths, groups = _build_candidates(k)
     # Boost the fractional-differencing models (by name, not magic index)
     prior = _prior_favoring_indices(len(candidates), favored=set(groups["frac"]), boost=3.0)
-    f = bayesian_ensemble(
+    f = terminal_leaf_ensemble(
         candidates, k=k,
         learning_rate=0.5,
         complexity_penalty=0.01,
@@ -292,7 +296,7 @@ def laplace(k: int = 1):
     fast convergence. Minimal complexity penalty. Let the data speak.
     """
     candidates, depths, _ = _build_candidates(k)
-    f = bayesian_ensemble(
+    f = terminal_leaf_ensemble(
         candidates, k=k,
         learning_rate=0.8,
         complexity_penalty=0.005,
@@ -313,7 +317,7 @@ def wald(k: int = 1):
     """
     candidates, depths, _ = _build_candidates(k)
     prior = _prior_favoring_depths(depths, favored={0}, boost=2.0)
-    f = bayesian_ensemble(
+    f = terminal_leaf_ensemble(
         candidates, k=k,
         learning_rate=0.15,
         complexity_penalty=0.08,
@@ -365,7 +369,7 @@ def samuelson(k: int = 1):
     for i in set(groups["drift"]) | set(groups["holt"]):
         prior[i] = 5.0
 
-    f = bayesian_ensemble(
+    f = terminal_leaf_ensemble(
         candidates, k=k,
         learning_rate=0.4,          # moderate — fast enough to find drift
         complexity_penalty=0.01,    # mild — willing to use drift+ema
@@ -413,7 +417,7 @@ def kahneman(k: int = 1, strength: float = 8.0):
     prior = _prior_favoring_indices(
         len(candidates), favored=set(groups["fast_slow"]), boost=strength
     )
-    f = bayesian_ensemble(
+    f = terminal_leaf_ensemble(
         candidates, k=k,
         learning_rate=0.5,
         complexity_penalty=0.01,
