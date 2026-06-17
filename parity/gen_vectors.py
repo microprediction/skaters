@@ -16,7 +16,8 @@ import math
 import os
 import random
 
-from skaters.leaf import leaf
+from skaters.leaf import leaf, heavy_leaf
+from skaters.conformal import conformal
 from skaters.conjugate import conjugate
 from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
@@ -92,6 +93,13 @@ def build_scenarios():
         S.ensemble_spec(S.ema_spec(0.01, 1), S.ema_spec(0.1, 1), k=1), S.diff_spec())
     s.append(("spec_diff_ensemble", 1, S.build(spec_conj)))
     s.append(("spec_ema", 1, S.build(S.ema_spec(0.05, 1))))
+
+    # Heavy-tailed leaf and conformal recalibration
+    s.append(("heavy_leaf", 1, heavy_leaf(k=1, excess_kurtosis=6.0)))
+    s.append(("heavy_ema", 1,
+              conjugate(heavy_leaf(k=1, excess_kurtosis=3.0), ema_transform(0.1), k=1)))
+    s.append(("conformal_ema", 1,
+              conformal(conjugate(leaf(k=1), ema_transform(0.1), k=1), k=1)))
     return s
 
 
@@ -120,7 +128,7 @@ def clean(x):
 def probe_dist(d):
     return [clean(v) for v in
             (d.mean, d.std, d.logpdf(PROBE), d.cdf(PROBE),
-             d.quantile(Q_LO), d.quantile(Q_HI))]
+             d.quantile(Q_LO), d.quantile(Q_HI), d.crps(PROBE))]
 
 
 def run_scenario(skater, series):

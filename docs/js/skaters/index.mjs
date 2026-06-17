@@ -6,8 +6,9 @@ export { Dist, erf } from "./dist.mjs";
 export {
   runningVarInit, runningVarUpdate, runningVarGet, runningStdGet, runningMseGet,
 } from "./runstats.mjs";
-export { leaf } from "./leaf.mjs";
+export { leaf, heavyLeaf } from "./leaf.mjs";
 export { ema } from "./ema.mjs";
+export { conformal } from "./conformal.mjs";
 export { conjugate } from "./conjugate.mjs";
 export {
   difference, fractionalDifference, standardize, emaTransform, theta, drift,

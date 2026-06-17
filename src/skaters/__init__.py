@@ -7,8 +7,9 @@ Log-likelihood: dist.logpdf(y_actual).
 
 from skaters.dist import Dist
 from skaters.conventions import Skater
-from skaters.leaf import leaf
+from skaters.leaf import leaf, heavy_leaf
 from skaters.ema import ema
+from skaters.conformal import conformal
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
 from skaters.conjugate import conjugate
@@ -42,6 +43,8 @@ __all__ = [
     "top_periods",
     # Building blocks
     "leaf",
+    "heavy_leaf",
+    "conformal",
     "ema",
     "conjugate",
     "difference",

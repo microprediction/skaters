@@ -26,7 +26,7 @@ function close(actual, expectedRaw) {
 }
 
 function probeDist(d, probe, qLo, qHi) {
-  return [d.mean, d.std, d.logpdf(probe), d.cdf(probe), d.quantile(qLo), d.quantile(qHi)];
+  return [d.mean, d.std, d.logpdf(probe), d.cdf(probe), d.quantile(qLo), d.quantile(qHi), d.crps(probe)];
 }
 
 function runScenario(skater, series, burn, probe, qLo, qHi) {
@@ -45,7 +45,7 @@ function main() {
   const { series, burn, probe, q_lo: qLo, q_hi: qHi } = vectors;
   const scenarios = new Map(buildScenarios().map(([name, k, skater]) => [name, { k, skater }]));
 
-  const LABELS = ["mean", "std", "logpdf", "cdf", "qlo", "qhi"];
+  const LABELS = ["mean", "std", "logpdf", "cdf", "qlo", "qhi", "crps"];
   let failures = 0;
   let checked = 0;
   const missing = [];
@@ -61,7 +61,7 @@ function main() {
     let scenarioFails = 0;
     for (let step = 0; step < expOut.length; step++) {
       for (let h = 0; h < expOut[step].length; h++) {
-        for (let j = 0; j < 6; j++) {
+        for (let j = 0; j < 7; j++) {
           checked++;
           if (!close(got[step][h][j], expOut[step][h][j])) {
             scenarioFails++;

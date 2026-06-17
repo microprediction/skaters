@@ -213,6 +213,36 @@ f = search(
 )
 ```
 
+## Calibration: CRPS & conformal
+
+Every `Dist` scores itself with **CRPS**, a proper scoring rule in the units of the
+data — more robust than log-likelihood, which the tails dominate:
+
+```python
+dist.crps(y_actual)   # closed form for the Gaussian mixture (lower is better)
+```
+
+A Gaussian leaf is the right *location* and *scale* but the wrong *shape* on
+heavy-tailed residuals — it over-covers the centre and under-covers the tails,
+and Bayesian averaging washes the kurtosis out. Two tools fix this:
+
+```python
+from skaters import heavy_leaf, conformal, laplace
+
+# A variance-matched heavy-tailed leaf (scale mixture ≈ Student-t):
+f = heavy_leaf(k=1, excess_kurtosis=6.0)
+
+# Online conformal recalibration — wraps any skater and replaces its predictive
+# shape with the empirical distribution of recent standardized residuals, so the
+# intervals attain ~nominal coverage (split conformal on a rolling window):
+f = conformal(laplace(k=1), window=250)
+```
+
+On heavy-tailed (t₃) data, `conformal(laplace)` pulls the nominal-50% interval
+from ~68% back to ~54% coverage and improves CRPS. Conformal targets coverage,
+not density, so it trades a little log-likelihood for calibration — judge it by
+CRPS and coverage (see `benchmarks/`).
+
 ## Spec system
 
 Serialize and rebuild any pipeline:

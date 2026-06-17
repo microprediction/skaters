@@ -1,6 +1,7 @@
 // JS scenario registry — must match parity/gen_vectors.py build_scenarios().
 
-import { leaf } from "../docs/js/skaters/leaf.mjs";
+import { leaf, heavyLeaf } from "../docs/js/skaters/leaf.mjs";
+import { conformal } from "../docs/js/skaters/conformal.mjs";
 import { conjugate } from "../docs/js/skaters/conjugate.mjs";
 import { ema } from "../docs/js/skaters/ema.mjs";
 import { precisionWeightedEnsemble } from "../docs/js/skaters/ensemble.mjs";
@@ -57,6 +58,11 @@ export function buildScenarios() {
   const specConj = conjugateSpec(ensembleSpec([emaSpec(0.01, 1), emaSpec(0.1, 1)], 1), diffSpec());
   s.push(["spec_diff_ensemble", 1, specBuild(specConj)]);
   s.push(["spec_ema", 1, specBuild(emaSpec(0.05, 1))]);
+
+  // Heavy-tailed leaf and conformal recalibration
+  s.push(["heavy_leaf", 1, heavyLeaf(1, 6.0)]);
+  s.push(["heavy_ema", 1, conjugate(heavyLeaf(1, 3.0), emaTransform(0.1), 1)]);
+  s.push(["conformal_ema", 1, conformal(conjugate(leaf(1), emaTransform(0.1), 1), 1)]);
   return s;
 }
 
