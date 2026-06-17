@@ -102,7 +102,7 @@ for y in observations:
       The names represent different <em>search strategies</em> &mdash; different priors, learning
       rates, and complexity penalties &mdash; not different models.
     </p>
-<pre><code>from skaters import holt, hosking, laplace, samuelson, wald, dantzig
+<pre><code>from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac
 
 f = holt(k=1)       # expect trends (Holt 1957)
 f = hosking(k=1)    # expect long memory (Hosking 1981)
@@ -110,7 +110,8 @@ f = laplace(k=1)    # no opinion — let the data decide
 f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
 f = wald(k=1)       # minimax caution (Wald)
 f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)</code></pre>
+f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
+f = dirac(k=1)      # bet on repetition — spike at the last value (after Paul Dirac)</code></pre>
 
     <table>
       <thead><tr><th>Policy</th><th>After</th><th>Prior</th><th>$\eta$</th><th>$\lambda$</th><th>Best for</th></tr></thead>
@@ -122,6 +123,7 @@ f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)</code></p
         <tr><td><code>wald</code></td><td>Wald</td><td>Depth 0</td><td>0.15</td><td>0.08</td><td>Adversarial, non-stationary</td></tr>
         <tr><td><code>dantzig</code></td><td>Dantzig 1947</td><td>Adaptive search</td><td>0.30</td><td>0.01</td><td>Adaptive (grows pool online)</td></tr>
         <tr><td><code>kahneman</code></td><td>timemachines</td><td>Fast tracker + slow residual scale</td><td>0.50</td><td>0.01</td><td>Fast signal, persistent noise</td></tr>
+        <tr><td><code>dirac</code></td><td>Paul Dirac</td><td>Zero-inflation spike over <code>skater</code></td><td>&mdash;</td><td>&mdash;</td><td>Repeating / grid-quoted series (policy rates, posted prices)</td></tr>
       </tbody>
     </table>
 

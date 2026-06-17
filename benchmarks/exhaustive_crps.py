@@ -27,7 +27,7 @@ from crepes import ConformalPredictiveSystem
 
 import fred
 from crps_leaf import crps_leaf
-from skaters.api import laplace, kahneman
+from skaters.api import laplace, kahneman, dirac
 from skaters.leaf import scale_mixture_leaf
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -117,6 +117,7 @@ FORECASTERS = {
     "crps-leaf-0.3": ("skater", lambda: crps_leaf(eta=0.3)),
     "crps-leaf-0.6": ("skater", lambda: crps_leaf(eta=0.6)),
     "crps-leaf-1.0": ("skater", lambda: crps_leaf(eta=1.0)),
+    "dirac": ("skater", lambda: dirac(1)),
 }
 
 
@@ -174,7 +175,7 @@ def summarize():
         r = csv.reader(f); next(r, None)
         for series, fc, crps, lp, n in r:
             rows.setdefault(series, {})[fc] = float(crps)
-    ours = ["laplace", "kahneman", "scalemix-leaf", "crps-leaf-0.3", "crps-leaf-0.6", "crps-leaf-1.0"]
+    ours = ["laplace", "kahneman", "scalemix-leaf", "crps-leaf-0.3", "crps-leaf-0.6", "crps-leaf-1.0", "dirac"]
     creps = ["crepes-w250", "crepes-w400", "crepes-w750"]
     wins = 0; total = 0
     print("\n=== summary: best-of-ours vs best-of-crepes CRPS (lower=better) ===")

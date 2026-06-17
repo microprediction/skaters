@@ -10,8 +10,9 @@ import {
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr,
 } from "../docs/js/skaters/transform.mjs";
 import {
-  skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig,
+  skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac,
 } from "../docs/js/skaters/api.mjs";
+import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
 import {
   build as specBuild, emaSpec, ensembleSpec, conjugateSpec, diffSpec,
@@ -64,3 +65,11 @@ export function buildScenarios() {
   return s;
 }
 
+
+// Sticky/dirac scenarios run on the repeat-heavy series (exercise the spike).
+export function buildRepeatScenarios() {
+  return [
+    ["sticky_ema", 1, sticky(conjugate(leaf(1), emaTransform(0.1), 1), 1)],
+    ["dirac", 1, dirac(1)],
+  ];
+}

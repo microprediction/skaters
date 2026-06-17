@@ -25,6 +25,7 @@ from skaters.transform import (
 )
 from skaters.search import search as adaptive_search
 from skaters.terminal import terminal_leaf_ensemble
+from skaters.sticky import sticky
 
 
 # ---------------------------------------------------------------------------
@@ -428,3 +429,23 @@ def kahneman(k: int = 1, strength: float = 8.0):
     f.__name__ = f"kahneman(k={k})"
     return f
 
+
+
+def dirac(k: int = 1, spike_frac: float = 0.003):
+    """Dirac's policy: bet on repetition.
+
+    After Paul Dirac (the delta it collapses toward). Wraps the general
+    skater with a :func:`sticky` near-Dirac spike at the last value, weighted
+    by the online probability that the series repeats exactly. On
+    administrative or grid-quoted series (policy rates, posted prices) that
+    stay unchanged for long stretches, the spike captures the point mass —
+    large likelihood and sharp intervals — while reducing to the ordinary
+    skater when the series actually moves.
+
+    Args:
+        k: forecast horizon.
+        spike_frac: how hard it commits to the point mass (smaller = harder).
+    """
+    f = sticky(skater(k=k), k=k, spike_frac=spike_frac)
+    f.__name__ = f"dirac(k={k})"
+    return f

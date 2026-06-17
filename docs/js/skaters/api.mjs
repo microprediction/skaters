@@ -9,6 +9,7 @@ import { leaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
 import { search } from "./search.mjs";
+import { sticky } from "./sticky.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, drift,
   holtLinear, ar, theta, seasonalDifference, garch, powerTransform,
@@ -208,5 +209,11 @@ export function kahneman(k = 1, strength = 8.0) {
     k, learningRate: 0.5, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
   });
   f.skaterName = `kahneman(k=${k})`;
+  return f;
+}
+
+export function dirac(k = 1, spikeFrac = 0.003) {
+  const f = sticky(skater(k), k, 0.05, spikeFrac);
+  f.skaterName = `dirac(k=${k})`;
   return f;
 }
