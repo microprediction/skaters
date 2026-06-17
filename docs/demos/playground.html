@@ -40,6 +40,7 @@
             <option value="wald">wald</option>
             <option value="dantzig">dantzig</option>
             <option value="kahneman">kahneman</option>
+            <option value="dirac">dirac</option>
             <option value="ema05">ema(0.05)</option>
           </select>
         </div>
@@ -89,7 +90,7 @@
   </footer>
 
   <script type="module">
-    import { skater, laplace, holt, hosking, samuelson, wald, dantzig, kahneman, ema }
+    import { skater, laplace, holt, hosking, samuelson, wald, dantzig, kahneman, dirac, ema }
       from "../js/skaters/index.mjs";
 
     const POLICIES = {
@@ -101,6 +102,7 @@
       wald: () => wald(1),
       dantzig: () => dantzig(1),
       kahneman: () => kahneman(1),
+      dirac: () => dirac(1),
       ema05: () => ema(0.05, 1),
     };
 
