@@ -16,8 +16,7 @@ import math
 import os
 import random
 
-from skaters.leaf import leaf, heavy_leaf
-from skaters.conformal import conformal
+from skaters.leaf import leaf, scale_mixture_leaf
 from skaters.conjugate import conjugate
 from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
@@ -94,12 +93,10 @@ def build_scenarios():
     s.append(("spec_diff_ensemble", 1, S.build(spec_conj)))
     s.append(("spec_ema", 1, S.build(S.ema_spec(0.05, 1))))
 
-    # Heavy-tailed leaf and conformal recalibration
-    s.append(("heavy_leaf", 1, heavy_leaf(k=1, excess_kurtosis=6.0)))
-    s.append(("heavy_ema", 1,
-              conjugate(heavy_leaf(k=1, excess_kurtosis=3.0), ema_transform(0.1), k=1)))
-    s.append(("conformal_ema", 1,
-              conformal(conjugate(leaf(k=1), ema_transform(0.1), k=1), k=1)))
+    # Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
+    s.append(("scale_mixture_leaf", 1, scale_mixture_leaf(k=1)))
+    s.append(("scalemix_ema", 1,
+              conjugate(scale_mixture_leaf(k=1), ema_transform(0.1), k=1)))
     return s
 
 

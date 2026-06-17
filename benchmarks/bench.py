@@ -1,14 +1,14 @@
 """Benchmark harness — NOT part of the deployed package.
 
-Compares skaters policies (and conformal recalibration) against classical
-baselines and split-conformal prediction, on point accuracy (MASE) *and*
-distributional quality (CRPS, interval coverage, log-likelihood).
+Judged the way the package judges everything: held-out predictive
+log-likelihood (higher is better). It pits the skaters policies against
+simple baselines and a self-contained **conformal predictive distribution**
+foil. The conformal foil is implemented here, not imported — the package
+ships no conformal/coverage machinery.
 
-It is deliberately self-contained and offline: the baselines and the
-conformal comparison are implemented here in pure Python, so the harness
-runs with only `skaters` installed and never adds a package dependency.
-External packages (statsforecast, statsmodels, river, ...) are optional and
-loaded behind try/except — used only if already installed.
+External SOTA opponents (crepes Conformal Predictive Systems, SPCI, ...) are
+loaded behind optional imports and used only if already installed; they need
+heavy deps + network, so the harness runs offline without them.
 
 Run:  python benchmarks/bench.py
 """
@@ -17,126 +17,99 @@ from __future__ import annotations
 import math
 import random
 
-from skaters import laplace, kahneman, dantzig, conformal, ema, Dist
+from skaters import laplace, kahneman, skater, leaf, scale_mixture_leaf, conjugate, ema_transform, Dist
 
 
-# ---------------------------------------------------------------------------
-# Reference baselines (pure Python), skater convention: (y, state) -> ([Dist], state)
-# Each emits a Gaussian predictive from a rolling residual scale, except the
-# conformal baseline which uses split-conformal quantiles.
-# ---------------------------------------------------------------------------
+# --- forecasters: (y, state) -> ([Dist], state) --------------------------
 
-def _gaussian_baseline(point_fn):
-    """Build a baseline from a point-forecaster, with a rolling residual std."""
+def _gaussian_naive():
+    """Last value + rolling-residual Gaussian (a minimal point+interval model)."""
     def f(y, state):
         if state is None:
-            state = {"pt": None, "last_pred": None, "n": 0, "m2": 0.0, "mean": 0.0}
-        if state["last_pred"] is not None:           # update residual variance (Welford)
-            e = y - state["last_pred"]
+            state = {"last": None, "n": 0, "mean": 0.0, "m2": 0.0}
+        if state["last"] is not None:
+            e = y - state["last"]
             state["n"] += 1
-            d = e - state["mean"]; state["mean"] += d / state["n"]
-            state["m2"] += d * (e - state["mean"])
-        pred, state["pt"] = point_fn(y, state["pt"])
-        state["last_pred"] = pred
+            d = e - state["mean"]; state["mean"] += d / state["n"]; state["m2"] += d * (e - state["mean"])
         var = state["m2"] / (state["n"] - 1) if state["n"] >= 2 else 1.0
-        return [Dist.gaussian(pred, math.sqrt(max(var, 1e-12)))], state
+        out = [Dist.gaussian(y, math.sqrt(max(var, 1e-12)))]
+        state["last"] = y
+        return out, state
     return f
 
 
-def _naive_pt(y, st):
-    return y, y                                       # predict last value
-
-
-def _drift_pt(y, st):
-    if st is None:
-        return y, {"last": y, "mu": 0.0, "n": 0}
-    n = st["n"] + 1
-    mu = st["mu"] + ((y - st["last"]) - st["mu"]) / n
-    return y + mu, {"last": y, "mu": mu, "n": n}
-
-
-def _ewma_pt(alpha):
-    def pt(y, st):
-        level = y if st is None else st + alpha * (y - st)
-        return level, level
-    return pt
-
-
-def conformal_naive(window=250):
-    """Split-conformal prediction on a naive forecaster (no parametric shape).
-
-    The predictive distribution is the empirical distribution of recent
-    naive residuals, recentred on the last value. This is the 'plain'
-    conformal baseline to compare the package's conformal() against.
-    """
-    return conformal(_gaussian_baseline(_naive_pt), k=1, window=window)
+def conformal_pd_naive(window=300):
+    """Conformal predictive distribution on a naive forecaster, scorable by
+    logpdf: empirical CDF of recent residuals, smoothed to a density (Gaussian
+    KDE). This is the foil — recency-unweighted, thin kernel tails."""
+    def f(y, state):
+        if state is None:
+            state = {"last": None, "buf": []}
+        # KDE density predictor for the *next* residual, recentred on y.
+        buf = state["buf"]
+        n = len(buf)
+        if n >= 2:
+            mean = sum(buf) / n
+            sd = math.sqrt(sum((v - mean) ** 2 for v in buf) / n) or 1.0
+            h = 0.9 * sd * n ** (-0.2)
+            comps = [(1.0 / n, y + r, h) for r in buf]
+            out = [Dist(comps)]
+        else:
+            out = [Dist.gaussian(y, 1.0)]
+        if state["last"] is not None:
+            buf.append(y - state["last"])
+            if len(buf) > window:
+                buf.pop(0)
+        state["last"] = y
+        return out, state
+    return f
 
 
 FORECASTERS = {
-    "naive":            lambda: _gaussian_baseline(_naive_pt),
-    "drift":            lambda: _gaussian_baseline(_drift_pt),
-    "ewma(.1)":         lambda: _gaussian_baseline(_ewma_pt(0.1)),
-    "conformal-naive":  lambda: conformal(_gaussian_baseline(_naive_pt), k=1),
-    "laplace":          lambda: laplace(1),
-    "kahneman":         lambda: kahneman(1),
-    "dantzig":          lambda: dantzig(1),
-    "conformal-laplace": lambda: conformal(laplace(1), k=1),
+    "naive-gauss": _gaussian_naive,
+    "conformal-PD": conformal_pd_naive,                 # the foil
+    "scale-mix leaf": lambda: conjugate(scale_mixture_leaf(1), ema_transform(0.1), 1),
+    "laplace": lambda: laplace(1),
+    "kahneman": lambda: kahneman(1),
+    "skater": lambda: skater(1),
 }
 
 
-# ---------------------------------------------------------------------------
-# Synthetic regimes
-# ---------------------------------------------------------------------------
+# --- synthetic regimes ---------------------------------------------------
 
 def _t(nu, r):
     z = r.gauss(0, 1); chi = sum(r.gauss(0, 1) ** 2 for _ in range(nu))
     return z / math.sqrt(chi / nu)
 
 
-def regimes(n=2000, seed=0):
+def regimes(n=2500, seed=0):
     r = random.Random(seed)
-    out = {"trend": [], "seasonal": [], "rwalk": [], "heavy-t3": [], "hetero": []}
-    lvl = 0.0
-    for t in range(n):
-        out["trend"].append(0.03 * t + 2 * r.gauss(0, 1))
-        out["seasonal"].append(5 * math.sin(2 * math.pi * t / 12) + r.gauss(0, 1))
-        lvl += r.gauss(0, 1); out["rwalk"].append(lvl)
+    out = {"trend": [], "ar+t3": [], "heavy-t3": [], "t3-drift": []}
+    ar = 0.0
+    for i in range(n):
+        out["trend"].append(0.03 * i + 2 * r.gauss(0, 1))
+        ar = 0.8 * ar + _t(3, r); out["ar+t3"].append(ar)
         out["heavy-t3"].append(_t(3, r))
-        sig = math.exp(math.log(.3) + (math.log(3) - math.log(.3)) * (.5 + .5 * math.sin(2 * math.pi * t / 250)))
-        out["hetero"].append(r.gauss(0, sig))
+        sc = math.exp(math.log(.4) + (math.log(3) - math.log(.4)) * (.5 + .5 * math.sin(2 * math.pi * i / 400)))
+        out["t3-drift"].append(_t(3, r) * sc)
     return out
 
 
-# ---------------------------------------------------------------------------
-# Scoring
-# ---------------------------------------------------------------------------
-
-def score(make, series, burn=300):
+def mean_logpdf(make, series, burn=300):
     f = make(); state = None; pending = None
-    ae = 0.0; crps = 0.0; lp = 0.0; c90 = c95 = n = 0
-    scale_num = 0.0; scale_den = 0; prev = None     # MASE scale = mean |Δy|
+    tot = 0.0; n = 0
     for i, y in enumerate(series):
-        if prev is not None:
-            scale_num += abs(y - prev); scale_den += 1
-        prev = y
         if pending is not None and i > burn:
-            d = pending[0]
-            ae += abs(d.mean - y)
-            crps += d.crps(y)
-            v = d.logpdf(y); lp += v if math.isfinite(v) else -20.0
-            if d.quantile(0.05) <= y <= d.quantile(0.95): c90 += 1
-            if d.quantile(0.025) <= y <= d.quantile(0.975): c95 += 1
+            v = pending[0].logpdf(y)
+            tot += v if math.isfinite(v) else -20.0
             n += 1
         dists, state = f(y, state); pending = dists
-    scale = scale_num / scale_den if scale_den else 1.0
-    return {"MASE": (ae / n) / scale, "CRPS": crps / n, "cov90": c90 / n,
-            "cov95": c95 / n, "logpdf": lp / n}
+    return tot / n
 
 
 def try_external():
-    """Report which optional external packages are available (none required)."""
     avail = []
-    for mod in ("statsforecast", "statsmodels", "river", "mapie", "crepes"):
+    for mod in ("crepes", "mapie", "statsforecast", "sklearn"):
         try:
             __import__(mod); avail.append(mod)
         except Exception:
@@ -145,19 +118,13 @@ def try_external():
 
 
 def main():
+    print(f"optional SOTA packages available: {try_external() or 'none (offline foils only)'}")
+    print("\nmean held-out log-likelihood (higher is better)\n")
     data = regimes()
-    ext = try_external()
-    print(f"optional external packages available: {ext or 'none (offline baselines only)'}\n")
-    for name, series in data.items():
-        print(f"=== {name} ===")
-        print(f"  {'forecaster':18s}{'MASE':>7}{'CRPS':>8}{'cov90':>8}{'cov95':>8}{'logpdf':>9}")
-        rows = [(nm, score(mk, series)) for nm, mk in FORECASTERS.items()]
-        best = min(r["CRPS"] for _, r in rows)
-        for nm, r in rows:
-            star = "  <- best CRPS" if r["CRPS"] == best else ""
-            print(f"  {nm:18s}{r['MASE']:>7.3f}{r['CRPS']:>8.3f}"
-                  f"{r['cov90']*100:>7.1f}%{r['cov95']*100:>7.1f}%{r['logpdf']:>9.3f}{star}")
-        print()
+    print(f"  {'forecaster':16s}" + "".join(f"{k:>11s}" for k in data))
+    for name, mk in FORECASTERS.items():
+        cells = "".join(f"{mean_logpdf(mk, s):>11.3f}" for s in data.values())
+        print(f"  {name:16s}{cells}")
 
 
 if __name__ == "__main__":

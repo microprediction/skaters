@@ -97,7 +97,8 @@ def test_strength_concentrates_on_fast_slow():
         for t in range(600):
             sigma = 0.5 + 1.5 * (0.5 + 0.5 * math.sin(2 * math.pi * t / 300))
             _, state = f(random.gauss(0, sigma), state)
-        log_w = [state["log_w"][i][0] for i in range(len(state["log_w"]))]
+        # terminal_leaf_ensemble keeps a flat per-model log-weight
+        log_w = list(state["log_w"])
         m = max(log_w)
         w = [math.exp(lw - m) for lw in log_w]
         tot = sum(w)

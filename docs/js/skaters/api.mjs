@@ -7,7 +7,7 @@
 
 import { leaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
-import { bayesianEnsemble } from "./bayesian.mjs";
+import { terminalLeafEnsemble } from "./terminal.mjs";
 import { search } from "./search.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, drift,
@@ -136,7 +136,7 @@ export function skater(k = 1, aggressiveness = 0.5) {
   const learningRate = 0.1 + 0.8 * aggressiveness;
   const complexityPenalty = 0.05 * (1 - aggressiveness);
   const [candidates, depths] = buildCandidates(k);
-  const f = bayesianEnsemble(candidates, { k, learningRate, complexityPenalty, depths, maxComponents: 20 });
+  const f = terminalLeafEnsemble(candidates, { k, learningRate, complexityPenalty, depths, maxComponents: 20 });
   f.skaterName = `skater(k=${k})`;
   return f;
 }
@@ -145,7 +145,7 @@ export function holt(k = 1) {
   const [candidates, depths, groups] = buildCandidates(k);
   const trend = new Set([...groups.diff, ...groups.drift, ...groups.holt]);
   const priorLogWeights = priorFavoringIndices(candidates.length, trend, 3.0);
-  const f = bayesianEnsemble(candidates, {
+  const f = terminalLeafEnsemble(candidates, {
     k, learningRate: 0.5, complexityPenalty: 0.02, depths, priorLogWeights, maxComponents: 15,
   });
   f.skaterName = `holt(k=${k})`;
@@ -155,7 +155,7 @@ export function holt(k = 1) {
 export function hosking(k = 1) {
   const [candidates, depths, groups] = buildCandidates(k);
   const priorLogWeights = priorFavoringIndices(candidates.length, new Set(groups.frac), 3.0);
-  const f = bayesianEnsemble(candidates, {
+  const f = terminalLeafEnsemble(candidates, {
     k, learningRate: 0.5, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
   });
   f.skaterName = `hosking(k=${k})`;
@@ -164,7 +164,7 @@ export function hosking(k = 1) {
 
 export function laplace(k = 1) {
   const [candidates, depths] = buildCandidates(k);
-  const f = bayesianEnsemble(candidates, {
+  const f = terminalLeafEnsemble(candidates, {
     k, learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
   });
   f.skaterName = `laplace(k=${k})`;
@@ -174,7 +174,7 @@ export function laplace(k = 1) {
 export function wald(k = 1) {
   const [candidates, depths] = buildCandidates(k);
   const priorLogWeights = priorFavoringDepths(depths, new Set([0]), 2.0);
-  const f = bayesianEnsemble(candidates, {
+  const f = terminalLeafEnsemble(candidates, {
     k, learningRate: 0.15, complexityPenalty: 0.08, depths, priorLogWeights, maxComponents: 10,
   });
   f.skaterName = `wald(k=${k})`;
@@ -185,7 +185,7 @@ export function samuelson(k = 1) {
   const [candidates, depths, groups] = buildCandidates(k);
   const priorLogWeights = priorFavoringDepths(depths, new Set([2]), 2.0);
   for (const i of new Set([...groups.drift, ...groups.holt])) priorLogWeights[i] = 5.0;
-  const f = bayesianEnsemble(candidates, {
+  const f = terminalLeafEnsemble(candidates, {
     k, learningRate: 0.4, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
   });
   f.skaterName = `samuelson(k=${k})`;
@@ -204,7 +204,7 @@ export function dantzig(k = 1) {
 export function kahneman(k = 1, strength = 8.0) {
   const [candidates, depths, groups] = buildCandidates(k);
   const priorLogWeights = priorFavoringIndices(candidates.length, new Set(groups.fast_slow), strength);
-  const f = bayesianEnsemble(candidates, {
+  const f = terminalLeafEnsemble(candidates, {
     k, learningRate: 0.5, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
   });
   f.skaterName = `kahneman(k=${k})`;
