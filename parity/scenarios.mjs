@@ -7,7 +7,7 @@ import { precisionWeightedEnsemble } from "../docs/js/skaters/ensemble.mjs";
 import { bayesianEnsemble } from "../docs/js/skaters/bayesian.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, theta, drift,
-  holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr,
+  holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
 } from "../docs/js/skaters/transform.mjs";
 import {
   skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac,
@@ -36,6 +36,8 @@ export function buildScenarios() {
     s.push([`ar2${suf}`, k, conjugate(leaf(k), ar(2, 0.99, 1.0, 1), k)]);
     s.push([`frac${suf}`, k, conjugate(leaf(k), fractionalDifference(0.4, 30), k)]);
     s.push([`grouped_ar${suf}`, k, conjugate(leaf(k), groupedAr(8), k)]);
+    s.push([`yeojohnson_log${suf}`, k, conjugate(leaf(k), yeoJohnson(0.0), k)]);
+    s.push([`yeojohnson_half${suf}`, k, conjugate(leaf(k), yeoJohnson(0.5), k)]);
     s.push([`ema_skater${suf}`, k, ema(0.05, k)]);
     s.push([`pw_ensemble${suf}`, k,
       precisionWeightedEnsemble([ema(0.05, k), ema(0.2, k)], k)]);

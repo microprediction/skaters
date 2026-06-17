@@ -555,6 +555,78 @@ def power_transform(p: float = 0.5):
     return forward, inverse_k
 
 
+def yeo_johnson(lmbda: float = 0.0):
+    """Yeo-Johnson coordinate transform — the signed Box-Cox family.
+
+    A one-parameter family that picks the *coordinate in which the series is
+    simple*. It subsumes log (lmbda=0, on the shifted level), identity
+    (lmbda=1), and reciprocal-ish (lmbda<0) shapes, but unlike Box-Cox it is
+    defined for all reals (no positivity requirement) — so the same primitive
+    expresses a non-negativity prior (lmbda~0 makes the inverse predictive
+    non-negative for non-negative data) and a generic re-scaling prior.
+
+    Forward:
+        y >= 0:  ((y+1)**L - 1) / L            (L != 0);   log(y+1)      (L == 0)
+        y <  0:  -(((-y+1)**(2-L) - 1)/(2-L))  (L != 2);  -log(-y+1)     (L == 2)
+
+    The inverse is nonlinear, so each Dist component is mapped by the exact
+    inverse on the mean and the delta method on the std (deriv = d inv / dy').
+
+    Fit the *family* the NFL-safe way: put a coarse grid of lmbda in the
+    candidate pool (see :func:`skaters.api._build_candidates`) and let the
+    ensemble weight the coordinate online, rather than MLE-ing a single value.
+
+    Args:
+        lmbda: the transform parameter. 0 = log1p (multiplicative / non-negative),
+            1 = identity, 0.5 = signed-sqrt-ish compression.
+    """
+    L = float(lmbda)
+
+    def _fwd(y: float) -> float:
+        if y >= 0.0:
+            return math.log1p(y) if L == 0.0 else ((y + 1.0) ** L - 1.0) / L
+        if L == 2.0:
+            return -math.log1p(-y)
+        return -(((-y + 1.0) ** (2.0 - L) - 1.0) / (2.0 - L))
+
+    def _inv(yp: float) -> float:
+        if yp >= 0.0:                       # forward is monotone, sign-preserving
+            if L == 0.0:
+                return math.expm1(yp)
+            base = max(L * yp + 1.0, 1e-12)
+            return base ** (1.0 / L) - 1.0
+        if L == 2.0:
+            return 1.0 - math.exp(-yp)
+        base = max(-(2.0 - L) * yp + 1.0, 1e-12)
+        return 1.0 - base ** (1.0 / (2.0 - L))
+
+    def _dinv(yp: float) -> float:
+        """d inv / dy' at yp (for the delta-method std)."""
+        if yp >= 0.0:
+            if L == 0.0:
+                return math.exp(yp)
+            base = max(L * yp + 1.0, 1e-12)
+            return base ** (1.0 / L - 1.0)
+        if L == 2.0:
+            return math.exp(-yp)
+        base = max(-(2.0 - L) * yp + 1.0, 1e-12)
+        return base ** (1.0 / (2.0 - L) - 1.0)
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        return _fwd(y), state or {}
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        result = []
+        for d in dists:
+            comps = []
+            for w, mu, sigma in d.components:
+                comps.append((w, _inv(mu), max(sigma * _dinv(mu), 1e-12)))
+            result.append(Dist(comps))
+        return result
+
+    return forward, inverse_k
+
+
 # ---------------------------------------------------------------------------
 # AR(p) transform with online recursive least squares
 # ---------------------------------------------------------------------------

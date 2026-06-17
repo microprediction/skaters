@@ -18,18 +18,27 @@ export function sticky(base, k = 1, propensityAlpha = 0.05, spikeFrac = 0.005) {
       state.p = (1 - a) * state.p + a * repeat;
     }
     const p = state.p;
+    const pc = 1.0 - p;
     const spikeAt = y;
 
     const out = [];
     for (const d of dists) {
-      if (p > 1e-6) {
-        const spikeStd = Math.max(spikeFrac * d.std, 1e-9);
-        const comps = [[p, spikeAt, spikeStd]];
-        for (const [w, m, s] of d.components) comps.push([(1 - p) * w, m, s]);
-        out.push(new Dist(comps));
-      } else {
+      if (p <= 1e-6) {
         out.push(d);
+        continue;
       }
+      const spikeStd = Math.max(spikeFrac * d.std, 1e-9);
+      if (pc <= 1e-9) {
+        out.push(new Dist([[1.0, spikeAt, spikeStd]]));
+        continue;
+      }
+      // Mean-preserving projection: recenter the continuous part by delta so the
+      // atom adds mass without moving the ensemble mean (E[out] === d.mean).
+      const mu = d.mean;
+      const delta = (p * (mu - spikeAt)) / pc;
+      const comps = [[p, spikeAt, spikeStd]];
+      for (const [w, m, s] of d.components) comps.push([pc * w, m + delta, s]);
+      out.push(new Dist(comps));
     }
     state.last = y;
     return [out, state];

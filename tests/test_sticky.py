@@ -51,6 +51,25 @@ def test_sticky_spike_on_repeats():
     assert s < 0.05                        # and it is narrow (near-Dirac)
 
 
+def test_sticky_is_mean_preserving():
+    # The projection adds atom mass WITHOUT moving the base ensemble's mean.
+    import random
+    random.seed(3)
+    series, v = [], 5.0
+    for _ in range(250):
+        if random.random() > 0.85:
+            v += random.choice([-0.25, 0.25])
+        series.append(round(v, 2))
+    base, proj = _base(), sticky(_base(), 1)
+    sb = sp = None
+    worst = 0.0
+    for y in series:
+        db, sb = base(y, sb)
+        dp, sp = proj(y, sp)
+        worst = max(worst, abs(db[0].mean - dp[0].mean))
+    assert worst < 1e-9                     # mean is untouched by the atom
+
+
 def test_dirac_is_skater_and_runs():
     f = dirac(1)
     assert isinstance(f, Skater)

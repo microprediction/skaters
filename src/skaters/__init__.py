@@ -16,6 +16,7 @@ from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform,
     garch, seasonal_difference, power_transform, ar, grouped_ar, drift, holt_linear, theta,
+    yeo_johnson,
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
@@ -56,6 +57,7 @@ __all__ = [
     "garch",
     "seasonal_difference",
     "power_transform",
+    "yeo_johnson",
     "ar",
     "grouped_ar",
     "drift",

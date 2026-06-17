@@ -10,6 +10,12 @@ with weight ``p`` = the online estimate of how often the value repeats. On
 repetitive series ``p`` is large and the spike captures the point mass (huge
 likelihood, sharp CRPS); on continuous series ``p`` -> 0 and the wrapper
 vanishes. Still a plain :class:`Dist` — just one extra narrow component.
+
+This is the *projection* mechanism only — it adds discrete mass at the realized
+value and is **mean-preserving** (the continuous part is recentered so the
+atom never moves the ensemble's mean). The complementary *pull* mechanism (the
+tendency of the mean to track the last value) is a separate concern handled in
+the trunk by the persistence/random-walk candidate and its prior — not here.
 """
 
 from __future__ import annotations
@@ -38,17 +44,27 @@ def sticky(base, k: int = 1, propensity_alpha: float = 0.05, spike_frac: float =
             repeat = 1.0 if y == state["last"] else 0.0
             state["p"] = (1 - a) * state["p"] + a * repeat
         p = state["p"]
+        pc = 1.0 - p
         spike_at = y  # if it repeats, the next value equals the last seen one
 
         out = []
         for d in dists:
-            if p > 1e-6:
-                spike_std = max(spike_frac * d.std, 1e-9)
-                comps = [(p, spike_at, spike_std)]
-                comps.extend(((1 - p) * w, m, s) for w, m, s in d.components)
-                out.append(Dist(comps))
-            else:
+            if p <= 1e-6:
                 out.append(d)
+                continue
+            spike_std = max(spike_frac * d.std, 1e-9)
+            if pc <= 1e-9:                     # p ~ 1: essentially a pure atom
+                out.append(Dist([(1.0, spike_at, spike_std)]))
+                continue
+            # Pure *projection*: add atom mass at the repeat value WITHOUT moving
+            # the mean. An atom of weight p at spike_at would drag the mean by
+            # p*(spike_at - mu); recenter the continuous part by delta to cancel
+            # it, so E[out] == d.mean exactly (the ensemble's mean is untouched).
+            mu = d.mean
+            delta = p * (mu - spike_at) / pc
+            comps = [(p, spike_at, spike_std)]
+            comps.extend((pc * w, m + delta, s) for w, m, s in d.components)
+            out.append(Dist(comps))
         state["last"] = y
         return out, state
 
