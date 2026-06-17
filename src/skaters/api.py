@@ -446,42 +446,31 @@ def kahneman(k: int = 1, strength: float = 8.0):
 
 
 
-def dirac(k: int = 1, spike_frac: float = 0.003, persistence_boost: float = 3.0):
+def dirac(k: int = 1, spike_frac: float = 0.003):
     """Dirac's policy: bet on repetition.
 
-    After Paul Dirac (the delta it collapses toward). Repetition is two
-    distinct things, and ``dirac`` is now exactly their composition:
+    After Paul Dirac (the delta it collapses toward). Repetition is two distinct
+    things, cleanly separated here:
 
-    * the **pull** — the mean tends to stay at the last value — is a *mean*
-      statement, handled in the trunk by a prior boosting the persistence
-      (differencing / random-walk) candidates, and
     * the **projection** — actual probability *mass* on the exact repeated
       value — is handled at the terminal by :func:`sticky`, a mean-preserving
-      near-Dirac atom weighted by the online repeat probability.
+      near-Dirac atom weighted by the online repeat probability, and
+    * the **pull** — the tendency of the mean to track the last value — is a
+      *mean* statement and is left to the trunk, where the random-walk
+      candidate earns its weight by likelihood on series that actually repeat.
+      (It needs no special prior: a prior boost is a one-time initialisation
+      and washes out after burn-in, so the ensemble must — and does — discover
+      persistence on its own.)
 
     On administrative or grid-quoted series (policy rates, posted prices) that
     stay unchanged for long stretches, the projection captures the point mass
-    (large likelihood, sharp intervals) while the pull keeps the mean glued to
-    the last value; on series that actually move, both fade and ``dirac``
-    reduces to the ordinary skater.
+    (large likelihood, sharp intervals); on series that actually move it fades
+    and ``dirac`` reduces to the ordinary skater.
 
     Args:
         k: forecast horizon.
         spike_frac: how hard the projection commits to the atom (smaller = harder).
-        persistence_boost: prior log-weight boost on the random-walk candidates.
     """
-    candidates, depths, groups = _build_candidates(k)
-    prior = _prior_favoring_indices(
-        len(candidates), favored=set(groups["diff"]), boost=persistence_boost
-    )
-    base = terminal_leaf_ensemble(
-        candidates, k=k,
-        learning_rate=0.8,
-        complexity_penalty=0.005,
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=20,
-    )
-    f = sticky(base, k=k, spike_frac=spike_frac)   # the mean-preserving projection
+    f = sticky(skater(k=k), k=k, spike_frac=spike_frac)   # mean-preserving projection
     f.__name__ = f"dirac(k={k})"
     return f

@@ -220,14 +220,9 @@ export function kahneman(k = 1, strength = 8.0) {
   return f;
 }
 
-export function dirac(k = 1, spikeFrac = 0.003, persistenceBoost = 3.0) {
-  // pull = persistence prior in the trunk; projection = mean-preserving sticky atom.
-  const [candidates, depths, groups] = buildCandidates(k);
-  const priorLogWeights = priorFavoringIndices(candidates.length, new Set(groups.diff), persistenceBoost);
-  const base = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.8, complexityPenalty: 0.005, depths, priorLogWeights, maxComponents: 20,
-  });
-  const f = sticky(base, k, 0.05, spikeFrac);
+export function dirac(k = 1, spikeFrac = 0.003) {
+  // projection = mean-preserving sticky atom; pull is left to the trunk.
+  const f = sticky(skater(k), k, 0.05, spikeFrac);
   f.skaterName = `dirac(k=${k})`;
   return f;
 }
