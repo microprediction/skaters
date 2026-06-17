@@ -71,23 +71,27 @@ fixed rule chosen independently of the forecasters. Transform is automatic
 Scored on **498** such series (the run targets ~2.5k; FRED fetch latency capped
 this pass — it is crash-safe and resumes, so the cache keeps growing):
 
-> **A CRPS-targeted skater beats crepes on CRPS in 87.8% of series**
-> (95% bootstrap CI 84.9–90.6%, N=498).
+> **A CRPS-targeted skater beats crepes on CRPS in 90.0% of series**
+> (95% bootstrap CI 87.1–92.6%, N=498).
 > **Family-clustered** — collapsing each correlated curve/panel (yields by
-> maturity, FX by counterparty) to one vote, 123 families — **76.6%**
-> (CI 69.4–83.8%). This is the honest, de-correlated headline.
+> maturity, FX by counterparty) to one vote, 123 families — **79.9%**
+> (CI 72.7–86.5%). This is the honest, de-correlated headline.
 
-By asset class (keyword-approximate): credit 100%, commodity 100%, equity 96%,
-rates 94%, fx 76%, other 78%. The raw rate slips from the curated 93% exactly as
-expected — at scale more series are the degenerate near-point-mass kind where the
-empirical conformal CDF is CRPS-optimal — yet ours still win a large, CI-backed
-majority, and on **every** asset class.
+By asset class (keyword-approximate): commodity 100%, equity 96%, credit 96%,
+rates 95%, other 85%, fx 76%. Ours win a large, CI-backed majority on **every**
+asset class; only FX (clean, near-i.i.d. returns where the empirical conformal
+CDF is hard to beat) stays close.
 
 On **log-likelihood**, the package's actual metric, there is no contest: crepes
 emits CDFs, not densities, so it scores *nothing*. Among ours, `dirac` leads with
-mean logpdf **3.43** vs ~2.90 for the rest (a **+0.45-nat** lift over the best
-non-`dirac` policy, positive on 53% of series), because it alone places mass on
+mean logpdf **3.63** vs ~2.90 for the rest (a **+0.65-nat** lift over the best
+non-`dirac` policy, positive on 54% of series), because it alone places mass on
 the exact repeats that pervade administrative daily series.
+
+(These numbers refreshed after the projection/coordinate work: the lattice
+prior — atoms on every revisited value, not just consecutive repeats — and the
+Yeo-Johnson coordinate axis lifted the family-clustered rate 76.6 → 79.9% and
+`dirac`'s mean logpdf 3.16 → 3.63 versus the original run.)
 
 Run it: `PYTHONPATH=src python benchmarks/large_study.py` (needs the conda env
 with `crepes` + a FRED key).
