@@ -129,9 +129,15 @@ class Dist:
 
     @property
     def var(self) -> float:
-        """Variance of the mixture (law of total variance)."""
+        """Variance of the mixture (law of total variance).
+
+        Centered form ``sum w (s^2 + (m - mu)^2)`` rather than
+        ``sum w (s^2 + m^2) - mu^2``: the latter catastrophically cancels when
+        the means are large relative to the spreads (e.g. a tight component at
+        a large mean), silently yielding var=0 and std=0 — an invalid Dist.
+        """
         mu = self.mean
-        return sum(w * (s * s + m * m) for w, m, s in self.components) - mu * mu
+        return sum(w * (s * s + (m - mu) * (m - mu)) for w, m, s in self.components)
 
     @property
     def std(self) -> float:
@@ -160,6 +166,7 @@ class Dist:
 
     def prune(self, max_components: int = 20) -> Dist:
         """Reduce component count by merging closest pairs."""
+        max_components = max(1, max_components)   # a Dist needs >=1 component
         comps = list(self.components)
         while len(comps) > max_components:
             # Find closest pair (by mean distance, weighted by mass)
@@ -182,7 +189,9 @@ class Dist:
                 s_new = max(si, sj, 1e-12)
             else:
                 m_new = (wi * mi + wj * mj) / w_new
-                v_new = (wi * (si * si + mi * mi) + wj * (sj * sj + mj * mj)) / w_new - m_new * m_new
+                # centered form — avoids the same cancellation as Dist.var
+                v_new = (wi * (si * si + (mi - m_new) ** 2)
+                         + wj * (sj * sj + (mj - m_new) ** 2)) / w_new
                 s_new = math.sqrt(max(v_new, 0.0))
             comps[best_i] = (w_new, m_new, s_new)
             comps.pop(best_j)

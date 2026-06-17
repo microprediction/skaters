@@ -590,13 +590,15 @@ def yeo_johnson(lmbda: float = 0.0):
         return -(((-y + 1.0) ** (2.0 - L) - 1.0) / (2.0 - L))
 
     def _inv(yp: float) -> float:
+        # clamp exp arguments to avoid OverflowError on pathological inputs
+        # (exp(350) ~ 1e152 keeps var (its square) finite); the value is huge-but-finite, not NaN.
         if yp >= 0.0:                       # forward is monotone, sign-preserving
             if L == 0.0:
-                return math.expm1(yp)
+                return math.expm1(min(yp, 350.0))
             base = max(L * yp + 1.0, 1e-12)
             return base ** (1.0 / L) - 1.0
         if L == 2.0:
-            return 1.0 - math.exp(-yp)
+            return 1.0 - math.exp(min(-yp, 350.0))
         base = max(-(2.0 - L) * yp + 1.0, 1e-12)
         return 1.0 - base ** (1.0 / (2.0 - L))
 
@@ -604,11 +606,11 @@ def yeo_johnson(lmbda: float = 0.0):
         """d inv / dy' at yp (for the delta-method std)."""
         if yp >= 0.0:
             if L == 0.0:
-                return math.exp(yp)
+                return math.exp(min(yp, 350.0))
             base = max(L * yp + 1.0, 1e-12)
             return base ** (1.0 / L - 1.0)
         if L == 2.0:
-            return math.exp(-yp)
+            return math.exp(min(-yp, 350.0))
         base = max(-(2.0 - L) * yp + 1.0, 1e-12)
         return base ** (1.0 / (2.0 - L) - 1.0)
 
