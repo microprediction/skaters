@@ -26,14 +26,17 @@ def available():
 
 def _smoothed_dist_from_quantiles(qvals):
     """Turn a set of predictive quantile values into a smooth Dist (KDE over
-    the quantiles). This is the 'graft a tail to enter the likelihood race'
-    step every conformal method needs — its tails are only as fat as this
-    bandwidth, which is the weakness we exploit."""
+    the quantiles), with a Silverman bandwidth from the quantiles' robust
+    spread (IQR/1.349). This is the 'graft a tail to enter the likelihood
+    race' step every conformal method needs — its tails are only as fat as
+    this bandwidth, which is the weakness we exploit. We pick a *fair*
+    bandwidth here so the foil isn't artificially hobbled."""
     n = len(qvals)
     sq = sorted(qvals)
-    gaps = [sq[i + 1] - sq[i] for i in range(n - 1) if sq[i + 1] > sq[i]]
-    h = (sorted(gaps)[len(gaps) // 2] if gaps else 1.0) or 1e-6
-    return Dist([(1.0 / n, q, max(h, 1e-9)) for q in qvals])
+    iqr = sq[int(0.75 * (n - 1))] - sq[int(0.25 * (n - 1))]
+    spread = iqr / 1.349 if iqr > 0 else (sq[-1] - sq[0]) or 1.0
+    h = max(0.9 * spread * n ** (-0.2), 1e-9)
+    return Dist([(1.0 / n, q, h) for q in qvals])
 
 
 def crepes_cps(window: int = 400, ar: float = 0.0):
@@ -47,10 +50,11 @@ def crepes_cps(window: int = 400, ar: float = 0.0):
     executable in this offline sandbox — verify the predict() signature
     against your installed crepes version.
     """
+    import warnings
     import numpy as np
     from crepes import ConformalPredictiveSystem
 
-    grid = list(range(2, 99, 2))
+    grid = list(range(5, 96, 2))  # avoid extreme percentiles that need huge calibration
 
     def f(y, state):
         if state is None:
@@ -60,16 +64,17 @@ def crepes_cps(window: int = 400, ar: float = 0.0):
         resid = y - mu
         buf = state["buf"]
 
-        if len(buf) >= 30:
+        if len(buf) >= 60:
             cps = ConformalPredictiveSystem()
             cps.fit(np.asarray(buf, dtype=float))
-            # Predict the next residual's percentiles (point estimate 0), then
-            # shift by the next mean. Fall back to recentred empirical if the
-            # percentile call differs in this crepes version.
             try:
-                qs = cps.predict(y_hat=np.zeros(1), higher_percentiles=grid)
-                qvals = [float(v) for v in np.ravel(qs)]
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    qs = cps.predict(y_hat=np.zeros(1), higher_percentiles=grid)
+                qvals = [float(v) for v in np.ravel(qs) if math.isfinite(float(v))]
             except Exception:
+                qvals = list(buf)
+            if not qvals:
                 qvals = list(buf)
             mu_next = ar * y if ar else 0.0
             out = [_smoothed_dist_from_quantiles([q + mu_next for q in qvals])]

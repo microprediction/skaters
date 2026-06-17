@@ -211,3 +211,5 @@ parity/vectors.json
 
 # FRED cache (benchmark, do not commit fetched data)
 benchmarks/data/
+benchmarks/results_crps.csv
+benchmarks/overnight.log
