@@ -107,24 +107,36 @@ def mean_logpdf(make, series, burn=300):
     return tot / n
 
 
-def try_external():
-    avail = []
-    for mod in ("crepes", "mapie", "statsforecast", "sklearn"):
-        try:
-            __import__(mod); avail.append(mod)
-        except Exception:
-            pass
-    return avail
+def _table(forecasters, data, label):
+    print(f"\n=== {label} === mean held-out log-likelihood (higher is better)\n")
+    cols = list(data.keys())
+    print(f"  {'forecaster':18s}" + "".join(f"{c[:10]:>11s}" for c in cols))
+    for name, mk in forecasters.items():
+        cells = "".join(f"{mean_logpdf(mk, data[c]):>11.3f}" for c in cols)
+        print(f"  {name:18s}{cells}")
 
 
 def main():
-    print(f"optional SOTA packages available: {try_external() or 'none (offline foils only)'}")
-    print("\nmean held-out log-likelihood (higher is better)\n")
-    data = regimes()
-    print(f"  {'forecaster':16s}" + "".join(f"{k:>11s}" for k in data))
-    for name, mk in FORECASTERS.items():
-        cells = "".join(f"{mean_logpdf(mk, s):>11.3f}" for s in data.values())
-        print(f"  {name:16s}{cells}")
+    forecasters = dict(FORECASTERS)
+    try:
+        import sota
+        sota_ops = sota.opponents()
+        forecasters.update(sota_ops)
+        print(f"SOTA libraries: {sota.available() or 'none'};  opponents added: {list(sota_ops) or 'none'}")
+    except Exception as e:  # noqa: BLE001
+        print(f"SOTA opponents unavailable ({e})")
+
+    _table(forecasters, regimes(), "synthetic")
+
+    try:
+        import fred
+        fred_data = fred.load_fred()
+        if fred_data:
+            _table(forecasters, fred_data, "FRED (one-step change)")
+        else:
+            print("\n(no FRED data — set FRED_API_KEY to enable the FRED table)")
+    except Exception as e:  # noqa: BLE001
+        print(f"\nFRED unavailable ({e})")
 
 
 if __name__ == "__main__":
