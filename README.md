@@ -1,6 +1,6 @@
 # skaters
 
-**One univariate time-series model to rule them all?** — Nah I think we need two, and they are both here. Online univariate time-series forecasting where every prediction is a full **distribution**, not a point. The one-call convenience of Prophet, but it ships a calibrated predictive distribution and beats AutoARIMA, ETS, and conformal on the benchmarks. In **Python _and_ JavaScript** (verified identical to 1e-6), zero dependencies, runs in the browser or [Pyodide](https://pyodide.org/).
+**One univariate time-series model to rule them all?** — Nah I think we need two, and they are both here. You'll find dependency-free online univariate *distributional* time-series forecasting that crushes AutoARIMA, ETS, etc (with or without conformal wrappers). Shipped in piodide friendly **Python _and_ JavaScript** (verified identical to 1e-6). Both run in the browser directly or via [Pyodide](https://pyodide.org/).
 
 <p align="center">
   <a href="https://skaters.microprediction.org/"><img src="https://img.shields.io/badge/docs%20%26%20live%20demos-skaters.microprediction.org-4a3aff?style=for-the-badge" alt="Documentation and live demos"></a>
