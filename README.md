@@ -43,7 +43,7 @@ Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horiz
 
 `skaters` exposes exactly two named forecasters — everything else is a building
 block (transforms, leaves, ensembles) you can compose. ("skater" is the *concept*
-— any `(y, state) -> ([Dist], state)` function; it is no longer a function name.)
+— any `(y, state) -> ([Dist], state)` function, borrowed from the old timemachines package)
 
 ```python
 from skaters import laplace, doob
