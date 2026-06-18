@@ -184,6 +184,10 @@ def lagllama_dists(ch):
         from gluonts.dataset.pandas import PandasDataset
         import pandas as pd
         if _lagllama is None:
+            # The Lag-Llama checkpoint predates torch 2.6's weights_only=True
+            # default; force full unpickling for this trusted file.
+            _orig_load = torch.load
+            torch.load = lambda *a, **k: _orig_load(*a, **{**k, "weights_only": False})
             from huggingface_hub import hf_hub_download
             from lag_llama.gluon.estimator import LagLlamaEstimator
             ckpt_path = hf_hub_download(repo_id="time-series-foundation-models/Lag-Llama",
@@ -203,7 +207,7 @@ def lagllama_dists(ch):
         frames = {}
         for k, t in enumerate(range(start, n)):
             frames[str(k)] = pd.DataFrame(
-                {"target": ch[t - CTX:t]},
+                {"target": np.asarray(ch[t - CTX:t], dtype=np.float32)},
                 index=pd.date_range("2000-01-01", periods=CTX, freq="D"))
         ds = PandasDataset(frames, target="target")
         fc = list(_lagllama.predict(ds, num_samples=NUM_SAMPLES))
