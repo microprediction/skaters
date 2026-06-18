@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from skaters.api import skater, laplace
+from skaters.api import laplace
 from skaters.leaf import crps_leaf, scale_mixture_leaf
 from skaters.dist import Dist
 
@@ -40,7 +40,7 @@ def test_objective_validation():
     with pytest.raises(ValueError):
         laplace(1, objective="coverage")
     with pytest.raises(ValueError):
-        skater(1, objective="nonsense")
+        laplace(1, objective="nonsense")
 
 
 def test_crps_objective_helps_on_heavy_tails():

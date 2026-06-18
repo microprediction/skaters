@@ -11,11 +11,9 @@ import pytest
 
 from skaters.dist import Dist
 from skaters.transform import yeo_johnson
-from skaters.api import (
-    skater, holt, hosking, laplace, wald, samuelson, dantzig, kahneman, dirac,
-)
+from skaters.api import laplace, doob
 
-POLICIES = [skater, holt, hosking, laplace, wald, samuelson, dantzig, kahneman, dirac]
+POLICIES = [laplace, doob]
 
 DEGENERATE_SERIES = {
     "constant": [3.0] * 40,

@@ -26,7 +26,7 @@ from skaters.transform import (
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
     grouped_ar, yeo_johnson,
 )
-from skaters.api import skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac, doob
+from skaters.api import laplace, doob
 from skaters.sticky import sticky
 from skaters.search import search as adaptive_search
 from skaters import spec as S
@@ -79,15 +79,10 @@ def build_scenarios():
             k=k, learning_rate=0.5, complexity_penalty=0.02, depths=[1, 1])))
 
     # Named policies (the full shared-pool ensembles)
-    for nm, fac in [("skater", skater), ("holt", holt), ("hosking", hosking),
-                    ("laplace", laplace), ("wald", wald), ("samuelson", samuelson),
-                    ("kahneman", kahneman), ("doob", doob)]:
+    for nm, fac in [("laplace", laplace), ("doob", doob)]:
         s.append((f"pol_{nm}", 1, fac(k=1)))
-    s.append(("pol_skater_k2", 2, skater(k=2)))
-    s.append(("pol_kahneman_k2", 2, kahneman(k=2)))
 
-    # Adaptive search (dantzig) and direct search
-    s.append(("pol_dantzig", 1, dantzig(k=1)))
+    # Adaptive-search engine (still public via skaters.search)
     s.append(("search_default", 1, adaptive_search(k=1, expand_interval=50)))
 
     # Spec-built skaters (exercise the spec/build path)
@@ -194,7 +189,6 @@ def main():
     vectors["repeat_series"] = rep
     rep_scen = {
         "sticky_ema": (1, sticky(conjugate(leaf(k=1), ema_transform(0.1), k=1), k=1)),
-        "dirac": (1, dirac(k=1)),
     }
     vectors["repeat_scenarios"] = {
         name: {"k": k, "out": run_scenario(sk, rep)} for name, (k, sk) in rep_scen.items()
