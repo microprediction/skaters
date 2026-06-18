@@ -32,8 +32,7 @@
       dependency-free.</p>
 
     <p class="lead"><strong>One skater to rule them all.</strong> The one-call convenience of
-      Prophet — except it ships a calibrated predictive distribution and actually wins the
-      benchmarks.</p>
+      Prophet — but it ships a calibrated predictive <em>distribution</em>, not a point.</p>
 
     <div class="tag-row">
       <span class="tag">distributional</span>
@@ -59,13 +58,14 @@
     </p>
 
     <div class="callout">
-      <strong>It outperforms conformal prediction.</strong> On a bias-free study of
-      <strong>2,500 daily FRED series</strong>, judged by held-out <strong>log-likelihood</strong>
-      — the decision-relevant, tail-sensitive metric — <code>skaters</code> beats state-of-the-art
-      conformal predictive systems: a conformal CDF carries no density, so it cannot be scored on
-      likelihood at all. And on <strong>CRPS</strong> — conformal&apos;s <em>own</em> metric — a
-      CRPS-tuned <code>skaters</code> still edges the specialist.
-      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
+      <strong>Distributional, and judged that way.</strong> Conformal predictive systems output a
+      <em>CDF</em>, not a density — they calibrate coverage, but cannot be scored on
+      <strong>log-likelihood</strong>, the decision-relevant metric — whereas <code>skaters</code>
+      is distributional end to end. In a preliminary 2,500-series FRED study a CRPS-tuned
+      <code>skaters</code> also edges the <code>crepes</code> conformal system on CRPS, its own
+      metric. <em>A broader head-to-head against AutoARIMA / ETS, Prophet, and adaptive-conformal
+      methods is in progress</em> — the <code>crepes</code> opponent here was given only a naive
+      mean. <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
     </div>
 
     <h2>Quick start</h2>

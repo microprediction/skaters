@@ -15,10 +15,14 @@ abstract: |
   judged by a downstream score such as CRPS). We call the resulting recipe
   **model first, conform last**, and show on a bias-free study of 2,500 daily
   FRED series that it matches a dedicated CRPS specialist on CRPS while *improving*
-  held-out log-likelihood — a free lunch. Against state-of-the-art conformal
-  predictive systems the comparison is starker still: a conformal CDF carries no
-  density and therefore cannot be scored on likelihood at all, the
-  decision-relevant metric. We further contribute a *mean-preserving lattice
+  held-out log-likelihood — a free lunch. We also note a structural point about
+  conformal predictive systems: a conformal CDF carries no density and therefore
+  cannot be scored on likelihood at all, the decision-relevant metric.
+  *(Limitation: the conformal opponent in §8 is given only a naive mean; a
+  head-to-head against AutoARIMA/ETS, Prophet, and adaptive-conformal baselines
+  with strong mean models is the subject of ongoing experiments and is required
+  before any broad "beats state of the art" claim.)*
+  We further contribute a *mean-preserving lattice
   projection* for series that revisit exact values, an online *coordinate*
   (Yeo–Johnson) search, and a committed *martingale* model whose volatility clock
   is a time-changed Brownian motion. Finally, a sequence of out-of-sample
@@ -182,6 +186,16 @@ keep those with $\geq 500$ changes, and score every step after a burn-in. This
 yields **2,501** series. The opponent is the `crepes` conformal-predictive-system,
 given its three best calibration windows and scored on its own CDF via the
 pinball decomposition of CRPS.
+
+> **Limitation (important).** This opponent is given only a *naive* (random-walk,
+> zero-mean) point model, so these results establish superiority over
+> *naive-mean conformal* only. They do **not** establish superiority over
+> AutoARIMA/ETS, Prophet, or conformal *paired with a strong mean model*
+> (AutoARIMA-mean + conformal, adaptive conformal/ACI, EnbPI) — none of which are
+> run here. Because ARIMA/ETS/Prophet emit prediction intervals (densities), they
+> *can* be scored on likelihood, so they are the genuinely hard test; that
+> head-to-head is ongoing and is a precondition for any broad
+> "beats state of the art" statement.
 
 **Read the CRPS numbers honestly.** A single eye-catching figure — *best of our
 forecasters, 91.4 %* — is post-hoc selection. The honest, de-correlated number
