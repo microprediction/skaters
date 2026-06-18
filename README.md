@@ -7,7 +7,7 @@
   <a href="#javascript--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript-1a8c4a?style=for-the-badge" alt="Python and JavaScript"></a>
 </p>
 
-Here *more than competitive* means it crushes them on log-likelihood and typically a tie on CRPS (the home turf for conformal methods). 
+Here *more than competitive* means it crushes them on log-likelihood (even if you *retrospectively* help conformal stumble onto that playing field) and typically a tie on CRPS (the home turf for conformal methods, but a goal-post that is not generally good for your wealth). 
 See [the benchmarks](https://github.com/microprediction/skaters/tree/main/benchmarks). If you don't know why likelihood is the more important metric we suggest you study [mechanisms.microprediction.org](https://mechanisms.microprediction.org). 
 
 ## Install
