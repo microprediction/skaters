@@ -6,7 +6,7 @@ export { Dist, erf } from "./dist.mjs";
 export {
   runningVarInit, runningVarUpdate, runningVarGet, runningStdGet, runningMseGet,
 } from "./runstats.mjs";
-export { leaf, scaleMixtureLeaf } from "./leaf.mjs";
+export { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
 export { ema } from "./ema.mjs";
 export { conjugate } from "./conjugate.mjs";
 export {
@@ -19,7 +19,7 @@ export { terminalLeafEnsemble } from "./terminal.mjs";
 export { search, TRANSFORMS } from "./search.mjs";
 export { periodDetector, topPeriods, DEFAULT_LAGS } from "./periodicity.mjs";
 export {
-  buildCandidates, skater, holt, hosking, laplace, wald, samuelson, dantzig, kahneman, dirac, doob,
+  buildCandidates, laplace, doob,
 } from "./api.mjs";
 export { sticky } from "./sticky.mjs";
 export {

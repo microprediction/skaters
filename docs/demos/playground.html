@@ -32,15 +32,8 @@
         <div class="control">
           <label for="policy">Policy</label>
           <select id="policy">
-            <option value="skater">skater (default)</option>
-            <option value="laplace">laplace</option>
-            <option value="holt">holt</option>
-            <option value="hosking">hosking</option>
-            <option value="samuelson">samuelson</option>
-            <option value="wald">wald</option>
-            <option value="dantzig">dantzig</option>
-            <option value="kahneman">kahneman</option>
-            <option value="dirac">dirac</option>
+            <option value="laplace">laplace (default)</option>
+            <option value="doob">doob (martingale)</option>
             <option value="ema05">ema(0.05)</option>
           </select>
         </div>
@@ -90,19 +83,11 @@
   </footer>
 
   <script type="module">
-    import { skater, laplace, holt, hosking, samuelson, wald, dantzig, kahneman, dirac, ema }
-      from "../js/skaters/index.mjs";
+    import { laplace, doob, ema } from "../js/skaters/index.mjs";
 
     const POLICIES = {
-      skater: () => skater(1),
       laplace: () => laplace(1),
-      holt: () => holt(1),
-      hosking: () => hosking(1),
-      samuelson: () => samuelson(1),
-      wald: () => wald(1),
-      dantzig: () => dantzig(1),
-      kahneman: () => kahneman(1),
-      dirac: () => dirac(1),
+      doob: () => doob(1),
       ema05: () => ema(0.05, 1),
     };
 

@@ -1,16 +1,12 @@
 // User-facing API — JS port of skaters/api.py (named search policies).
 //
-// Every named policy builds a Bayesian ensemble over the SAME shared
-// candidate population. They differ only in prior, learning rate, and
-// complexity penalty — i.e., the search strategy. (dantzig lives in
-// search.mjs because it uses adaptive search.)
+// Two named forecasters: laplace (general) and doob (martingale specialist).
 
-import { leaf, scaleMixtureLeaf } from "./leaf.mjs";
+import { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
-import { search } from "./search.mjs";
-import { sticky } from "./sticky.mjs";
+import { sticky as project } from "./sticky.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, drift,
   holtLinear, ar, theta, seasonalDifference, garch, powerTransform, yeoJohnson,
@@ -127,116 +123,35 @@ export function buildCandidates(k) {
   return [candidates, depths, groups];
 }
 
-function priorFavoringDepths(depths, favored, boost = 2.0) {
-  return depths.map((d) => (favored.has(d) ? boost : 0.0));
-}
-
-function priorFavoringIndices(n, favored, boost = 2.0) {
-  const out = new Array(n).fill(0.0);
-  for (const i of favored) out[i] = boost;
-  return out;
-}
-
 // ---------------------------------------------------------------------------
 // Policies
 // ---------------------------------------------------------------------------
 
-export function skater(k = 1, aggressiveness = 0.5) {
-  if (!(aggressiveness > 0 && aggressiveness < 1)) throw new Error("aggressiveness in (0,1)");
-  const learningRate = 0.1 + 0.8 * aggressiveness;
-  const complexityPenalty = 0.05 * (1 - aggressiveness);
+function objectiveLeaf(objective) {
+  if (objective === "crps") return crpsLeaf;
+  if (objective === "likelihood") return scaleMixtureLeaf;
+  throw new Error(`objective must be 'crps' or 'likelihood', got ${objective}`);
+}
+
+export function laplace(k = 1, objective = "crps", sticky = true) {
   const [candidates, depths] = buildCandidates(k);
-  const f = terminalLeafEnsemble(candidates, { k, learningRate, complexityPenalty, depths, maxComponents: 20 });
-  f.skaterName = `skater(k=${k})`;
-  return f;
-}
-
-export function holt(k = 1) {
-  const [candidates, depths, groups] = buildCandidates(k);
-  const trend = new Set([...groups.diff, ...groups.drift, ...groups.holt]);
-  const priorLogWeights = priorFavoringIndices(candidates.length, trend, 3.0);
-  const f = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.5, complexityPenalty: 0.02, depths, priorLogWeights, maxComponents: 15,
+  let f = terminalLeafEnsemble(candidates, {
+    k, leafFn: objectiveLeaf(objective), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
   });
-  f.skaterName = `holt(k=${k})`;
-  return f;
-}
-
-export function hosking(k = 1) {
-  const [candidates, depths, groups] = buildCandidates(k);
-  const priorLogWeights = priorFavoringIndices(candidates.length, new Set(groups.frac), 3.0);
-  const f = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.5, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
-  });
-  f.skaterName = `hosking(k=${k})`;
-  return f;
-}
-
-export function laplace(k = 1) {
-  const [candidates, depths] = buildCandidates(k);
-  const f = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
-  });
+  if (sticky) f = project(f, k);
   f.skaterName = `laplace(k=${k})`;
   return f;
 }
 
-export function wald(k = 1) {
-  const [candidates, depths] = buildCandidates(k);
-  const priorLogWeights = priorFavoringDepths(depths, new Set([0]), 2.0);
-  const f = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.15, complexityPenalty: 0.08, depths, priorLogWeights, maxComponents: 10,
-  });
-  f.skaterName = `wald(k=${k})`;
-  return f;
-}
-
-export function samuelson(k = 1) {
-  const [candidates, depths, groups] = buildCandidates(k);
-  const priorLogWeights = priorFavoringDepths(depths, new Set([2]), 2.0);
-  for (const i of new Set([...groups.drift, ...groups.holt])) priorLogWeights[i] = 5.0;
-  const f = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.4, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
-  });
-  f.skaterName = `samuelson(k=${k})`;
-  return f;
-}
-
-export function dantzig(k = 1) {
-  const f = search({
-    k, learningRate: 0.3, complexityPenalty: 0.01, maxPool: 40,
-    expandInterval: 50, expandTopN: 5, maxDepth: 3, costBudget: 10.0,
-  });
-  f.skaterName = `dantzig(k=${k})`;
-  return f;
-}
-
-export function kahneman(k = 1, strength = 8.0) {
-  const [candidates, depths, groups] = buildCandidates(k);
-  const priorLogWeights = priorFavoringIndices(candidates.length, new Set(groups.fast_slow), strength);
-  const f = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.5, complexityPenalty: 0.01, depths, priorLogWeights, maxComponents: 15,
-  });
-  f.skaterName = `kahneman(k=${k})`;
-  return f;
-}
-
-export function dirac(k = 1, spikeFrac = 0.003) {
-  // projection = mean-preserving sticky atom; pull is left to the trunk.
-  const f = sticky(skater(k), k, 0.05, spikeFrac);
-  f.skaterName = `dirac(k=${k})`;
-  return f;
-}
-
-export function doob(k = 1) {
-  // committed martingale mean + learned volatility clock (time-changed BM).
-  // Same mean across candidates -> BMA blends vol clocks without washing kurtosis.
+export function doob(k = 1, objective = "crps") {
+  if (objective !== "crps" && objective !== "likelihood") throw new Error(`objective must be 'crps' or 'likelihood', got ${objective}`);
+  const lf = objective === "crps" ? crpsLeaf : scaleMixtureLeaf;
   const cands = [
-    conjugate(leaf(k), difference(), k),
-    conjugate(conjugate(leaf(k), garch(), k), difference(), k),
-    conjugate(conjugate(leaf(k), standardize(0.02), k), difference(), k),
-    conjugate(conjugate(scaleMixtureLeaf(k), garch(), k), difference(), k),
-    conjugate(scaleMixtureLeaf(k), difference(), k),
+    conjugate(lf(k), difference(), k),
+    conjugate(conjugate(lf(k), garch(), k), difference(), k),
+    conjugate(conjugate(lf(k), standardize(0.02), k), difference(), k),
+    conjugate(conjugate(lf(k), garch(), k), difference(), k),
+    conjugate(lf(k), difference(), k),
   ];
   const f = bayesianEnsemble(cands, { k, learningRate: 0.5, depths: [1, 2, 2, 2, 1], maxComponents: 30 });
   f.skaterName = `doob(k=${k})`;

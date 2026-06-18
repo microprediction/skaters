@@ -4,10 +4,10 @@
 // output undiluted.
 
 import { Dist } from "./dist.mjs";
-import { scaleMixtureLeaf } from "./leaf.mjs";
+import { crpsLeaf } from "./leaf.mjs";
 
 export function terminalLeafEnsemble(skaters, {
-  leafFn = scaleMixtureLeaf,
+  leafFn = crpsLeaf,
   k = 1,
   learningRate = 0.5,
   complexityPenalty = 0.0,

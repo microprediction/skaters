@@ -7,7 +7,7 @@ Log-likelihood: dist.logpdf(y_actual).
 
 from skaters.dist import Dist
 from skaters.conventions import Skater
-from skaters.leaf import leaf, scale_mixture_leaf
+from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.ema import ema
 from skaters.terminal import terminal_leaf_ensemble
 from skaters.ensemble import precision_weighted_ensemble
@@ -20,7 +20,7 @@ from skaters.transform import (
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import skater, holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac, doob
+from skaters.api import laplace, doob
 from skaters.sticky import sticky
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -33,15 +33,7 @@ __all__ = [
     "Dist",
     "Skater",
     # Search policies (the main user API)
-    "skater",
-    "holt",
-    "hosking",
     "laplace",
-    "samuelson",
-    "wald",
-    "dantzig",
-    "kahneman",
-    "dirac",
     "doob",
     "sticky",
     "period_detector",
@@ -49,6 +41,7 @@ __all__ = [
     # Building blocks
     "leaf",
     "scale_mixture_leaf",
+    "crps_leaf",
     "ema",
     "conjugate",
     "difference",

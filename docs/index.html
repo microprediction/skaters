@@ -51,9 +51,9 @@
     </p>
 
     <h2>Quick start</h2>
-<pre><code>from skaters import skater
+<pre><code>from skaters import laplace
 
-f = skater(k=3)
+f = laplace(k=3)
 state = None
 for y in observations:
     dists, state = f(y, state)
@@ -76,8 +76,8 @@ for y in observations:
       the actual Python package in the browser via <a href="https://pyodide.org/">Pyodide</a>.
     </p>
 <pre><code>&lt;script type="module"&gt;
-  import { kahneman } from "https://skaters.microprediction.org/js/skaters/index.mjs";
-  const f = kahneman(1);
+  import { laplace } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  const f = laplace(1);
   let state = null;
   for (const y of observations) {
     const [dists, st] = f(y, state); state = st;
@@ -96,43 +96,30 @@ for y in observations:
       </a>
     </div>
 
-    <h2>Named search policies</h2>
+    <h2>The two forecasters</h2>
     <p>
-      Every named function builds a Bayesian ensemble over the same full candidate population.
-      The names represent different <em>search strategies</em> &mdash; different priors, learning
-      rates, and complexity penalties &mdash; not different models.
+      <code>skaters</code> exposes exactly two named forecasters; everything else is a building
+      block you can compose. ("skater" is the <em>concept</em> — any
+      <code>(y, state) → ([Dist], state)</code> function — not a function name.)
     </p>
-<pre><code>from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac, doob
+<pre><code>from skaters import laplace, doob
 
-f = holt(k=1)       # expect trends (Holt 1957)
-f = hosking(k=1)    # expect long memory (Hosking 1981)
-f = laplace(k=1)    # no opinion — let the data decide
-f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
-f = wald(k=1)       # minimax caution (Wald)
-f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
-f = dirac(k=1)      # bet on repetition — atoms on the lattice it revisits (after Paul Dirac)
-f = doob(k=1)       # martingale + learned volatility clock; feed levels (after Joseph Doob)</code></pre>
+f = laplace(k=1)   # general purpose — the default
+f = doob(k=1)      # committed martingale + volatility clock (feed levels)</code></pre>
 
     <table>
-      <thead><tr><th>Policy</th><th>After</th><th>Prior</th><th>$\eta$</th><th>$\lambda$</th><th>Best for</th></tr></thead>
+      <thead><tr><th>Forecaster</th><th>What it is</th><th>Defaults</th><th>Best for</th></tr></thead>
       <tbody>
-        <tr><td><code>holt</code></td><td>Holt 1957</td><td>Differencing + Holt linear</td><td>0.50</td><td>0.02</td><td>Trending data</td></tr>
-        <tr><td><code>hosking</code></td><td>Hosking 1981</td><td>Fractional differencing</td><td>0.50</td><td>0.01</td><td>Long memory</td></tr>
-        <tr><td><code>laplace</code></td><td>Laplace</td><td>Uniform</td><td>0.80</td><td>0.005</td><td><strong>General purpose (default)</strong></td></tr>
-        <tr><td><code>samuelson</code></td><td>Samuelson 1965</td><td>Drift + Holt</td><td>0.40</td><td>0.01</td><td>Persistent drift (GDP, prices)</td></tr>
-        <tr><td><code>wald</code></td><td>Wald</td><td>Depth 0</td><td>0.15</td><td>0.08</td><td>Adversarial, non-stationary</td></tr>
-        <tr><td><code>dantzig</code></td><td>Dantzig 1947</td><td>Adaptive search</td><td>0.30</td><td>0.01</td><td>Adaptive (grows pool online)</td></tr>
-        <tr><td><code>kahneman</code></td><td>timemachines</td><td>Fast tracker + slow residual scale</td><td>0.50</td><td>0.01</td><td>Fast signal, persistent noise</td></tr>
-        <tr><td><code>dirac</code></td><td>Paul Dirac</td><td>Lattice projection over <code>skater</code></td><td>&mdash;</td><td>&mdash;</td><td>Repeating / grid-quoted series (policy rates, posted prices)</td></tr>
-        <tr><td><code>doob</code></td><td>Joseph Doob</td><td>Martingale mean + learned volatility clock</td><td>&mdash;</td><td>&mdash;</td><td>Near-martingale <strong>levels</strong> (prices, indices)</td></tr>
+        <tr><td><code>laplace</code></td><td>Likelihood-weighted ensemble over the full candidate pool</td><td>CRPS terminal leaf + lattice projection (<em>model first, conform last</em>; handles repeats), both on</td><td><strong>General purpose (default)</strong></td></tr>
+        <tr><td><code>doob</code></td><td>Committed martingale + learned volatility clock (time-changed Brownian motion)</td><td>CRPS leaves; Bayesian-averaged vol clocks</td><td>Near-martingale <strong>levels</strong> (prices, indices)</td></tr>
       </tbody>
     </table>
 
     <p>
-      The names are mnemonics for the search strategy, not different models — every policy draws
-      on the same candidate population. Tune any of them directly, or reach for
-      <code>skater(k, aggressiveness)</code> when you have no prior.
+      <code>laplace</code> defaults to <em>model first, conform last</em>: the trunk is weighted by
+      likelihood, the terminal leaf by CRPS (<code>objective="likelihood"</code> to switch), and a
+      lattice projection (<code>sticky=False</code> to disable) places mass on values a series
+      revisits — free on continuous data, a win on grid/repeating series.
     </p>
 
     <h2>Architecture: transforms all the way down</h2>

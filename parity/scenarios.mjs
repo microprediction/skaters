@@ -1,6 +1,6 @@
 // JS scenario registry — must match parity/gen_vectors.py build_scenarios().
 
-import { leaf, scaleMixtureLeaf } from "../docs/js/skaters/leaf.mjs";
+import { leaf, scaleMixtureLeaf, crpsLeaf } from "../docs/js/skaters/leaf.mjs";
 import { conjugate } from "../docs/js/skaters/conjugate.mjs";
 import { ema } from "../docs/js/skaters/ema.mjs";
 import { precisionWeightedEnsemble } from "../docs/js/skaters/ensemble.mjs";
@@ -9,9 +9,7 @@ import {
   difference, fractionalDifference, standardize, emaTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
 } from "../docs/js/skaters/transform.mjs";
-import {
-  skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac, doob,
-} from "../docs/js/skaters/api.mjs";
+import { laplace, doob } from "../docs/js/skaters/api.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
 import {
@@ -47,13 +45,10 @@ export function buildScenarios() {
   }
 
   // Named policies
-  const pols = { skater, holt, hosking, laplace, wald, samuelson, kahneman, doob };
+  const pols = { laplace, doob };
   for (const [nm, fac] of Object.entries(pols)) s.push([`pol_${nm}`, 1, fac(1)]);
-  s.push(["pol_skater_k2", 2, skater(2)]);
-  s.push(["pol_kahneman_k2", 2, kahneman(2)]);
 
-  // Adaptive search and direct search
-  s.push(["pol_dantzig", 1, dantzig(1)]);
+  // Adaptive-search engine (still public via skaters.search)
   s.push(["search_default", 1, search({ k: 1, expandInterval: 50 })]);
 
   // Spec-built skaters
@@ -63,6 +58,7 @@ export function buildScenarios() {
 
   // Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
   s.push(["scale_mixture_leaf", 1, scaleMixtureLeaf(1)]);
+  s.push(["crps_leaf", 1, crpsLeaf(1)]);
   s.push(["scalemix_ema", 1, conjugate(scaleMixtureLeaf(1), emaTransform(0.1), 1)]);
   return s;
 }
@@ -72,6 +68,5 @@ export function buildScenarios() {
 export function buildRepeatScenarios() {
   return [
     ["sticky_ema", 1, sticky(conjugate(leaf(1), emaTransform(0.1), 1), 1)],
-    ["dirac", 1, dirac(1)],
   ];
 }

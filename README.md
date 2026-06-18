@@ -21,9 +21,9 @@ pip install skaters
 ## Quick start
 
 ```python
-from skaters import skater
+from skaters import laplace
 
-f = skater(k=3)
+f = laplace(k=3)
 state = None
 for y in observations:
     dists, state = f(y, state)
@@ -36,78 +36,55 @@ for y in observations:
 
 Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
-## Named search policies
+## The two forecasters
 
-Every named function builds a Bayesian ensemble over the same full candidate population. The names represent different **search strategies** — different priors, learning rates, and complexity penalties — not different models. 
+`skaters` exposes exactly two named forecasters — everything else is a building
+block (transforms, leaves, ensembles) you can compose. ("skater" is the *concept*
+— any `(y, state) -> ([Dist], state)` function; it is no longer a function name.)
 
 ```python
-from skaters import holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac, doob
+from skaters import laplace, doob
 
-f = holt(k=1)       # expect trends (Holt 1957)
-f = hosking(k=1)    # expect long memory (Hosking 1981)
-f = laplace(k=1)    # no opinion — let the data decide
-f = samuelson(k=1)  # there's a drift, find it carefully (Samuelson 1965)
-f = wald(k=1)       # minimax caution (Wald)
-f = dantzig(k=1)    # optimize under compute constraints (Dantzig 1947)
-f = kahneman(k=1)   # think fast and slow (after timemachines, Cotton)
-f = dirac(k=1)      # bet on repetition — atoms on the lattice it revisits (after Paul Dirac)
-f = doob(k=1)       # martingale + learned volatility clock; feed levels (after Joseph Doob)
+f = laplace(k=1)   # general purpose — the default
+f = doob(k=1)      # committed martingale + volatility clock (feed levels)
 ```
 
-They are nmenomics in some instances.
+### `laplace` — the general forecaster
 
-| Policy | After | Prior | $\eta$ | $\lambda$ | Best for |
-|--------|-------|-------|--------|-----------|----------|
-| `holt` | Holt 1957 | Differencing + Holt linear | 0.50 | 0.02 | Trending data |
-| `hosking` | Hosking 1981 | Fractional differencing | 0.50 | 0.01 | Long memory |
-| `laplace` | Laplace | Uniform | 0.80 | 0.005 | **General purpose (recommended default)** |
-| `samuelson` | Samuelson 1965 | Drift + Holt | 0.40 | 0.01 | Persistent drift (GDP, prices) |
-| `wald` | Wald | Depth 0 | 0.15 | 0.08 | Adversarial, non-stationary |
-| `dantzig` | Dantzig 1947 | Adaptive search | 0.30 | 0.01 | Adaptive (grows pool online) |
-| `kahneman` | timemachines | Fast tracker + slow residual scale | 0.50 | 0.01 | Fast signal, persistent noise |
-| `dirac` | Paul Dirac | Lattice projection over `skater` | — | — | Repeating / grid-quoted series (policy rates, posted prices) |
-| `doob` | Joseph Doob | Martingale mean + learned volatility clock | — | — | Near-martingale **levels** (prices, indices) |
+A likelihood-weighted Bayesian ensemble over a large candidate population (EMA,
+differencing, drift, Holt, AR, fractional differencing, seasonal, a Yeo-Johnson
+**coordinate** grid, a fast/slow two-systems block, …). Three things are on by
+default, each a free or near-free win:
 
-For example `kahneman` is a nod to `thinking_fast_and_slow` in
-timemachines and puts a strong
-prior on candidates with a **fast** process tracker outside and a **slowly-varying**
-residual scale inside. Tune the bet with `kahneman(k=1, strength=8)`; see `examples/benchmark_kahneman.py`.
+- **model first, conform last** — the trunk is weighted by **likelihood** (honest
+  modelling); the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
+  2,500-series FRED study this matches a CRPS specialist on CRPS *and* lifts
+  likelihood on real data. Switch back with `objective="likelihood"`.
+- **lattice projection** (`sticky=True`) — near-Dirac atoms on the exact values a
+  series revisits. *Free* on continuous data (it vanishes), a large win on
+  grid/repeating series (policy rates, posted prices).
+- **coordinate learning** — a Yeo-Johnson λ-grid lets the ensemble learn whether
+  the series is simple in a log/multiplicative, sqrt, or linear coordinate.
 
-`dirac` wraps `skater` in a **lattice projection**: it keeps a recency-weighted
-frequency table of the exact values the series takes and adds near-Dirac atoms on
-the ones it *revisits* (each carrying that value's frequency as probability),
-**mean-preserving** so the atoms add mass without moving the ensemble's mean.
-It's still a plain `Dist`. On continuous data nothing is revisited, no atom
-fires, and it vanishes; unlike a simple last-value spike it also captures values
-that recur often but never twice in a row. Judged by **log-likelihood** — the
-package's metric — it dominates on administrative, grid-quoted series that sit on
-a small set of values (policy rates, posted prices), where a continuous
-predictive cannot place mass on an exact value.
+```python
+f = laplace(k=1)                          # CRPS leaf + lattice, both on
+f = laplace(k=1, objective="likelihood")  # pure-likelihood leaf
+f = laplace(k=1, sticky=False)            # no lattice projection
+```
 
-Every policy also draws on a **Yeo-Johnson coordinate** candidate group (a coarse
-grid of the signed Box-Cox family), so the ensemble can *learn the coordinate* a
-series is simple in — log/multiplicative, sqrt, or linear — online, rather than
-committing to one up front.
+### `doob` — the martingale specialist
 
-`doob` is the one **committed** policy (after Joseph Doob): it pins the mean to a
-**martingale** (the last value — no drift, no mean reversion) and only learns how
-the **volatility breathes**, Bayesian-averaging several martingale predictives
-that differ in their volatility clock (constant, GARCH, slowly-varying, heavy
-tailed). By Dambis–Dubins–Schwarz any continuous martingale is a *time-changed
-Brownian motion*, so the bet is exactly "BM on a stochastic clock". Feed it the
-**level** series (prices, indices, rates), not pre-differenced changes: when the
-martingale prior holds it beats the diffuse `laplace` ensemble by committing the
+A committed, driftless **martingale** with a learned **volatility clock**: a
+Bayesian average over martingale predictives that differ only in their volatility
+model (constant, GARCH, slowly-varying, heavy-tailed). Because every candidate
+shares the same mean, plain averaging blends the clocks without washing out
+kurtosis. By Dambis–Dubins–Schwarz a continuous martingale is a *time-changed
+Brownian motion* — "BM on a stochastic clock".
+
+Feed it the **level** series (prices, indices, rates), not pre-differenced
+changes. When the martingale prior holds it edges `laplace` by committing the
 mean and spending its capacity on the clock; on genuinely mean-reverting series
 (e.g. the VIX) the prior is wrong and it gives ground — a deliberately sharp tool.
-
-Or tune directly:
-
-```python
-from skaters import skater
-
-f = skater(k=3, aggressiveness=0.9)  # fast adapter
-f = skater(k=3, aggressiveness=0.1)  # conservative
-```
 
 ## Architecture
 
@@ -319,8 +296,8 @@ suite that checks 76,000+ values to 1e-6 (`parity/`, run in the test suite via
 
 ```html
 <script type="module">
-  import { kahneman } from "https://skaters.microprediction.org/js/skaters/index.mjs";
-  const f = kahneman(1);
+  import { laplace } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  const f = laplace(1);
   let state = null;
   for (const y of observations) {
     const [dists, st] = f(y, state); state = st;

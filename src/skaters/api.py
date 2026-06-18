@@ -1,13 +1,16 @@
 """User-facing API.
 
-Every named function builds a Bayesian ensemble over the SAME full
-candidate population. The names represent different search policies —
-different priors, learning rates, and complexity penalties — not
-different models.
+Two named forecasters:
 
-    from skaters import skater
+* ``laplace`` — the general forecaster: a likelihood-weighted ensemble over the
+  full candidate population, with a CRPS terminal leaf (*model first, conform
+  last*) and the lattice projection for repeating series, both on by default.
+* ``doob`` — a committed martingale with a learned volatility clock, for
+  near-martingale *levels*.
 
-    f = skater(k=3)
+    from skaters import laplace
+
+    f = laplace(k=3)
     state = None
     for y in observations:
         dists, state = f(y, state)
@@ -16,7 +19,7 @@ different models.
 
 from __future__ import annotations
 import math
-from skaters.leaf import leaf, scale_mixture_leaf
+from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.conjugate import conjugate
 from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
@@ -24,9 +27,19 @@ from skaters.transform import (
     garch, power_transform, drift, holt_linear, ar, theta,
     seasonal_difference, yeo_johnson,
 )
-from skaters.search import search as adaptive_search
 from skaters.terminal import terminal_leaf_ensemble
-from skaters.sticky import sticky
+from skaters.sticky import sticky as _project  # lattice projection (handles repeats)
+
+
+def _objective_leaf(objective: str):
+    """Terminal-leaf factory for a policy's objective. ``crps`` is the default:
+    *model first* (likelihood-weighted trunk) then *conform last* (CRPS-fit leaf).
+    Pass ``"likelihood"`` for the scale-mixture leaf instead."""
+    if objective == "crps":
+        return crps_leaf
+    if objective == "likelihood":
+        return scale_mixture_leaf
+    raise ValueError(f"objective must be 'crps' or 'likelihood', got {objective!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -211,300 +224,68 @@ def _build_candidates(k: int, leaf_fn=leaf):
     return candidates, depths, groups
 
 
-def _prior_favoring_depths(depths: list[int], favored: set[int], boost: float = 2.0) -> list[float]:
-    """Compute prior log-weights that boost candidates at certain depths."""
-    return [boost if d in favored else 0.0 for d in depths]
-
-
-def _prior_favoring_indices(n: int, favored: set[int], boost: float = 2.0) -> list[float]:
-    """Compute prior log-weights that boost specific candidate indices."""
-    return [boost if i in favored else 0.0 for i in range(n)]
-
-
 # ---------------------------------------------------------------------------
-# The default entry point
+# The two named forecasters
 # ---------------------------------------------------------------------------
 
-def skater(k: int = 1, aggressiveness: float = 0.5):
-    """Create a general-purpose online forecaster.
+def laplace(k: int = 1, objective: str = "crps", sticky: bool = True):
+    """The general forecaster.
 
-    Builds a Bayesian ensemble over a diverse candidate population
-    and lets the data decide which complexity is appropriate.
+    A likelihood-weighted Bayesian ensemble over the full candidate population
+    (*model first*), with a CRPS terminal leaf (*conform last*) and the lattice
+    projection for repeating values — both on by default. After Pierre-Simon
+    Laplace: a uniform prior, let the data speak.
 
     Args:
-        k: forecast horizon (steps ahead).
-        aggressiveness: float in (0, 1). Controls adaptation speed.
-            Low = conservative (slow to change, penalizes complexity).
-            High = aggressive (adapts fast, tolerates complexity).
-    """
-    assert 0 < aggressiveness < 1
-    learning_rate = 0.1 + 0.8 * aggressiveness
-    complexity_penalty = 0.05 * (1 - aggressiveness)
-
-    candidates, depths, _ = _build_candidates(k)
-    f = terminal_leaf_ensemble(
-        candidates, k=k,
-        learning_rate=learning_rate,
-        complexity_penalty=complexity_penalty,
-        depths=depths,
-        max_components=20,
-    )
-    f.__name__ = f"skater(k={k})"
-    return f
-
-
-# ---------------------------------------------------------------------------
-# Named search policies
-#
-# All consider the same candidates. They differ in prior, learning
-# rate, and complexity penalty — i.e., the search strategy.
-# ---------------------------------------------------------------------------
-
-def holt(k: int = 1):
-    """Holt's policy: expect trends.
-
-    After Charles Holt (1957). Prior favoring differencing-based models
-    that capture trends. Moderate complexity penalty. Best when the
-    series has persistent drift or momentum.
-    """
-    candidates, depths, groups = _build_candidates(k)
-    # Boost the trend-capturing families: differencing, drift, Holt linear.
-    trend = set(groups["diff"]) | set(groups["drift"]) | set(groups["holt"])
-    prior = _prior_favoring_indices(len(candidates), favored=trend, boost=3.0)
-    f = terminal_leaf_ensemble(
-        candidates, k=k,
-        learning_rate=0.5,
-        complexity_penalty=0.02,
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=15,
-    )
-    f.__name__ = f"holt(k={k})"
-    return f
-
-
-def hosking(k: int = 1):
-    """Hosking's policy: expect long memory.
-
-    After Jonathan Hosking (1981). Prior favoring fractional differencing
-    models that capture long-range dependence. Tolerates depth-2
-    complexity. Best for series with slowly decaying autocorrelation.
-    """
-    candidates, depths, groups = _build_candidates(k)
-    # Boost the fractional-differencing models (by name, not magic index)
-    prior = _prior_favoring_indices(len(candidates), favored=set(groups["frac"]), boost=3.0)
-    f = terminal_leaf_ensemble(
-        candidates, k=k,
-        learning_rate=0.5,
-        complexity_penalty=0.01,
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=15,
-    )
-    f.__name__ = f"hosking(k={k})"
-    return f
-
-
-def laplace(k: int = 1):
-    """Laplace's policy: maximum ignorance.
-
-    After Pierre-Simon Laplace. Uniform prior — no preference for any
-    model class. Pure Bayesian updating. Learning rate close to 1 for
-    fast convergence. Minimal complexity penalty. Let the data speak.
+        k: forecast horizon.
+        objective: terminal-leaf objective — ``"crps"`` (default) or
+            ``"likelihood"``.
+        sticky: lattice projection for repeating values (default True; free on
+            continuous data, a large win on grid/repeating series).
     """
     candidates, depths, _ = _build_candidates(k)
     f = terminal_leaf_ensemble(
         candidates, k=k,
+        leaf_fn=_objective_leaf(objective),
         learning_rate=0.8,
         complexity_penalty=0.005,
         depths=depths,
         max_components=20,
     )
+    if sticky:
+        f = _project(f, k=k)
     f.__name__ = f"laplace(k={k})"
     return f
 
 
-def wald(k: int = 1):
-    """Wald's policy: minimax caution.
+def doob(k: int = 1, objective: str = "crps"):
+    """A driftless martingale with a stochastic volatility clock.
 
-    After Abraham Wald. Very conservative — high complexity penalty,
-    low learning rate. Slow to commit to any model, resistant to being
-    fooled by short-term patterns. Best in adversarial or highly
-    non-stationary environments.
-    """
-    candidates, depths, _ = _build_candidates(k)
-    prior = _prior_favoring_depths(depths, favored={0}, boost=2.0)
-    f = terminal_leaf_ensemble(
-        candidates, k=k,
-        learning_rate=0.15,
-        complexity_penalty=0.08,
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=10,
-    )
-    f.__name__ = f"wald(k={k})"
-    return f
-
-
-def dantzig(k: int = 1):
-    """Dantzig's policy: adaptive search over the transform grammar.
-
-    After George Dantzig (1947). Uses adaptive search that grows the
-    candidate pool online — expanding top performers and pruning losers.
-    """
-    f = adaptive_search(
-        k=k,
-        learning_rate=0.3,
-        complexity_penalty=0.01,
-        max_pool=40,
-        expand_interval=50,
-        expand_top_n=5,
-        max_depth=3,
-        cost_budget=10.0,
-    )
-    f.__name__ = f"dantzig(k={k})"
-    return f
-
-
-def samuelson(k: int = 1):
-    """Samuelson's policy: there's a drift, find it carefully.
-
-    After Paul Samuelson (1965), who extended Bachelier's random walk
-    with geometric drift for asset pricing. Strong prior on Holt
-    linear and drift transforms. Moderate learning rate so the
-    ensemble concentrates on the best drift tracker reasonably fast.
-
-    Best for series with persistent but slowly varying drift — GDP,
-    population, prices with inflation.
-    """
-    candidates, depths, groups = _build_candidates(k)
-
-    # Strong prior on the drift and Holt-linear families (Samuelson's
-    # geometric-drift random walk); a moderate prior on the remaining
-    # depth-2 chains, which may compose drift with smoothing.
-    prior = _prior_favoring_depths(depths, favored={2}, boost=2.0)
-    for i in set(groups["drift"]) | set(groups["holt"]):
-        prior[i] = 5.0
-
-    f = terminal_leaf_ensemble(
-        candidates, k=k,
-        learning_rate=0.4,          # moderate — fast enough to find drift
-        complexity_penalty=0.01,    # mild — willing to use drift+ema
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=15,
-    )
-    f.__name__ = f"samuelson(k={k})"
-    return f
-
-
-# ---------------------------------------------------------------------------
-# Kahneman's policy: think fast and slow
-# ---------------------------------------------------------------------------
-
-def kahneman(k: int = 1, strength: float = 8.0):
-    """Kahneman's policy: think fast and slow.
-
-    A nod to the ``thinking_fast_and_slow`` skater in Cotton's
-    timemachines package. This is a prior,
-    not a new model — it draws on the same shared candidate population as
-    every other policy. It simply places a strong prior on the candidates
-    that embody the two-systems structure: a **fast** underlying-process
-    tracker (System 1: reactive EMA, Holt, AR, drift) on the outside, and
-    a **slowly-varying** residual scale (System 2: ``standardize`` with a
-    long half-life) on the inside, over the plain Gaussian leaf.
-
-    The point forecast reacts to every observation; the predicted
-    *distribution* of the residuals drifts slowly. Because these
-    candidates live in the shared pool, any policy (e.g. ``laplace``) can
-    discover the pattern on its own — Kahneman just bets on it up front.
-
-    Args:
-        k: forecast horizon.
-        strength: prior log-weight boost on the fast/slow candidates.
-            Larger = a more committed bet on the two-systems structure. On
-            slowly-varying-noise data a strong bet adapts faster than a
-            uniform prior; on stationary data it costs a little early. The
-            default trades these off (see examples/benchmark_kahneman.py).
-
-    Best for series whose signal moves quickly but whose noise level is
-    persistent — most financial and operational series.
-    """
-    candidates, depths, groups = _build_candidates(k)
-    prior = _prior_favoring_indices(
-        len(candidates), favored=set(groups["fast_slow"]), boost=strength
-    )
-    f = terminal_leaf_ensemble(
-        candidates, k=k,
-        learning_rate=0.5,
-        complexity_penalty=0.01,
-        depths=depths,
-        prior_log_weights=prior,
-        max_components=15,
-    )
-    f.__name__ = f"kahneman(k={k})"
-    return f
-
-
-
-def dirac(k: int = 1, spike_frac: float = 0.003):
-    """Dirac's policy: bet on repetition.
-
-    After Paul Dirac (the delta it collapses toward). Repetition is two distinct
-    things, cleanly separated here:
-
-    * the **projection** — actual probability *mass* on the exact repeated
-      value — is handled at the terminal by :func:`sticky`, a mean-preserving
-      near-Dirac atom weighted by the online repeat probability, and
-    * the **pull** — the tendency of the mean to track the last value — is a
-      *mean* statement and is left to the trunk, where the random-walk
-      candidate earns its weight by likelihood on series that actually repeat.
-      (It needs no special prior: a prior boost is a one-time initialisation
-      and washes out after burn-in, so the ensemble must — and does — discover
-      persistence on its own.)
-
-    On administrative or grid-quoted series (policy rates, posted prices) that
-    stay unchanged for long stretches, the projection captures the point mass
-    (large likelihood, sharp intervals); on series that actually move it fades
-    and ``dirac`` reduces to the ordinary skater.
-
-    Args:
-        k: forecast horizon.
-        spike_frac: how hard the projection commits to the atom (smaller = harder).
-    """
-    f = sticky(skater(k=k), k=k, spike_frac=spike_frac)   # mean-preserving projection
-    f.__name__ = f"dirac(k={k})"
-    return f
-
-
-def doob(k: int = 1):
-    """Doob's policy: a driftless martingale with a stochastic volatility clock.
-
-    After Joseph Doob (martingale theory). A committed **level-domain** model:
-    the mean is pinned to the last value — a martingale, no drift and no mean
-    reversion — and the only thing learned is how the volatility *breathes*. By
-    the Dambis-Dubins-Schwarz theorem any continuous martingale is a
-    time-changed Brownian motion, so the bet is exactly "BM on a stochastic
-    clock".
-
-    It is a Bayesian average over several martingale predictives that differ
-    only in their volatility model (constant, GARCH, slowly-varying, and
-    heavy-tailed). Because every candidate shares the *same* mean, the average
-    does **not** wash out kurtosis (the usual BMA failure mode) — instead it
-    blends the volatility clocks into one scale mixture and lets likelihood pick.
+    After Joseph Doob. A committed **level-domain** model: the mean is pinned to
+    the last value (a martingale — no drift, no mean reversion) and only the
+    volatility clock is learned. By Dambis-Dubins-Schwarz a continuous martingale
+    is a time-changed Brownian motion, so the bet is "BM on a stochastic clock".
+    Because every candidate shares the same mean, plain Bayesian averaging blends
+    the volatility clocks without washing out kurtosis.
 
     Feed it the **level** series (prices, indices, rates), not pre-differenced
-    changes. When the martingale prior holds — near-martingale levels — it beats
-    the diffuse ``laplace`` ensemble by committing the mean and spending its
-    capacity on the clock; on genuinely mean-reverting series (e.g. the VIX) the
-    prior is wrong and it gives ground. A deliberately sharp instrument.
+    changes. It beats ``laplace`` on near-martingale levels by committing the
+    mean; on mean-reverting series the prior is wrong and it gives ground.
+
+    Args:
+        k: forecast horizon.
+        objective: residual-leaf objective — ``"crps"`` (default) or
+            ``"likelihood"``.
     """
+    lf = crps_leaf if objective == "crps" else scale_mixture_leaf
+    if objective not in ("crps", "likelihood"):
+        raise ValueError(f"objective must be 'crps' or 'likelihood', got {objective!r}")
     cands = [
-        conjugate(leaf(k=k), difference(), k=k),                                       # constant vol
-        conjugate(conjugate(leaf(k=k), garch(), k=k), difference(), k=k),              # GARCH clock
-        conjugate(conjugate(leaf(k=k), standardize(0.02), k=k), difference(), k=k),    # slow clock
-        conjugate(conjugate(scale_mixture_leaf(k=k), garch(), k=k), difference(), k=k),  # GARCH + heavy
-        conjugate(scale_mixture_leaf(k=k), difference(), k=k),                         # EWMA + heavy
+        conjugate(lf(k=k), difference(), k=k),
+        conjugate(conjugate(lf(k=k), garch(), k=k), difference(), k=k),
+        conjugate(conjugate(lf(k=k), standardize(0.02), k=k), difference(), k=k),
+        conjugate(conjugate(lf(k=k), garch(), k=k), difference(), k=k),
+        conjugate(lf(k=k), difference(), k=k),
     ]
     f = bayesian_ensemble(cands, k=k, learning_rate=0.5, depths=[1, 2, 2, 2, 1],
                           max_components=30)

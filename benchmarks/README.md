@@ -102,6 +102,11 @@ both — likelihood trunk, CRPS leaf — beats the likelihood-only policy on **e
 axis (CRPS raw, CRPS family, *and* likelihood): a CRPS-fit leaf is more
 outlier-robust, so it even generalises slightly better on likelihood. No trade.
 
+As of **0.8.0 this is the package default**: `laplace(k)` *is* the "log trunk +
+CRPS tail" row; the "log trunk + log tail" row is `laplace(k,
+objective="likelihood")`. The table's `laplace` rows were scored before the
+default flipped, so they name the configuration explicitly.
+
 By asset class (best-of-ours, keyword-approximate): equity 99% (n=1033),
 commodity 100%, rates 95%, credit 94%, fx 89%, other 81%.
 

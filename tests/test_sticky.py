@@ -1,11 +1,11 @@
-"""Tests for the sticky (zero-inflation) wrapper and the dirac policy."""
+"""Tests for the sticky (zero-inflation / lattice) projection."""
 
 import math
 import random
 
 from skaters.dist import Dist
 from skaters.sticky import sticky
-from skaters.api import dirac, skater
+from skaters.api import laplace
 from skaters.conventions import Skater
 from skaters.leaf import leaf
 from skaters.conjugate import conjugate
@@ -35,7 +35,7 @@ def test_sticky_vanishes_on_continuous_data():
 
 
 def test_sticky_is_still_a_dist():
-    d = _run(sticky(skater(1), 1), [3.0] * 50 + [3.0, 4.0, 4.0])[-1]
+    d = _run(sticky(laplace(1, sticky=False), 1), [3.0] * 50 + [3.0, 4.0, 4.0])[-1]
     assert isinstance(d, Dist)
     assert d.std > 0 and math.isfinite(d.logpdf(4.0))
 
@@ -58,7 +58,7 @@ def test_sticky_anchors_at_modal_value_not_last():
     series = [0.25 if i % 17 == 0 else 0.0 for i in range(200)]
     series.append(0.25)                      # force the last value to be a jump
     assert series[-1] == 0.25
-    d = _run(sticky(skater(1), 1), series)[-1]
+    d = _run(sticky(laplace(1, sticky=False), 1), series)[-1]
     w, m, s = max(d.components, key=lambda c: c[0])
     assert s < 0.05                          # it is the narrow atom
     assert abs(m - 0.0) < 1e-9               # anchored at the mode, not 0.25
@@ -93,7 +93,7 @@ def test_sticky_captures_non_consecutive_lattice():
         v = random.choice([x for x in [0.0, 1.0, 2.0] if x != last])
         series.append(v)
         last = v
-    d = _run(sticky(skater(1), 1), series)[-1]
+    d = _run(sticky(laplace(1, sticky=False), 1), series)[-1]
     atoms = [(w, m) for w, m, s in d.components if s < 0.05]
     assert len(atoms) >= 3                       # an atom on each lattice value
     on_lattice = sum(w for w, m in atoms
@@ -103,20 +103,10 @@ def test_sticky_captures_non_consecutive_lattice():
     assert d.logpdf(1.0) > math.log(0.2)
 
 
-def test_dirac_is_skater_and_runs():
-    f = dirac(1)
-    assert isinstance(f, Skater)
-    state = None
-    random.seed(1)
-    for _ in range(80):
-        d, state = f(random.gauss(0, 1), state)
-    assert d[0].std > 0 and math.isfinite(d[0].logpdf(0.0))
-
-
-def test_dirac_rewards_repetition():
-    # On a perfectly sticky series, dirac places a sharp spike at the repeat.
-    f = dirac(1)
+def test_laplace_rewards_repetition_by_default():
+    # laplace is sticky by default, so it spikes on a perfectly repeating series.
+    f = laplace(1)
     state = None
     for _ in range(120):
         d, state = f(2.0, state)
-    assert d[0].logpdf(2.0) > 2.0          # the spike makes the repeat very likely
+    assert d[0].logpdf(2.0) > 2.0          # the default lattice projection fires

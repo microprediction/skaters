@@ -45,9 +45,9 @@
     <h2>Use the port yourself</h2>
     <p>The JavaScript port is a zero-dependency ES module. Drop it into any page:</p>
     <pre><code>&lt;script type="module"&gt;
-  import { skater } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  import { laplace } from "https://skaters.microprediction.org/js/skaters/index.mjs";
 
-  const f = skater(1);
+  const f = laplace(1);
   let state = null;
   for (const y of observations) {
     const [dists, st] = f(y, state); state = st;
