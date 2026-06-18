@@ -1,6 +1,6 @@
 # skaters
 
-**One univariate time-series model to rule them all?** — Nah I think we need two, and they are both here. Their names are *Laplace* and *Doob* and you can watch them [here](https://skaters.microprediction.org/demos/playground.html). 
+**One univariate time-series model to rule them all?** — Nah I think we need two, and they are both here. Their names are *Laplace* and *Doob* and you can watch them [here](https://skaters.microprediction.org/demos/playground.html). Only use the latter if your martingality prior is very strong. 
 
 
 <p align="center">
