@@ -7,13 +7,7 @@
   <a href="#javascript--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript-1a8c4a?style=for-the-badge" alt="Python and JavaScript"></a>
 </p>
 
-> **Beats classical SOTA on likelihood.** On 500 FRED series (rolling one-step-ahead), `laplace`
-> beats **AutoARIMA** and **AutoETS** on held-out **log-likelihood** — the decision-relevant
-> metric — on **96–98%** of independent families (≈ +1.9 nats/obs), and on CRPS (84–86%). Against
-> AutoARIMA paired with **conformal** residuals it still wins on likelihood (87–89%) and ties on
-> CRPS, conformal's own metric; conformal systems that emit only a CDF can't be scored on
-> likelihood at all. See
-> [the benchmarks](https://github.com/microprediction/skaters/tree/main/benchmarks).
+See [the benchmarks](https://github.com/microprediction/skaters/tree/main/benchmarks).
 
 ## Install
 
