@@ -225,3 +225,6 @@ papers/*.bbl
 papers/*.blg
 papers/*.out
 papers/*.toc
+
+# foundation study results (regenerable)
+benchmarks/results_foundation_*.csv
