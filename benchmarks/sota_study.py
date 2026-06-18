@@ -277,92 +277,107 @@ def nf_scores(ch):
 
 
 BATCH = int(os.environ.get("SOTA_BATCH", 60))   # series per statsforecast call
+WORKERS = int(os.environ.get("SOTA_WORKERS", max(1, (os.cpu_count() or 2) - 1)))
+
+
+def _extract_cv(g):
+    """Per-series statsforecast cross_validation slice -> picklable arrays for a
+    worker (or None if the window is too short)."""
+    if len(g) < TEST // 2:
+        return None
+    g = g.sort_values("ds")
+    return {k: g[col].to_numpy() for k, col in (
+        ("y", "y"), ("aa", "AutoARIMA"),
+        ("aalo", "AutoARIMA-lo-90"), ("aahi", "AutoARIMA-hi-90"),
+        ("ae", "AutoETS"), ("aelo", "AutoETS-lo-90"), ("aehi", "AutoETS-hi-90"))}
+
+
+def score_one(payload):
+    """Score every opponent for ONE series (runs in a worker process). Returns
+    (sid, [rows]). The statsforecast-derived methods reuse the precomputed cv
+    arrays; the rest fit per series here."""
+    sid, ch, cvd = payload
+    rows = []
+    if cvd is not None:                          # AutoARIMA/AutoETS + conformal/ACI
+        y = cvd["y"]
+        acc = {m: [0.0, 0.0, 0] for m in
+               ("AutoARIMA", "AutoETS", "AutoARIMA+conformal", "AutoARIMA+ACI")}
+        resid = []; aci_scale = 1.0
+        for t in range(len(y)):
+            yt = y[t]
+            for m, mean, lo, hi in (("AutoARIMA", cvd["aa"][t], cvd["aalo"][t], cvd["aahi"][t]),
+                                    ("AutoETS", cvd["ae"][t], cvd["aelo"][t], cvd["aehi"][t])):
+                a, b = score_dist(gauss_dist(mean, lo, hi), yt)
+                acc[m][0] += a; acc[m][1] += b; acc[m][2] += 1
+            pt = cvd["aa"][t]
+            if len(resid) >= 40:
+                win = resid[-250:]
+                a, b = score_dist(conformal_dist(pt, win), yt)
+                acc["AutoARIMA+conformal"][0] += a; acc["AutoARIMA+conformal"][1] += b
+                acc["AutoARIMA+conformal"][2] += 1
+                d2 = conformal_dist(pt, win, scale=aci_scale)
+                a2, b2 = score_dist(d2, yt)
+                acc["AutoARIMA+ACI"][0] += a2; acc["AutoARIMA+ACI"][1] += b2
+                acc["AutoARIMA+ACI"][2] += 1
+                lo2, hi2 = d2.quantile(0.05), d2.quantile(0.95)
+                aci_scale *= 1.0 + 0.02 * ((0.0 if lo2 <= yt <= hi2 else 1.0) - 0.10)
+                aci_scale = min(max(aci_scale, 0.2), 5.0)
+            resid.append(yt - pt)
+        for m, (lp, cr, n) in acc.items():
+            if n:
+                rows.append([sid, m, f"{lp/n:.6f}", f"{cr/n:.6f}", n])
+    for name, fn, gate in (("GARCH-t", garch_t_scores, _HAVE_ARCH),
+                           ("SARIMAX", sarimax_scores, _HAVE_SM),
+                           ("ETS-sm", ets_scores, _HAVE_SM),
+                           ("NF-StudentT", nf_scores, _HAVE_NF)):
+        if not gate:
+            continue
+        try:
+            r = fn(ch)
+        except Exception:               # noqa: BLE001 — never let one opponent kill a series
+            r = None
+        if r is not None:
+            rows.append([sid, name, f"{r[0]:.6f}", f"{r[1]:.6f}", TEST])
+    lp, cr = laplace_scores(ch)
+    rows.append([sid, "laplace", f"{lp:.6f}", f"{cr:.6f}", TEST])
+    return sid, rows
 
 
 def run():
+    from concurrent.futures import ProcessPoolExecutor
     series = load_series()
-    print(f"loaded {len(series)} series (HIST={HIST}, TEST={TEST})", flush=True)
     sids = list(series)
-
-    with open(RESULTS, "w") as fh:
+    print(f"loaded {len(sids)} series (HIST={HIST}, TEST={TEST}); {WORKERS} workers",
+          flush=True)
+    done = 0
+    with open(RESULTS, "w") as fh, ProcessPoolExecutor(max_workers=WORKERS) as pool:
         w = csv.writer(fh); w.writerow(["series", "method", "logpdf", "crps", "n"])
-
-      # process in batches so an overnight crash keeps prior results
+        # process in batches: statsforecast cross_validation (parallel, main proc)
+        # then fan the per-series scoring out across the pool.
         for b0 in range(0, len(sids), BATCH):
             batch = sids[b0:b0 + BATCH]
             rows = []
             for sid in batch:
-                ch = series[sid]
-                ds = pd.date_range("1900-01-01", periods=len(ch), freq="D")
-                for d, v in zip(ds, ch):
-                    rows.append((sid, d, float(v)))
+                ds = pd.date_range("1900-01-01", periods=len(series[sid]), freq="D")
+                rows.extend((sid, d, float(v)) for d, v in zip(ds, series[sid]))
             df = pd.DataFrame(rows, columns=["unique_id", "ds", "y"])
             try:
                 sf = StatsForecast(models=[AutoARIMA(), AutoETS()], freq="D", n_jobs=-1)
                 cv = sf.cross_validation(df=df, h=1, step_size=1, n_windows=TEST,
                                          level=[90], refit=REFIT)
                 cv = cv.reset_index() if "unique_id" not in cv.columns else cv
-            except Exception as e:  # noqa: BLE001
-                print(f"  batch {b0}-{b0+len(batch)} FAILED: {e}", flush=True)
-                continue
-            _score_batch(w, fh, batch, series, cv)
-            print(f"  done {min(b0+BATCH, len(sids))}/{len(sids)} series", flush=True)
-    summarize()
-
-
-def _score_batch(w, fh, batch, series, cv):
-        for sid in batch:
-            ch = series[sid]
-            g = cv[cv["unique_id"] == sid].sort_values("ds")
-            if len(g) < TEST // 2:
-                continue
-            y = g["y"].to_numpy()
-            acc = {m: [0.0, 0.0, 0] for m in
-                   ("AutoARIMA", "AutoETS", "AutoARIMA+conformal", "AutoARIMA+ACI")}
-            resid = []                       # rolling AutoARIMA residuals
-            aci_scale = 1.0                  # adaptive-conformal scale
-            for t in range(len(g)):
-                yt = y[t]
-                # parametric Gaussian from each model's 90% band
-                for m in ("AutoARIMA", "AutoETS"):
-                    d = gauss_dist(g[m].iloc[t], g[f"{m}-lo-90"].iloc[t], g[f"{m}-hi-90"].iloc[t])
-                    a, b = score_dist(d, yt); acc[m][0] += a; acc[m][1] += b; acc[m][2] += 1
-                # conformal on AutoARIMA residuals (need a warm window)
-                pt = g["AutoARIMA"].iloc[t]
-                if len(resid) >= 40:
-                    win = resid[-250:]
-                    d = conformal_dist(pt, win)
-                    a, b = score_dist(d, yt)
-                    acc["AutoARIMA+conformal"][0] += a; acc["AutoARIMA+conformal"][1] += b
-                    acc["AutoARIMA+conformal"][2] += 1
-                    d2 = conformal_dist(pt, win, scale=aci_scale)
-                    a2, b2 = score_dist(d2, yt)
-                    acc["AutoARIMA+ACI"][0] += a2; acc["AutoARIMA+ACI"][1] += b2
-                    acc["AutoARIMA+ACI"][2] += 1
-                    # ACI: widen if the actual fell outside the ~90% band, else shrink
-                    lo, hi = d2.quantile(0.05), d2.quantile(0.95)
-                    aci_scale *= 1.0 + 0.02 * ((0.0 if lo <= yt <= hi else 1.0) - 0.10)
-                    aci_scale = min(max(aci_scale, 0.2), 5.0)
-                resid.append(yt - pt)
-            for m, (lp, cr, n) in acc.items():
-                if n:
-                    w.writerow([sid, m, f"{lp/n:.6f}", f"{cr/n:.6f}", n])
-            # extra per-series opponents, same test window
-            for name, fn, gate in (
-                ("GARCH-t", garch_t_scores, _HAVE_ARCH),
-                ("SARIMAX", sarimax_scores, _HAVE_SM),
-                ("ETS-sm", ets_scores, _HAVE_SM),
-                ("NF-StudentT", nf_scores, _HAVE_NF),
-            ):
-                if not gate:
-                    continue
-                r = fn(ch)
-                if r is not None:
-                    w.writerow([sid, name, f"{r[0]:.6f}", f"{r[1]:.6f}", TEST])
-            # ours, same test window
-            lp, cr = laplace_scores(ch)
-            w.writerow([sid, "laplace", f"{lp:.6f}", f"{cr:.6f}", TEST])
+            except Exception as e:      # noqa: BLE001
+                print(f"  batch CV {b0} FAILED: {e}", flush=True); cv = None
+            payloads = [(sid, series[sid],
+                         _extract_cv(cv[cv["unique_id"] == sid]) if cv is not None else None)
+                        for sid in batch]
+            for sid, srows in pool.map(score_one, payloads):
+                for r in srows:
+                    w.writerow(r)
+                done += 1
             fh.flush()
+            print(f"  done {done}/{len(sids)} series", flush=True)
+    summarize()
 
 
 def summarize():
