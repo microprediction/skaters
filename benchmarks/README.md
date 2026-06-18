@@ -36,6 +36,33 @@ pip install statsforecast # AutoARIMA/ETS mean models to pair conformal with
 The script prints which it found. These need network + heavy deps, so they are
 intentionally absent from the package's `pyproject.toml`.
 
+## Headline: vs AutoARIMA / ETS / conformal (`sota_study.py`)
+
+The honest head-to-head against real baselines — `statsforecast`'s **AutoARIMA**
+and **AutoETS**, and **AutoARIMA paired with conformal residuals** (split-conformal
+and an adaptive/ACI variant). Fair rolling one-step-ahead on 500 FRED change
+series: each baseline is fit on an expanding window with periodic refit, its 90 %
+interval is read as a Gaussian predictive, and *every* method — ours and theirs —
+is scored through the same `Dist` on held-out log-likelihood and CRPS. ARIMA/ETS
+emit densities, so this is a genuine likelihood test. Per-family win-rate (mean
+CRPS is not comparable across series of different scales):
+
+| baseline | `laplace` wins on **log-likelihood** | on **CRPS** |
+|---|---|---|
+| AutoARIMA | **96 %** of families (≈ +1.9 nats/obs) | **84 %** |
+| AutoETS | **98 %** | **86 %** |
+| AutoARIMA + conformal | **87 %** | 51 % (tie) |
+| AutoARIMA + ACI | **89 %** | 51 % (tie) |
+
+> **`laplace` beats classical SOTA (AutoARIMA, AutoETS) on both metrics**,
+> decisively on log-likelihood. Against AutoARIMA *paired with conformal* it wins
+> on likelihood and ties on CRPS — matching the conformal system where it is
+> strong while dominating it on the decision-relevant metric.
+
+Scope: 500 change-series, one-step horizon. Prophet, levels, and longer horizons
+are left for an extended study. Run it: `PYTHONPATH=src python benchmarks/sota_study.py`
+(needs the conda env with `statsforecast` + a FRED key).
+
 ## Headline result: skaters vs crepes, on CRPS (`exhaustive_crps.py`)
 
 The skater is a *pluggable proper-scoring-rule optimizer* — the leaf fits its

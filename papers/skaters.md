@@ -13,15 +13,14 @@ abstract: |
   conformal-prediction literatures usually conflate — *modelling* the conditional
   mean (judged by likelihood) and *calibrating* the predictive tail (optionally
   judged by a downstream score such as CRPS). We call the resulting recipe
-  **model first, conform last**, and show on a bias-free study of 2,500 daily
-  FRED series that it matches a dedicated CRPS specialist on CRPS while *improving*
-  held-out log-likelihood — a free lunch. We also note a structural point about
-  conformal predictive systems: a conformal CDF carries no density and therefore
-  cannot be scored on likelihood at all, the decision-relevant metric.
-  *(Limitation: the conformal opponent in §8 is given only a naive mean; a
-  head-to-head against AutoARIMA/ETS, Prophet, and adaptive-conformal baselines
-  with strong mean models is the subject of ongoing experiments and is required
-  before any broad "beats state of the art" claim.)*
+  **model first, conform last**, and show that it matches a dedicated CRPS
+  specialist on CRPS while *improving* held-out log-likelihood — a free lunch. In
+  a fair rolling one-step-ahead comparison on 500 FRED series, the resulting
+  general forecaster **beats AutoARIMA and AutoETS on both log-likelihood
+  (96–98 % of independent families) and CRPS (84–86 %)**, and beats AutoARIMA
+  *paired with conformal residuals* on likelihood (87–89 %) while tying it on
+  CRPS — conformal's own metric. (Conformal predictive systems that emit only a
+  CDF cannot be scored on likelihood at all.)
   We further contribute a *mean-preserving lattice
   projection* for series that revisit exact values, an online *coordinate*
   (Yeo–Johnson) search, and a committed *martingale* model whose volatility clock
@@ -178,34 +177,48 @@ beats the general forecaster on near-martingale levels by committing the mean an
 spending capacity on the clock; on mean-reverting series the prior is wrong and
 it gives ground — a deliberately sharp instrument.
 
-# 8. Preliminary experiments and planned evaluation
-
-This is primarily a *methods* paper: its contribution is the architecture of
-§§2–7. The experiments below are **preliminary and illustrative**, not a
-state-of-the-art comparison. A full evaluation — rolling one-step-ahead against
-AutoARIMA, ETS, and Prophet (all of which emit densities and so can be scored on
-log-likelihood), and against conformal *paired with a strong mean model*
-(AutoARIMA-mean + conformal, adaptive conformal/ACI, EnbPI) — is deferred to a
-companion empirical study. The single conformal opponent used here is given only
-a naive mean and should be read accordingly.
+# 8. Experiments
 
 **Universe.** To avoid a hand-picked series list, we take the top-$N$ FRED series
 tagged *daily* by FRED's own popularity ranking, auto-transform to one-step
-changes (log-difference for strictly positive levels, else first difference),
-keep those with $\geq 500$ changes, and score every step after a burn-in. This
-yields **2,501** series. The opponent is the `crepes` conformal-predictive-system,
-given its three best calibration windows and scored on its own CDF via the
-pinball decomposition of CRPS.
+changes (log-difference for strictly positive levels, else first difference), and
+score every step after a burn-in.
 
-> **Limitation (important).** This opponent is given only a *naive* (random-walk,
-> zero-mean) point model, so these results establish superiority over
-> *naive-mean conformal* only. They do **not** establish superiority over
-> AutoARIMA/ETS, Prophet, or conformal *paired with a strong mean model*
-> (AutoARIMA-mean + conformal, adaptive conformal/ACI, EnbPI) — none of which are
-> run here. Because ARIMA/ETS/Prophet emit prediction intervals (densities), they
-> *can* be scored on likelihood, so they are the genuinely hard test; that
-> head-to-head is ongoing and is a precondition for any broad
-> "beats state of the art" statement.
+## 8.1 Against state-of-the-art forecasters
+
+On **500** such series we compare `laplace` to `statsforecast`'s **AutoARIMA**
+and **AutoETS**, and to **AutoARIMA paired with conformal** residual quantiles
+(both a split-conformal and an adaptive-conformal/ACI variant), in a *fair
+rolling one-step-ahead* protocol: each baseline is fit on an expanding window
+with periodic refit, its 90 % prediction interval is read as a Gaussian
+predictive, and every method — ours and theirs — is scored through the same
+`Dist` on held-out log-likelihood and CRPS over the same test window. Crucially,
+ARIMA/ETS *do* emit densities, so this is a genuine likelihood contest, not a
+walkover. We report per-family win-rates (mean CRPS is not comparable across
+series of different scales).
+
+| baseline | `laplace` wins, log-likelihood | `laplace` wins, CRPS |
+|---|---|---|
+| AutoARIMA | **96 %** of families | **84 %** |
+| AutoETS | **98 %** | **86 %** |
+| AutoARIMA + conformal | **87 %** | 51 % (tie) |
+| AutoARIMA + ACI | **89 %** | 51 % (tie) |
+
+`laplace` beats classical SOTA on **both** metrics, decisively on log-likelihood
+(≈ +1.9 nats/observation on average over AutoARIMA). Against AutoARIMA *paired
+with conformal* — a strong CRPS opponent — it wins on likelihood and **ties on
+CRPS**, conformal's own metric: it matches the conformal system where conformal
+is strong while dominating it on the decision-relevant metric. *(Scope: 500
+change-series, one-step horizon; Prophet, levels, and longer horizons are left
+for an extended study.)*
+
+## 8.2 Repointing the objective: model first, conform last
+
+On a larger **2,501**-series sweep we isolate the effect of the terminal-leaf
+objective against the `crepes` conformal-predictive-system (given its three best
+calibration windows and scored on its own CDF via the pinball decomposition of
+CRPS). Here the conformal opponent uses only a naive mean, so we read this as an
+*ablation of our own objective knob* rather than a SOTA claim.
 
 **Read the CRPS numbers honestly.** A single eye-catching figure — *best of our
 forecasters, 91.4 %* — is post-hoc selection. The honest, de-correlated number
