@@ -26,7 +26,7 @@ from skaters.transform import (
 )
 from skaters.search import search as adaptive_search
 from skaters.terminal import terminal_leaf_ensemble
-from skaters.sticky import sticky
+from skaters.sticky import sticky as _project  # lattice projection (handles repeats)
 
 
 def _objective_leaf(objective: str):
@@ -236,7 +236,8 @@ def _prior_favoring_indices(n: int, favored: set[int], boost: float = 2.0) -> li
 # The default entry point
 # ---------------------------------------------------------------------------
 
-def skater(k: int = 1, aggressiveness: float = 0.5, objective: str = "crps"):
+def skater(k: int = 1, aggressiveness: float = 0.5, objective: str = "crps",
+           sticky: bool = True):
     """Create a general-purpose online forecaster.
 
     Builds a Bayesian ensemble over a diverse candidate population
@@ -250,6 +251,10 @@ def skater(k: int = 1, aggressiveness: float = 0.5, objective: str = "crps"):
         objective: terminal-leaf objective — ``"crps"`` (default; *model first,
             conform last*) or ``"likelihood"``. CRPS wins on heavy-tailed/real
             data and costs a few thousandths of a nat on idealised Gaussian.
+        sticky: if True (default), add the **lattice projection** — atoms on the
+            exact values a series revisits. It is free when not needed (it
+            vanishes on continuous data) and a large win on repeating/grid
+            series, so it is on by default.
     """
     assert 0 < aggressiveness < 1
     learning_rate = 0.1 + 0.8 * aggressiveness
@@ -264,6 +269,8 @@ def skater(k: int = 1, aggressiveness: float = 0.5, objective: str = "crps"):
         depths=depths,
         max_components=20,
     )
+    if sticky:
+        f = _project(f, k=k)
     f.__name__ = f"skater(k={k})"
     return f
 
@@ -320,7 +327,7 @@ def hosking(k: int = 1):
     return f
 
 
-def laplace(k: int = 1, objective: str = "crps"):
+def laplace(k: int = 1, objective: str = "crps", sticky: bool = True):
     """Laplace's policy: maximum ignorance.
 
     After Pierre-Simon Laplace. Uniform prior — no preference for any
@@ -331,6 +338,8 @@ def laplace(k: int = 1, objective: str = "crps"):
         k: forecast horizon.
         objective: terminal-leaf objective — ``"crps"`` (default; *model first,
             conform last*) or ``"likelihood"``.
+        sticky: add the lattice projection for repeating values (default True;
+            free on continuous data, a large win on grid/repeating series).
     """
     candidates, depths, _ = _build_candidates(k)
     f = terminal_leaf_ensemble(
@@ -341,6 +350,8 @@ def laplace(k: int = 1, objective: str = "crps"):
         depths=depths,
         max_components=20,
     )
+    if sticky:
+        f = _project(f, k=k)
     f.__name__ = f"laplace(k={k})"
     return f
 
@@ -492,8 +503,11 @@ def dirac(k: int = 1, spike_frac: float = 0.003):
     Args:
         k: forecast horizon.
         spike_frac: how hard the projection commits to the atom (smaller = harder).
+
+    Note: ``skater`` now carries the lattice projection by default, so ``dirac``
+    is just ``skater`` with a *harder* atom; it remains as a named shorthand.
     """
-    f = sticky(skater(k=k), k=k, spike_frac=spike_frac)   # mean-preserving projection
+    f = _project(skater(k=k, sticky=False), k=k, spike_frac=spike_frac)
     f.__name__ = f"dirac(k={k})"
     return f
 

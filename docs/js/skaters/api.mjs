@@ -10,7 +10,7 @@ import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
 import { search } from "./search.mjs";
-import { sticky } from "./sticky.mjs";
+import { sticky as project } from "./sticky.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, drift,
   holtLinear, ar, theta, seasonalDifference, garch, powerTransform, yeoJohnson,
@@ -147,12 +147,13 @@ function objectiveLeaf(objective) {
   throw new Error(`objective must be 'crps' or 'likelihood', got ${objective}`);
 }
 
-export function skater(k = 1, aggressiveness = 0.5, objective = "crps") {
+export function skater(k = 1, aggressiveness = 0.5, objective = "crps", sticky = true) {
   if (!(aggressiveness > 0 && aggressiveness < 1)) throw new Error("aggressiveness in (0,1)");
   const learningRate = 0.1 + 0.8 * aggressiveness;
   const complexityPenalty = 0.05 * (1 - aggressiveness);
   const [candidates, depths] = buildCandidates(k);
-  const f = terminalLeafEnsemble(candidates, { k, leafFn: objectiveLeaf(objective), learningRate, complexityPenalty, depths, maxComponents: 20 });
+  let f = terminalLeafEnsemble(candidates, { k, leafFn: objectiveLeaf(objective), learningRate, complexityPenalty, depths, maxComponents: 20 });
+  if (sticky) f = project(f, k);
   f.skaterName = `skater(k=${k})`;
   return f;
 }
@@ -178,11 +179,12 @@ export function hosking(k = 1) {
   return f;
 }
 
-export function laplace(k = 1, objective = "crps") {
+export function laplace(k = 1, objective = "crps", sticky = true) {
   const [candidates, depths] = buildCandidates(k);
-  const f = terminalLeafEnsemble(candidates, {
+  let f = terminalLeafEnsemble(candidates, {
     k, leafFn: objectiveLeaf(objective), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
   });
+  if (sticky) f = project(f, k);
   f.skaterName = `laplace(k=${k})`;
   return f;
 }
@@ -228,8 +230,8 @@ export function kahneman(k = 1, strength = 8.0) {
 }
 
 export function dirac(k = 1, spikeFrac = 0.003) {
-  // projection = mean-preserving sticky atom; pull is left to the trunk.
-  const f = sticky(skater(k), k, 0.05, spikeFrac);
+  // skater is sticky by default; dirac is the harder-atom shorthand.
+  const f = project(skater(k, 0.5, "crps", false), k, 0.05, spikeFrac);
   f.skaterName = `dirac(k=${k})`;
   return f;
 }
