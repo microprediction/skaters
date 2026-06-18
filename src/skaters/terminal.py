@@ -8,9 +8,11 @@ back to Gaussian shape at the output (verified empirically).
 This ensemble fixes that. It uses the sub-models only as **mean forecasters**:
 it weights them by predictive likelihood (as in :func:`bayesian_ensemble`),
 combines their means, and then models the distribution of the *combined
-residual* with a single terminal leaf — by default the Gaussian
-scale-mixture leaf. Because there is exactly one leaf at the end, its shape
-(heavy tails, learned online) reaches the output undiluted.
+residual* with a single terminal leaf — **model first, conform last**. The
+default terminal leaf is :func:`crps_leaf` (the residual is shaped to minimise
+CRPS); pass ``leaf_fn=scale_mixture_leaf`` for the likelihood objective.
+Because there is exactly one leaf at the end, its shape reaches the output
+undiluted.
 
     y --[weighted mix of candidate means]--> mu_hat
     residual = y - mu_hat  -->  terminal leaf  -->  D
@@ -24,12 +26,12 @@ from __future__ import annotations
 import math
 from collections import deque
 from skaters.dist import Dist
-from skaters.leaf import scale_mixture_leaf
+from skaters.leaf import crps_leaf
 
 
 def terminal_leaf_ensemble(
     skaters: list,
-    leaf_fn=scale_mixture_leaf,
+    leaf_fn=crps_leaf,
     k: int = 1,
     learning_rate: float = 0.5,
     complexity_penalty: float = 0.0,
@@ -41,8 +43,8 @@ def terminal_leaf_ensemble(
 
     Args:
         skaters: sub-models used as mean forecasters.
-        leaf_fn: factory for the terminal residual leaf (default the Gaussian
-            scale-mixture leaf).
+        leaf_fn: factory for the terminal residual leaf (default :func:`crps_leaf`;
+            pass ``scale_mixture_leaf`` for the likelihood objective).
         k: forecast horizon.
         learning_rate: eta for the likelihood-based mean weighting.
         complexity_penalty: per-depth penalty (as in bayesian_ensemble).

@@ -109,6 +109,21 @@ f = skater(k=3, aggressiveness=0.9)  # fast adapter
 f = skater(k=3, aggressiveness=0.1)  # conservative
 ```
 
+### Objective: model first, conform last
+
+The candidate trunk is always weighted by **likelihood** (model the structure
+honestly), but the *terminal leaf* — the residual shape — is fit by a
+**proper scoring rule of your choice**. The default is now **CRPS**
+(`objective="crps"`): *model first, conform last*. On a large FRED study this
+matches a dedicated CRPS specialist on CRPS **and** lifts likelihood on
+heavy-tailed data (a free lunch); on idealised light-tailed data it costs a few
+thousandths of a nat, so likelihood remains one switch away:
+
+```python
+f = laplace(k=1)                          # default: likelihood trunk + CRPS tail
+f = laplace(k=1, objective="likelihood")  # pure-likelihood leaf
+```
+
 ## Architecture
 
 Everything is transforms all the way down, with a distributional leaf at the bottom:

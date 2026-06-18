@@ -16,7 +16,7 @@ import math
 import os
 import random
 
-from skaters.leaf import leaf, scale_mixture_leaf
+from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.conjugate import conjugate
 from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
@@ -98,6 +98,7 @@ def build_scenarios():
 
     # Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
     s.append(("scale_mixture_leaf", 1, scale_mixture_leaf(k=1)))
+    s.append(("crps_leaf", 1, crps_leaf(k=1)))
     s.append(("scalemix_ema", 1,
               conjugate(scale_mixture_leaf(k=1), ema_transform(0.1), k=1)))
     return s

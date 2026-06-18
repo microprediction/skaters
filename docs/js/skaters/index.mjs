@@ -6,7 +6,7 @@ export { Dist, erf } from "./dist.mjs";
 export {
   runningVarInit, runningVarUpdate, runningVarGet, runningStdGet, runningMseGet,
 } from "./runstats.mjs";
-export { leaf, scaleMixtureLeaf } from "./leaf.mjs";
+export { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
 export { ema } from "./ema.mjs";
 export { conjugate } from "./conjugate.mjs";
 export {

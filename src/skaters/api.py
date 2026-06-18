@@ -16,7 +16,7 @@ different models.
 
 from __future__ import annotations
 import math
-from skaters.leaf import leaf, scale_mixture_leaf
+from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.conjugate import conjugate
 from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
@@ -27,6 +27,17 @@ from skaters.transform import (
 from skaters.search import search as adaptive_search
 from skaters.terminal import terminal_leaf_ensemble
 from skaters.sticky import sticky
+
+
+def _objective_leaf(objective: str):
+    """Terminal-leaf factory for a policy's objective. ``crps`` is the default:
+    *model first* (likelihood-weighted trunk) then *conform last* (CRPS-fit leaf).
+    Pass ``"likelihood"`` for the scale-mixture leaf instead."""
+    if objective == "crps":
+        return crps_leaf
+    if objective == "likelihood":
+        return scale_mixture_leaf
+    raise ValueError(f"objective must be 'crps' or 'likelihood', got {objective!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +236,7 @@ def _prior_favoring_indices(n: int, favored: set[int], boost: float = 2.0) -> li
 # The default entry point
 # ---------------------------------------------------------------------------
 
-def skater(k: int = 1, aggressiveness: float = 0.5):
+def skater(k: int = 1, aggressiveness: float = 0.5, objective: str = "crps"):
     """Create a general-purpose online forecaster.
 
     Builds a Bayesian ensemble over a diverse candidate population
@@ -236,6 +247,9 @@ def skater(k: int = 1, aggressiveness: float = 0.5):
         aggressiveness: float in (0, 1). Controls adaptation speed.
             Low = conservative (slow to change, penalizes complexity).
             High = aggressive (adapts fast, tolerates complexity).
+        objective: terminal-leaf objective — ``"crps"`` (default; *model first,
+            conform last*) or ``"likelihood"``. CRPS wins on heavy-tailed/real
+            data and costs a few thousandths of a nat on idealised Gaussian.
     """
     assert 0 < aggressiveness < 1
     learning_rate = 0.1 + 0.8 * aggressiveness
@@ -244,6 +258,7 @@ def skater(k: int = 1, aggressiveness: float = 0.5):
     candidates, depths, _ = _build_candidates(k)
     f = terminal_leaf_ensemble(
         candidates, k=k,
+        leaf_fn=_objective_leaf(objective),
         learning_rate=learning_rate,
         complexity_penalty=complexity_penalty,
         depths=depths,
@@ -305,16 +320,22 @@ def hosking(k: int = 1):
     return f
 
 
-def laplace(k: int = 1):
+def laplace(k: int = 1, objective: str = "crps"):
     """Laplace's policy: maximum ignorance.
 
     After Pierre-Simon Laplace. Uniform prior — no preference for any
     model class. Pure Bayesian updating. Learning rate close to 1 for
     fast convergence. Minimal complexity penalty. Let the data speak.
+
+    Args:
+        k: forecast horizon.
+        objective: terminal-leaf objective — ``"crps"`` (default; *model first,
+            conform last*) or ``"likelihood"``.
     """
     candidates, depths, _ = _build_candidates(k)
     f = terminal_leaf_ensemble(
         candidates, k=k,
+        leaf_fn=_objective_leaf(objective),
         learning_rate=0.8,
         complexity_penalty=0.005,
         depths=depths,

@@ -5,7 +5,7 @@
 // complexity penalty — i.e., the search strategy. (dantzig lives in
 // search.mjs because it uses adaptive search.)
 
-import { leaf, scaleMixtureLeaf } from "./leaf.mjs";
+import { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
@@ -141,12 +141,18 @@ function priorFavoringIndices(n, favored, boost = 2.0) {
 // Policies
 // ---------------------------------------------------------------------------
 
-export function skater(k = 1, aggressiveness = 0.5) {
+function objectiveLeaf(objective) {
+  if (objective === "crps") return crpsLeaf;
+  if (objective === "likelihood") return scaleMixtureLeaf;
+  throw new Error(`objective must be 'crps' or 'likelihood', got ${objective}`);
+}
+
+export function skater(k = 1, aggressiveness = 0.5, objective = "crps") {
   if (!(aggressiveness > 0 && aggressiveness < 1)) throw new Error("aggressiveness in (0,1)");
   const learningRate = 0.1 + 0.8 * aggressiveness;
   const complexityPenalty = 0.05 * (1 - aggressiveness);
   const [candidates, depths] = buildCandidates(k);
-  const f = terminalLeafEnsemble(candidates, { k, learningRate, complexityPenalty, depths, maxComponents: 20 });
+  const f = terminalLeafEnsemble(candidates, { k, leafFn: objectiveLeaf(objective), learningRate, complexityPenalty, depths, maxComponents: 20 });
   f.skaterName = `skater(k=${k})`;
   return f;
 }
@@ -172,10 +178,10 @@ export function hosking(k = 1) {
   return f;
 }
 
-export function laplace(k = 1) {
+export function laplace(k = 1, objective = "crps") {
   const [candidates, depths] = buildCandidates(k);
   const f = terminalLeafEnsemble(candidates, {
-    k, learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
+    k, leafFn: objectiveLeaf(objective), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
   });
   f.skaterName = `laplace(k=${k})`;
   return f;

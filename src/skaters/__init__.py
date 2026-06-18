@@ -7,7 +7,7 @@ Log-likelihood: dist.logpdf(y_actual).
 
 from skaters.dist import Dist
 from skaters.conventions import Skater
-from skaters.leaf import leaf, scale_mixture_leaf
+from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.ema import ema
 from skaters.terminal import terminal_leaf_ensemble
 from skaters.ensemble import precision_weighted_ensemble
@@ -49,6 +49,7 @@ __all__ = [
     # Building blocks
     "leaf",
     "scale_mixture_leaf",
+    "crps_leaf",
     "ema",
     "conjugate",
     "difference",
