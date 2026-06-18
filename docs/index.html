@@ -33,7 +33,7 @@
 
     <p class="lead"><strong>One skater to rule them all.</strong> The one-call convenience of
       Prophet — but it ships a calibrated predictive <em>distribution</em> and beats AutoARIMA,
-      ETS, and conformal on the benchmarks.</p>
+      ETS, and conformal on held-out likelihood.</p>
 
     <div class="tag-row">
       <span class="tag">distributional</span>
@@ -59,13 +59,13 @@
     </p>
 
     <div class="callout">
-      <strong>It beats classical SOTA on likelihood.</strong> On 500 FRED series (rolling
-      one-step-ahead), <code>laplace</code> beats <strong>AutoARIMA</strong> and
-      <strong>AutoETS</strong> on held-out <strong>log-likelihood</strong> — the decision-relevant
-      metric — on <strong>96–98%</strong> of independent families (≈ +1.9 nats/obs), and on CRPS
-      (84–86%). Against AutoARIMA paired with <em>conformal</em> residuals it still wins on
-      likelihood (87–89%) and ties on CRPS (its own metric). Conformal systems that emit only a CDF
-      cannot be scored on likelihood at all.
+      <strong>It wins the likelihood race.</strong> On 500 FRED series (rolling one-step-ahead, by
+      series), <code>laplace</code> beats <strong>AutoARIMA</strong>, <strong>AutoETS</strong>, and
+      AutoARIMA-with-<em>conformal</em> on held-out <strong>log-likelihood</strong> — the
+      decision-relevant metric — including on continuous series (64–88% of them, per opponent). On
+      <strong>CRPS</strong> the picture is mixed: it beats AutoETS, roughly ties AutoARIMA, and
+      <em>loses</em> to conformal, which is CRPS-optimized. (Conformal systems that emit only a CDF
+      cannot be scored on likelihood at all.)
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
     </div>
 

@@ -44,24 +44,30 @@ and an adaptive/ACI variant). Fair rolling one-step-ahead on 500 FRED change
 series: each baseline is fit on an expanding window with periodic refit, its 90 %
 interval is read as a Gaussian predictive, and *every* method — ours and theirs —
 is scored through the same `Dist` on held-out log-likelihood and CRPS. ARIMA/ETS
-emit densities, so this is a genuine likelihood test. Per-family win-rate (mean
-CRPS is not comparable across series of different scales):
+emit densities, so this is a genuine likelihood test. **Per-series** win-rate
+(the fraction of series where `laplace` scores better), reported both for all 500
+and for the **309 continuous** series (< 5 % exactly-repeating changes), since on
+repeating/grid series the lattice projection gives a large but metric-specific
+edge that would otherwise dominate the aggregate:
 
-| baseline | `laplace` wins on **log-likelihood** | on **CRPS** |
+| baseline | LL (all / continuous) | CRPS (all / continuous) |
 |---|---|---|
-| AutoARIMA | **96 %** of families (≈ +1.9 nats/obs) | **84 %** |
-| AutoETS | **98 %** | **86 %** |
-| AutoARIMA + conformal | **87 %** | 51 % (tie) |
-| AutoARIMA + ACI | **89 %** | 51 % (tie) |
+| AutoARIMA | **78 % / 64 %** | 51 % / 47 % |
+| AutoETS | **92 % / 88 %** | 68 % / 67 % |
+| AutoARIMA + conformal | **84 % / 75 %** | 37 % / 29 % |
+| AutoARIMA + ACI | **87 % / 80 %** | 36 % / 28 % |
 
-> **`laplace` beats classical SOTA (AutoARIMA, AutoETS) on both metrics**,
-> decisively on log-likelihood. Against AutoARIMA *paired with conformal* it wins
-> on likelihood and ties on CRPS — matching the conformal system where it is
-> strong while dominating it on the decision-relevant metric.
+> **`laplace` wins the likelihood race against all four** — including on
+> continuous series (≈ +0.77 nats/obs over AutoARIMA there). On **CRPS** it is
+> mixed: it beats AutoETS, roughly ties AutoARIMA, and *loses* to the conformal
+> variants, which are CRPS-optimised. Likelihood is the metric where a faithful
+> density wins; CRPS is conformal's home turf.
 
-Scope: 500 change-series, one-step horizon. Prophet, levels, and longer horizons
-are left for an extended study. Run it: `PYTHONPATH=src python benchmarks/sota_study.py`
-(needs the conda env with `statsforecast` + a FRED key).
+We report per-series (not family-clustered) because on this universe the family
+heuristic *inflated* the numbers. Scope: 500 change-series, one-step horizon;
+Prophet, levels, longer horizons, and modern probabilistic/foundation models
+(DeepAR, TFT, Chronos, TimesFM) are left for an extended study. Run it:
+`PYTHONPATH=src python benchmarks/sota_study.py` (conda env with `statsforecast` + a FRED key).
 
 ## Headline result: skaters vs crepes, on CRPS (`exhaustive_crps.py`)
 

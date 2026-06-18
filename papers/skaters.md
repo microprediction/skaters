@@ -16,11 +16,14 @@ abstract: |
   **model first, conform last**, and show that it matches a dedicated CRPS
   specialist on CRPS while *improving* held-out log-likelihood — a free lunch. In
   a fair rolling one-step-ahead comparison on 500 FRED series, the resulting
-  general forecaster **beats AutoARIMA and AutoETS on both log-likelihood
-  (96–98 % of independent families) and CRPS (84–86 %)**, and beats AutoARIMA
-  *paired with conformal residuals* on likelihood (87–89 %) while tying it on
-  CRPS — conformal's own metric. (Conformal predictive systems that emit only a
-  CDF cannot be scored on likelihood at all.)
+  general forecaster **wins the log-likelihood race against AutoARIMA, AutoETS,
+  and AutoARIMA-with-conformal** — including on the continuous-series subset
+  (64–88 % per-series, depending on the opponent) — reflecting a genuine
+  heavy-tail advantage. On CRPS the picture is mixed: it beats AutoETS, roughly
+  ties AutoARIMA, and loses to the CRPS-optimised conformal variants — consistent
+  with likelihood, not CRPS, being the metric where a faithful density wins.
+  (Conformal predictive systems that emit only a CDF cannot be scored on
+  likelihood at all.)
   We further contribute a *mean-preserving lattice
   projection* for series that revisit exact values, an online *coordinate*
   (Yeo–Johnson) search, and a committed *martingale* model whose volatility clock
@@ -194,22 +197,32 @@ with periodic refit, its 90 % prediction interval is read as a Gaussian
 predictive, and every method — ours and theirs — is scored through the same
 `Dist` on held-out log-likelihood and CRPS over the same test window. Crucially,
 ARIMA/ETS *do* emit densities, so this is a genuine likelihood contest, not a
-walkover. We report per-family win-rates (mean CRPS is not comparable across
-series of different scales).
+walkover. We report **per-series** win-rates (the fraction of series on which
+`laplace` scores better), and additionally restrict to the **309 continuous
+series** — those with < 5 % exactly-repeating one-step changes — since on
+repeating/grid series our lattice projection (§5) gives a large but
+metric-specific advantage that would otherwise dominate the aggregate.
 
-| baseline | `laplace` wins, log-likelihood | `laplace` wins, CRPS |
+| baseline | LL (all / continuous) | CRPS (all / continuous) |
 |---|---|---|
-| AutoARIMA | **96 %** of families | **84 %** |
-| AutoETS | **98 %** | **86 %** |
-| AutoARIMA + conformal | **87 %** | 51 % (tie) |
-| AutoARIMA + ACI | **89 %** | 51 % (tie) |
+| AutoARIMA | **78 % / 64 %** | 51 % / 47 % |
+| AutoETS | **92 % / 88 %** | 68 % / 67 % |
+| AutoARIMA + conformal | **84 % / 75 %** | 37 % / 29 % |
+| AutoARIMA + ACI | **87 % / 80 %** | 36 % / 28 % |
 
-`laplace` beats classical SOTA on **both** metrics, decisively on log-likelihood
-(≈ +1.9 nats/observation on average over AutoARIMA). Against AutoARIMA *paired
-with conformal* — a strong CRPS opponent — it wins on likelihood and **ties on
-CRPS**, conformal's own metric: it matches the conformal system where conformal
-is strong while dominating it on the decision-relevant metric. *(Scope: 500
-change-series, one-step horizon; Prophet, levels, and longer horizons are left
+The honest reading: `laplace` **wins the likelihood race against all four
+baselines, including on continuous series** (64–88 %; ≈ +0.77 nats/obs over
+AutoARIMA on the continuous subset), reflecting a genuine heavy-tail advantage.
+On **CRPS** the picture is mixed — it beats AutoETS, roughly ties AutoARIMA, and
+*loses* to the conformal variants, which are CRPS-optimised. This is consistent
+with the paper's thesis: likelihood is the metric where a faithful density wins;
+CRPS is conformal's home turf, where we are competitive but not dominant.
+
+*(We deliberately report per-series rather than family-clustered win-rates here:
+on this universe the family heuristic happened to inflate the figures, spreading
+wins across many small families while collapsing losses into a few large ones.
+Scope: 500 change-series, one-step horizon; Prophet, levels, longer horizons, and
+modern probabilistic/foundation models — DeepAR, TFT, Chronos, TimesFM — are left
 for an extended study.)*
 
 ## 8.2 Repointing the objective: model first, conform last

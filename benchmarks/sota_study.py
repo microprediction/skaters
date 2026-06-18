@@ -176,29 +176,35 @@ def summarize():
     by = collections.defaultdict(dict)
     for r in csv.DictReader(open(RESULTS)):
         by[r["series"]][r["method"]] = (float(r["logpdf"]), float(r["crps"]))
-    methods = ["laplace", "AutoARIMA", "AutoETS", "AutoARIMA+conformal", "AutoARIMA+ACI"]
-    print(f"\n=== SOTA study: {len(by)} series, rolling 1-step ===")
-    print(f"{'method':22s}{'mean logpdf':>13s}{'mean CRPS':>11s}"
-          f"{'laplace beats (family)':>24s}")
+
+    # repeat fraction of each series' tail changes -> isolate continuous series,
+    # since the lattice projection gives a large but metric-specific edge on
+    # repeating/grid series that would otherwise dominate the aggregate.
+    def rfrac(sid):
+        ch = fred._to_changes(fred._load_levels(sid) or [])[-TEST:]
+        return sum(1 for i in range(1, len(ch)) if ch[i] == ch[i - 1]) / max(len(ch) - 1, 1)
+    cont = {s for s in by if rfrac(s) < 0.05}
+
+    methods = ["AutoARIMA", "AutoETS", "AutoARIMA+conformal", "AutoARIMA+ACI"]
+    print(f"\n=== SOTA study: {len(by)} series ({len(cont)} continuous), rolling 1-step ===")
+    print("per-series win-rate, laplace vs each (LL = higher logpdf; CRPS = lower):")
+    print(f"  {'baseline':22s}{'LL all/cont':>14s}{'CRPS all/cont':>16s}")
+
+    def wr(method, subset, idx, lower=False):
+        sub = [by[s] for s in subset if method in by[s] and "laplace" in by[s]]
+        if not sub:
+            return float("nan")
+        if lower:
+            w = sum(1 for d in sub if d["laplace"][idx] < d[method][idx])
+        else:
+            w = sum(1 for d in sub if d["laplace"][idx] > d[method][idx])
+        return 100.0 * w / len(sub)
+
+    alls = set(by)
     for m in methods:
-        lp = [d[m][0] for d in by.values() if m in d]
-        cr = [d[m][1] for d in by.values() if m in d]
-        if m == "laplace":
-            print(f"  {m:20s}{np.mean(lp):13.3f}{np.mean(cr):11.4f}{'—':>24s}")
-            continue
-        # family-clustered win-rate: laplace logpdf > method, per family then averaged
-        fam = collections.defaultdict(list)
-        for s, d in by.items():
-            if "laplace" in d and m in d:
-                fam[fred_universe.family(s)].append(1.0 if d["laplace"][0] > d[m][0] else 0.0)
-        fr = [np.mean(v) for v in fam.values()]
-        crfam = collections.defaultdict(list)
-        for s, d in by.items():
-            if "laplace" in d and m in d:
-                crfam[fred_universe.family(s)].append(1.0 if d["laplace"][1] < d[m][1] else 0.0)
-        crr = [np.mean(v) for v in crfam.values()]
-        print(f"  {m:20s}{np.mean(lp):13.3f}{np.mean(cr):11.4f}"
-              f"   LL {100*np.mean(fr):4.0f}%  CRPS {100*np.mean(crr):4.0f}%")
+        ll = f"{wr(m, alls, 0):.0f}/{wr(m, cont, 0):.0f}%"
+        cp = f"{wr(m, alls, 1, lower=True):.0f}/{wr(m, cont, 1, lower=True):.0f}%"
+        print(f"  {m:22s}{ll:>14s}{cp:>16s}")
 
 
 if __name__ == "__main__":
