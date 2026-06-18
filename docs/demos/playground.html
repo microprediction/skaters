@@ -34,7 +34,6 @@
           <select id="policy">
             <option value="laplace">laplace (default)</option>
             <option value="doob">doob (martingale)</option>
-            <option value="ema05">ema(0.05)</option>
           </select>
         </div>
         <div class="control">
@@ -83,12 +82,11 @@
   </footer>
 
   <script type="module">
-    import { laplace, doob, ema } from "../js/skaters/index.mjs";
+    import { laplace, doob } from "../js/skaters/index.mjs";
 
     const POLICIES = {
       laplace: () => laplace(1),
       doob: () => doob(1),
-      ema05: () => ema(0.05, 1),
     };
 
     // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
