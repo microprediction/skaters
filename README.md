@@ -1,16 +1,18 @@
 # skaters
 
-Fast univariate online time series models — in **Python _and_ JavaScript**. Zero dependencies. Runs natively in the browser or in [Pyodide](https://pyodide.org/).
+**One skater to rule them all** — online univariate time-series forecasting where every prediction is a full **distribution**, not a point. The one-call convenience of Prophet, except it ships a calibrated predictive distribution and actually wins the benchmarks. In **Python _and_ JavaScript** (verified identical to 1e-6), zero dependencies, runs in the browser or [Pyodide](https://pyodide.org/).
 
 <p align="center">
   <a href="https://skaters.microprediction.org/"><img src="https://img.shields.io/badge/docs%20%26%20live%20demos-skaters.microprediction.org-4a3aff?style=for-the-badge" alt="Documentation and live demos"></a>
   <a href="#javascript--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript-1a8c4a?style=for-the-badge" alt="Python and JavaScript"></a>
 </p>
 
-> **Python and JavaScript, verified identical.** The full library is ported to zero-dependency
-> JavaScript and checked against the Python reference to 1e-6. Use it [natively in the
-> browser](#javascript--the-browser) or via Pyodide — see the
-> [live demos](https://skaters.microprediction.org/demos/).
+> **It outperforms conformal prediction.** On a bias-free study of **2,500 daily FRED series**,
+> judged by held-out **log-likelihood** — the decision-relevant, tail-sensitive metric —
+> `skaters` beats state-of-the-art conformal predictive systems (a conformal CDF carries no
+> density, so it cannot be scored on likelihood at all), and on **CRPS**, conformal's own metric,
+> a CRPS-tuned `skaters` still edges the specialist. See
+> [the study](https://github.com/microprediction/skaters/tree/main/benchmarks).
 
 ## Install
 

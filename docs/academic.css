@@ -59,7 +59,8 @@ main { max-width: 980px; margin: 32px auto; padding: 0 24px 60px; }
 main.narrow { max-width: 860px; }
 
 h1 { font-size: 2.1rem; margin: 0 0 4px; line-height: 1.2; }
-.subtitle { color: var(--muted); font-size: 1.1rem; margin: 0 0 28px; }
+.subtitle { color: var(--muted); font-size: 1.1rem; margin: 0 0 16px; }
+.lead { font-size: 1.15rem; margin: 0 0 28px; }
 h2 { font-size: 1.35rem; margin: 2.2em 0 0.6em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 h3 { font-size: 1.08rem; margin: 1.6em 0 0.4em; }
 p, ul, ol { font-size: 1rem; }

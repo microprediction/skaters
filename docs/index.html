@@ -26,29 +26,46 @@
 
   <main>
     <h1>skaters</h1>
-    <p class="subtitle">Fast online univariate time series, in <strong>Python <em>and</em> JavaScript</strong>. Zero dependencies. Runs natively in the browser or in <a href="https://pyodide.org/">Pyodide</a>.</p>
+    <p class="subtitle">Online univariate time-series forecasting where every prediction is a full
+      <strong>distribution</strong>, not a point — fast (O(1) per observation) and
+      dependency-free.</p>
+
+    <p class="lead"><strong>One skater to rule them all.</strong> The one-call convenience of
+      Prophet — except it ships a calibrated predictive distribution and actually wins the
+      benchmarks.</p>
 
     <div class="tag-row">
-      <span class="tag">Python + JavaScript</span>
       <span class="tag">distributional</span>
-      <span class="tag">O(1) per observation</span>
-      <span class="tag">zero dependencies</span>
+      <span class="tag">O(1) online</span>
+      <span class="tag">Python + JavaScript</span>
       <span class="tag">browser-native</span>
       <span class="tag">composable</span>
     </div>
 
     <div class="callout">
-      <strong>Two implementations, verified identical.</strong> The whole library is also a
-      zero-dependency <a href="#javascript">JavaScript port</a> — checked against the Python
-      reference to 1e-6. Use it natively in the browser, try the
-      <a href="./demos/">live demos</a>, or <code>pip install skaters</code> for Python.
+      <strong>One library, two languages — verified identical.</strong> The pure-Python package is
+      mirrored by a zero-dependency <a href="#javascript">JavaScript port</a>, checked against it to
+      1e-6, so the same models run server-side, natively in the browser, or in
+      <a href="https://pyodide.org/">Pyodide</a>.
+      <a href="./demos/">Try the live demos →</a>
     </div>
 
     <p>
       <code>pip install skaters</code>. Every prediction is a <code>Dist</code> — a weighted
-      Gaussian mixture — not a point estimate. Transforms compose, ensembles nest, and the whole
-      stack runs in the browser via WebAssembly.
+      Gaussian mixture carrying the mean, the spread, quantiles, and a density at once. You build
+      models by <em>composition</em>: transforms chain, ensembles nest, and a distributional leaf
+      sits at the bottom.
     </p>
+
+    <div class="callout">
+      <strong>It outperforms conformal prediction.</strong> On a bias-free study of
+      <strong>2,500 daily FRED series</strong>, judged by held-out <strong>log-likelihood</strong>
+      — the decision-relevant, tail-sensitive metric — <code>skaters</code> beats state-of-the-art
+      conformal predictive systems: a conformal CDF carries no density, so it cannot be scored on
+      likelihood at all. And on <strong>CRPS</strong> — conformal&apos;s <em>own</em> metric — a
+      CRPS-tuned <code>skaters</code> still edges the specialist.
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
+    </div>
 
     <h2>Quick start</h2>
 <pre><code>from skaters import laplace
