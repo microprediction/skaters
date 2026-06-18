@@ -20,7 +20,7 @@ from skaters.transform import (
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import skater, holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac
+from skaters.api import skater, holt, hosking, laplace, samuelson, wald, dantzig, kahneman, dirac, doob
 from skaters.sticky import sticky
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -42,6 +42,7 @@ __all__ = [
     "dantzig",
     "kahneman",
     "dirac",
+    "doob",
     "sticky",
     "period_detector",
     "top_periods",

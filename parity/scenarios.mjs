@@ -10,7 +10,7 @@ import {
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
 } from "../docs/js/skaters/transform.mjs";
 import {
-  skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac,
+  skater, holt, hosking, laplace, wald, samuelson, kahneman, dantzig, dirac, doob,
 } from "../docs/js/skaters/api.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
@@ -47,7 +47,7 @@ export function buildScenarios() {
   }
 
   // Named policies
-  const pols = { skater, holt, hosking, laplace, wald, samuelson, kahneman };
+  const pols = { skater, holt, hosking, laplace, wald, samuelson, kahneman, doob };
   for (const [nm, fac] of Object.entries(pols)) s.push([`pol_${nm}`, 1, fac(1)]);
   s.push(["pol_skater_k2", 2, skater(2)]);
   s.push(["pol_kahneman_k2", 2, kahneman(2)]);
