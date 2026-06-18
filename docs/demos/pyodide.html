@@ -39,7 +39,7 @@
         <div class="control">
           <label for="policy">Policy</label>
           <select id="policy">
-            <option value="skater">skater</option>
+            <option value="doob">doob</option>
             <option value="laplace">laplace</option>
           </select>
         </div>
@@ -59,9 +59,9 @@
 await micropip.install("skaters")
 
 import random, math
-from skaters import skater
+from skaters import laplace
 
-f = skater(k=1)
+f = laplace(k=1)
 state = None
 for y in series:           # one observation at a time
     dists, state = f(y, state)
