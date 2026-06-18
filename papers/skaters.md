@@ -25,10 +25,11 @@ abstract: |
   We further contribute a *mean-preserving lattice
   projection* for series that revisit exact values, an online *coordinate*
   (Yeo–Johnson) search, and a committed *martingale* model whose volatility clock
-  is a time-changed Brownian motion. Finally, a sequence of out-of-sample
-  experiments shows that the conventional menu of "named methods" largely
-  collapses: prior-only policies wash out to a single general forecaster on long
-  series, leaving an API of essentially **one** forecaster plus one specialist.
+  is a time-changed Brownian motion. Finally, *preliminary* out-of-sample
+  experiments motivate a radical simplification of the public API: prior-only
+  policies appear to wash out to a single general forecaster on long series,
+  leaving essentially **one** forecaster plus one specialist. A full empirical
+  comparison against strong baselines is left to a companion study.
   The whole library is implemented twice — pure Python and zero-dependency
   JavaScript — and verified identical to 1e-6 on ~90,000 probe values, so the
   same models run server-side or in the browser.
@@ -177,7 +178,16 @@ beats the general forecaster on near-martingale levels by committing the mean an
 spending capacity on the clock; on mean-reverting series the prior is wrong and
 it gives ground — a deliberately sharp instrument.
 
-# 8. Experiments
+# 8. Preliminary experiments and planned evaluation
+
+This is primarily a *methods* paper: its contribution is the architecture of
+§§2–7. The experiments below are **preliminary and illustrative**, not a
+state-of-the-art comparison. A full evaluation — rolling one-step-ahead against
+AutoARIMA, ETS, and Prophet (all of which emit densities and so can be scored on
+log-likelihood), and against conformal *paired with a strong mean model*
+(AutoARIMA-mean + conformal, adaptive conformal/ACI, EnbPI) — is deferred to a
+companion empirical study. The single conformal opponent used here is given only
+a naive mean and should be read accordingly.
 
 **Universe.** To avoid a hand-picked series list, we take the top-$N$ FRED series
 tagged *daily* by FRED's own popularity ranking, auto-transform to one-step
@@ -219,7 +229,12 @@ emits a CDF and scores *nothing*. On the economically grounded, tail-sensitive
 metric — log-likelihood, the Kelly/log-growth criterion — conformal cannot take
 the field, and skaters can.
 
-# 9. Ablations: the menu collapses
+# 9. Preliminary ablations (design rationale)
+
+*The observations in this section motivate the design and the API simplification;
+like §8 they are preliminary and not a substitute for the planned full
+evaluation.*
+
 
 **Priors wash out.** Across 25 series with $\geq 2000$ changes, the conventional
 prior-flavoured policies (trend, long-memory, drift, minimax, fast/slow) are
