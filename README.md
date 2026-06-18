@@ -1,6 +1,6 @@
 # skaters
 
-**One univariate time-series model to rule them all?** — Nah I think we need two, and they are both here. You'll find blazing fast dependency-free online univariate *distributional* time-series forecasting that crushes AutoARIMA+conformal ETS+conformal, prophet etc. Shipped in piodide friendly **Python _and_ JavaScript** (verified identical to 1e-6). Both run in the browser directly or via [Pyodide](https://pyodide.org/).
+**One univariate time-series model to rule them all?** — Nah I think we need two, and they are both here. You'll find blazing fast dependency-free online univariate *distributional* time-series forecasting that crushes AutoARIMA+conformal, AutoETS+conformal, AutoARIMA+ACI, prophet etc. Shipped in piodide friendly **Python _and_ JavaScript** (verified identical to 1e-6). Both run in the browser directly or via [Pyodide](https://pyodide.org/).
 
 <p align="center">
   <a href="https://skaters.microprediction.org/"><img src="https://img.shields.io/badge/docs%20%26%20live%20demos-skaters.microprediction.org-4a3aff?style=for-the-badge" alt="Documentation and live demos"></a>
