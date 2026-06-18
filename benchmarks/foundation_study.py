@@ -222,28 +222,30 @@ def lagllama_dists(ch):
 
 _timesfm = None
 def timesfm_dists(ch):
-    """TimesFM zero-shot; quantile head -> quantile_dist."""
+    """TimesFM 2.5 zero-shot; decile quantile head -> quantile_dist."""
     global _timesfm
     try:
         import timesfm
         if _timesfm is None:
-            _timesfm = timesfm.TimesFm(
-                hparams=timesfm.TimesFmHparams(backend="cpu", per_core_batch_size=32,
-                                               horizon_len=1, context_len=CTX,
-                                               num_layers=50),
-                checkpoint=timesfm.TimesFmCheckpoint(
-                    huggingface_repo_id="google/timesfm-2.0-500m-pytorch"))
+            M = timesfm.TimesFM_2p5_200M_torch
+            m = M.from_pretrained(M.DEFAULT_REPO_ID)
+            m.compile(timesfm.ForecastConfig(
+                max_context=CTX, max_horizon=1, normalize_inputs=True,
+                use_continuous_quantile_head=True, per_core_batch_size=64))
+            _timesfm = m
         n = len(ch); start = n - TEST
-        inputs = [np.asarray(ch[t - CTX:t], float) for t in range(start, n)]
-        freq = [0] * len(inputs)
-        point, quant = _timesfm.forecast(inputs, freq=freq)
-        # quant: [B, horizon, 10] for deciles 0.1..0.9 plus mean at idx 0
-        levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        out = []
-        for i in range(len(inputs)):
-            qs = quant[i, 0, 1:10]
-            out.append(quantile_dist(levels, qs))
-        return out
+        inputs = [np.asarray(ch[t - CTX:t], dtype=np.float32) for t in range(start, n)]
+        _, quant = _timesfm.forecast(horizon=1, inputs=inputs)   # [B, 1, Q]
+        Q = quant.shape[-1]
+        # TimesFM emits deciles; a leading column is the mean when Q==10.
+        if Q >= 10:
+            qcols, levels = quant[:, 0, 1:10], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        else:
+            qcols = quant[:, 0, :Q]
+            levels = list(np.linspace(0.1, 0.9, Q))
+        # NB forecast() pads `inputs` in place to per_core_batch_size but returns
+        # exactly one row per real window; iterate over the returned rows.
+        return [quantile_dist(levels, qcols[i]) for i in range(qcols.shape[0])]
     except Exception as e:                  # noqa: BLE001
         print(f"  timesfm failed: {e}", flush=True); return None
 
