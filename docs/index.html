@@ -17,7 +17,8 @@
       <nav>
         <a href="/">Home</a>
         <a href="/demos/">Demos</a>
-        <a href="/#literature">Literature</a>
+        <a href="/#papers">Papers</a>
+        <a href="/#heritage">Heritage</a>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
         <a href="https://pypi.org/project/skaters/">PyPI</a>
       </nav>
@@ -250,45 +251,27 @@ f = search(
       <li><strong>Pyodide compatible</strong> &mdash; works in the browser via WebAssembly.</li>
     </ul>
 
-    <h2 id="literature">Papers &amp; literature</h2>
+    <h2 id="papers">Papers</h2>
     <p>
-      <code>skaters</code> has no dependencies and no papers of its own — it is a faithful online,
-      distributional take on classical ideas. The primary sources, grouped:
+      <strong>Model First, Conform Last: Composable Online Distributional Time-Series
+      Forecasting</strong> — P. Cotton (in preparation). The <code>Dist</code> abstraction and
+      composable transforms; the <em>model first, conform last</em> result; the lattice projection
+      and coordinate search; and a bias-free 2,500-series benchmark in which <code>skaters</code>
+      outperforms conformal predictive systems on log-likelihood and matches them on CRPS.
+      <a href="https://github.com/microprediction/skaters/blob/main/paper/skaters.md">Read the draft →</a>
     </p>
 
-    <h3>The two forecasters</h3>
-    <ul>
-      <li><strong>Laplace</strong> — P.-S. Laplace, <em>Théorie analytique des probabilités</em> (1812): Bayesian updating under a flat prior, the spirit of the general forecaster.</li>
-      <li><strong>Brownian motion</strong> — L. Bachelier, <em>Théorie de la spéculation</em> (1900): the arithmetic random walk underlying <code>doob</code>.</li>
-      <li><strong>Martingales &amp; the time change</strong> — J. L. Doob, <em>Stochastic Processes</em> (1953); P. Lévy's characterization of Brownian motion; and Dambis (1965), Dubins &amp; Schwarz (1965): every continuous martingale is a <em>time-changed</em> Brownian motion — the "stochastic clock" of <code>doob</code>.</li>
-    </ul>
-
-    <h3>Scoring: how we judge</h3>
-    <ul>
-      <li><strong>CRPS</strong> — J. E. Matheson &amp; R. L. Winkler (1976); T. Gneiting &amp; A. Raftery, <em>Strictly proper scoring rules, prediction, and estimation</em>, JASA (2007). The terminal leaf can be fit by CRPS (<em>conform last</em>) rather than likelihood.</li>
-      <li><strong>Conformal prediction</strong> — V. Vovk, A. Gammerman &amp; G. Shafer, <em>Algorithmic Learning in a Random World</em> (2005); the <a href="https://github.com/henrikbostrom/crepes">crepes</a> conformal-predictive-systems package is the benchmark foil (it outputs CDFs, not densities, so it cannot be scored on likelihood at all).</li>
-    </ul>
-
-    <h3>The transform library</h3>
-    <ul>
-      <li><strong>Holt linear</strong> — C. C. Holt (1957). <strong>Theta</strong> — V. Assimakopoulos &amp; K. Nikolopoulos (2000).</li>
-      <li><strong>Fractional differencing</strong> — J. R. M. Hosking, Biometrika (1981).</li>
-      <li><strong>Drift</strong> — P. A. Samuelson, <em>Rational theory of warrant pricing</em> (1965). <strong>AR / Minnesota prior</strong> — R. Litterman (1986).</li>
-      <li><strong>Volatility (GARCH)</strong> — R. F. Engle (1982); T. Bollerslev (1986).</li>
-      <li><strong>Coordinate (power) transforms</strong> — G. Box &amp; D. Cox (1964); I.-K. Yeo &amp; R. Johnson (2000), the signed family used for online coordinate learning.</li>
-    </ul>
-
-    <h3>Numerics</h3>
-    <ul>
-      <li><strong>Online variance</strong> — B. P. Welford (1962). <strong>Covariance shrinkage</strong> — O. Ledoit &amp; M. Wolf (2004).</li>
-    </ul>
-
+    <h2 id="heritage">Heritage</h2>
     <p>
-      Heritage: this is a from-scratch rewrite of ideas in
-      <a href="https://github.com/microprediction/timemachines">timemachines</a> (P. Cotton), which
-      gave many time-series packages a common skater interface. Sibling streaming-prediction
-      packages: <a href="https://github.com/microprediction/precise">precise</a> (online covariance)
-      and <a href="https://github.com/microprediction/humpday">humpday</a> (global optimizers).
+      <code>skaters</code> is a from-scratch rewrite that distils ideas from
+      <a href="https://github.com/microprediction/timemachines">timemachines</a>, the
+      competition-winning forecasting package by Peter Cotton, and builds on years of experience
+      running live <strong>distributional prediction contests</strong> at
+      <a href="https://www.microprediction.org/">microprediction</a> — where forecasts are scored,
+      continuously, as full distributions rather than points. Sibling packages in the same
+      ecosystem: <a href="https://github.com/microprediction/precise">precise</a> (online
+      covariance) and <a href="https://github.com/microprediction/humpday">humpday</a> (global
+      optimizers).
     </p>
 
     <h2>Get the source</h2>
