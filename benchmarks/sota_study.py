@@ -15,6 +15,12 @@ scored identically):
                          on financial change-series. Refit every REFIT, variance
                          recursion filtered forward between refits; the
                          location-scale t is scored as a Gaussian scale-mixture.
+  * SARIMAX            — statsmodels SARIMAX(1,0,1)+c, the canonical *exact*
+                         Gaussian closed-form one-step predictive (not a band).
+  * ETS-sm             — statsmodels simple exponential smoothing, Gaussian.
+  * NF-StudentT        — NeuralForecast MLP with a Student-t distribution head
+                         (exact df/loc/scale via return_params), a neural density
+                         opponent in the matched online univariate protocol.
   * AutoARIMA+conformal — AutoARIMA point + a rolling split-conformal predictive
                          over recent residuals (a strong-mean conformal system).
   * AutoARIMA+ACI       — the same, with an online adaptive-conformal scale.
@@ -51,6 +57,24 @@ try:                                    # GARCH-t opponent (the heavy-tail SOTA)
     _HAVE_ARCH = True
 except Exception:                       # noqa: BLE001
     _HAVE_ARCH = False
+
+try:                                    # statsmodels exact-Gaussian references
+    from statsmodels.tsa.statespace.sarimax import SARIMAX
+    from statsmodels.tsa.holtwinters import SimpleExpSmoothing
+    _HAVE_SM = True
+except Exception:                       # noqa: BLE001
+    _HAVE_SM = False
+
+try:                                    # NeuralForecast StudentT (neural density)
+    import logging as _logging
+    for _nm in ("pytorch_lightning", "lightning.pytorch", "lightning"):
+        _logging.getLogger(_nm).setLevel(_logging.ERROR)
+    from neuralforecast import NeuralForecast
+    from neuralforecast.models import MLP
+    from neuralforecast.losses.pytorch import DistributionLoss
+    _HAVE_NF = True
+except Exception:                       # noqa: BLE001
+    _HAVE_NF = False
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(_HERE, "results_sota.csv")
@@ -163,6 +187,95 @@ def garch_t_scores(ch):
     return lp / m, cr / m
 
 
+def sarimax_scores(ch, order=(1, 0, 1)):
+    """statsmodels SARIMAX(1,0,1) with constant — the canonical *exact* Gaussian
+    closed-form predictive (mean + se_mean), not a band reconstruction. Rolling
+    one-step: refit every REFIT, cheap `append(refit=False)` filtering between."""
+    y = np.asarray(ch, float); n = len(y); start = n - TEST
+    lp = cr = 0.0; m = 0; res = None
+    for t in range(start, n):
+        if res is None or (t - start) % REFIT == 0:
+            hist = y[max(0, t - GARCH_WIN):t]
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    res = SARIMAX(hist, order=order, trend="c",
+                                  enforce_stationarity=False,
+                                  enforce_invertibility=False).fit(disp=False, maxiter=50)
+            except Exception:           # noqa: BLE001
+                if res is None:
+                    return None
+        fc = res.get_forecast(1)
+        d = Dist.gaussian(float(fc.predicted_mean[0]), max(float(fc.se_mean[0]), 1e-9))
+        a, b = score_dist(d, y[t]); lp += a; cr += b; m += 1
+        res = res.append([y[t]], refit=False)
+    return lp / m, cr / m
+
+
+def ets_scores(ch):
+    """statsmodels simple exponential smoothing (ETS A,N,N) on the change series;
+    one-step Gaussian with se = residual std (exact for SES at h=1). Online
+    smoothing recursion between periodic refits."""
+    y = np.asarray(ch, float); n = len(y); start = n - TEST
+    lp = cr = 0.0; m = 0; level = None; se = 1e-9; alpha = 0.3
+    for t in range(start, n):
+        if level is None or (t - start) % REFIT == 0:
+            hist = y[max(0, t - GARCH_WIN):t]
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    fit = SimpleExpSmoothing(hist, initialization_method="estimated").fit()
+                alpha = float(fit.params.get("smoothing_level", 0.3))
+                level = float(fit.forecast(1)[0]); se = float(np.std(fit.resid)) or 1e-9
+            except Exception:           # noqa: BLE001
+                if level is None:
+                    return None
+        d = Dist.gaussian(level, max(se, 1e-9))
+        a, b = score_dist(d, y[t]); lp += a; cr += b; m += 1
+        level = level + alpha * (y[t] - level)               # SES recursion
+    return lp / m, cr / m
+
+
+NF_INPUT = int(os.environ.get("SOTA_NF_INPUT", 24))
+NF_STEPS = int(os.environ.get("SOTA_NF_STEPS", 100))
+NF_REFIT = int(os.environ.get("SOTA_NF_REFIT", 50))
+
+
+def nf_scores(ch):
+    """NeuralForecast MLP with a Student-t distribution head — a neural
+    *density* opponent in the matched online univariate one-step protocol
+    (per-series model, periodic refit). `return_params=True` gives exact
+    (df, loc, scale), scored as the same Gaussian scale-mixture `Dist`. NB this
+    is NF's weak regime: it is built for global cross-series training, which we
+    deliberately exclude as a different protocol."""
+    y = np.asarray(ch, float); n = len(y)
+    df = pd.DataFrame({"unique_id": "s",
+                       "ds": pd.date_range("2000-01-01", periods=n, freq="D"),
+                       "y": y})
+    m = MLP(h=1, input_size=NF_INPUT,
+            loss=DistributionLoss("StudentT", return_params=True, num_samples=1),
+            max_steps=NF_STEPS, num_layers=2, hidden_size=64, scaler_type="standard",
+            enable_progress_bar=False, logger=False, enable_model_summary=False,
+            accelerator="cpu")
+    nf = NeuralForecast(models=[m], freq="D")
+    try:
+        import contextlib, io
+        with warnings.catch_warnings(), contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            warnings.simplefilter("ignore")
+            cv = nf.cross_validation(df=df, n_windows=TEST, step_size=1, refit=NF_REFIT)
+    except Exception:                   # noqa: BLE001
+        return None
+    cv = cv.sort_values("ds")
+    lp = cr = 0.0; m = 0
+    for _, row in cv.iterrows():
+        nu = max(float(row["MLP-df"]), 2.1)
+        sc = float(row["MLP-scale"]); var = sc * sc * nu / (nu - 2.0)
+        d = student_t_dist(float(row["MLP-loc"]), var, nu)
+        a, b = score_dist(d, float(row["y"])); lp += a; cr += b; m += 1
+    return (lp / m, cr / m) if m else None
+
+
 BATCH = int(os.environ.get("SOTA_BATCH", 60))   # series per statsforecast call
 
 
@@ -234,11 +347,18 @@ def _score_batch(w, fh, batch, series, cv):
             for m, (lp, cr, n) in acc.items():
                 if n:
                     w.writerow([sid, m, f"{lp/n:.6f}", f"{cr/n:.6f}", n])
-            # GARCH-t (heavy-tail SOTA), same test window
-            if _HAVE_ARCH:
-                g = garch_t_scores(ch)
-                if g is not None:
-                    w.writerow([sid, "GARCH-t", f"{g[0]:.6f}", f"{g[1]:.6f}", TEST])
+            # extra per-series opponents, same test window
+            for name, fn, gate in (
+                ("GARCH-t", garch_t_scores, _HAVE_ARCH),
+                ("SARIMAX", sarimax_scores, _HAVE_SM),
+                ("ETS-sm", ets_scores, _HAVE_SM),
+                ("NF-StudentT", nf_scores, _HAVE_NF),
+            ):
+                if not gate:
+                    continue
+                r = fn(ch)
+                if r is not None:
+                    w.writerow([sid, name, f"{r[0]:.6f}", f"{r[1]:.6f}", TEST])
             # ours, same test window
             lp, cr = laplace_scores(ch)
             w.writerow([sid, "laplace", f"{lp:.6f}", f"{cr:.6f}", TEST])
@@ -259,7 +379,8 @@ def summarize():
         return sum(1 for i in range(1, len(ch)) if ch[i] == ch[i - 1]) / max(len(ch) - 1, 1)
     cont = {s for s in by if rfrac(s) < 0.05}
 
-    methods = ["AutoARIMA", "AutoETS", "GARCH-t", "AutoARIMA+conformal", "AutoARIMA+ACI"]
+    methods = ["AutoARIMA", "AutoETS", "SARIMAX", "ETS-sm", "GARCH-t",
+               "NF-StudentT", "AutoARIMA+conformal", "AutoARIMA+ACI"]
     print(f"\n=== SOTA study: {len(by)} series ({len(cont)} continuous), rolling 1-step ===")
     print("per-series win-rate, laplace vs each (LL = higher logpdf; CRPS = lower):")
     print(f"  {'baseline':22s}{'LL all/cont':>14s}{'CRPS all/cont':>16s}")
