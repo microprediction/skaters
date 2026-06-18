@@ -1,4 +1,4 @@
-"""The real SOTA study: laplace vs AutoARIMA / AutoETS / AutoARIMA+conformal.
+"""The real SOTA study: laplace vs AutoARIMA / AutoETS / GARCH-t / conformal.
 
 Fair rolling one-step-ahead comparison on FRED one-step *changes*, scored on
 BOTH held-out log-likelihood and CRPS (every method is turned into a `Dist` and
@@ -9,6 +9,12 @@ scored identically):
                          periodic refit; the 90% interval gives a Gaussian Dist
                          (these emit densities, so this is the *real* likelihood
                          test, unlike a bare conformal CDF).
+  * GARCH-t            — `arch` constant-mean GARCH(1,1) with Student-t
+                         innovations: the classical SOTA for volatility
+                         clustering + heavy tails, and the most honest opponent
+                         on financial change-series. Refit every REFIT, variance
+                         recursion filtered forward between refits; the
+                         location-scale t is scored as a Gaussian scale-mixture.
   * AutoARIMA+conformal — AutoARIMA point + a rolling split-conformal predictive
                          over recent residuals (a strong-mean conformal system).
   * AutoARIMA+ACI       — the same, with an online adaptive-conformal scale.
@@ -20,6 +26,11 @@ and a FRED key:  PYTHONPATH=src python benchmarks/sota_study.py
 from __future__ import annotations
 import os, sys, math, warnings
 warnings.filterwarnings("ignore")
+try:                                    # silence arch's SLSQP convergence chatter
+    from arch.utility.exceptions import ConvergenceWarning as _ArchCW
+    warnings.simplefilter("ignore", _ArchCW)
+except Exception:                       # noqa: BLE001
+    pass
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_v, "1")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,6 +44,13 @@ import fred
 import fred_universe
 from skaters.dist import Dist
 from skaters.api import laplace
+
+try:                                    # GARCH-t opponent (the heavy-tail SOTA)
+    from arch import arch_model
+    from scipy.stats import chi2
+    _HAVE_ARCH = True
+except Exception:                       # noqa: BLE001
+    _HAVE_ARCH = False
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(_HERE, "results_sota.csv")
@@ -91,6 +109,57 @@ def laplace_scores(ch):
         if pend is not None and i >= start:
             a, b = score_dist(pend[0], y); lp += a; cr += b; m += 1
         d, st = f(y, st); pend = d
+    return lp / m, cr / m
+
+
+def student_t_dist(mu, var, nu, K=24):
+    """Location-scale Student-t as a Gaussian *scale mixture* `Dist`, so it goes
+    through the exact same logpdf/CRPS scoring as everything else. A standardised
+    (unit-variance) t equals N(mu, var*(nu-2)/v) mixed over v ~ chi2_nu; we
+    quantise v at K equal-probability nodes. Matches the analytic t logpdf to
+    ~1e-3 at K=24."""
+    nu = max(float(nu), 2.1)
+    v = chi2.ppf((np.arange(K) + 0.5) / K, df=nu)
+    s2 = var * (nu - 2.0)
+    return Dist([(1.0 / K, mu, math.sqrt(max(s2 / vi, 1e-18))) for vi in v])
+
+
+GARCH_WIN = 750         # capped expanding window for each GARCH refit
+
+
+def garch_t_scores(ch):
+    """Constant-mean GARCH(1,1) with Student-t innovations (the `arch` package) —
+    the classical SOTA for volatility clustering + heavy tails. Rolling one-step:
+    refit every REFIT steps, filter the conditional-variance recursion forward
+    between refits, and score the resulting location-scale t over the same TEST
+    window. Fit in a unit-variance-scaled space for optimiser stability, then map
+    the predictive `Dist` back. Returns (logpdf, crps) or None if it cannot fit."""
+    y = np.asarray(ch, float); n = len(y); start = n - TEST
+    s = 1.0 / (np.std(y[:start]) or 1.0)
+    ys = y * s
+    mu = om = al = be = nu = None
+    h_prev = res_prev = None; have = False
+    lp = cr = 0.0; m = 0
+    for t in range(start, n):
+        if (not have) or (t - start) % REFIT == 0:
+            hist = ys[max(0, t - GARCH_WIN):t]
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    r = arch_model(hist, mean="Constant", vol="GARCH", p=1, q=1,
+                                   dist="t", rescale=False).fit(
+                                       disp="off", options={"maxiter": 200})
+                mu = r.params["mu"]; om = r.params["omega"]
+                al = r.params["alpha[1]"]; be = r.params["beta[1]"]; nu = r.params["nu"]
+                h_prev = float(r.conditional_volatility[-1]) ** 2
+                res_prev = float(hist[-1] - mu); have = True
+            except Exception:           # noqa: BLE001
+                if not have:
+                    return None         # never managed to fit this series
+        h_t = om + al * res_prev ** 2 + be * h_prev          # one-step cond. var
+        d = student_t_dist(mu, h_t, nu).scale(1.0 / s)       # back to data space
+        a, b = score_dist(d, y[t]); lp += a; cr += b; m += 1
+        res_prev = float(ys[t] - mu); h_prev = h_t           # GARCH filter update
     return lp / m, cr / m
 
 
@@ -165,6 +234,11 @@ def _score_batch(w, fh, batch, series, cv):
             for m, (lp, cr, n) in acc.items():
                 if n:
                     w.writerow([sid, m, f"{lp/n:.6f}", f"{cr/n:.6f}", n])
+            # GARCH-t (heavy-tail SOTA), same test window
+            if _HAVE_ARCH:
+                g = garch_t_scores(ch)
+                if g is not None:
+                    w.writerow([sid, "GARCH-t", f"{g[0]:.6f}", f"{g[1]:.6f}", TEST])
             # ours, same test window
             lp, cr = laplace_scores(ch)
             w.writerow([sid, "laplace", f"{lp:.6f}", f"{cr:.6f}", TEST])
@@ -185,7 +259,7 @@ def summarize():
         return sum(1 for i in range(1, len(ch)) if ch[i] == ch[i - 1]) / max(len(ch) - 1, 1)
     cont = {s for s in by if rfrac(s) < 0.05}
 
-    methods = ["AutoARIMA", "AutoETS", "AutoARIMA+conformal", "AutoARIMA+ACI"]
+    methods = ["AutoARIMA", "AutoETS", "GARCH-t", "AutoARIMA+conformal", "AutoARIMA+ACI"]
     print(f"\n=== SOTA study: {len(by)} series ({len(cont)} continuous), rolling 1-step ===")
     print("per-series win-rate, laplace vs each (LL = higher logpdf; CRPS = lower):")
     print(f"  {'baseline':22s}{'LL all/cont':>14s}{'CRPS all/cont':>16s}")
