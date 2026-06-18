@@ -15,15 +15,19 @@ abstract: |
   judged by a downstream score such as CRPS). We call the resulting recipe
   **model first, conform last**, and show that it matches a dedicated CRPS
   specialist on CRPS while *improving* held-out log-likelihood — a free lunch. In
-  a fair rolling one-step-ahead comparison on 500 FRED series, the resulting
-  general forecaster **wins the log-likelihood race against AutoARIMA, AutoETS,
-  and AutoARIMA-with-conformal** — including on the continuous-series subset
-  (64–88 % per-series, depending on the opponent) — reflecting a genuine
-  heavy-tail advantage. On CRPS the picture is mixed: it beats AutoETS, roughly
-  ties AutoARIMA, and loses to the CRPS-optimised conformal variants — consistent
-  with likelihood, not CRPS, being the metric where a faithful density wins.
-  (Conformal predictive systems that emit only a CDF cannot be scored on
-  likelihood at all.)
+  a fair rolling one-step-ahead comparison on 500 FRED series against **eight
+  distributional baselines** — AutoARIMA, AutoETS, statsmodels SARIMAX and
+  exponential smoothing, a GARCH(1,1)-t model, a NeuralForecast Student-t model,
+  and AutoARIMA paired with split- and adaptive-conformal residuals — the general
+  forecaster **wins the per-series log-likelihood race against all eight**. The
+  decisive test is GARCH-t, the classical heavy-tail/volatility-clustering SOTA:
+  the forecaster still edges it on the continuous subset (mean continuous logpdf
+  2.86 vs 2.72), confirming a genuine heavy-tail advantage *against the heavy-tail
+  specialist*. On CRPS the picture is mixed: it beats the smoothing, GARCH and
+  neural baselines, ties the ARIMA family, and loses to the CRPS-optimised
+  conformal variants — consistent with likelihood, not CRPS, being the metric
+  where a faithful density wins. (Conformal predictive systems that emit only a
+  CDF cannot be scored on likelihood at all.)
   We further contribute a *mean-preserving lattice
   projection* for series that revisit exact values, an online *coordinate*
   (Yeo–Johnson) search, and a committed *martingale* model whose volatility clock
@@ -189,41 +193,55 @@ score every step after a burn-in.
 
 ## 8.1 Against state-of-the-art forecasters
 
-On **500** such series we compare `laplace` to `statsforecast`'s **AutoARIMA**
-and **AutoETS**, and to **AutoARIMA paired with conformal** residual quantiles
-(both a split-conformal and an adaptive-conformal/ACI variant), in a *fair
-rolling one-step-ahead* protocol: each baseline is fit on an expanding window
-with periodic refit, its 90 % prediction interval is read as a Gaussian
-predictive, and every method — ours and theirs — is scored through the same
-`Dist` on held-out log-likelihood and CRPS over the same test window. Crucially,
-ARIMA/ETS *do* emit densities, so this is a genuine likelihood contest, not a
-walkover. We report **per-series** win-rates (the fraction of series on which
-`laplace` scores better), and additionally restrict to the **309 continuous
-series** — those with < 5 % exactly-repeating one-step changes — since on
-repeating/grid series our lattice projection (§5) gives a large but
-metric-specific advantage that would otherwise dominate the aggregate.
+On **500** such series we compare `laplace` against every distributional
+one-step baseline we could assemble: `statsforecast`'s **AutoARIMA** and
+**AutoETS**; `statsmodels` **SARIMAX** and simple exponential smoothing (exact
+closed-form Gaussian predictives); a constant-mean **GARCH(1,1)-t** (the `arch`
+package — the heavy-tail/vol-clustering SOTA); a **NeuralForecast** MLP with a
+**Student-t** head; and **AutoARIMA paired with conformal** residual quantiles
+(split-conformal and adaptive-conformal/ACI). The protocol is *fair rolling
+one-step-ahead*: each baseline is fit on an expanding/rolling window with periodic
+refit, and every method — ours and theirs — is turned into the same `Dist` and
+scored on held-out log-likelihood and CRPS over the same window. All but the
+conformal pair emit genuine densities, so this is a real likelihood contest. We
+report **per-series** win-rates and additionally restrict to the **309 continuous
+series** (< 5 % exactly-repeating changes), since on repeating/grid series the
+lattice projection (§5) gives a large but metric-specific edge.
 
-| baseline | LL (all / continuous) | CRPS (all / continuous) |
-|---|---|---|
-| AutoARIMA | **78 % / 64 %** | 51 % / 47 % |
-| AutoETS | **92 % / 88 %** | 68 % / 67 % |
-| AutoARIMA + conformal | **84 % / 75 %** | 37 % / 29 % |
-| AutoARIMA + ACI | **87 % / 80 %** | 36 % / 28 % |
+| baseline | LL (all / cont) | CRPS (all / cont) | mean LL (cont) |
+|---|---|---|---|
+| AutoARIMA | **78 % / 64 %** | 51 % / 47 % | 2.09 |
+| AutoETS | **92 % / 88 %** | 68 % / 67 % | 2.20 |
+| SARIMAX (statsmodels) | **82 % / 72 %** | 53 % / 49 % | 2.13 |
+| ETS (statsmodels) | **93 % / 89 %** | 69 % / 68 % | 2.12 |
+| GARCH(1,1)-t (`arch`) | **79 % / 67 %** | 76 % / 66 % | 2.72 |
+| NF-StudentT (NeuralForecast) | **100 % / 100 %** | 78 % / 76 % | 0.82 |
+| AutoARIMA + conformal | **84 % / 75 %** | 37 % / 29 % | 1.47 |
+| AutoARIMA + ACI | **87 % / 80 %** | 36 % / 28 % | 1.89 |
 
-The honest reading: `laplace` **wins the likelihood race against all four
-baselines, including on continuous series** (64–88 %; ≈ +0.77 nats/obs over
-AutoARIMA on the continuous subset), reflecting a genuine heavy-tail advantage.
-On **CRPS** the picture is mixed — it beats AutoETS, roughly ties AutoARIMA, and
-*loses* to the conformal variants, which are CRPS-optimised. This is consistent
-with the paper's thesis: likelihood is the metric where a faithful density wins;
-CRPS is conformal's home turf, where we are competitive but not dominant.
+*(`laplace`: mean continuous logpdf **2.855**.)*
 
-*(We deliberately report per-series rather than family-clustered win-rates here:
-on this universe the family heuristic happened to inflate the figures, spreading
-wins across many small families while collapsing losses into a few large ones.
-Scope: 500 change-series, one-step horizon; Prophet, levels, longer horizons, and
-modern probabilistic/foundation models — DeepAR, TFT, Chronos, TimesFM — are left
-for an extended study.)*
+The honest reading. **`laplace` wins the per-series likelihood race against all
+eight**, on the full universe and the continuous subset — including the two
+exact-Gaussian references (SARIMAX, statsmodels ETS). **GARCH-t is the real
+test**: as the heavy-tail specialist it is *supposed* to win on financial change
+series, and it is indeed the tightest race (67 % of continuous series; mean
+continuous logpdf 2.855 vs 2.72 — a genuine but narrow +0.14 nats). The heavy-tail
+claim holds *against the heavy-tail specialist*, which is the point. **The
+NF-StudentT 100 % is not a scalp**: that is NeuralForecast in the *matched online
+univariate one-step* regime (a tiny per-series MLP, periodic refit) — its weak
+regime. NF is built for *global cross-series* training; this says nothing about
+DeepAR-style models in their home setting, and we don't claim it does (the NF
+densities are well-formed — median logpdf 0.50, none floored — so the 100 % is a
+real calibration gap, not a degenerate score). On **CRPS** the picture is mixed:
+it beats AutoETS/ETS/GARCH-t/NF, roughly ties AutoARIMA/SARIMAX, and *loses* to
+the conformal variants, which are CRPS-optimised. Likelihood is the metric where a
+faithful density wins; CRPS is conformal's home turf.
+
+*(Per-series, not family-clustered: on this universe the family heuristic inflated
+the figures. Scope: 500 change-series, one-step horizon; Prophet, levels, longer
+horizons, and zero-shot foundation models — Chronos, TimesFM, Moirai, Lag-Llama,
+a different no-refit protocol — are left for an extended study.)*
 
 ## 8.2 Repointing the objective: model first, conform last
 

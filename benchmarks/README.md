@@ -36,38 +36,63 @@ pip install statsforecast # AutoARIMA/ETS mean models to pair conformal with
 The script prints which it found. These need network + heavy deps, so they are
 intentionally absent from the package's `pyproject.toml`.
 
-## Headline: vs AutoARIMA / ETS / conformal (`sota_study.py`)
+## Headline: vs eight distributional baselines (`sota_study.py`)
 
-The honest head-to-head against real baselines — `statsforecast`'s **AutoARIMA**
-and **AutoETS**, and **AutoARIMA paired with conformal residuals** (split-conformal
-and an adaptive/ACI variant). Fair rolling one-step-ahead on 500 FRED change
-series: each baseline is fit on an expanding window with periodic refit, its 90 %
-interval is read as a Gaussian predictive, and *every* method — ours and theirs —
-is scored through the same `Dist` on held-out log-likelihood and CRPS. ARIMA/ETS
-emit densities, so this is a genuine likelihood test. **Per-series** win-rate
-(the fraction of series where `laplace` scores better), reported both for all 500
-and for the **309 continuous** series (< 5 % exactly-repeating changes), since on
+The honest head-to-head against everything we could find that claims a
+*distributional* one-step forecast: `statsforecast`'s **AutoARIMA** and
+**AutoETS**; `statsmodels` **SARIMAX** and **ETS** (exact closed-form Gaussian
+predictives); the `arch` package's **GARCH(1,1)-t** (the classical heavy-tail /
+volatility-clustering SOTA); **NeuralForecast** with a **Student-t** distribution
+head; and **AutoARIMA paired with conformal residuals** (split-conformal + an
+adaptive/ACI variant). Fair rolling one-step-ahead on 500 FRED change series:
+each baseline is fit on an expanding/rolling window with periodic refit, and
+*every* method — ours and theirs — is turned into the same `Dist` and scored on
+held-out log-likelihood **and** CRPS. All but the conformal pair emit genuine
+densities, so this is a real likelihood test. **Per-series** win-rate (the
+fraction of series where `laplace` scores better), reported both for all 500 and
+for the **309 continuous** series (< 5 % exactly-repeating changes), since on
 repeating/grid series the lattice projection gives a large but metric-specific
 edge that would otherwise dominate the aggregate:
 
-| baseline | LL (all / continuous) | CRPS (all / continuous) |
-|---|---|---|
-| AutoARIMA | **78 % / 64 %** | 51 % / 47 % |
-| AutoETS | **92 % / 88 %** | 68 % / 67 % |
-| AutoARIMA + conformal | **84 % / 75 %** | 37 % / 29 % |
-| AutoARIMA + ACI | **87 % / 80 %** | 36 % / 28 % |
+| baseline | LL (all / cont) | CRPS (all / cont) | mean LL (cont) |
+|---|---|---|---|
+| AutoARIMA | **78 % / 64 %** | 51 % / 47 % | 2.09 |
+| AutoETS | **92 % / 88 %** | 68 % / 67 % | 2.20 |
+| SARIMAX (statsmodels) | **82 % / 72 %** | 53 % / 49 % | 2.13 |
+| ETS (statsmodels) | **93 % / 89 %** | 69 % / 68 % | 2.12 |
+| GARCH(1,1)-t (`arch`) | **79 % / 67 %** | 76 % / 66 % | 2.72 |
+| NF-StudentT (NeuralForecast) | **100 % / 100 %** | 78 % / 76 % | 0.82 |
+| AutoARIMA + conformal | **84 % / 75 %** | 37 % / 29 % | 1.47 |
+| AutoARIMA + ACI | **87 % / 80 %** | 36 % / 28 % | 1.89 |
 
-> **`laplace` wins the likelihood race against all four** — including on
-> continuous series (≈ +0.77 nats/obs over AutoARIMA there). On **CRPS** it is
-> mixed: it beats AutoETS, roughly ties AutoARIMA, and *loses* to the conformal
+*(`laplace`: mean continuous logpdf **2.855**.)*
+
+> **`laplace` wins the likelihood race, per-series, against all eight.** The two
+> results that matter:
+>
+> - **GARCH-t is the real test** — it is the heavy-tail / vol-clustering SOTA, so
+>   it is *supposed* to win on financial change-series. It is indeed the tightest
+>   likelihood race (laplace wins 67 % of continuous series; mean continuous
+>   logpdf **2.855 vs 2.72**, a genuine but *narrow* +0.14 nats). The heavy-tail
+>   claim holds **against the heavy-tail specialist** — which is the point.
+> - **The NF-StudentT 100 % is not a scalp.** It is NeuralForecast run in the
+>   *matched online univariate one-step* protocol (a tiny per-series MLP, periodic
+>   refit) — NF's **weak** regime. NF is built for **global cross-series** training;
+>   this says nothing about DeepAR-style models in their home setting, and we
+>   don't claim it does.
+>
+> On **CRPS** the picture is mixed (as ever): laplace beats AutoETS / ETS /
+> GARCH-t / NF, roughly ties AutoARIMA / SARIMAX, and *loses* to the conformal
 > variants, which are CRPS-optimised. Likelihood is the metric where a faithful
 > density wins; CRPS is conformal's home turf.
 
 We report per-series (not family-clustered) because on this universe the family
 heuristic *inflated* the numbers. Scope: 500 change-series, one-step horizon;
-Prophet, levels, longer horizons, and modern probabilistic/foundation models
-(DeepAR, TFT, Chronos, TimesFM) are left for an extended study. Run it:
-`PYTHONPATH=src python benchmarks/sota_study.py` (conda env with `statsforecast` + a FRED key).
+Prophet, levels, longer horizons, and zero-shot foundation models (Chronos,
+TimesFM, Moirai, Lag-Llama — a different, no-refit protocol) are left for an
+extended study. Run it (parallel across cores): `PYTHONPATH=src python
+benchmarks/sota_study.py` (conda env with `statsforecast`, `arch`, `statsmodels`,
+`neuralforecast`, and a FRED key).
 
 ## Headline result: skaters vs crepes, on CRPS (`exhaustive_crps.py`)
 

@@ -59,13 +59,14 @@
     </p>
 
     <div class="callout">
-      <strong>It wins the likelihood race.</strong> On 500 FRED series (rolling one-step-ahead, by
-      series), <code>laplace</code> beats <strong>AutoARIMA</strong>, <strong>AutoETS</strong>, and
-      AutoARIMA-with-<em>conformal</em> on held-out <strong>log-likelihood</strong> — the
-      decision-relevant metric — including on continuous series (64–88% of them, per opponent). On
-      <strong>CRPS</strong> the picture is mixed: it beats AutoETS, roughly ties AutoARIMA, and
-      <em>loses</em> to conformal, which is CRPS-optimized. (Conformal systems that emit only a CDF
-      cannot be scored on likelihood at all.)
+      <strong>It wins the likelihood race against eight distributional baselines.</strong> On 500
+      FRED series (rolling one-step-ahead, per series), <code>laplace</code> beats
+      <strong>AutoARIMA</strong>, <strong>AutoETS</strong>, statsmodels <strong>SARIMAX/ETS</strong>,
+      <strong>GARCH-t</strong>, <strong>NeuralForecast-StudentT</strong>, and AutoARIMA-with-<em>conformal</em>
+      on held-out <strong>log-likelihood</strong> — the decision-relevant metric — including on the
+      continuous series. The real test is <strong>GARCH-t</strong>, the heavy-tail SOTA: laplace
+      still edges it (mean continuous logpdf 2.86 vs 2.72). On <strong>CRPS</strong> it's mixed —
+      it beats ETS/GARCH/NF, ties ARIMA, and loses to conformal (which is CRPS-optimized).
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
     </div>
 
@@ -254,12 +255,17 @@ f = search(
 
     <h2 id="papers">Papers</h2>
     <p>
-      <strong>Model First, Conform Last: Composable Online Distributional Time-Series
-      Forecasting</strong> — P. Cotton (in preparation). The <code>Dist</code> abstraction and
-      composable transforms; the <em>model first, conform last</em> result; the lattice projection
-      and coordinate search; and a bias-free 2,500-series benchmark in which <code>skaters</code>
-      outperforms conformal predictive systems on log-likelihood and matches them on CRPS.
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters.md">Read the draft →</a>
+      <strong>skaters: Model First, Conform Last — Composable Online Distributional Time-Series
+      Forecasting</strong> — P. Cotton. The <code>Dist</code> abstraction and composable transforms;
+      the <em>model first, conform last</em> result; the lattice projection and coordinate search;
+      the martingale volatility clock; and a fair rolling one-step study in which <code>laplace</code>
+      wins the log-likelihood race against eight distributional baselines — including GARCH-t (the
+      heavy-tail SOTA) and a NeuralForecast Student-t model.
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF →</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX (JSS)</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters.md">Markdown draft</a>
     </p>
 
     <h2 id="heritage">Heritage</h2>
