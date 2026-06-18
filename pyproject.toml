@@ -10,6 +10,12 @@ authors = [
 requires-python = ">=3.10"
 dependencies = []
 
+[project.urls]
+Homepage = "https://skaters.microprediction.org/"
+Documentation = "https://skaters.microprediction.org/"
+Source = "https://github.com/microprediction/skaters"
+Issues = "https://github.com/microprediction/skaters/issues"
+
 [project.optional-dependencies]
 dev = ["pytest"]
 
