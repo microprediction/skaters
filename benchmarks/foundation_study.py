@@ -136,17 +136,23 @@ def _ctx_batch(ch):
 
 _chronos = None
 def chronos_dists(ch):
+    """Chronos-Bolt (quantile head) zero-shot. We use Bolt rather than the
+    autoregressive T5 sampler: it is ~36x faster (a single forward pass) and does
+    not stall, at the cost of being quantile-only -> its log-likelihood is a
+    reconstruction (like TimesFM), so read its CRPS as the primary signal."""
     global _chronos
     try:
         import torch
         if _chronos is None:
             from chronos import BaseChronosPipeline
             _chronos = BaseChronosPipeline.from_pretrained(
-                "amazon/chronos-t5-small", device_map="cpu", torch_dtype=torch.float32)
+                "amazon/chronos-bolt-small", device_map="cpu", torch_dtype=torch.float32)
         ctx = _ctx_batch(ch)
-        fc = _chronos.predict(inputs=ctx, prediction_length=1, num_samples=NUM_SAMPLES)
-        s = fc[:, :, 0].cpu().numpy()
-        return [sample_dist(s[i]) for i in range(len(s))]
+        levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        q, _ = _chronos.predict_quantiles(inputs=ctx, prediction_length=1,
+                                          quantile_levels=levels)
+        q = q[:, 0, :].cpu().numpy()        # [B, n_levels]
+        return [quantile_dist(levels, q[i]) for i in range(len(q))]
     except Exception as e:                  # noqa: BLE001
         print(f"  chronos failed: {e}", flush=True); return None
 
