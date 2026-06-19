@@ -273,6 +273,36 @@ emits a CDF and scores *nothing*. On the economically grounded, tail-sensitive
 metric — log-likelihood, the Kelly/log-growth criterion — conformal cannot take
 the field, and skaters can.
 
+## 8.3 Against zero-shot foundation models
+
+Pretrained foundation models use a different protocol — applied **zero-shot**,
+conditioning on a context window with no fitting. We evaluate four — **Chronos-Bolt**,
+**TimesFM 2.5**, **Moirai**, **Lag-Llama** — on 120 change-series (69 continuous):
+each receives a fixed 256-length window of preceding changes and predicts the next
+change (all windows batched into one call), turned into the same `Dist` (native
+Student-t for Moirai/Lag-Llama; sample/quantile reconstruction for
+Chronos-Bolt/TimesFM), with `laplace` re-scored on the identical window.
+
+| model | density | LL (all / cont) | CRPS (all / cont) | mean LL (cont) |
+|---|---|---|---|---|
+| Moirai (1.1-R-small) | native t | 98 % / **97 %** | 94 % / 93 % | 0.92 |
+| Lag-Llama | native t | 67 % / **99 %** | 65 % / 94 % | 0.39 |
+| Chronos-Bolt (small) | quantile\* | 76 % / **100 %** | 67 % / 88 % | −1.96 |
+| TimesFM (2.5-200M) | quantile\* | 75 % / **100 %** | 58 % / 72 % | −1.18 |
+
+*\*quantile-reconstructed logpdf, tail-limited — read CRPS as the fairer signal.
+`laplace` mean continuous logpdf: **1.51**.*
+
+On the **continuous** series `laplace` beats all four foundation models, zero-shot,
+on both metrics (97–100 % LL, 72–94 % CRPS). The native-density models (Moirai,
+Lag-Llama) are the meaningful likelihood opponents and the closest, but still lose
+per-series. On **repeat-heavy** series the foundation models are competitive or
+better — Lag-Llama even beats `laplace` on mean LL over the *full* universe (6.54
+vs 4.52) by placing tight mass on revisited values, the lattice trick — which is
+why the continuous split matters. Honest scope: zero-shot, no refit, fixed context,
+forecasting the *change* stream (not the levels these models were trained on).
+Whether per-series **fine-tuning** closes the gap is a separate, GPU/MPS-bound study.
+
 # 9. Preliminary ablations (design rationale)
 
 *The observations in this section motivate the design and the API simplification;

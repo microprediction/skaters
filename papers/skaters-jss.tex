@@ -390,11 +390,56 @@ about the density --- for risk, sizing, or combination --- should prefer the
 honest log-likelihood column.
 
 \paragraph{Scope.}
-Five hundred change-series, one-step horizon. Prophet, multi-step horizons, raw
-levels, and zero-shot foundation models
-\citep{ansari2024chronos,das2024timesfm,woo2024moirai,rasul2023lagllama} --- which
-require a fundamentally different, no-refit evaluation protocol --- are left to an
-extended study.
+Five hundred change-series, one-step horizon. Prophet, multi-step horizons and raw
+levels are left for later; zero-shot foundation models get their own protocol in
+Section~\ref{sec:foundation}.
+
+\subsection{Against zero-shot foundation models} \label{sec:foundation}
+
+Pretrained time-series foundation models use a fundamentally different protocol:
+they are applied \emph{zero-shot}, conditioning on a context window with no
+fitting. We evaluate four ---
+Chronos-Bolt \citep{ansari2024chronos}, TimesFM~2.5 \citep{das2024timesfm},
+Moirai \citep{woo2024moirai}, and Lag-Llama \citep{rasul2023lagllama} --- on 120
+change-series (69 continuous). At each step the model receives a fixed
+$256$-length window of the preceding changes and predicts the next change, with
+all windows for a series batched into one inference call. Each predictive is
+turned into the same \code{Dist} --- the native Student-$t$ head for
+Moirai/Lag-Llama, a sample/quantile reconstruction for Chronos-Bolt/TimesFM ---
+and \code{laplace} is re-scored on the identical window. Table~\ref{tab:foundation}
+reports per-series win-rates.
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{llccc}
+\toprule
+Model & density & LL (all / cont.) & CRPS (all / cont.) & Mean LL (cont.) \\
+\midrule
+Moirai (1.1-R-small)  & native $t$    & 98 / \textbf{97}\,\% & 94 / 93\,\% & 0.92 \\
+Lag-Llama             & native $t$    & 67 / \textbf{99}\,\% & 65 / 94\,\% & 0.39 \\
+Chronos-Bolt (small)  & quantile$^{*}$ & 76 / \textbf{100}\,\% & 67 / 88\,\% & $-1.96$ \\
+TimesFM (2.5-200M)    & quantile$^{*}$ & 75 / \textbf{100}\,\% & 58 / 72\,\% & $-1.18$ \\
+\bottomrule
+\end{tabular}
+\caption{Per-series win-rate of \code{laplace} versus four zero-shot foundation
+models on 120 change-series (69 continuous). $^{*}$Chronos-Bolt/TimesFM
+log-likelihood is reconstructed from a quantile head and is tail-limited; read
+their CRPS as the fairer signal. \code{laplace} mean continuous logpdf:
+\textbf{1.51}.}
+\label{tab:foundation}
+\end{table}
+
+\emph{On the continuous series, \code{laplace} beats all four foundation models
+zero-shot on both metrics} (97--100\% LL, 72--94\% CRPS). The native-density
+models (Moirai, Lag-Llama) are the meaningful likelihood opponents and the
+closest, but still lose per-series. On repeat-heavy/grid series the foundation
+models are competitive or better --- Lag-Llama even beats \code{laplace} on mean
+log-likelihood over the \emph{full} universe ($6.54$ vs $4.52$) by placing tight
+mass on revisited values, the same effect as the lattice projection --- which is
+why the continuous split matters. The honest scope is narrow: zero-shot, no refit,
+fixed context, and forecasting the change stream rather than the levels these
+models were chiefly trained on. Whether per-series \emph{fine-tuning} closes the
+gap is a separate study; for the larger models it is GPU/MPS-bound.
 
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}

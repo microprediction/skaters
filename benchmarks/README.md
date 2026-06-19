@@ -88,11 +88,48 @@ edge that would otherwise dominate the aggregate:
 
 We report per-series (not family-clustered) because on this universe the family
 heuristic *inflated* the numbers. Scope: 500 change-series, one-step horizon;
-Prophet, levels, longer horizons, and zero-shot foundation models (Chronos,
-TimesFM, Moirai, Lag-Llama — a different, no-refit protocol) are left for an
-extended study. Run it (parallel across cores): `PYTHONPATH=src python
-benchmarks/sota_study.py` (conda env with `statsforecast`, `arch`, `statsmodels`,
-`neuralforecast`, and a FRED key).
+Prophet and longer horizons are left for later. Zero-shot foundation models get
+their own protocol — see the next section. Run it (parallel across cores):
+`PYTHONPATH=src python benchmarks/sota_study.py` (conda env with `statsforecast`,
+`arch`, `statsmodels`, `neuralforecast`, and a FRED key).
+
+## Zero-shot foundation models (`foundation_study.py`)
+
+A **different protocol** from the eight-baseline study. Pretrained time-series
+foundation models are used **zero-shot**: at each step we feed a fixed-length
+context window (256) of the preceding one-step *changes* and ask for the next
+change — no fitting, no refit. All test windows for a series are batched into one
+inference call. Every predictive is turned into the same `Dist` (native Student-t
+for Moirai/Lag-Llama; sample/quantile reconstruction for Chronos-Bolt/TimesFM)
+and scored on log-likelihood and CRPS; `laplace` is re-scored on the identical
+window. On 120 FRED change-series (69 continuous), per-series win-rate of
+`laplace`:
+
+| model | density | LL (all / cont) | CRPS (all / cont) | mean LL (cont) |
+|---|---|---|---|---|
+| Moirai (1.1-R-small) | native Student-t | 98 % / **97 %** | 94 % / 93 % | 0.92 |
+| Lag-Llama | native Student-t | 67 % / **99 %** | 65 % / 94 % | 0.39 |
+| Chronos-Bolt (small) | quantile\* | 76 % / **100 %** | 67 % / 88 % | −1.96 |
+| TimesFM (2.5-200M) | quantile\* | 75 % / **100 %** | 58 % / 72 % | −1.18 |
+
+*\*quantile-reconstructed log-likelihood — tail-limited, so read CRPS as the
+fairer signal for these two. `laplace` mean continuous logpdf: **1.51**.*
+
+> **On continuous series, `laplace` beats all four foundation models — zero-shot
+> — on both metrics** (97–100 % LL, 72–94 % CRPS). The native-density models
+> (Moirai, Lag-Llama) are the meaningful likelihood opponents and the closest, but
+> still lose per-series. On **repeat-heavy / grid** series the foundation models are
+> competitive or better — Lag-Llama even beats `laplace` on mean LL across the
+> *full* universe (6.54 vs 4.52) by placing tight mass on revisited values, the
+> same trick as the lattice projection — which is why the continuous split matters.
+
+This is the honest scope: zero-shot, no refit, fixed context, forecasting the
+*change* stream (not the levels these models were chiefly trained on).
+**Fine-tuning may close the gap** — that is a separate study (`foundation_study`
+with per-series refit, GPU/MPS-bound for the larger models). Each model needs its
+own env (conflicting `gluonts`/`torch`/`jax` pins); the harness writes one
+`results_foundation_<tag>.csv` per run and `summarize()` merges them:
+`FM_MODELS=Chronos,Moirai FM_TAG=cm PYTHONPATH=src python benchmarks/foundation_study.py`.
 
 ## Headline result: skaters vs crepes, on CRPS (`exhaustive_crps.py`)
 
