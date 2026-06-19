@@ -43,6 +43,7 @@ HIST = 1000
 TEST = int(os.environ.get("FM_TEST", 150))      # rolling one-step test window
 CTX = int(os.environ.get("FM_CTX", 256))        # context window length
 NUM_SAMPLES = int(os.environ.get("FM_SAMPLES", 30))
+DEVICE = os.environ.get("FM_DEVICE", "cpu")     # cpu | mps (Mac Studio) | cuda
 
 
 # ---------------------------------------------------------------- data + scoring
@@ -146,7 +147,7 @@ def chronos_dists(ch):
         if _chronos is None:
             from chronos import BaseChronosPipeline
             _chronos = BaseChronosPipeline.from_pretrained(
-                "amazon/chronos-bolt-small", device_map="cpu", torch_dtype=torch.float32)
+                "amazon/chronos-bolt-small", device_map=DEVICE, torch_dtype=torch.float32)
         ctx = _ctx_batch(ch)
         levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         q, _ = _chronos.predict_quantiles(inputs=ctx, prediction_length=1,
@@ -169,10 +170,11 @@ def moirai_dists(ch):
         model = MoiraiForecast(
             module=_moirai, prediction_length=1, context_length=CTX,
             patch_size=8, num_samples=NUM_SAMPLES, target_dim=1,
-            feat_dynamic_real_dim=0, past_feat_dynamic_real_dim=0)
+            feat_dynamic_real_dim=0, past_feat_dynamic_real_dim=0).to(DEVICE)
+        ctx = ctx.to(DEVICE)
         past_target = ctx.unsqueeze(-1)                       # [B, CTX, 1]
         past_observed = torch.ones_like(past_target, dtype=torch.bool)
-        past_is_pad = torch.zeros(ctx.shape[0], CTX, dtype=torch.bool)
+        past_is_pad = torch.zeros(ctx.shape[0], CTX, dtype=torch.bool, device=DEVICE)
         fc = model(past_target=past_target, past_observed_target=past_observed,
                    past_is_pad=past_is_pad)                    # [B, num_samples, 1]
         s = fc[:, :, 0].cpu().numpy()
@@ -205,7 +207,7 @@ def lagllama_dists(ch):
                 input_size=args["input_size"], n_layer=args["n_layer"],
                 n_embd_per_head=args["n_embd_per_head"], n_head=args["n_head"],
                 scaling=args["scaling"], time_feat=args["time_feat"],
-                num_parallel_samples=NUM_SAMPLES, device=torch.device("cpu"))
+                num_parallel_samples=NUM_SAMPLES, device=torch.device(DEVICE))
             _lagllama = est.create_predictor(est.create_transformation(),
                                              est.create_lightning_module())
         n = len(ch); start = n - TEST
