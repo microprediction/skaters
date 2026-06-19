@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — papers &amp; benchmarks</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Papers &amp; benchmarks</h1>
+    <p class="subtitle">A new practical benchmark for univariate distributional prediction —
+      simpler and lighter than Prophet, and scored where it counts: held-out likelihood.</p>
+
+    <h2>The paper</h2>
+    <p>
+      <strong>skaters: Model First, Conform Last — A Composition-Based Automatic Online
+      Distributional Forecaster.</strong> P. Cotton.
+    </p>
+    <p>
+      Every prediction is a full predictive distribution, assembled by composition: invertible
+      transforms chain together above a single distributional leaf, and ensembles combine such
+      chains. Because the leaf fits its shape by optimising a proper scoring rule, its objective is
+      a choice — fit the model by likelihood, then conform the predictive tail to a downstream score
+      such as CRPS. The library is written twice, in pure Python and in zero-dependency JavaScript
+      that agrees to 1e-6, so the same model runs on a server or in a browser.
+    </p>
+    <p>
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF →</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX (JSS)</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters.md">Markdown draft</a>
+    </p>
+
+    <h2>Benchmark 1 — eight distributional baselines</h2>
+    <p>
+      A fair rolling one-step-ahead comparison on 500 FRED change-series (309 continuous). Every
+      method — ours and theirs — is turned into the same <code>Dist</code> and scored on held-out
+      log-likelihood <em>and</em> CRPS. Per-series win-rate of <code>laplace</code> (all / continuous):
+    </p>
+    <table>
+      <thead><tr><th>Baseline</th><th>LL (all / cont)</th><th>CRPS (all / cont)</th><th>mean LL (cont)</th></tr></thead>
+      <tbody>
+        <tr><td>AutoARIMA</td><td>78 / 64%</td><td>51 / 47%</td><td>2.09</td></tr>
+        <tr><td>AutoETS</td><td>92 / 88%</td><td>68 / 67%</td><td>2.20</td></tr>
+        <tr><td>SARIMAX (statsmodels)</td><td>82 / 72%</td><td>53 / 49%</td><td>2.13</td></tr>
+        <tr><td>ETS (statsmodels)</td><td>93 / 89%</td><td>69 / 68%</td><td>2.12</td></tr>
+        <tr><td>GARCH(1,1)-t (<code>arch</code>)</td><td>79 / 67%</td><td>76 / 66%</td><td>2.72</td></tr>
+        <tr><td>NF-StudentT (NeuralForecast)</td><td>100 / 100%</td><td>78 / 76%</td><td>0.82</td></tr>
+        <tr><td>AutoARIMA + conformal</td><td>84 / 75%</td><td>37 / 29%</td><td>1.47</td></tr>
+        <tr><td>AutoARIMA + ACI</td><td>87 / 80%</td><td>36 / 28%</td><td>1.89</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>laplace</code> (mean continuous logpdf <strong>2.855</strong>) wins the likelihood race
+      against all eight. The real test is <strong>GARCH-t</strong>, the heavy-tail SOTA: it still
+      edges it (2.86 vs 2.72). On CRPS it beats the smoothing/GARCH/neural baselines, ties the ARIMA
+      family, and loses to the CRPS-optimised conformal variants.
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
+    </p>
+
+    <h2>Benchmark 2 — zero-shot foundation models</h2>
+    <p>
+      A different protocol: pretrained models used zero-shot (fixed 256-context, no refit) on 120
+      change-series (69 continuous). Per-series win-rate of <code>laplace</code>:
+    </p>
+    <table>
+      <thead><tr><th>Model</th><th>density</th><th>LL (all / cont)</th><th>CRPS (all / cont)</th></tr></thead>
+      <tbody>
+        <tr><td>Moirai (1.1-R-small)</td><td>native Student-t</td><td>98 / 97%</td><td>94 / 93%</td></tr>
+        <tr><td>Lag-Llama</td><td>native Student-t</td><td>67 / 99%</td><td>65 / 94%</td></tr>
+        <tr><td>Chronos-Bolt (small)</td><td>quantile*</td><td>76 / 100%</td><td>67 / 88%</td></tr>
+        <tr><td>TimesFM (2.5-200M)</td><td>quantile*</td><td>75 / 100%</td><td>58 / 72%</td></tr>
+      </tbody>
+    </table>
+    <p>
+      On the continuous series, <code>laplace</code> beats all four zero-shot. The native-density
+      models (Moirai, Lag-Llama) are the closest. Naive per-series <em>fine-tuning</em> doesn't
+      rescue them — it catastrophically overfits (logpdf +1.5 → −118). A zero-dependency online
+      ensemble holding its own against 200M-parameter transformers.
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">The foundation study →</a>
+    </p>
+
+    <h2>Related reading</h2>
+    <ul>
+      <!-- TODO: confirm the canonical URL of Peter's Prophet critique -->
+      <li><strong>On Prophet.</strong> The famous critique of Facebook Prophet —
+        <em>“Is Facebook’s Prophet the Time-Series Messiah, or Just a Very Naughty Boy?”</em>
+        (P. Cotton). <a href="https://www.microprediction.com/blog/prophet">Read it →</a></li>
+      <li><strong>Benchmarks repository.</strong> All studies are reproducible end-to-end:
+        <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">skaters/benchmarks</a>.</li>
+    </ul>
+
+    <h2>Citation</h2>
+<pre><code>@misc{cotton2026skaters,
+  title  = {{skaters}: Model First, Conform Last --- A Composition-Based
+            Automatic Online Distributional Forecaster},
+  author = {Cotton, Peter},
+  year   = {2026},
+  note   = {https://skaters.microprediction.org}
+}</code></pre>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — Claude skills</title>
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Claude skills</h1>
+    <p class="subtitle">Markdown skills you can point Claude (or Claude Code) at — for using
+      <code>skaters</code>, for reviewing forecasting code, and for benchmarking any time-series
+      paper that ships code.</p>
+
+    <p>
+      A <em>skill</em> here is just a markdown file of instructions. Drop it in your repo, or paste
+      it into a chat, and Claude follows the procedure. Each one below lives in the
+      <a href="https://github.com/microprediction/skaters">skaters repository</a>.
+    </p>
+
+    <div class="card-grid">
+      <a class="card" href="https://github.com/microprediction/skaters/blob/main/skills/benchmark-review.md">
+        <h3>benchmark-review →</h3>
+        <p>For reviewers and authors. The exact steps to benchmark <em>any</em> univariate
+          distributional time-series method that ships code — one identical scoring harness, the
+          toughest baselines, and the traps to avoid.</p>
+      </a>
+      <a class="card" href="https://github.com/microprediction/skaters/blob/main/SKILL.md">
+        <h3>forecast-roast →</h3>
+        <p>A tongue-in-cheek code review. Point it at a file and it flags imports of Prophet,
+          crepes, GARCH, AutoARIMA and friends, explains why they're the wrong tool for online
+          univariate one-step distributional forecasting, and suggests the <code>skaters</code> swap.</p>
+      </a>
+    </div>
+
+    <h2>benchmark-review — for reviewing time-series papers</h2>
+    <p>
+      A reviewer's procedure for any paper claiming univariate <em>distributional</em> prediction
+      with code. The core rule: every method — theirs, yours, and the baselines — is turned into the
+      same predictive object and scored by the same code on the same held-out points. The skill
+      walks through:
+    </p>
+    <ul>
+      <li><strong>Classify the output</strong> — density, samples, quantiles, or a CDF — which
+        decides whether it can be log-likelihood-scored at all (a conformal CDF cannot).</li>
+      <li><strong>Fix one target and one protocol</strong> — one-step change, rolling refit (or
+        zero-shot for foundation models); never mix protocols in one table.</li>
+      <li><strong>Bias-free universe</strong> — a fixed selection rule, continuous vs repeat-heavy
+        split, and <strong>per-series</strong> win-rates (family-clustering inflates).</li>
+      <li><strong>Adversarial checklist</strong> — toughest baselines not straw men, constant mean
+        model across wrapped comparisons, reconstruction caveats, reproducible from one script.</li>
+    </ul>
+    <p>
+      <code>skaters</code> ships the reference harness it describes:
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/sota_study.py"><code>benchmarks/sota_study.py</code></a>
+      (nine rolling baselines incl. Prophet) and
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/foundation_study.py"><code>foundation_study.py</code></a>
+      (zero-shot Chronos / TimesFM / Moirai / Lag-Llama).
+      <a href="https://github.com/microprediction/skaters/blob/main/skills/benchmark-review.md">Read the skill →</a>
+    </p>
+
+    <h2>forecast-roast — for reviewing forecasting code</h2>
+    <p>
+      A code-review skill with opinions and a sense of humour. It scans for the usual heavyweight,
+      curve-fitting, or conformal-only patterns, roasts the misapplication, and points at the right
+      online distributional tool. The joke is the hook; the calibrated density is the point.
+      <a href="https://github.com/microprediction/skaters/blob/main/SKILL.md">Read the skill →</a>
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>

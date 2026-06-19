@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — guide</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+    onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Guide</h1>
+    <p class="subtitle">How the pieces fit: the <code>Dist</code> object, transforms, conjugation,
+      and ensembles — everything returns a distribution, everything composes.</p>
+
+    <h2>Architecture: transforms all the way down</h2>
+    <p>
+      Every model in <code>skaters</code> is a chain of bijective transforms with a distributional
+      leaf at the bottom:
+    </p>
+    <p style="text-align:center">
+      $y \;\xrightarrow{T_1}\; y' \;\xrightarrow{T_2}\; y'' \;\xrightarrow{\cdots}\;
+       \text{leaf} \;\rightarrow\; \hat{D}$
+    </p>
+    <p>
+      The leaf estimates $\hat{D} = \mathcal{N}(0, \hat\sigma^2)$ from residuals via
+      Welford&apos;s algorithm. Predictions in the original space come from inverting the
+      transform chain:
+      $\hat{D}_{\text{original}} = T_1^{-1}\bigl(T_2^{-1}\bigl(\cdots(\hat{D})\bigr)\bigr).$
+    </p>
+    <p>
+      Every node returns a <code>list[Dist]</code>. There is no separate &ldquo;point
+      forecast&rdquo; vs &ldquo;uncertainty&rdquo; &mdash; both are aspects of the same
+      $\hat{D}$. An EMA doesn&apos;t &ldquo;predict&rdquo;; it strips off a running level
+      $\ell_t$, leaving simpler residuals $\varepsilon_t = y_t - \ell_t$, and the prediction is
+      whatever the leaf&apos;s estimate becomes when run back through the inverse.
+    </p>
+
+    <h3>Transforms</h3>
+    <table>
+      <thead><tr><th>Transform</th><th>Forward</th><th>Use case</th></tr></thead>
+      <tbody>
+        <tr><td><code>ema_transform(α)</code></td><td>$y'_t = y_t - \ell_t$</td><td>Remove level</td></tr>
+        <tr><td><code>difference()</code></td><td>$y'_t = y_t - y_{t-1}$</td><td>Random walk</td></tr>
+        <tr><td><code>drift(α, λ)</code></td><td>$y'_t = \Delta y_t - \hat\mu_t$</td><td>Random walk + drift</td></tr>
+        <tr><td><code>holt_linear(α, β)</code></td><td>$y'_t = y_t - (\ell_t + b_t)$</td><td>Level + trend (Holt 1957)</td></tr>
+        <tr><td><code>ar(p)</code></td><td>$y'_t = y_t - \sum \hat\phi_j y_{t-j}$</td><td>Autoregression (online RLS)</td></tr>
+        <tr><td><code>fractional_difference(d)</code></td><td>$y'_t = (1-B)^d y_t$</td><td>Long memory</td></tr>
+        <tr><td><code>standardize(α)</code></td><td>$y'_t = (y_t - \hat\mu_t)/\hat\sigma_t$</td><td>Remove scale</td></tr>
+        <tr><td><code>garch(ω, α, β)</code></td><td>$y'_t = y_t / \hat\sigma_t$</td><td>Volatility clustering</td></tr>
+        <tr><td><code>seasonal_difference(s)</code></td><td>$y'_t = y_t - y_{t-s}$</td><td>Periodicity</td></tr>
+        <tr><td><code>yeo_johnson(λ)</code></td><td>signed Box–Cox coordinate</td><td>Learn the coordinate (log / root / linear)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Conjugation</h2>
+    <p>
+      Transforms compose via conjugation. Given a transform $T$ and a skater $f$,
+      $f_{\text{conj}}(y) = T^{-1}\bigl(f\bigl(T(y)\bigr)\bigr).$ The whole predictive distribution
+      is mapped back through the inverse, so multi-step uncertainty accumulates correctly and the
+      coordinate choice is handled coherently rather than by a biased point back-transform.
+    </p>
+<pre><code>from skaters import conjugate, ema, difference, standardize
+
+# diff removes trend, then EMA predicts the differenced series
+f = conjugate(ema(alpha=0.1, k=3), difference(), k=3)
+
+# Chain: standardize, then difference, then EMA
+f = conjugate(
+    conjugate(ema(alpha=0.1, k=3), difference(), k=3),
+    standardize(),
+    k=3,
+)
+# canonical name: std|diff|ema_t|leaf</code></pre>
+
+    <h2>Ensembles</h2>
+    <h3>Precision-weighted (MSE)</h3>
+    <p>Weights by $w_i \propto 1/\text{MSE}_i$ where $\text{MSE} = \text{bias}^2 + \text{variance}$.</p>
+<pre><code>from skaters import precision_weighted_ensemble, ema
+
+f = precision_weighted_ensemble([
+    ema(alpha=0.05, k=1),
+    ema(alpha=0.2, k=1),
+], k=1)</code></pre>
+
+    <h3>Bayesian (log-likelihood with XGBoost-inspired regularisation)</h3>
+    <p>
+      Each model accumulates a log-weight updated at every observation:
+      $\log w_i \mathrel{+}= \eta \cdot \log p_i(y_t) - \lambda \cdot d_i,$
+      where $\eta$ is the learning rate (shrinkage), $\lambda$ is the complexity penalty, and
+      $d_i$ is the model&apos;s depth. Predictions are combined via
+      <code>Dist.combine</code> with softmax weights.
+    </p>
+<pre><code>from skaters import bayesian_ensemble, ema
+
+f = bayesian_ensemble(
+    [ema(alpha=0.05, k=1), ema(alpha=0.2, k=1)],
+    k=1,
+    learning_rate=0.5,       # eta: prevents over-concentrating
+    complexity_penalty=0.02, # lambda: penalises deeper chains
+    depths=[1, 1],
+)</code></pre>
+
+    <h3>Adaptive search</h3>
+    <p>Beam search over the transform grammar. Grows the candidate population online:
+    expand top performers with new transforms, replay recent history to warm-start, prune losers.</p>
+<pre><code>from skaters import search
+
+f = search(
+    k=1,
+    expand_interval=100,   # expand top performers every 100 obs
+    max_depth=3,           # max transform chain depth
+    replay_buffer=500,     # warm-start new candidates on recent history
+    max_pool=30,
+)</code></pre>
+
+    <h2>Design</h2>
+    <ul>
+      <li><strong>Online only</strong> &mdash; $O(1)$ per observation, no batch recomputation.</li>
+      <li><strong>Distributional</strong> &mdash; every prediction is a <code>Dist</code>, not a
+        point estimate.</li>
+      <li><strong>Composable</strong> &mdash; transforms chain, ensembles nest, everything returns
+        <code>Dist</code>.</li>
+      <li><strong>Pure Python</strong> &mdash; zero dependencies. Only <code>math.erf</code> and
+        <code>math.exp</code>.</li>
+      <li><strong>Pyodide compatible</strong> &mdash; works in the browser via WebAssembly.</li>
+    </ul>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>
