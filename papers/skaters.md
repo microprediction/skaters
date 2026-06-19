@@ -301,7 +301,13 @@ better — Lag-Llama even beats `laplace` on mean LL over the *full* universe (6
 vs 4.52) by placing tight mass on revisited values, the lattice trick — which is
 why the continuous split matters. Honest scope: zero-shot, no refit, fixed context,
 forecasting the *change* stream (not the levels these models were trained on).
-Whether per-series **fine-tuning** closes the gap is a separate, GPU/MPS-bound study.
+
+> **Footnote — fine-tuning doesn't rescue them.** Naively fine-tuning Lag-Llama on
+> a single series' history (5 epochs) *catastrophically overfits*: held-out logpdf
+> collapses from +1.5 to below −100, while taking ~15× longer. That's the expected
+> failure mode — adapting a pretrained model to one short univariate stream is not
+> its design regime. Zero-shot (or domain-level fine-tuning across many series) is
+> the intended use, so the zero-shot result is the headline.
 
 # 9. Preliminary ablations (design rationale)
 

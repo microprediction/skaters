@@ -72,8 +72,12 @@ per series). Merge + print the table:
 python benchmarks/foundation_finetune.py summarize
 ```
 
-> **Status:** `foundation_finetune.py` is a first draft validated only for
-> import/shape on CPU — the Mac Studio will be the first real MPS/fine-tune run.
-> Report any adapter errors and they're quick to fix. Fine-tuning a 200–500M model
-> per series is genuinely expensive; start with `FM_N=20` to gauge wall-clock
-> before scaling up.
+> **Finding — don't bother fine-tuning per series.** A small test (Lag-Llama, 5
+> epochs, 2 continuous series) showed naive per-series fine-tuning
+> **catastrophically overfits**: held-out logpdf collapsed from `+1.5` (zero-shot)
+> to `−118`, CRPS got worse, and it ran ~15× slower. Adapting a pretrained model
+> to one short univariate stream is not its design regime — zero-shot, or
+> domain-level fine-tuning across *many* series, is the intended use. The
+> `foundation_finetune.py` harness is kept for completeness, but the zero-shot
+> study is the headline and per-series fine-tuning is **not worth GPU time**
+> without heavy per-series regularization (which defeats the purpose).

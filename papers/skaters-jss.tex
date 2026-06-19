@@ -438,8 +438,14 @@ log-likelihood over the \emph{full} universe ($6.54$ vs $4.52$) by placing tight
 mass on revisited values, the same effect as the lattice projection --- which is
 why the continuous split matters. The honest scope is narrow: zero-shot, no refit,
 fixed context, and forecasting the change stream rather than the levels these
-models were chiefly trained on. Whether per-series \emph{fine-tuning} closes the
-gap is a separate study; for the larger models it is GPU/MPS-bound.
+models were chiefly trained on.\footnote{Per-series \emph{fine-tuning} does not
+rescue the foundation models on this task: naively fine-tuning Lag-Llama on a
+single series' history (5 epochs) \emph{catastrophically overfits}, collapsing its
+held-out log-likelihood from $+1.5$ to below $-100$ while taking $\sim$15$\times$
+longer. This is the expected failure mode --- adapting a pretrained model to one
+short univariate stream is not its design regime; zero-shot (or domain-level
+fine-tuning across many series) is the intended use. We therefore report the
+zero-shot result as the headline.}
 
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
