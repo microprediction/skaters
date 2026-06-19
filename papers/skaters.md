@@ -1,44 +1,22 @@
 ---
-title: "Model First, Conform Last: Composable Online Distributional Time-Series Forecasting"
+title: "Model First, Conform Last: A Composition-Based Automatic Online Distributional Forecaster"
 author:
   - Peter Cotton (Microprediction)
 date: 2026
 abstract: |
-  We present *skaters*, a zero-dependency library for online univariate
-  time-series forecasting in which **every prediction is a full probability
-  distribution**, not a point. Models are built by composition: invertible
-  transforms chain together, ensembles nest, and a single distributional *leaf*
-  sits at the bottom of every chain. The leaf is a pluggable proper-scoring-rule
-  optimiser, which lets us separate two concerns that the forecasting and
-  conformal-prediction literatures usually conflate — *modelling* the conditional
-  mean (judged by likelihood) and *calibrating* the predictive tail (optionally
-  judged by a downstream score such as CRPS). We call the resulting recipe
-  **model first, conform last**, and show that it matches a dedicated CRPS
-  specialist on CRPS while *improving* held-out log-likelihood — a free lunch. In
-  a fair rolling one-step-ahead comparison on 500 FRED series against **eight
-  distributional baselines** — AutoARIMA, AutoETS, statsmodels SARIMAX and
-  exponential smoothing, a GARCH(1,1)-t model, a NeuralForecast Student-t model,
-  and AutoARIMA paired with split- and adaptive-conformal residuals — the general
-  forecaster **wins the per-series log-likelihood race against all eight**. The
-  decisive test is GARCH-t, the classical heavy-tail/volatility-clustering SOTA:
-  the forecaster still edges it on the continuous subset (mean continuous logpdf
-  2.86 vs 2.72), confirming a genuine heavy-tail advantage *against the heavy-tail
-  specialist*. On CRPS the picture is mixed: it beats the smoothing, GARCH and
-  neural baselines, ties the ARIMA family, and loses to the CRPS-optimised
-  conformal variants — consistent with likelihood, not CRPS, being the metric
-  where a faithful density wins. (Conformal predictive systems that emit only a
-  CDF cannot be scored on likelihood at all.)
-  We further contribute a *mean-preserving lattice
-  projection* for series that revisit exact values, an online *coordinate*
-  (Yeo–Johnson) search, and a committed *martingale* model whose volatility clock
-  is a time-changed Brownian motion. Finally, *preliminary* out-of-sample
-  experiments motivate a radical simplification of the public API: prior-only
-  policies appear to wash out to a single general forecaster on long series,
-  leaving essentially **one** forecaster plus one specialist. A full empirical
-  comparison against strong baselines is left to a companion study.
-  The whole library is implemented twice — pure Python and zero-dependency
-  JavaScript — and verified identical to 1e-6 on ~90,000 probe values, so the
-  same models run server-side or in the browser.
+  *skaters* performs online univariate time-series forecasting in which every
+  prediction is a full probability distribution rather than a point. A forecaster
+  is built by composition: invertible transforms chain together above a single
+  distributional leaf, and ensembles combine such chains. The leaf fits its shape
+  by optimising a proper scoring rule, so its objective is a choice rather than a
+  fixed property of the method. This separates two concerns the forecasting and
+  conformal-prediction literatures tend to merge: modelling the conditional mean,
+  judged by likelihood, and shaping the predictive tail, optionally judged by a
+  downstream score such as CRPS. We call the arrangement *model first, conform
+  last*. The library is written twice, in pure Python and in zero-dependency
+  JavaScript that agrees to within 1e-6, so the same model runs on a server or in
+  a browser. We evaluate it against classical, neural, and pretrained
+  foundation-model baselines on FRED series.
 ---
 
 # 1. Introduction
