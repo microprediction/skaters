@@ -108,9 +108,12 @@ turn:
   search over whether a series is simple in a log, root, or linear coordinate; and
   a committed martingale model that learns only a volatility clock.
 \item \emph{A benchmark against eight distributional baselines}
-  (Section~\ref{sec:experiments}), including the heavy-tail (\pkg{GARCH}-$t$) and
-  neural (\pkg{NeuralForecast}) state of the art, scored on held-out
-  log-likelihood and CRPS through a single, identical \code{Dist}-based protocol.
+  (Section~\ref{sec:experiments}), chosen as the strongest available opponents:
+  the heavy-tail state of the art (\pkg{GARCH}-$t$), a neural density model
+  (\pkg{NeuralForecast}), and \pkg{AutoARIMA} paired with split- and
+  adaptive-conformal residuals --- the CRPS-optimised methods that are hardest to
+  beat on that metric. Every method is scored on held-out log-likelihood and CRPS
+  through a single, identical \code{Dist}-based protocol.
 \end{enumerate}
 
 The unifying premise is the No-Free-Lunch theorem \citep{wolpert1997no} taken
