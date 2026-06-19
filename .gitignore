@@ -227,7 +227,7 @@ papers/*.out
 papers/*.toc
 
 # foundation study results (regenerable)
-benchmarks/results_foundation_*.csv
+benchmarks/results_foundation*.csv
 benchmarks/results_finetune_*.csv
 
 # foundation fine-tune artifacts
