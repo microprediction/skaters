@@ -30,16 +30,16 @@
 \Shorttitle{Model First, Conform Last}
 
 \newcommand{\skatersabstract}{
-\pkg{skaters} performs online univariate time-series forecasting in which every
-prediction is a full probability distribution rather than a point. A forecaster
+The \proglang{Python} package \pkg{skaters} performs online univariate
+time-series forecasting in which every prediction is a full probability
+distribution rather than a point. A forecaster
 is built by composition: invertible transforms chain together above a single
 distributional leaf, and ensembles combine such chains. The leaf fits its shape
 by optimising a proper scoring rule, so its objective is a choice rather than a
 fixed property of the method. This separates two concerns the forecasting and
-conformal-prediction literatures tend to merge: modelling the conditional mean,
-judged by likelihood, and shaping the predictive tail, optionally judged by a
-downstream score such as CRPS. We call the arrangement \emph{model first, conform
-last}. The library is written twice, in pure \proglang{Python} and in
+conformal-prediction literatures tend to merge: fitting the model, judged by
+likelihood, and conforming the predictive tail to a downstream score such as
+CRPS. We call the arrangement \emph{model first, conform last}. The library is written twice, in pure \proglang{Python} and in
 zero-dependency \proglang{JavaScript} that agrees to within $10^{-6}$, so a model
 runs unchanged on a server or in a browser. We evaluate it against classical,
 neural, and pretrained foundation-model baselines on \proglang{FRED} series.
