@@ -76,8 +76,17 @@ try:                                    # NeuralForecast StudentT (neural densit
 except Exception:                       # noqa: BLE001
     _HAVE_NF = False
 
+try:                                    # Prophet (the popular, heavy foil)
+    import logging as _logging2
+    for _nm in ("prophet", "cmdstanpy"):
+        _logging2.getLogger(_nm).setLevel(_logging2.ERROR)
+    from prophet import Prophet
+    _HAVE_PROPHET = True
+except Exception:                       # noqa: BLE001
+    _HAVE_PROPHET = False
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(_HERE, "results_sota.csv")
+RESULTS = os.environ.get("SOTA_OUT", os.path.join(_HERE, "results_sota.csv"))
 
 N_SERIES = int(os.environ.get("SOTA_N", 300))   # how many cached series to use
 HIST = 1000                                     # last-N changes kept per series
@@ -236,6 +245,40 @@ def ets_scores(ch):
     return lp / m, cr / m
 
 
+PROPHET_Z90 = 1.6448536269514722
+
+
+def prophet_scores(ch):
+    """Facebook Prophet on the change series — the popular, heavy foil. Refit
+    every REFIT steps on the expanding window (Prophet has no cheap online
+    update); its 90% interval is read as a Gaussian predictive. Ruinously slow
+    (Stan), so in practice run it on a subset (SOTA_N small) rather than the full
+    sweep."""
+    import contextlib, io
+    y = np.asarray(ch, float); n = len(y); start = n - TEST
+    ds_all = pd.date_range("2000-01-01", periods=n, freq="D")
+    lp = cr = 0.0; m = 0; fc = None
+    for t in range(start, n):
+        if fc is None or (t - start) % REFIT == 0:
+            hist = pd.DataFrame({"ds": ds_all[:t], "y": y[:t]})
+            try:
+                mdl = Prophet(interval_width=0.90, daily_seasonality=False,
+                              weekly_seasonality=True, yearly_seasonality=True)
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    mdl.fit(hist)
+                    fc = mdl.predict(mdl.make_future_dataframe(
+                        periods=REFIT + 2, freq="D")).set_index("ds")
+            except Exception:           # noqa: BLE001
+                if fc is None:
+                    return None
+        row = fc.iloc[t]
+        sd = max((row["yhat_upper"] - row["yhat_lower"]) / (2 * PROPHET_Z90), 1e-9)
+        a, b = score_dist(Dist.gaussian(float(row["yhat"]), sd), y[t])
+        lp += a; cr += b; m += 1
+    return lp / m, cr / m
+
+
 NF_INPUT = int(os.environ.get("SOTA_NF_INPUT", 24))
 NF_STEPS = int(os.environ.get("SOTA_NF_STEPS", 100))
 NF_REFIT = int(os.environ.get("SOTA_NF_REFIT", 50))
@@ -278,6 +321,8 @@ def nf_scores(ch):
 
 BATCH = int(os.environ.get("SOTA_BATCH", 60))   # series per statsforecast call
 WORKERS = int(os.environ.get("SOTA_WORKERS", max(1, (os.cpu_count() or 2) - 1)))
+# Per-series methods to skip (e.g. SOTA_SKIP="Prophet,NF-StudentT" for a big run).
+SKIP = {s.strip() for s in os.environ.get("SOTA_SKIP", "").split(",") if s.strip()}
 
 
 def _extract_cv(g):
@@ -329,8 +374,9 @@ def score_one(payload):
     for name, fn, gate in (("GARCH-t", garch_t_scores, _HAVE_ARCH),
                            ("SARIMAX", sarimax_scores, _HAVE_SM),
                            ("ETS-sm", ets_scores, _HAVE_SM),
-                           ("NF-StudentT", nf_scores, _HAVE_NF)):
-        if not gate:
+                           ("NF-StudentT", nf_scores, _HAVE_NF),
+                           ("Prophet", prophet_scores, _HAVE_PROPHET)):
+        if not gate or name in SKIP:
             continue
         try:
             r = fn(ch)
@@ -347,15 +393,25 @@ def run():
     from concurrent.futures import ProcessPoolExecutor
     series = load_series()
     sids = list(series)
-    print(f"loaded {len(sids)} series (HIST={HIST}, TEST={TEST}); {WORKERS} workers",
-          flush=True)
-    done = 0
-    with open(RESULTS, "w") as fh, ProcessPoolExecutor(max_workers=WORKERS) as pool:
-        w = csv.writer(fh); w.writerow(["series", "method", "logpdf", "crps", "n"])
+    # Resume: skip series already in the CSV and append (SOTA_RESUME=1).
+    done_sids = set(); mode = "w"
+    if os.environ.get("SOTA_RESUME") and os.path.exists(RESULTS):
+        done_sids = {r["series"] for r in csv.DictReader(open(RESULTS))}
+        mode = "a"
+    print(f"loaded {len(sids)} series (HIST={HIST}, TEST={TEST}); {WORKERS} workers"
+          + (f"; resuming ({len(done_sids)} already done)" if done_sids else "")
+          + (f"; skipping {sorted(SKIP)}" if SKIP else ""), flush=True)
+    done = len(done_sids)
+    with open(RESULTS, mode) as fh, ProcessPoolExecutor(max_workers=WORKERS) as pool:
+        w = csv.writer(fh)
+        if mode == "w":
+            w.writerow(["series", "method", "logpdf", "crps", "n"])
         # process in batches: statsforecast cross_validation (parallel, main proc)
         # then fan the per-series scoring out across the pool.
         for b0 in range(0, len(sids), BATCH):
-            batch = sids[b0:b0 + BATCH]
+            batch = [sid for sid in sids[b0:b0 + BATCH] if sid not in done_sids]
+            if not batch:
+                continue
             rows = []
             for sid in batch:
                 ds = pd.date_range("1900-01-01", periods=len(series[sid]), freq="D")
@@ -395,7 +451,7 @@ def summarize():
     cont = {s for s in by if rfrac(s) < 0.05}
 
     methods = ["AutoARIMA", "AutoETS", "SARIMAX", "ETS-sm", "GARCH-t",
-               "NF-StudentT", "AutoARIMA+conformal", "AutoARIMA+ACI"]
+               "NF-StudentT", "Prophet", "AutoARIMA+conformal", "AutoARIMA+ACI"]
     print(f"\n=== SOTA study: {len(by)} series ({len(cont)} continuous), rolling 1-step ===")
     print("per-series win-rate, laplace vs each (LL = higher logpdf; CRPS = lower):")
     print(f"  {'baseline':22s}{'LL all/cont':>14s}{'CRPS all/cont':>16s}")

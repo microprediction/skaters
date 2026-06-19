@@ -1,7 +1,7 @@
 """FRED data loader for the benchmark — stdlib only, with local caching.
 
-Set FRED_API_KEY (env var, ./.env, ~/.env, or ../mpp3/.env). Series are
-fetched once and cached under benchmarks/data/, so later runs work offline.
+Set FRED_API_KEY (env var, a gitignored skaters/.env, ./.env, or ~/.env). Series
+are fetched once and cached under benchmarks/data/, so later runs work offline.
 
 We forecast the one-step *change* of each series (first difference, or
 log-difference for strictly-positive levels) — that is the stationary-ish
@@ -35,8 +35,8 @@ SERIES = {
 
 def _api_key():
     key = os.environ.get("FRED_API_KEY", "")
-    for path in ("./.env", os.path.expanduser("~/.env"),
-                 os.path.join(_HERE, "..", "..", "mpp3", ".env")):
+    for path in (os.path.join(_HERE, "..", ".env"),   # skaters/.env (gitignored)
+                 "./.env", os.path.expanduser("~/.env")):
         if not key and os.path.exists(path):
             for line in open(path):
                 if line.strip().startswith("FRED_API_KEY="):

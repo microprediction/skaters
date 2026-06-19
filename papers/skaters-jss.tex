@@ -16,6 +16,10 @@
 \providecommand{\pkg}[1]{\textbf{#1}}
 \providecommand{\code}[1]{\texttt{#1}}
 
+% Let TeX relax interword spacing slightly to avoid minor margin protrusions
+% on lines densely packed with \pkg/\code tokens.
+\setlength{\emergencystretch}{3em}
+
 %% JSS article information
 \author{
   Peter Cotton\\
@@ -24,10 +28,10 @@
   \url{https://skaters.microprediction.org}
 }
 
-\title{Model First, Conform Last: A Composition-Based Automatic Online Distributional Forecaster}
+\title{\pkg{skaters}: Model First, Conform Last --- A Composition-Based Automatic Online Distributional Forecaster}
 
-\Plaintitle{Model First, Conform Last: A Composition-Based Automatic Online Distributional Forecaster}
-\Shorttitle{Model First, Conform Last}
+\Plaintitle{skaters: Model First, Conform Last - A Composition-Based Automatic Online Distributional Forecaster}
+\Shorttitle{\pkg{skaters}: Model First, Conform Last}
 
 \newcommand{\skatersabstract}{
 The \proglang{Python} package \pkg{skaters} performs online univariate
@@ -108,9 +112,12 @@ turn:
   search over whether a series is simple in a log, root, or linear coordinate; and
   a committed martingale model that learns only a volatility clock.
 \item \emph{A benchmark against eight distributional baselines}
-  (Section~\ref{sec:experiments}), including the heavy-tail (\pkg{GARCH}-$t$) and
-  neural (\pkg{NeuralForecast}) state of the art, scored on held-out
-  log-likelihood and CRPS through a single, identical \code{Dist}-based protocol.
+  (Section~\ref{sec:experiments}), chosen as the strongest available opponents:
+  the heavy-tail state of the art (\pkg{GARCH}-$t$), a neural density model
+  (\pkg{NeuralForecast}), and \pkg{AutoARIMA} paired with split- and
+  adaptive-conformal residuals --- the CRPS-optimised methods that are hardest to
+  beat on that metric. Every method is scored on held-out log-likelihood and CRPS
+  through a single, identical \code{Dist}-based protocol.
 \end{enumerate}
 
 The unifying premise is the No-Free-Lunch theorem \citep{wolpert1997no} taken
@@ -443,14 +450,15 @@ correlated family (195 families):
 \toprule
 Forecaster (identical structure) & CRPS, raw & CRPS, family & Mean LL \\
 \midrule
-likelihood trunk + likelihood leaf              & 82.6\,\% & 48.7\,\% & 2.96 \\
-likelihood trunk + CRPS leaf (\emph{model first, conform last}) & 89.5\,\% & \textbf{60.1\,\%} & \textbf{3.01} \\
-bare CRPS leaf (no trunk)                        & 80.8\,\% & 60.3\,\% & 2.96 \\
+likelihood trunk + likelihood leaf & 82.6\,\% & 48.7\,\% & 2.96 \\
+likelihood trunk + CRPS leaf       & 89.5\,\% & \textbf{60.1\,\%} & \textbf{3.01} \\
+bare CRPS leaf (no trunk)          & 80.8\,\% & 60.3\,\% & 2.96 \\
 \bottomrule
 \end{tabular}
-\caption{Effect of the terminal-leaf objective. A general likelihood policy is
+\caption{Effect of the terminal-leaf objective. The middle row is the
+\emph{model first, conform last} recipe. A general likelihood policy is
 essentially even with conformal on CRPS over independent families ($48.7\%$);
-repointing only the terminal leaf to CRPS lifts that to $60.1\%$ \emph{and} raises
+repointing only the terminal leaf to CRPS lifts that to $60.1\%$ and raises
 log-likelihood, matching the dedicated CRPS specialist while modelling faithfully.}
 \label{tab:objective}
 \end{table}

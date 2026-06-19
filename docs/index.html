@@ -17,8 +17,8 @@
       <nav>
         <a href="/">Home</a>
         <a href="/demos/">Demos</a>
-        <a href="/#papers">Papers</a>
-        <a href="/#heritage">Heritage</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
         <a href="https://pypi.org/project/skaters/">PyPI</a>
       </nav>
@@ -27,36 +27,38 @@
 
   <main>
     <h1>skaters</h1>
-    <p class="subtitle">Online univariate time-series forecasting where every prediction is a full
-      <strong>distribution</strong>, not a point — fast (O(1) per observation) and
-      dependency-free.</p>
+    <p class="subtitle">Simple, fast, automatic, <strong>distributional</strong> univariate
+      time-series prediction.</p>
 
-    <p class="lead"><strong>One skater to rule them all.</strong> The one-call convenience of
-      Prophet — but it ships a calibrated predictive <em>distribution</em> and beats AutoARIMA,
-      ETS, and conformal on held-out likelihood.</p>
+    <p class="lead">One call, zero dependencies, every prediction a full probability
+      <em>distribution</em> computed online in O(1) — in pure Python and JavaScript alike. On
+      held-out likelihood <code>laplace</code> beats AutoARIMA, AutoETS, GARCH-t, conformal, and
+      even zero-shot foundation models like Chronos and TimesFM — all of them heavier and slower.</p>
 
     <div class="tag-row">
       <span class="tag">distributional</span>
       <span class="tag">O(1) online</span>
+      <span class="tag">automatic</span>
+      <span class="tag">zero-dependency</span>
       <span class="tag">Python + JavaScript</span>
-      <span class="tag">browser-native</span>
-      <span class="tag">composable</span>
     </div>
+
+    <figure class="hero-figure">
+      <img src="./assets/frontier.svg" alt="Accuracy vs speed frontier: laplace dominates the
+        baselines, with higher held-out likelihood at a fraction of the runtime." />
+      <figcaption>Held-out accuracy vs. runtime on 500 FRED series. <code>laplace</code> sits alone
+        in the top-left — best likelihood, lowest cost — while the classical, neural, and
+        foundation-model baselines trade accuracy for orders of magnitude more compute.
+        <a href="/papers.html">The benchmarks →</a></figcaption>
+    </figure>
 
     <div class="callout">
       <strong>One library, two languages — verified identical.</strong> The pure-Python package is
-      mirrored by a zero-dependency <a href="#javascript">JavaScript port</a>, checked against it to
+      mirrored by a zero-dependency <a href="/guide.html">JavaScript port</a>, checked against it to
       1e-6, so the same models run server-side, natively in the browser, or in
       <a href="https://pyodide.org/">Pyodide</a>.
       <a href="./demos/">Try the live demos →</a>
     </div>
-
-    <p>
-      <code>pip install skaters</code>. Every prediction is a <code>Dist</code> — a weighted
-      Gaussian mixture carrying the mean, the spread, quantiles, and a density at once. You build
-      models by <em>composition</em>: transforms chain, ensembles nest, and a distributional leaf
-      sits at the bottom.
-    </p>
 
     <div class="callout">
       <strong>It wins the likelihood race against eight distributional baselines.</strong> On 500
@@ -65,23 +67,25 @@
       <strong>GARCH-t</strong>, <strong>NeuralForecast-StudentT</strong>, and AutoARIMA-with-<em>conformal</em>
       on held-out <strong>log-likelihood</strong> — the decision-relevant metric — including on the
       continuous series. The real test is <strong>GARCH-t</strong>, the heavy-tail SOTA: laplace
-      still edges it (mean continuous logpdf 2.86 vs 2.72). On <strong>CRPS</strong> it's mixed —
-      it beats ETS/GARCH/NF, ties ARIMA, and loses to conformal (which is CRPS-optimized).
-      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
+      still edges it (mean continuous logpdf 2.86 vs 2.72).
+      <a href="/papers.html">The benchmarks →</a>
     </div>
 
     <div class="callout">
       <strong>…and it beats the foundation models too — zero-shot.</strong> On 120 FRED change-series,
       <code>laplace</code> beats <strong>Chronos</strong>, <strong>TimesFM</strong>,
       <strong>Moirai</strong>, and <strong>Lag-Llama</strong> used zero-shot, on the continuous series,
-      on both <strong>log-likelihood</strong> (97–100%) and <strong>CRPS</strong> (72–94%). The
-      native-density models (Moirai, Lag-Llama) are the closest, but still lose per-series. Naive
-      per-series <em>fine-tuning</em> doesn't help — it catastrophically overfits (logpdf +1.5 → −118),
-      because adapting a pretrained transformer to one short stream isn't its design regime. A
-      zero-dependency online ensemble, in <strong>pure Python &amp; JavaScript</strong>, holding its own
-      against 200M-parameter transformers.
-      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">The foundation study →</a>
+      on both <strong>log-likelihood</strong> (97–100%) and <strong>CRPS</strong> (72–94%) — a
+      zero-dependency online ensemble holding its own against 200M-parameter transformers.
+      <a href="/papers.html">The foundation study →</a>
     </div>
+
+    <p>
+      <code>pip install skaters</code>. Every prediction is a <code>Dist</code> — a weighted
+      Gaussian mixture carrying the mean, the spread, quantiles, and a density at once. You build
+      models by <em>composition</em>: transforms chain, ensembles nest, and a distributional leaf
+      sits at the bottom (see the <a href="/guide.html">Guide</a>).
+    </p>
 
     <h2>Quick start</h2>
 <pre><code>from skaters import laplace
@@ -101,34 +105,6 @@ for y in observations:
       facets of the same object.
     </p>
 
-    <h2 id="javascript">JavaScript &amp; the browser</h2>
-    <p>
-      The whole library is also a zero-dependency <strong>JavaScript port</strong> — every
-      transform, ensemble, and named policy. A parity suite checks 76,000+ values against the
-      Python reference on every run, so the two agree to 1e-6. Use it natively for speed, or run
-      the actual Python package in the browser via <a href="https://pyodide.org/">Pyodide</a>.
-    </p>
-<pre><code>&lt;script type="module"&gt;
-  import { laplace } from "https://skaters.microprediction.org/js/skaters/index.mjs";
-  const f = laplace(1);
-  let state = null;
-  for (const y of observations) {
-    const [dists, st] = f(y, state); state = st;
-    dists[0].mean;            // point forecast
-    dists[0].quantile(0.975); // 97.5th percentile
-  }
-&lt;/script&gt;</code></pre>
-    <div class="card-grid">
-      <a class="card" href="./demos/playground.html">
-        <h3>Forecasting playground →</h3>
-        <p>Watch any policy forecast live, with its uncertainty band, on data you choose.</p>
-      </a>
-      <a class="card" href="./demos/pyodide.html">
-        <h3>Running in Pyodide →</h3>
-        <p>The real Python package, compiled to WebAssembly, running in your browser.</p>
-      </a>
-    </div>
-
     <h2>The two forecasters</h2>
     <p>
       <code>skaters</code> exposes exactly two named forecasters; everything else is a building
@@ -139,148 +115,28 @@ for y in observations:
 
 f = laplace(k=1)   # general purpose — the default
 f = doob(k=1)      # committed martingale + volatility clock (feed levels)</code></pre>
-
     <table>
-      <thead><tr><th>Forecaster</th><th>What it is</th><th>Defaults</th><th>Best for</th></tr></thead>
+      <thead><tr><th>Forecaster</th><th>What it is</th><th>Best for</th></tr></thead>
       <tbody>
-        <tr><td><code>laplace</code></td><td>Likelihood-weighted ensemble over the full candidate pool</td><td>CRPS terminal leaf + lattice projection (<em>model first, conform last</em>; handles repeats), both on</td><td><strong>General purpose (default)</strong></td></tr>
-        <tr><td><code>doob</code></td><td>Committed martingale + learned volatility clock (time-changed Brownian motion)</td><td>CRPS leaves; Bayesian-averaged vol clocks</td><td>Near-martingale <strong>levels</strong> (prices, indices)</td></tr>
+        <tr><td><code>laplace</code></td><td>Likelihood-weighted ensemble over the full candidate pool; <em>model first, conform last</em> + lattice projection on by default</td><td><strong>General purpose (default)</strong></td></tr>
+        <tr><td><code>doob</code></td><td>Committed martingale + learned volatility clock (time-changed Brownian motion)</td><td>Near-martingale <strong>levels</strong> (prices, indices)</td></tr>
       </tbody>
     </table>
 
-    <p>
-      <code>laplace</code> defaults to <em>model first, conform last</em>: the trunk is weighted by
-      likelihood, the terminal leaf by CRPS (<code>objective="likelihood"</code> to switch), and a
-      lattice projection (<code>sticky=False</code> to disable) places mass on values a series
-      revisits — free on continuous data, a win on grid/repeating series.
-    </p>
-
-    <h2>Architecture: transforms all the way down</h2>
-    <p>
-      Every model in <code>skaters</code> is a chain of bijective transforms with a distributional
-      leaf at the bottom:
-    </p>
-    <p style="text-align:center">
-      $y \;\xrightarrow{T_1}\; y' \;\xrightarrow{T_2}\; y'' \;\xrightarrow{\cdots}\;
-       \text{leaf} \;\rightarrow\; \hat{D}$
-    </p>
-    <p>
-      The leaf estimates $\hat{D} = \mathcal{N}(0, \hat\sigma^2)$ from residuals via
-      Welford&apos;s algorithm. Predictions in the original space come from inverting the
-      transform chain:
-      $\hat{D}_{\text{original}} = T_1^{-1}\bigl(T_2^{-1}\bigl(\cdots(\hat{D})\bigr)\bigr).$
-    </p>
-    <p>
-      Every node returns a <code>list[Dist]</code>. There is no separate &ldquo;point
-      forecast&rdquo; vs &ldquo;uncertainty&rdquo; &mdash; both are aspects of the same
-      $\hat{D}$. An EMA doesn&apos;t &ldquo;predict&rdquo;; it strips off a running level
-      $\ell_t$, leaving simpler residuals $\varepsilon_t = y_t - \ell_t$, and the prediction is
-      whatever the leaf&apos;s estimate becomes when run back through the inverse.
-    </p>
-
-    <h3>Transforms</h3>
-    <table>
-      <thead><tr><th>Transform</th><th>Forward</th><th>Use case</th></tr></thead>
-      <tbody>
-        <tr><td><code>ema_transform(α)</code></td><td>$y'_t = y_t - \ell_t$</td><td>Remove level</td></tr>
-        <tr><td><code>difference()</code></td><td>$y'_t = y_t - y_{t-1}$</td><td>Random walk</td></tr>
-        <tr><td><code>drift(α, λ)</code></td><td>$y'_t = \Delta y_t - \hat\mu_t$</td><td>Random walk + drift</td></tr>
-        <tr><td><code>holt_linear(α, β)</code></td><td>$y'_t = y_t - (\ell_t + b_t)$</td><td>Level + trend (Holt 1957)</td></tr>
-        <tr><td><code>ar(p)</code></td><td>$y'_t = y_t - \sum \hat\phi_j y_{t-j}$</td><td>Autoregression (online RLS)</td></tr>
-        <tr><td><code>fractional_difference(d)</code></td><td>$y'_t = (1-B)^d y_t$</td><td>Long memory</td></tr>
-        <tr><td><code>standardize(α)</code></td><td>$y'_t = (y_t - \hat\mu_t)/\hat\sigma_t$</td><td>Remove scale</td></tr>
-        <tr><td><code>garch(ω, α, β)</code></td><td>$y'_t = y_t / \hat\sigma_t$</td><td>Volatility clustering</td></tr>
-        <tr><td><code>seasonal_difference(s)</code></td><td>$y'_t = y_t - y_{t-s}$</td><td>Periodicity</td></tr>
-        <tr><td><code>power_transform(p)</code></td><td>$y'_t = \mathrm{sgn}(y_t)|y_t|^p$</td><td>Tail compression</td></tr>
-      </tbody>
-    </table>
-
-    <h2>Conjugation</h2>
-    <p>
-      Transforms compose via conjugation. Given a transform $T$ and a skater $f$,
-      $f_{\text{conj}}(y) = T^{-1}\bigl(f\bigl(T(y)\bigr)\bigr).$
-    </p>
-<pre><code>from skaters import conjugate, ema, difference, standardize
-
-# diff removes trend, then EMA predicts the differenced series
-f = conjugate(ema(alpha=0.1, k=3), difference(), k=3)
-
-# Chain: standardize, then difference, then EMA
-f = conjugate(
-    conjugate(ema(alpha=0.1, k=3), difference(), k=3),
-    standardize(),
-    k=3,
-)
-# canonical name: std|diff|ema_t|leaf</code></pre>
-
-    <h2>Ensembles</h2>
-    <h3>Precision-weighted (MSE)</h3>
-    <p>Weights by $w_i \propto 1/\text{MSE}_i$ where $\text{MSE} = \text{bias}^2 + \text{variance}$.</p>
-<pre><code>from skaters import precision_weighted_ensemble, ema
-
-f = precision_weighted_ensemble([
-    ema(alpha=0.05, k=1),
-    ema(alpha=0.2, k=1),
-], k=1)</code></pre>
-
-    <h3>Bayesian (log-likelihood with XGBoost-inspired regularisation)</h3>
-    <p>
-      Each model accumulates a log-weight updated at every observation:
-      $\log w_i \mathrel{+}= \eta \cdot \log p_i(y_t) - \lambda \cdot d_i,$
-      where $\eta$ is the learning rate (shrinkage), $\lambda$ is the complexity penalty, and
-      $d_i$ is the model&apos;s depth. Predictions are combined via
-      <code>Dist.combine</code> with softmax weights.
-    </p>
-<pre><code>from skaters import bayesian_ensemble, ema
-
-f = bayesian_ensemble(
-    [ema(alpha=0.05, k=1), ema(alpha=0.2, k=1)],
-    k=1,
-    learning_rate=0.5,       # eta: prevents over-concentrating
-    complexity_penalty=0.02, # lambda: penalises deeper chains
-    depths=[1, 1],
-)</code></pre>
-
-    <h3>Adaptive search</h3>
-    <p>Beam search over the transform grammar. Grows the candidate population online:
-    expand top performers with new transforms, replay recent history to warm-start, prune losers.</p>
-<pre><code>from skaters import search
-
-f = search(
-    k=1,
-    expand_interval=100,   # expand top performers every 100 obs
-    max_depth=3,           # max transform chain depth
-    replay_buffer=500,     # warm-start new candidates on recent history
-    max_pool=30,
-)</code></pre>
-
-    <h2>Design</h2>
-    <ul>
-      <li><strong>Online only</strong> &mdash; $O(1)$ per observation, no batch recomputation.</li>
-      <li><strong>Distributional</strong> &mdash; every prediction is a <code>Dist</code>, not a
-        point estimate.</li>
-      <li><strong>Composable</strong> &mdash; transforms chain, ensembles nest, everything returns
-        <code>Dist</code>.</li>
-      <li><strong>Pure Python</strong> &mdash; zero dependencies. Only <code>math.erf</code> and
-        <code>math.exp</code>.</li>
-      <li><strong>Pyodide compatible</strong> &mdash; works in the browser via WebAssembly.</li>
-    </ul>
-
-    <h2 id="papers">Papers</h2>
-    <p>
-      <strong>skaters: Model First, Conform Last — Composable Online Distributional Time-Series
-      Forecasting</strong> — P. Cotton. The <code>Dist</code> abstraction and composable transforms;
-      the <em>model first, conform last</em> result; the lattice projection and coordinate search;
-      the martingale volatility clock; and fair rolling one-step studies in which <code>laplace</code>
-      wins the log-likelihood race against eight distributional baselines — including GARCH-t (the
-      heavy-tail SOTA) and a NeuralForecast Student-t model — and against four zero-shot foundation
-      models (Chronos, TimesFM, Moirai, Lag-Llama).
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF →</a>
-      &nbsp;·&nbsp;
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX (JSS)</a>
-      &nbsp;·&nbsp;
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters.md">Markdown draft</a>
-    </p>
+    <div class="card-grid">
+      <a class="card" href="/guide.html">
+        <h3>Guide →</h3>
+        <p>The <code>Dist</code> object, transforms, conjugation, and ensembles — how it all composes.</p>
+      </a>
+      <a class="card" href="/papers.html">
+        <h3>Papers &amp; benchmarks →</h3>
+        <p>The paper, and the studies vs ARIMA/ETS/GARCH/conformal and the foundation models.</p>
+      </a>
+      <a class="card" href="./demos/playground.html">
+        <h3>Live demos →</h3>
+        <p>Watch a policy forecast live, with its uncertainty band, on data you choose.</p>
+      </a>
+    </div>
 
     <h2 id="heritage">Heritage</h2>
     <p>
@@ -289,10 +145,9 @@ f = search(
       competition-winning forecasting package by Peter Cotton, and builds on years of experience
       running live <strong>distributional prediction contests</strong> at
       <a href="https://www.microprediction.org/">microprediction</a> — where forecasts are scored,
-      continuously, as full distributions rather than points. Sibling packages in the same
-      ecosystem: <a href="https://github.com/microprediction/precise">precise</a> (online
-      covariance) and <a href="https://github.com/microprediction/humpday">humpday</a> (global
-      optimizers).
+      continuously, as full distributions rather than points. Sibling packages: <a
+      href="https://github.com/microprediction/precise">precise</a> (online covariance) and
+      <a href="https://github.com/microprediction/humpday">humpday</a> (global optimizers).
     </p>
 
     <h2>Get the source</h2>
