@@ -70,6 +70,19 @@
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
     </div>
 
+    <div class="callout">
+      <strong>…and it beats the foundation models too — zero-shot.</strong> On 120 FRED change-series,
+      <code>laplace</code> beats <strong>Chronos</strong>, <strong>TimesFM</strong>,
+      <strong>Moirai</strong>, and <strong>Lag-Llama</strong> used zero-shot, on the continuous series,
+      on both <strong>log-likelihood</strong> (97–100%) and <strong>CRPS</strong> (72–94%). The
+      native-density models (Moirai, Lag-Llama) are the closest, but still lose per-series. Naive
+      per-series <em>fine-tuning</em> doesn't help — it catastrophically overfits (logpdf +1.5 → −118),
+      because adapting a pretrained transformer to one short stream isn't its design regime. A
+      zero-dependency online ensemble, in <strong>pure Python &amp; JavaScript</strong>, holding its own
+      against 200M-parameter transformers.
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">The foundation study →</a>
+    </div>
+
     <h2>Quick start</h2>
 <pre><code>from skaters import laplace
 
@@ -258,9 +271,10 @@ f = search(
       <strong>skaters: Model First, Conform Last — Composable Online Distributional Time-Series
       Forecasting</strong> — P. Cotton. The <code>Dist</code> abstraction and composable transforms;
       the <em>model first, conform last</em> result; the lattice projection and coordinate search;
-      the martingale volatility clock; and a fair rolling one-step study in which <code>laplace</code>
+      the martingale volatility clock; and fair rolling one-step studies in which <code>laplace</code>
       wins the log-likelihood race against eight distributional baselines — including GARCH-t (the
-      heavy-tail SOTA) and a NeuralForecast Student-t model.
+      heavy-tail SOTA) and a NeuralForecast Student-t model — and against four zero-shot foundation
+      models (Chronos, TimesFM, Moirai, Lag-Llama).
       <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF →</a>
       &nbsp;·&nbsp;
       <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX (JSS)</a>
