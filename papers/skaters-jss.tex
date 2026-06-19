@@ -16,6 +16,10 @@
 \providecommand{\pkg}[1]{\textbf{#1}}
 \providecommand{\code}[1]{\texttt{#1}}
 
+% Let TeX relax interword spacing slightly to avoid minor margin protrusions
+% on lines densely packed with \pkg/\code tokens.
+\setlength{\emergencystretch}{3em}
+
 %% JSS article information
 \author{
   Peter Cotton\\
@@ -446,14 +450,15 @@ correlated family (195 families):
 \toprule
 Forecaster (identical structure) & CRPS, raw & CRPS, family & Mean LL \\
 \midrule
-likelihood trunk + likelihood leaf              & 82.6\,\% & 48.7\,\% & 2.96 \\
-likelihood trunk + CRPS leaf (\emph{model first, conform last}) & 89.5\,\% & \textbf{60.1\,\%} & \textbf{3.01} \\
-bare CRPS leaf (no trunk)                        & 80.8\,\% & 60.3\,\% & 2.96 \\
+likelihood trunk + likelihood leaf & 82.6\,\% & 48.7\,\% & 2.96 \\
+likelihood trunk + CRPS leaf       & 89.5\,\% & \textbf{60.1\,\%} & \textbf{3.01} \\
+bare CRPS leaf (no trunk)          & 80.8\,\% & 60.3\,\% & 2.96 \\
 \bottomrule
 \end{tabular}
-\caption{Effect of the terminal-leaf objective. A general likelihood policy is
+\caption{Effect of the terminal-leaf objective. The middle row is the
+\emph{model first, conform last} recipe. A general likelihood policy is
 essentially even with conformal on CRPS over independent families ($48.7\%$);
-repointing only the terminal leaf to CRPS lifts that to $60.1\%$ \emph{and} raises
+repointing only the terminal leaf to CRPS lifts that to $60.1\%$ and raises
 log-likelihood, matching the dedicated CRPS specialist while modelling faithfully.}
 \label{tab:objective}
 \end{table}
