@@ -4,16 +4,15 @@ author:
   - Peter Cotton (Microprediction)
 date: 2026
 abstract: |
-  *skaters* performs online univariate time-series forecasting in which every
-  prediction is a full probability distribution rather than a point. A forecaster
-  is built by composition: invertible transforms chain together above a single
-  distributional leaf, and ensembles combine such chains. The leaf fits its shape
-  by optimising a proper scoring rule, so its objective is a choice rather than a
-  fixed property of the method. This separates two concerns the forecasting and
-  conformal-prediction literatures tend to merge: modelling the conditional mean,
-  judged by likelihood, and shaping the predictive tail, optionally judged by a
-  downstream score such as CRPS. We call the arrangement *model first, conform
-  last*. The library is written twice, in pure Python and in zero-dependency
+  The Python package *skaters* performs online univariate time-series forecasting
+  in which every prediction is a full probability distribution rather than a
+  point. A forecaster is built by composition: invertible transforms chain
+  together above a single distributional leaf, and ensembles combine such chains.
+  The leaf fits its shape by optimising a proper scoring rule, so its objective is
+  a choice rather than a fixed property of the method. This separates two concerns
+  the forecasting and conformal-prediction literatures tend to merge: fitting the
+  model, judged by likelihood, and conforming the predictive tail to a downstream
+  score such as CRPS. We call the arrangement *model first, conform last*. The library is written twice, in pure Python and in zero-dependency
   JavaScript that agrees to within 1e-6, so the same model runs on a server or in
   a browser. We evaluate it against classical, neural, and pretrained
   foundation-model baselines on FRED series.
