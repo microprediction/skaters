@@ -21,47 +21,28 @@
   Peter Cotton\\
   Microprediction\\
   \email{peter.cotton@microprediction.com}\\
-  \url{https://www.microprediction.org}
+  \url{https://skaters.microprediction.org}
 }
 
-\title{\pkg{skaters}: Model First, Conform Last --- Composable Online Distributional Time-Series Forecasting in \proglang{Python} and \proglang{JavaScript}}
+\title{Model First, Conform Last: A Composition-Based Automatic Online Distributional Forecaster}
 
-\Plaintitle{skaters: Model First, Conform Last}
-\Shorttitle{\pkg{skaters}: Online Distributional Forecasting}
+\Plaintitle{Model First, Conform Last: A Composition-Based Automatic Online Distributional Forecaster}
+\Shorttitle{Model First, Conform Last}
 
 \newcommand{\skatersabstract}{
-We present \pkg{skaters}, a zero-dependency library for online univariate
-time-series forecasting in which \emph{every prediction is a full probability
-distribution}, not a point. Models are built by composition: invertible
-transforms chain together, ensembles nest, and a single distributional
-\emph{leaf} sits at the bottom of every chain. The leaf is a pluggable
-proper-scoring-rule optimiser, which lets us separate two concerns that the
-forecasting and conformal-prediction literatures usually conflate ---
-\emph{modelling} the conditional mean (judged by likelihood) and
-\emph{calibrating} the predictive tail (optionally judged by a downstream score
-such as the continuous ranked probability score, CRPS). We call the resulting
-recipe \textbf{model first, conform last}, and show that it matches a dedicated
-CRPS specialist on CRPS while \emph{improving} held-out log-likelihood. In a fair
-rolling one-step-ahead comparison on 500 \proglang{FRED} change-series against
-\emph{eight} distributional baselines --- \pkg{AutoARIMA}, \pkg{AutoETS},
-\pkg{statsmodels} \pkg{SARIMAX} and exponential smoothing, a \pkg{GARCH}$(1,1)$
-model with Student-$t$ innovations, a \pkg{NeuralForecast} model with a
-Student-$t$ head, and \pkg{AutoARIMA} paired with split-conformal and
-adaptive-conformal residuals --- the general forecaster \textbf{wins the
-per-series log-likelihood race against all eight}. The decisive test is the
-\pkg{GARCH}-$t$ model, the classical heavy-tail / volatility-clustering state of
-the art: our forecaster still edges it on the continuous subset (mean continuous
-log-likelihood $2.86$ versus $2.72$), confirming the heavy-tail advantage
-\emph{against the heavy-tail specialist}. On CRPS the picture is mixed, as
-expected: we beat the smoothing, \pkg{GARCH} and neural baselines, roughly tie the
-\pkg{ARIMA} family, and lose to the CRPS-optimised conformal variants. We further
-contribute a \emph{mean-preserving lattice projection} for series that revisit
-exact values, an online \emph{coordinate} (Yeo--Johnson) search, and a committed
-\emph{martingale} model whose volatility clock is a time-changed Brownian motion.
-The whole library is implemented twice --- pure \proglang{Python} and
-zero-dependency \proglang{JavaScript} --- and verified identical to $10^{-6}$ on
-roughly 90{,}000 probe values, so the same models run server-side or in the
-browser via \pkg{Pyodide}.
+\pkg{skaters} performs online univariate time-series forecasting in which every
+prediction is a full probability distribution rather than a point. A forecaster
+is built by composition: invertible transforms chain together above a single
+distributional leaf, and ensembles combine such chains. The leaf fits its shape
+by optimising a proper scoring rule, so its objective is a choice rather than a
+fixed property of the method. This separates two concerns the forecasting and
+conformal-prediction literatures tend to merge: modelling the conditional mean,
+judged by likelihood, and shaping the predictive tail, optionally judged by a
+downstream score such as CRPS. We call the arrangement \emph{model first, conform
+last}. The library is written twice, in pure \proglang{Python} and in
+zero-dependency \proglang{JavaScript} that agrees to within $10^{-6}$, so a model
+runs unchanged on a server or in a browser. We evaluate it against classical,
+neural, and pretrained foundation-model baselines on \proglang{FRED} series.
 }
 
 \begin{document}
@@ -92,11 +73,11 @@ Classical state-space and exponential-smoothing models
 filter. Conditional-heteroscedasticity models \citep{engle1982autoregressive,
 bollerslev1986generalized} capture the heavy tails and volatility clustering of
 financial data, but commit to a single parametric form and are refit in batch.
-At the other extreme, \textbf{conformal prediction}
+At the other extreme, conformal prediction
 \citep{vovk2005algorithmic,vovk2019conformal} is distribution-free and online,
-but a conformal predictive system outputs a \emph{cumulative distribution
-function}, not a density. It is calibrated for coverage and CRPS but
-\textbf{cannot be scored on log-likelihood at all}, and an empirical conformal CDF
+but a conformal predictive system outputs a cumulative distribution
+function, not a density. It is calibrated for coverage and CRPS but
+cannot be scored on log-likelihood at all, and an empirical conformal CDF
 assigns zero density --- and hence $-\infty$ log-likelihood --- to any value
 outside the observed residual range. Modern neural and foundation models
 \citep{salinas2020deepar,ansari2024chronos,das2024timesfm,woo2024moirai} are
@@ -114,23 +95,22 @@ other skaters. This single abstraction yields three contributions developed in
 turn:
 
 \begin{enumerate}
-\item \textbf{A pluggable objective} (Sections~\ref{sec:trunk}--\ref{sec:leaf}).
-  The leaf fits its mixture weights by \emph{a} proper scoring rule. Point it at
-  log-likelihood and it models honestly; point its \emph{terminal} copy at CRPS
-  while keeping a likelihood-weighted trunk, and you get \textbf{model first,
-  conform last} --- competitive with a CRPS specialist on CRPS \emph{and} better
-  on likelihood.
-\item \textbf{Distributional structure that survives composition}
-  (Sections~\ref{sec:lattice}--\ref{sec:doob}). A \emph{mean-preserving lattice
-  projection} places atoms on the exact values a series revisits without moving
-  the ensemble mean and while vanishing on continuous data; an online
-  \emph{coordinate} search learns whether a series is simple in a log, root, or
-  linear coordinate; and a committed \emph{martingale} model learns only a
-  volatility clock.
-\item \textbf{An honest benchmark against eight distributional baselines}
+\item \emph{A pluggable objective} (Sections~\ref{sec:trunk}--\ref{sec:leaf}).
+  The leaf fits its mixture weights by a proper scoring rule. Pointed at
+  log-likelihood it models the conditional distribution directly; with its
+  terminal copy pointed at CRPS while the trunk stays likelihood-weighted, the
+  result is \emph{model first, conform last}, which is competitive with a CRPS
+  specialist on CRPS and stronger on likelihood.
+\item \emph{Distributional structure that survives composition}
+  (Sections~\ref{sec:lattice}--\ref{sec:doob}): a mean-preserving lattice
+  projection that places atoms on the exact values a series revisits without
+  moving the ensemble mean and vanishes on continuous data; an online coordinate
+  search over whether a series is simple in a log, root, or linear coordinate; and
+  a committed martingale model that learns only a volatility clock.
+\item \emph{A benchmark against eight distributional baselines}
   (Section~\ref{sec:experiments}), including the heavy-tail (\pkg{GARCH}-$t$) and
   neural (\pkg{NeuralForecast}) state of the art, scored on held-out
-  log-likelihood and CRPS in a single, identical \code{Dist}-based protocol.
+  log-likelihood and CRPS through a single, identical \code{Dist}-based protocol.
 \end{enumerate}
 
 The unifying premise is the No-Free-Lunch theorem \citep{wolpert1997no} taken
@@ -185,10 +165,10 @@ distributions, which preserves the combined mean and variance but \emph{washes
 out higher moments}: a heavy-tailed leaf used inside the pool collapses toward a
 Gaussian shape at the output, because a mixture of differently located Gaussians
 is dominated by the spread of their means. We therefore use the candidate models
-only as \textbf{mean forecasters}, weight them online by predictive likelihood
+only as mean forecasters, weight them online by predictive likelihood
 (with a learning-rate shrinkage and a per-depth complexity penalty, in the
 spirit of gradient boosting), combine their means, and model the distribution of
-the \emph{combined residual} with a \textbf{single terminal leaf}:
+the combined residual with a single terminal leaf:
 \[
  y \;\to\; \hat\mu = \sum_i w_i\,\hat\mu_i, \qquad
  r = y-\hat\mu \;\to\; \text{leaf} \;\to\; D, \qquad
@@ -211,7 +191,7 @@ with $\hat\sigma$ an exponentially weighted scale --- whose only learned
 quantities are the mixture weights $\{w_k\}$ on the simplex. A Gaussian scale
 mixture is a Student-$t$ in the limit, so the leaf approximates heavy tails by
 construction while remaining a plain \code{Dist}. The weights are fit online by
-\textbf{a proper scoring rule} \citep{gneiting2007strictly}:
+a proper scoring rule \citep{gneiting2007strictly}:
 \begin{itemize}
 \item \code{likelihood} --- recency-weighted expectation--maximisation on the
   component responsibilities;
@@ -220,16 +200,16 @@ construction while remaining a plain \code{Dist}. The weights are fit online by
   since the mixture CRPS is a finite sum of $\mathbb E\,|\mathcal N(m,s^2)|$ terms.
 \end{itemize}
 
-Placing the CRPS leaf at the \emph{terminal} of a likelihood-weighted trunk gives
-\textbf{model first, conform last}. The trunk's job is to model, and the honest
-objective for modelling is likelihood --- a proper, tail-sensitive score that is,
+Placing the CRPS leaf at the terminal of a likelihood-weighted trunk gives
+\emph{model first, conform last}. The trunk's job is to model, and the right
+objective for modelling is likelihood, a proper, tail-sensitive score that is,
 up to a constant, the Kelly log-growth criterion \citep{kelly1956new}; corrupting
 it to chase CRPS would repeat the conformal mistake of discarding the density.
 The tail's job is to be shaped, and that is the only place a downstream metric
 (CRPS) should get a vote. Section~\ref{sec:ablations} shows this configuration
-dominates a pure-likelihood policy on CRPS \emph{and} on likelihood: a CRPS-fit
+improving on a pure-likelihood policy on CRPS and on likelihood alike: a CRPS-fit
 leaf is more outlier-robust, so it even generalises slightly better in
-log-likelihood. The objective is a knob, not a fixed cost.
+log-likelihood.
 
 %% -------------------------------------------------------------------------
 \section{The lattice projection} \label{sec:lattice}
@@ -239,8 +219,8 @@ exchange rates --- revisit a small set of exact values, and a continuous
 predictive density cannot place mass there. We add a \emph{projection}: a
 recency-weighted frequency table of exact values, with near-Dirac atoms on the
 values revisited above a noise floor, each carrying its observed frequency as
-probability. The atom is \textbf{mean-preserving}: the continuous part is
-recentred so the atoms add \emph{mass} without moving the ensemble mean.
+probability. The atom is mean-preserving: the continuous part is
+recentred so the atoms add mass without moving the ensemble mean.
 
 Two properties make this a safe default. First, on continuous data nothing is
 revisited, no atom fires, and the projection vanishes identically --- it is free
@@ -254,7 +234,7 @@ pure statement about mass, not mean.
 \section{Coordinate learning} \label{sec:coord}
 
 Whether a series is simple in a linear, log/multiplicative, or root coordinate is
-itself learnable. We add a coarse grid of \textbf{Yeo--Johnson} $\lambda$
+itself learnable. We add a coarse grid of Yeo--Johnson $\lambda$
 candidates --- the signed Box--Cox family \citep{box1964analysis,yeo2000new},
 defined on all of $\mathbb R$ --- to the pool, so the ensemble learns the
 coordinate online rather than committing up front. This is No-Free-Lunch-safe: a
@@ -279,7 +259,7 @@ continuous martingale is a time-changed Brownian motion, so the model is
 literally ``Brownian motion on a stochastic clock''. It beats the general
 forecaster on near-martingale levels by committing the mean and spending its
 capacity on the clock; on genuinely mean-reverting series the martingale prior is
-wrong and it gives ground --- a deliberately sharp instrument, fed \emph{levels}
+wrong and it gives ground --- a sharp, single-purpose instrument, fed \emph{levels}
 rather than pre-differenced changes.
 
 %% -------------------------------------------------------------------------
@@ -315,9 +295,9 @@ theirs --- is turned into the \emph{same} \code{Dist} and scored on held-out
 log-likelihood \emph{and} CRPS over the same test window. The parametric
 Student-$t$ predictives (\pkg{GARCH}, \pkg{NeuralForecast}) are represented as
 finite Gaussian scale mixtures, matching the analytic $t$ density to $\sim
-10^{-3}$. We report \textbf{per-series} win-rates (the fraction of series on
+10^{-3}$. We report per-series win-rates (the fraction of series on
 which \code{laplace} scores better), and additionally restrict to the $309$
-\emph{continuous} series --- those with under $5\%$ exactly-repeating one-step
+continuous series --- those with under $5\%$ exactly-repeating one-step
 changes --- since on repeating/grid series the lattice projection
 (Section~\ref{sec:lattice}) gives a large but metric-specific advantage that
 would otherwise dominate the aggregate. Table~\ref{tab:sota} reports the result.
@@ -342,40 +322,39 @@ NF-Student$t$               & \textbf{100 / 100\,\%} & 78 / 76\,\% & 0.82 \\
 \proglang{FRED} change-series, all and on the 309 continuous series. LL counts
 series where \code{laplace} has the higher held-out log-likelihood; CRPS where it
 has the lower CRPS. The final column is each baseline's mean continuous
-log-likelihood (\code{laplace}: \textbf{2.855}). Higher is better for LL; lower for
+log-likelihood (\code{laplace}: 2.855). Higher is better for LL; lower for
 CRPS.}
 \label{tab:sota}
 \end{table}
 
 \paragraph{The likelihood race.}
-\code{laplace} wins the per-series log-likelihood race against \emph{all eight}
+\code{laplace} wins the per-series log-likelihood race against all eight
 baselines, on the full universe and on the continuous subset, including the two
 exact-Gaussian references (\pkg{SARIMAX}, statsmodels ETS) for which there is no
 band-reconstruction approximation to blame.
 
-\paragraph{\pkg{GARCH}-$t$ is the decisive test.}
+\paragraph{\pkg{GARCH}-$t$ is the tightest case.}
 The \pkg{GARCH}$(1,1)$-$t$ model is purpose-built for the heavy tails and
-volatility clustering of financial change-series, so it is \emph{supposed} to be
-the hardest opponent on log-likelihood --- and it is. It is the tightest race
+volatility clustering of financial change-series, so it is the strongest opponent
+on log-likelihood, and the numbers bear that out. It is the closest race
 ($67\%$ of continuous series), and its mean continuous log-likelihood, $2.72$, is
-closest to ours, $2.855$ --- a genuine but \emph{narrow} edge of about $0.14$
-nats per observation. That the advantage survives \emph{against the heavy-tail
-specialist} is the result that matters: the general forecaster captures the same
-conditional heteroscedasticity without committing to a parametric volatility law.
+nearest to ours, $2.855$, a narrow edge of about $0.14$ nats per observation. That
+the advantage holds against the heavy-tail specialist is the substantive point:
+the general forecaster captures the same conditional heteroscedasticity without
+committing to a parametric volatility law.
 
-\paragraph{The neural result is not a scalp.}
-\code{laplace} beats NF-Student$t$ on $100\%$ of series, but we are deliberately
-loud about what this does and does not mean. NF here is \pkg{NeuralForecast} run
-in the \emph{matched online univariate one-step} protocol --- a tiny per-series
-multilayer perceptron with periodic refit --- which is its \textbf{weak} regime.
-Neural and foundation forecasters \citep{salinas2020deepar,
-olivares2022neuralforecast} are built for \emph{global cross-series} training,
-where they amortise structure across thousands of related series. Our result says
-nothing about \pkg{DeepAR}-style models in that home setting, and we do not claim
-it does; it says only that a single short univariate stream does not give a neural
-density head enough to beat an online ensemble. (We verified the NF densities are
-well formed --- median log-likelihood $0.50$, none floored --- so the $100\%$ is a
-real calibration gap, not a degenerate score.)
+\paragraph{The neural result, in context.}
+\code{laplace} beats NF-Student$t$ on $100\%$ of series, but the comparison needs
+reading carefully. NF here is \pkg{NeuralForecast} run in the matched online
+univariate one-step protocol, a small per-series multilayer perceptron with
+periodic refit, which is its weak regime. Neural and foundation forecasters
+\citep{salinas2020deepar, olivares2022neuralforecast} are built for global
+cross-series training, where they amortise structure across thousands of related
+series. The result says nothing about \pkg{DeepAR}-style models in that setting,
+and we do not claim it does; it says only that a single short univariate stream
+does not give a neural density head enough to beat an online ensemble. The NF
+densities are well formed (median log-likelihood $0.50$, none floored), so the
+$100\%$ is a real calibration gap, not a degenerate score.
 
 \paragraph{CRPS.}
 As ever, CRPS tells a mixed story. \code{laplace} beats the smoothing baselines
@@ -387,7 +366,7 @@ is the metric where a faithful density wins; CRPS is conformal's home turf, wher
 we are competitive but not dominant. A practitioner who truly only cares about
 CRPS can repoint the leaf (Section~\ref{sec:ablations}); a practitioner who cares
 about the density --- for risk, sizing, or combination --- should prefer the
-honest log-likelihood column.
+log-likelihood column.
 
 \paragraph{Scope.}
 Five hundred change-series, one-step horizon. Prophet, multi-step horizons and raw
@@ -425,18 +404,18 @@ TimesFM (2.5-200M)    & quantile$^{*}$ & 75 / \textbf{100}\,\% & 58 / 72\,\% & $
 models on 120 change-series (69 continuous). $^{*}$Chronos-Bolt/TimesFM
 log-likelihood is reconstructed from a quantile head and is tail-limited; read
 their CRPS as the fairer signal. \code{laplace} mean continuous logpdf:
-\textbf{1.51}.}
+1.51.}
 \label{tab:foundation}
 \end{table}
 
-\emph{On the continuous series, \code{laplace} beats all four foundation models
-zero-shot on both metrics} (97--100\% LL, 72--94\% CRPS). The native-density
+On the continuous series \code{laplace} beats all four foundation models
+zero-shot on both metrics (97--100\% LL, 72--94\% CRPS). The native-density
 models (Moirai, Lag-Llama) are the meaningful likelihood opponents and the
 closest, but still lose per-series. On repeat-heavy/grid series the foundation
 models are competitive or better --- Lag-Llama even beats \code{laplace} on mean
 log-likelihood over the \emph{full} universe ($6.54$ vs $4.52$) by placing tight
 mass on revisited values, the same effect as the lattice projection --- which is
-why the continuous split matters. The honest scope is narrow: zero-shot, no refit,
+why the continuous split matters. The scope is narrow: zero-shot, no refit,
 fixed context, and forecasting the change stream rather than the levels these
 models were chiefly trained on.\footnote{Per-series \emph{fine-tuning} does not
 rescue the foundation models on this task: naively fine-tuning Lag-Llama on a
@@ -472,24 +451,23 @@ bare CRPS leaf (no trunk)                        & 80.8\,\% & 60.3\,\% & 2.96 \\
 \caption{Effect of the terminal-leaf objective. A general likelihood policy is
 essentially even with conformal on CRPS over independent families ($48.7\%$);
 repointing only the terminal leaf to CRPS lifts that to $60.1\%$ \emph{and} raises
-log-likelihood, matching the dedicated CRPS specialist while modelling honestly.}
+log-likelihood, matching the dedicated CRPS specialist while modelling faithfully.}
 \label{tab:objective}
 \end{table}
 
-Three further observations motivate the radically small public API.
-\textbf{Priors wash out:} across $25$ series with $\geq 2000$ changes the
-conventional prior-flavoured policies (trend, long-memory, drift, minimax,
-fast/slow) sit within $0.0006$ nats of the uniform-prior general forecaster on
-the second half of each series, and the first-half winner beats the general
-forecaster on the second half only $44\%$ of the time --- worse than chance.
-\textbf{Conform-last is near-free:} on idealised light-tailed processes the CRPS
-leaf costs $0.005$--$0.007$ nats versus the likelihood leaf, while on heavy-tailed
-and stochastic-volatility processes it \emph{helps} (up to $+0.04$); real data
-lives in the second regime. \textbf{The lattice projection is free when unused.}
-Together these justify exposing exactly \emph{one} general forecaster
+Three further observations motivate the small public API. Priors wash out:
+across $25$ series with $\geq 2000$ changes the conventional prior-flavoured
+policies (trend, long-memory, drift, minimax, fast/slow) sit within $0.0006$ nats
+of the uniform-prior general forecaster on the second half of each series, and the
+first-half winner beats the general forecaster on the second half only $44\%$ of
+the time, worse than chance. Conform-last is near-free: on idealised light-tailed
+processes the CRPS leaf costs $0.005$--$0.007$ nats versus the likelihood leaf,
+while on heavy-tailed and stochastic-volatility processes it helps (up to
+$+0.04$); real data lives in the second regime. And the lattice projection is free
+when unused. Together these justify exposing exactly one general forecaster
 (uniform prior, CRPS leaf, lattice projection and coordinate learning on by
-default) plus \emph{one} committed martingale specialist; the remaining
-structural ideas do not pay their way out of sample.
+default) plus one committed martingale specialist; the remaining structural ideas
+do not pay their way out of sample.
 
 %% -------------------------------------------------------------------------
 \section{Discussion} \label{sec:discussion}
@@ -499,7 +477,7 @@ The unifying theme is No-Free-Lunch \citep{wolpert1997no} taken seriously. Every
 response is not to choose one but to make the priors explicit, weight them online,
 and bound the cost of a wrong prior by how fast the weighting abandons it. Read
 that way, the named methods of classical forecasting are convenience bundles, and
-the honest object is a single adaptive ensemble with two orthogonal terminal knobs
+the natural object is a single adaptive ensemble with two orthogonal terminal knobs
 --- \emph{which proper scoring rule the leaf optimises}, and \emph{whether a
 lattice projection is active} --- neither of which is a prior over the trunk. The
 empirical headline supports the design: against the strongest distributional
