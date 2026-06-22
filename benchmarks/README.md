@@ -57,7 +57,7 @@ pip install statsforecast # AutoARIMA/ETS mean models to pair conformal with
 The script prints which it found. These need network + heavy deps, so they are
 intentionally absent from the package's `pyproject.toml`.
 
-## Headline: vs eight distributional baselines (`sota_study.py`)
+## Headline: vs eight distributional baselines (`study.py sota`)
 
 The honest head-to-head against everything we could find that claims a
 *distributional* one-step forecast: `statsforecast`'s **AutoARIMA** and
@@ -111,8 +111,8 @@ We report per-series (not family-clustered) because on this universe the family
 heuristic *inflated* the numbers. Scope: 500 change-series, one-step horizon;
 Prophet and longer horizons are left for later. Zero-shot foundation models get
 their own protocol — see the next section. Run it (parallel across cores):
-`PYTHONPATH=src python benchmarks/sota_study.py` (conda env with `statsforecast`,
-`arch`, `statsmodels`, `neuralforecast`, and a FRED key).
+`PYTHONPATH=src python benchmarks/study.py sota` (venv with `statsforecast`,
+`arch`, `statsmodels`, `neuralforecast`, `crepes`, and a FRED key).
 
 ## Zero-shot foundation models (`foundation_study.py`)
 
@@ -152,7 +152,7 @@ own env (conflicting `gluonts`/`torch`/`jax` pins); the harness writes one
 `results_foundation_<tag>.csv` per run and `summarize()` merges them:
 `FM_MODELS=Chronos,Moirai FM_TAG=cm PYTHONPATH=src python benchmarks/foundation_study.py`.
 
-## Headline result: skaters vs crepes, on CRPS (`exhaustive_crps.py`)
+## Headline result: skaters vs crepes, on CRPS (curated 42-series; now `study.py conformal-scale`)
 
 The skater is a *pluggable proper-scoring-rule optimizer* — the leaf fits its
 scale-mixture weights by **a** score. Point it at log-likelihood and it models
@@ -176,9 +176,9 @@ is degenerate, not where there's forecasting skill.
 And crepes produces no log-likelihood at all (its docs: a CPS outputs *CDFs*),
 so on the economically-grounded, tail-sensitive metric it cannot compete; on
 CRPS, the metric it is built for, it still loses 93% of the time once we aim at
-it. Run it yourself: `PYTHONPATH=src python benchmarks/exhaustive_crps.py`.
+it. Run it yourself: `PYTHONPATH=src python benchmarks/study.py conformal-scale`.
 
-## At scale: 10,822 systematically-selected series (`large_study.py`)
+## At scale: 10,822 systematically-selected series (`study.py conformal-scale`)
 
 The 42-series result invites one fair objection — *you picked the series*. So we
 re-ran it on a **bias-free universe**: every FRED series tagged `daily`, ordered
@@ -190,7 +190,7 @@ most recent 6,000 changes.
 The opponent is `crepes` with a **naive (zero-change) mean** — the cheapest mean
 model, which is why this arm scales to ten thousand series. (A *fitted*-mean
 conformal — AutoARIMA + conformal — is the tougher CRPS opponent; it costs a refit
-per step, so it lives in the smaller `sota_study.py`. Same opponent family,
+per step, so it lives in the smaller `sota` preset. Same opponent family,
 different mean model, different feasible universe size.)
 
 ### Read the CRPS numbers honestly — a single fixed policy, not best-of-ours
@@ -270,8 +270,8 @@ conformal predictive systems cannot take the field, and skaters can** — while
 *also* matching the CRPS specialist on its own metric, by conforming the tail
 last without touching the model.
 
-Run it: `PYTHONPATH=src python benchmarks/large_study.py` (needs a venv with
-`crepes` + a FRED key).
+Run it: `PYTHONPATH=src python benchmarks/study.py conformal-scale` (needs a venv
+with `crepes` + a FRED key).
 
 ## On the table
 

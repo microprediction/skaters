@@ -101,7 +101,7 @@ To pit it against the classical baselines on your own data, the benchmark harnes
 scores everything through the same `Dist` on held-out log-likelihood **and** CRPS:
 
 ```
-PYTHONPATH=src python benchmarks/sota_study.py     # vs AutoARIMA / AutoETS / conformal / GARCH-t
+PYTHONPATH=src python benchmarks/study.py sota     # vs AutoARIMA / AutoETS / conformal / GARCH-t
 ```
 
 The honest headline on 500 FRED change-series: `laplace` **wins the likelihood
