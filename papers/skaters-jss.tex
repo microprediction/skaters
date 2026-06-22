@@ -436,13 +436,15 @@ zero-shot result as the headline.}
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
 
-A companion sweep on $2{,}500$ \proglang{FRED} series isolates the effect of the
-terminal-leaf objective against the \pkg{crepes} conformal predictive system
-(given its three best calibration windows and scored on its own CDF via the
-pinball decomposition of CRPS). Because the conformal opponent there uses only a
-naive mean, we read this as an ablation of our own objective knob rather than a
-state-of-the-art claim. Reporting per-policy and de-correlating to one vote per
-correlated family (194 families):
+A companion sweep on $10{,}822$ \proglang{FRED} series (every daily-tagged series
+by popularity) isolates the effect of the terminal-leaf objective against the
+\pkg{crepes} conformal predictive system (scored on its own CDF via the pinball
+decomposition of CRPS). We report the single fixed \code{laplace} default --- not
+a per-series best-of, which would be post-hoc selection --- and give the opponent
+its best calibration window per series. Because this conformal opponent uses a
+naive (zero-change) mean, we read it as an ablation of our own objective knob
+rather than a state-of-the-art claim. Per-policy, de-correlating to one vote per
+correlated family (198 families):
 
 \begin{table}[h!]
 \centering
@@ -450,17 +452,20 @@ correlated family (194 families):
 \toprule
 Forecaster (identical structure) & CRPS, raw & CRPS, family & Mean LL \\
 \midrule
-likelihood trunk + likelihood leaf & 85.2\,\% & 55.2\,\% & 3.44 \\
-likelihood trunk + CRPS leaf       & \textbf{91.2\,\%} & \textbf{64.1\,\%} & \textbf{3.49} \\
-bare CRPS leaf (no trunk)          & 80.6\,\% & 60.1\,\% & 2.96 \\
+likelihood trunk + likelihood leaf & 92.1\,\% & 55.6\,\% & 2.97 \\
+likelihood trunk + CRPS leaf       & \textbf{96.6\,\%} & \textbf{64.8\,\%} & \textbf{2.99} \\
+bare CRPS leaf (no trunk)          & 92.6\,\% & 61.0\,\% & 2.82 \\
 \bottomrule
 \end{tabular}
-\caption{Effect of the terminal-leaf objective. The middle row is the
-\emph{model first, conform last} recipe (the \code{laplace} default: CRPS leaf,
-lattice projection on). A general likelihood policy already edges conformal on
-CRPS over independent families ($55.2\%$); repointing only the terminal leaf to
-CRPS lifts that to $64.1\%$ and raises log-likelihood ($3.44 \rightarrow 3.49$),
-matching the dedicated CRPS specialist while modelling faithfully.}
+\caption{Effect of the terminal-leaf objective (fixed \code{laplace} vs
+best-of-crepes, $10{,}822$ series). The middle row is the \emph{model first,
+conform last} recipe (the \code{laplace} default: CRPS leaf, lattice projection
+on). A general likelihood policy already edges conformal on CRPS over independent
+families ($55.6\%$); repointing only the terminal leaf to CRPS lifts that to
+$64.8\%$ and raises log-likelihood ($2.97 \rightarrow 2.99$), matching the
+dedicated CRPS specialist while modelling faithfully. Crepes' CRPS is U-shaped in
+window length (optimum near 250); \code{laplace} beats its best-of-$\{60\dots1500\}$
+on $96.4\%$ of series, so the gap is structural, not a calibration-window choice.}
 \label{tab:objective}
 \end{table}
 
