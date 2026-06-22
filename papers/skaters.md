@@ -52,7 +52,7 @@ abstraction yields three things the paper develops in turn:
    and while vanishing on continuous data; an online *coordinate* search (§6)
    learns whether a series is simple in a log, root, or linear coordinate; and a
    committed *martingale* model (§7) learns only a volatility clock.
-3. **An honest, bias-free benchmark** (§8) on 2,500 systematically chosen FRED
+3. **An honest, bias-free benchmark** (§8) on 10,822 systematically chosen FRED
    series, with ablations (§9) showing that most of the conventional "named
    method" menu is redundant out of sample.
 
@@ -160,6 +160,17 @@ motion, so the model is literally "Brownian motion on a stochastic clock". It
 beats the general forecaster on near-martingale levels by committing the mean and
 spending capacity on the clock; on mean-reverting series the prior is wrong and
 it gives ground — a deliberately sharp instrument.
+
+The clock candidates have a Bayesian reading. Each is a *score-driven* update
+(Creal, Koopman, and Lucas 2013; Harvey 2013): the GARCH variance recursion
+$h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$ is, term for term, the
+inverse-Fisher-scaled conditional score, and Hansen and Tong (2026) show via
+Tweedie's formula that under a conjugate prior and local precision discounting it
+is the *exact* Bayesian posterior-mean correction for the variance — with the
+same smoothing factor $\alpha = 1-\delta$ that governs the exponential-smoothing
+and GARCH-style transforms, and the Gaussian-location case recovering the Kalman
+filter. Averaging the candidates thus blends a family of (approximate) Bayesian
+volatility filters.
 
 # 8. Experiments
 
@@ -350,4 +361,5 @@ reproducible across both runtimes and in the browser via Pyodide.
 scoring rules; Vovk, Gammerman & Shafer 2005 on conformal prediction; Box & Cox
 1964 and Yeo & Johnson 2000 on power transforms; Doob 1953, Dambis 1965, Dubins &
 Schwarz 1965 on the martingale time change; Engle 1982, Bollerslev 1986 on GARCH;
-Welford 1962; Ledoit & Wolf 2004.)*
+Creal, Koopman & Lucas 2013 and Harvey 2013 on score-driven models, Hansen & Tong
+2026 on their Tweedie/Bayesian interpretation; Welford 1962; Ledoit & Wolf 2004.)*
