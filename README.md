@@ -322,6 +322,30 @@ Interactive demos (forecasting playground in native JS, and the real Python pack
 - **Pure Python** — zero dependencies, only `math.erf` and `math.exp`
 - **Pyodide compatible** — works in the browser via WebAssembly
 
+## Theoretical context
+
+The online recursions here are **score-driven updates** with a Bayesian reading.
+The EMA level update $\mu_t = \mu_{t-1} + \alpha\,(y_t - \mu_{t-1})$ and the GARCH
+variance update $h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$ — the heart of
+`doob`'s volatility clock — are both inverse-Fisher-scaled conditional-score
+corrections. Via **Tweedie's formula**, Hansen & Tong (2026,
+[arXiv:2605.15902](https://arxiv.org/abs/2605.15902)) show these are the *exact*
+Bayesian posterior-mean corrections under a conjugate prior with local precision
+discounting (with the smoothing factor identified as $\alpha = 1-\delta$, the
+Gaussian-location case recovering the Kalman filter), and tractable local
+approximations otherwise. So `doob` is averaging a family of (approximate)
+Bayesian volatility filters rather than ad-hoc heuristics. See also Creal,
+Koopman & Lucas (2013) and Harvey (2013) for the score-driven / GAS framework.
+
+The same identity is the backbone of modern **denoising / score-based diffusion
+models**: the posterior mean of a clean signal given a noisy observation is
+"observation $+\ \sigma^2 \times$ score of the marginal density," which is what
+lets a diffusion denoiser be read as a score estimator (Efron 2011; Vincent 2011;
+Song & Ermon 2019). Each forecast step here is the time-series analogue —
+denoising the next observation toward the latent level or variance. A short essay
+on this — Kalman, empirical Bayes, and diffusion as one identity — is in
+[`papers/tweedie-note.md`](papers/tweedie-note.md).
+
 ## Lineage
 
 This package distills ideas from timemachines, which provided a common skater interface for dozens of time series packages. This is a from-scratch rewrite focused on speed, distributional predictions, and browser compatibility.
