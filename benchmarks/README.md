@@ -8,6 +8,27 @@ zero-dependency and pure Python.
 python benchmarks/bench.py
 ```
 
+## One harness, many presets (`study.py`)
+
+There is a *single* study. Everything below is the same machine — one FRED
+change-series loader, one one-step `Dist` scorer (`bench_core.py`), one opponent
+registry (`opponents.py`) — differing only in **which opponents** and **how big a
+universe** (which is set by what the opponents can afford). Conformal isn't a
+separate study; it's `conformal(mean=…)` — naive-mean (cheap, scales to the whole
+universe) or AutoARIMA-mean (a refit per step, so small-N). Slow methods carry a
+per-method `max_series` budget: they cover fewer series (N reported), but always
+score a covered series fully — never a within-series shortcut (Prophet refits at
+*every* step, because reusing a fit scores multi-step-ahead as one-step).
+
+```bash
+PYTHONPATH=src python benchmarks/study.py conformal-scale   # ours vs naive-mean crepes, whole daily universe
+PYTHONPATH=src python benchmarks/study.py sota              # ours vs the heavy baselines, small universe
+PYTHONPATH=src python benchmarks/study.py <preset> summarize
+```
+
+The sections below describe each preset's opponents and the published numbers.
+(The older per-study entry points are being folded into `study.py`.)
+
 Everything is judged by **held-out predictive log-likelihood** (higher is
 better). Coverage is deliberately not a criterion: a method can hit nominal
 coverage with a terrible density.

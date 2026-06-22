@@ -246,29 +246,22 @@ def ets_scores(ch):
 
 
 PROPHET_Z90 = 1.6448536269514722
-# Prophet is ruinously slow (a fresh Stan fit has no cheap online update), so we
-# do NOT score every one of the TEST points. Instead we sample one one-step test
-# every PROPHET_STRIDE steps: fit on history-up-to-t, forecast the single next
-# step, score the realized y[t]. At stride 50 that's ~TEST/50 fits per series
-# instead of a fit every REFIT steps + 300 scores. It is a subsample of the same
-# rolling one-step test (noisier per-series, same expected per-step score), and
-# must be reported as such. Set PROPHET_STRIDE=1 for the full (interminable) sweep.
-PROPHET_STRIDE = int(os.environ.get("PROPHET_STRIDE", 50))
 
 
 def prophet_scores(ch):
     """Facebook Prophet on the change series — the popular, heavy foil. A fresh
-    Stan fit has no cheap online update, so rather than the full TEST-point sweep
-    we sample one one-step test every PROPHET_STRIDE steps: fit on history-up-to-t,
-    forecast the single next step, read the 90% interval as a Gaussian predictive,
-    and score the realized y[t]. Returns the mean (logpdf, crps) over the sampled
-    points, or None if no point could be fit. Report it as a stride-subsampled
-    estimate (see PROPHET_STRIDE)."""
+    Stan fit has NO cheap online update, so a true one-step-ahead forecast at step
+    t requires fitting on history[:t] and predicting t — there is no honest
+    shortcut (reusing a fit scores multi-step-ahead as one-step, which is garbage).
+    So we refit at EVERY step over the TEST window. Ruinously slow (~TEST Stan fits
+    per series); it is meant to run on a SMALL universe (SOTA_N small) — a method
+    that is too slow for a series should skip that series, never cut corners within
+    it. Returns mean (logpdf, crps, n=TEST) or None if it could not fit at all."""
     import contextlib, io
     y = np.asarray(ch, float); n = len(y); start = n - TEST
     ds_all = pd.date_range("2000-01-01", periods=n, freq="D")
     lp = cr = 0.0; m = 0
-    for t in range(start, n, PROPHET_STRIDE):
+    for t in range(start, n):                       # every single step — no reuse
         hist = pd.DataFrame({"ds": ds_all[:t], "y": y[:t]})
         try:
             mdl = Prophet(interval_width=0.90, daily_seasonality=False,
@@ -277,14 +270,14 @@ def prophet_scores(ch):
                     contextlib.redirect_stderr(io.StringIO()):
                 mdl.fit(hist)
                 fc = mdl.predict(mdl.make_future_dataframe(
-                    periods=2, freq="D")).set_index("ds")
+                    periods=1, freq="D")).set_index("ds")
         except Exception:               # noqa: BLE001
             continue
         row = fc.iloc[t]                # ds_all[t]: the one-step-ahead forecast
         sd = max((row["yhat_upper"] - row["yhat_lower"]) / (2 * PROPHET_Z90), 1e-9)
         a, b = score_dist(Dist.gaussian(float(row["yhat"]), sd), y[t])
         lp += a; cr += b; m += 1
-    return (lp / m, cr / m, m) if m else None     # m = sampled points (<< TEST)
+    return (lp / m, cr / m, m) if m else None
 
 
 NF_INPUT = int(os.environ.get("SOTA_NF_INPUT", 24))
