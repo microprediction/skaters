@@ -39,18 +39,24 @@ for y in observations:
 
 Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
-## The two forecasters
+## The named forecasters
 
-`skaters` exposes exactly two named forecasters — everything else is a building
-block (transforms, leaves, ensembles) you can compose. ("skater" is the *concept*
-— any `(y, state) -> ([Dist], state)` function, borrowed from the old timemachines package)
+`skaters` exposes a general forecaster plus two committed specialists —
+everything else is a building block (transforms, leaves, ensembles) you can
+compose. ("skater" is the *concept* — any `(y, state) -> ([Dist], state)`
+function, borrowed from the old timemachines package)
 
 ```python
-from skaters import laplace, doob
+from skaters import laplace, doob, mean_revert
 
-f = laplace(k=1)   # general purpose — the default
-f = doob(k=1)      # committed martingale + volatility clock (feed levels)
+f = laplace(k=1)         # general purpose — the default
+f = doob(k=1)            # committed martingale + volatility clock (feed levels)
+f = mean_revert(k=10)    # committed mean reversion — multi-step (spreads, vol, rates)
 ```
+
+`doob` and `mean_revert` are opposite priors: `doob` commits to a martingale (no
+reversion), `mean_revert` to reversion toward a running mean. Pick the one whose
+prior matches your series; `laplace` if you're unsure.
 
 ### `laplace` — the general forecaster
 
@@ -88,6 +94,27 @@ Feed it the **level** series (prices, indices, rates), not pre-differenced
 changes. When the martingale prior holds it edges `laplace` by committing the
 mean and spending its capacity on the clock; on genuinely mean-reverting series
 (e.g. the VIX) the prior is wrong and it gives ground — a deliberately sharp tool.
+
+### `mean_revert` — the mean-reversion specialist
+
+The counterpart to `doob`: where `doob` commits to a martingale, `mean_revert`
+commits to **Ornstein–Uhlenbeck reversion toward a running mean** and learns only
+*how fast*, averaging candidates over a grid of reversion speeds (online,
+likelihood-weighted). It's built for exactly the regime where `doob` gives ground.
+
+```python
+f = mean_revert(k=10)                  # signed spreads (pairs trading) — linear space
+f = mean_revert(k=10, coordinate=0.5)  # positive series (vol, rates) — sqrt / CIR space
+f = mean_revert(k=10, coordinate=0.0)  # positive series — log / geometric reversion
+```
+
+The reversion edge over a random walk **grows with the horizon** ($1-\phi^h$), so
+this is primarily a **multi-step** tool — feed it `k>1`. (At one step, mean
+reversion is nearly indistinguishable from predicting the running level, which the
+general pool already does.) The mechanism is `ou_transform`, a reusable
+mean-reversion transform; the math is the OU-on-a-coordinate reading of CIR — see
+[`papers/tweedie-note.md`](papers/tweedie-note.md) and the validation in
+[`benchmarks/cir_ablation.py`](benchmarks/cir_ablation.py).
 
 ## Architecture
 
