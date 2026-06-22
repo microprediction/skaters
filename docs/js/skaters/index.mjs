@@ -10,7 +10,7 @@ export { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
 export { ema } from "./ema.mjs";
 export { conjugate } from "./conjugate.mjs";
 export {
-  difference, fractionalDifference, standardize, emaTransform, theta, drift,
+  difference, fractionalDifference, standardize, emaTransform, ouTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr,
 } from "./transform.mjs";
 export { precisionWeightedEnsemble } from "./ensemble.mjs";
@@ -19,7 +19,7 @@ export { terminalLeafEnsemble } from "./terminal.mjs";
 export { search, TRANSFORMS } from "./search.mjs";
 export { periodDetector, topPeriods, DEFAULT_LAGS } from "./periodicity.mjs";
 export {
-  buildCandidates, laplace, doob,
+  buildCandidates, laplace, doob, meanRevert,
 } from "./api.mjs";
 export { sticky } from "./sticky.mjs";
 export {

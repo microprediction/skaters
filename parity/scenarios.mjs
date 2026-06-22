@@ -6,10 +6,10 @@ import { ema } from "../docs/js/skaters/ema.mjs";
 import { precisionWeightedEnsemble } from "../docs/js/skaters/ensemble.mjs";
 import { bayesianEnsemble } from "../docs/js/skaters/bayesian.mjs";
 import {
-  difference, fractionalDifference, standardize, emaTransform, theta, drift,
+  difference, fractionalDifference, standardize, emaTransform, ouTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
 } from "../docs/js/skaters/transform.mjs";
-import { laplace, doob } from "../docs/js/skaters/api.mjs";
+import { laplace, doob, meanRevert } from "../docs/js/skaters/api.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
 import {
@@ -36,6 +36,8 @@ export function buildScenarios() {
     s.push([`grouped_ar${suf}`, k, conjugate(leaf(k), groupedAr(8), k)]);
     s.push([`yeojohnson_log${suf}`, k, conjugate(leaf(k), yeoJohnson(0.0), k)]);
     s.push([`yeojohnson_half${suf}`, k, conjugate(leaf(k), yeoJohnson(0.5), k)]);
+    s.push([`ou${suf}`, k, conjugate(leaf(k), ouTransform(0.1), k)]);
+    s.push([`ou_sqrt${suf}`, k, conjugate(conjugate(leaf(k), ouTransform(0.1), k), yeoJohnson(0.5), k)]);
     s.push([`ema_skater${suf}`, k, ema(0.05, k)]);
     s.push([`pw_ensemble${suf}`, k,
       precisionWeightedEnsemble([ema(0.05, k), ema(0.2, k)], k)]);
@@ -45,7 +47,7 @@ export function buildScenarios() {
   }
 
   // Named policies
-  const pols = { laplace, doob };
+  const pols = { laplace, doob, mean_revert: meanRevert };
   for (const [nm, fac] of Object.entries(pols)) s.push([`pol_${nm}`, 1, fac(1)]);
 
   // Adaptive-search engine (still public via skaters.search)
