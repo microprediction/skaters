@@ -354,4 +354,5 @@ reproducible across both runtimes and in the browser via Pyodide.
 scoring rules; Vovk, Gammerman & Shafer 2005 on conformal prediction; Box & Cox
 1964 and Yeo & Johnson 2000 on power transforms; Doob 1953, Dambis 1965, Dubins &
 Schwarz 1965 on the martingale time change; Engle 1982, Bollerslev 1986 on GARCH;
-Welford 1962; Ledoit & Wolf 2004.)*
+Creal, Koopman & Lucas 2013 and Harvey 2013 on score-driven models, Hansen & Tong
+2026 on their Tweedie/Bayesian interpretation; Welford 1962; Ledoit & Wolf 2004.)*
