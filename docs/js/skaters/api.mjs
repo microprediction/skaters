@@ -8,7 +8,7 @@ import { terminalLeafEnsemble } from "./terminal.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
 import { sticky as project } from "./sticky.mjs";
 import {
-  difference, fractionalDifference, standardize, emaTransform, drift,
+  difference, fractionalDifference, standardize, emaTransform, ouTransform, drift,
   holtLinear, ar, theta, seasonalDifference, garch, powerTransform, yeoJohnson,
 } from "./transform.mjs";
 
@@ -155,5 +155,29 @@ export function doob(k = 1, objective = "crps") {
   ];
   const f = bayesianEnsemble(cands, { k, learningRate: 0.5, depths: [1, 2, 2, 2, 1], maxComponents: 30 });
   f.skaterName = `doob(k=${k})`;
+  return f;
+}
+
+// The mean-reverting counterpart of doob: an online likelihood-weighted average
+// over Ornstein-Uhlenbeck reversion speeds (JS port of api.mean_revert).
+export function meanRevert(k = 1, kappas = [0.02, 0.05, 0.1, 0.2, 0.4], alpha = 0.02,
+                           coordinate = null, objective = "crps") {
+  const leafFn = objectiveLeaf(objective);
+  const cands = [];
+  const depths = [];
+  for (const kp of kappas) {
+    let c = conjugate(leaf(k), ouTransform(kp, alpha), k);
+    let depth = 1;
+    if (coordinate !== null && coordinate !== undefined) {
+      c = conjugate(c, yeoJohnson(coordinate), k);
+      depth = 2;
+    }
+    cands.push(c);
+    depths.push(depth);
+  }
+  const f = terminalLeafEnsemble(cands, {
+    k, leafFn, learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
+  });
+  f.skaterName = `mean_revert(k=${k})`;
   return f;
 }
