@@ -63,56 +63,61 @@ The honest head-to-head against everything we could find that claims a
 *distributional* one-step forecast: `statsforecast`'s **AutoARIMA** and
 **AutoETS**; `statsmodels` **SARIMAX** and **ETS** (exact closed-form Gaussian
 predictives); the `arch` package's **GARCH(1,1)-t** (the classical heavy-tail /
-volatility-clustering SOTA); **NeuralForecast** with a **Student-t** distribution
-head; and **AutoARIMA paired with conformal residuals** (split-conformal + an
-adaptive/ACI variant). Fair rolling one-step-ahead on 500 FRED change series:
-each baseline is fit on an expanding/rolling window with periodic refit, and
-*every* method — ours and theirs — is turned into the same `Dist` and scored on
-held-out log-likelihood **and** CRPS. All but the conformal pair emit genuine
-densities, so this is a real likelihood test. **Per-series** win-rate (the
-fraction of series where `laplace` scores better), reported both for all 500 and
-for the **309 continuous** series (< 5 % exactly-repeating changes), since on
-repeating/grid series the lattice projection gives a large but metric-specific
-edge that would otherwise dominate the aggregate:
+volatility-clustering SOTA); **AutoARIMA paired with conformal residuals**
+(split-conformal + an adaptive/ACI variant); and **Prophet**. Fair rolling
+one-step-ahead on **500 popularity-ranked daily FRED change series**: each
+baseline is fit on an expanding/rolling window with periodic refit (Prophet
+refits *every* step — it has no online update), and *every* method — ours and
+theirs — is turned into the same `Dist` and scored on held-out log-likelihood
+**and** CRPS. All but the conformal pair emit genuine densities, so this is a real
+likelihood test. **Per-series** win-rate (the fraction of series where `laplace`
+scores better), reported both for all 500 and for the **389 continuous** series
+(< 5 % exactly-repeating changes), since on repeating/grid series the lattice
+projection gives a large but metric-specific edge that would otherwise dominate
+the aggregate (numbers from the unified `study.py sota` run):
 
 | baseline | LL (all / cont) | CRPS (all / cont) | mean LL (cont) |
 |---|---|---|---|
-| AutoARIMA | **78 % / 64 %** | 51 % / 47 % | 2.09 |
-| AutoETS | **92 % / 88 %** | 68 % / 67 % | 2.20 |
-| SARIMAX (statsmodels) | **82 % / 72 %** | 53 % / 49 % | 2.13 |
-| ETS (statsmodels) | **93 % / 89 %** | 69 % / 68 % | 2.12 |
-| GARCH(1,1)-t (`arch`) | **79 % / 67 %** | 76 % / 66 % | 2.72 |
-| NF-StudentT (NeuralForecast) | **100 % / 100 %** | 78 % / 76 % | 0.82 |
-| AutoARIMA + conformal | **84 % / 75 %** | 37 % / 29 % | 1.47 |
-| AutoARIMA + ACI | **87 % / 80 %** | 36 % / 28 % | 1.89 |
+| AutoARIMA | **88 % / 85 %** | 68 % / 64 % | 2.79 |
+| AutoETS | **95 % / 94 %** | 77 % / 73 % | 2.76 |
+| SARIMAX (statsmodels) | **89 % / 86 %** | 64 % / 59 % | 2.88 |
+| ETS (statsmodels) | **93 % / 92 %** | 74 % / 70 % | 2.87 |
+| GARCH(1,1)-t (`arch`) | 59 % / 51 % | 40 % / 33 % | 2.92 |
+| AutoARIMA + conformal | **87 % / 83 %** | 31 % / 21 % | 2.39 |
+| AutoARIMA + ACI | **89 % / 86 %** | 31 % / 21 % | 2.52 |
+| Prophet † | **100 % / 100 %** | 100 % / 100 % | 1.86 |
+| NF-StudentT ‡ | **100 % / 100 %** | 78 % / 76 % | 0.82 |
 
-*(`laplace`: mean continuous logpdf **2.855**.)*
+*(`laplace`: mean continuous logpdf **3.10**. † Prophet n = 30 (every-step refit
+is ruinously slow). ‡ NF-StudentT carried from the prior run — it needs `torch`
+and was not re-scored in this run.)*
 
-> **`laplace` wins the likelihood race, per-series, against all eight.** The two
-> results that matter:
+> **`laplace` wins the likelihood race, per-series, against every density baseline
+> — except it is a near dead-heat with GARCH-t.** The results that matter:
 >
-> - **GARCH-t is the real test** — it is the heavy-tail / vol-clustering SOTA, so
->   it is *supposed* to win on financial change-series. It is indeed the tightest
->   likelihood race (laplace wins 67 % of continuous series; mean continuous
->   logpdf **2.855 vs 2.72**, a genuine but *narrow* +0.14 nats). The heavy-tail
->   claim holds **against the heavy-tail specialist** — which is the point.
-> - **The NF-StudentT 100 % is not a scalp.** It is NeuralForecast run in the
->   *matched online univariate one-step* protocol (a tiny per-series MLP, periodic
->   refit) — NF's **weak** regime. NF is built for **global cross-series** training;
->   this says nothing about DeepAR-style models in their home setting, and we
->   don't claim it does.
+> - **GARCH-t is the real test** — the heavy-tail / vol-clustering SOTA, so it is
+>   *supposed* to win on financial change-series. On this popularity-ranked
+>   universe (rates/FX/indices heavy) the likelihood race is a **near tie**:
+>   `laplace` wins only **51 %** of continuous series on log-likelihood, though its
+>   mean continuous logpdf still edges ahead, **3.10 vs 2.92** (+0.18 nats). The
+>   heavy-tail claim holds **against the heavy-tail specialist** — but narrowly,
+>   and we say so.
+> - **The deep baselines lose on likelihood by a wide margin** (AutoETS/ETS/SARIMAX/
+>   AutoARIMA 85–94 % continuous), and Prophet is dominated (100 %, n = 30). NF in
+>   this *matched online univariate one-step* protocol is NF's **weak** regime
+>   (it is built for global cross-series training); we don't read it as a scalp.
 >
-> On **CRPS** the picture is mixed (as ever): laplace beats AutoETS / ETS /
-> GARCH-t / NF, roughly ties AutoARIMA / SARIMAX, and *loses* to the conformal
-> variants, which are CRPS-optimised. Likelihood is the metric where a faithful
-> density wins; CRPS is conformal's home turf.
+> On **CRPS** the picture is mixed (as ever): laplace beats the mean-model
+> baselines, but *loses* to **GARCH-t** (33 % continuous) and the **conformal
+> variants** (21 %), which are CRPS-optimised. Likelihood is the metric where a
+> faithful density wins; CRPS is conformal's (and GARCH's) home turf.
 
 We report per-series (not family-clustered) because on this universe the family
-heuristic *inflated* the numbers. Scope: 500 change-series, one-step horizon;
-Prophet and longer horizons are left for later. Zero-shot foundation models get
-their own protocol — see the next section. Run it (parallel across cores):
-`PYTHONPATH=src python benchmarks/study.py sota` (venv with `statsforecast`,
-`arch`, `statsmodels`, `neuralforecast`, `crepes`, and a FRED key).
+heuristic *inflated* the numbers. Scope: 500 daily change-series, one-step
+horizon. Zero-shot foundation models get their own protocol — see the next
+section. Run it (parallel across cores): `PYTHONPATH=src python
+benchmarks/study.py sota` (venv with `statsforecast`, `arch`, `statsmodels`,
+`crepes`, optionally `neuralforecast`/`prophet`, and a FRED key).
 
 ## Zero-shot foundation models (`foundation_study.py`)
 

@@ -316,11 +316,12 @@ log-likelihood \emph{and} CRPS over the same test window. The parametric
 Student-$t$ predictives (\pkg{GARCH}, \pkg{NeuralForecast}) are represented as
 finite Gaussian scale mixtures, matching the analytic $t$ density to $\sim
 10^{-3}$. We report per-series win-rates (the fraction of series on
-which \code{laplace} scores better), and additionally restrict to the $309$
+which \code{laplace} scores better), and additionally restrict to the $389$
 continuous series --- those with under $5\%$ exactly-repeating one-step
 changes --- since on repeating/grid series the lattice projection
 (Section~\ref{sec:lattice}) gives a large but metric-specific advantage that
-would otherwise dominate the aggregate. Table~\ref{tab:sota} reports the result.
+would otherwise dominate the aggregate. Table~\ref{tab:sota} reports the result
+(the unified \code{study.py sota} run).
 
 \begin{table}[t!]
 \centering
@@ -328,44 +329,53 @@ would otherwise dominate the aggregate. Table~\ref{tab:sota} reports the result.
 \toprule
 Baseline & LL (all / cont.) & CRPS (all / cont.) & Mean LL (cont.) \\
 \midrule
-\pkg{AutoARIMA}             & \textbf{78 / 64\,\%} & 51 / 47\,\% & 2.09 \\
-\pkg{AutoETS}               & \textbf{92 / 88\,\%} & 68 / 67\,\% & 2.20 \\
-\pkg{SARIMAX} (statsmodels) & \textbf{82 / 72\,\%} & 53 / 49\,\% & 2.13 \\
-ETS (statsmodels)           & \textbf{93 / 89\,\%} & 69 / 68\,\% & 2.12 \\
-\pkg{GARCH}$(1,1)$-$t$      & \textbf{79 / 67\,\%} & 76 / 66\,\% & \textbf{2.72} \\
-NF-Student$t$               & \textbf{100 / 100\,\%} & 78 / 76\,\% & 0.82 \\
-\pkg{AutoARIMA} + conformal & \textbf{84 / 75\,\%} & 37 / 29\,\% & 1.47 \\
-\pkg{AutoARIMA} + ACI       & \textbf{87 / 80\,\%} & 36 / 28\,\% & 1.89 \\
+\pkg{AutoARIMA}             & \textbf{88 / 85\,\%} & 68 / 64\,\% & 2.79 \\
+\pkg{AutoETS}               & \textbf{95 / 94\,\%} & 77 / 73\,\% & 2.76 \\
+\pkg{SARIMAX} (statsmodels) & \textbf{89 / 86\,\%} & 64 / 59\,\% & 2.88 \\
+ETS (statsmodels)           & \textbf{93 / 92\,\%} & 74 / 70\,\% & 2.87 \\
+\pkg{GARCH}$(1,1)$-$t$      & 59 / 51\,\% & 40 / 33\,\% & \textbf{2.92} \\
+\pkg{AutoARIMA} + conformal & \textbf{87 / 83\,\%} & 31 / 21\,\% & 2.39 \\
+\pkg{AutoARIMA} + ACI       & \textbf{89 / 86\,\%} & 31 / 21\,\% & 2.52 \\
+Prophet$^{\dagger}$         & \textbf{100 / 100\,\%} & 100 / 100\,\% & 1.86 \\
+NF-Student$t^{\ddagger}$    & \textbf{100 / 100\,\%} & 78 / 76\,\% & 0.82 \\
 \bottomrule
 \end{tabular}
 \caption{Per-series win-rate of \code{laplace} versus each baseline on 500
-\proglang{FRED} change-series, all and on the 309 continuous series. LL counts
-series where \code{laplace} has the higher held-out log-likelihood; CRPS where it
-has the lower CRPS. The final column is each baseline's mean continuous
-log-likelihood (\code{laplace}: 2.855). Higher is better for LL; lower for
-CRPS.}
+popularity-ranked daily \proglang{FRED} change-series, all and on the 389
+continuous series. LL counts series where \code{laplace} has the higher held-out
+log-likelihood; CRPS where it has the lower CRPS. The final column is each
+baseline's mean continuous log-likelihood (\code{laplace}: 3.10). Higher is better
+for LL; lower for CRPS. $^{\dagger}$Prophet refits at every step ($n=30$; a fresh
+Stan fit has no online update). $^{\ddagger}$NF-Student$t$ is carried from the
+prior run --- it requires \pkg{torch} and was not re-scored in this run.}
 \label{tab:sota}
 \end{table}
 
 \paragraph{The likelihood race.}
-\code{laplace} wins the per-series log-likelihood race against all eight
-baselines, on the full universe and on the continuous subset, including the two
-exact-Gaussian references (\pkg{SARIMAX}, statsmodels ETS) for which there is no
-band-reconstruction approximation to blame.
+\code{laplace} wins the per-series log-likelihood race against every baseline
+decisively (85--94\% of continuous series) --- including the two exact-Gaussian
+references (\pkg{SARIMAX}, statsmodels ETS) for which there is no
+band-reconstruction approximation to blame --- with a single exception, a near
+dead-heat with \pkg{GARCH}-$t$.
 
 \paragraph{\pkg{GARCH}-$t$ is the tightest case.}
 The \pkg{GARCH}$(1,1)$-$t$ model is purpose-built for the heavy tails and
-volatility clustering of financial change-series, so it is the strongest opponent
-on log-likelihood, and the numbers bear that out. It is the closest race
-($67\%$ of continuous series), and its mean continuous log-likelihood, $2.72$, is
-nearest to ours, $2.855$, a narrow edge of about $0.14$ nats per observation. That
-the advantage holds against the heavy-tail specialist is the substantive point:
-the general forecaster captures the same conditional heteroscedasticity without
-committing to a parametric volatility law.
+volatility clustering of financial change-series, so it is by far the strongest
+opponent on log-likelihood, and on this popularity-ranked universe (heavy in
+rates, FX, and indices) the per-series race is a \emph{near dead-heat}:
+\code{laplace} has the higher held-out log-likelihood on only $51\%$ of continuous
+series. Its \emph{mean} continuous log-likelihood nonetheless edges ahead,
+$3.10$ versus $2.92$ --- about $0.18$ nats per observation, a slightly larger gap
+than the win-rate suggests because \code{laplace} avoids the worst tail
+mis-specifications. That a general forecaster matches the heavy-tail specialist
+series-by-series, and edges it on average, without committing to a parametric
+volatility law, is the substantive point --- stated with the honest caveat that
+against this one opponent it is a tie, not a rout.
 
 \paragraph{The neural result, in context.}
-\code{laplace} beats NF-Student$t$ on $100\%$ of series, but the comparison needs
-reading carefully. NF here is \pkg{NeuralForecast} run in the matched online
+\code{laplace} beats NF-Student$t$ on $100\%$ of series (carried from the prior
+run; the unified run omits NF, which requires \pkg{torch}), but the comparison
+needs reading carefully. NF here is \pkg{NeuralForecast} run in the matched online
 univariate one-step protocol, a small per-series multilayer perceptron with
 periodic refit, which is its weak regime. Neural and foundation forecasters
 \citep{salinas2020deepar, olivares2022neuralforecast} are built for global
@@ -377,21 +387,22 @@ densities are well formed (median log-likelihood $0.50$, none floored), so the
 $100\%$ is a real calibration gap, not a degenerate score.
 
 \paragraph{CRPS.}
-As ever, CRPS tells a mixed story. \code{laplace} beats the smoothing baselines
-(\pkg{AutoETS}, ETS), \pkg{GARCH}-$t$ and NF on CRPS, roughly ties the
-\pkg{ARIMA} family (\pkg{AutoARIMA} $51\%$, \pkg{SARIMAX} $53\%$), and
-\emph{loses} to the conformal variants ($37\%$, $36\%$), which are CRPS-optimised
-by construction. This is exactly the thesis of Sections~\ref{sec:leaf}: likelihood
-is the metric where a faithful density wins; CRPS is conformal's home turf, where
-we are competitive but not dominant. A practitioner who truly only cares about
-CRPS can repoint the leaf (Section~\ref{sec:ablations}); a practitioner who cares
-about the density --- for risk, sizing, or combination --- should prefer the
+As ever, CRPS tells a mixed story. \code{laplace} beats the mean-model baselines
+on CRPS --- the \pkg{ARIMA} family (\pkg{AutoARIMA} $64\%$, \pkg{SARIMAX} $59\%$),
+the smoothing models (\pkg{AutoETS} $73\%$, ETS $70\%$), and Prophet --- but
+\emph{loses} to \pkg{GARCH}-$t$ ($33\%$) and the conformal variants ($21\%$),
+which are CRPS-optimised (or volatility-specialised) by construction. This is
+exactly the thesis of Section~\ref{sec:leaf}: likelihood is the metric where a
+faithful density wins; CRPS is conformal's and \pkg{GARCH}'s home turf, where we
+are competitive but not dominant. A practitioner who truly only cares about CRPS
+can repoint the leaf (Section~\ref{sec:ablations}); a practitioner who cares about
+the density --- for risk, sizing, or combination --- should prefer the
 log-likelihood column.
 
 \paragraph{Scope.}
-Five hundred change-series, one-step horizon. Prophet, multi-step horizons and raw
-levels are left for later; zero-shot foundation models get their own protocol in
-Section~\ref{sec:foundation}.
+Five hundred popularity-ranked daily change-series, one-step horizon. Multi-step
+horizons and raw levels are left for later; zero-shot foundation models get their
+own protocol in Section~\ref{sec:foundation}.
 
 \subsection{Against zero-shot foundation models} \label{sec:foundation}
 
