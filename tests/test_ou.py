@@ -102,6 +102,14 @@ class TestMeanRevert:
 
         assert run(lambda: mean_revert(k=k)) > run(rw)
 
+    def test_pool_gated_on_multistep(self):
+        """laplace's pool gains the mean-reversion group only for k > 1."""
+        from skaters.api import _build_candidates
+        _, _, g1 = _build_candidates(1)
+        _, _, g3 = _build_candidates(3)
+        assert g1["mean_revert"] == []          # k=1 pool byte-identical to before
+        assert len(g3["mean_revert"]) == 6      # k>1 adds the OU group
+
     def test_coordinate_option_positive_series(self):
         f = mean_revert(k=2, coordinate=0.5)        # sqrt coordinate for positive data
         state = None

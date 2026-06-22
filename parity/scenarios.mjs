@@ -49,6 +49,8 @@ export function buildScenarios() {
   // Named policies
   const pols = { laplace, doob, mean_revert: meanRevert };
   for (const [nm, fac] of Object.entries(pols)) s.push([`pol_${nm}`, 1, fac(1)]);
+  // laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
+  s.push(["pol_laplace_k3", 3, laplace(3)]);
 
   // Adaptive-search engine (still public via skaters.search)
   s.push(["search_default", 1, search({ k: 1, expandInterval: 50 })]);

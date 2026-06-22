@@ -120,6 +120,18 @@ export function buildCandidates(k) {
     }
   }
 
+  // Mean-reversion prior (Ornstein-Uhlenbeck), MULTI-STEP ONLY: redundant with
+  // the ema/random-walk mix at one step, so gated on k > 1 (see api.py).
+  groups.mean_revert = [];
+  if (k > 1) {
+    for (const L of [0.0, 0.5]) {
+      for (const kappa of [0.03, 0.1, 0.3]) {
+        groups.mean_revert.push(push(
+          conjugate(conjugate(leaf(k), ouTransform(kappa, 0.02), k), yeoJohnson(L), k), 2));
+      }
+    }
+  }
+
   return [candidates, depths, groups];
 }
 
