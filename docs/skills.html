@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — Claude skills</title>
   <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .skill-copy { margin: 22px 0; padding-bottom: 18px; border-bottom: 1px solid var(--border, #e6e6ef); }
+    .skill-copy:last-of-type { border-bottom: none; }
+    .skill-copy-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .skill-copy-head h2 { margin: 0; }
+    .skill-label { color: var(--muted); margin: 6px 0 0; }
+    .skill-copy details { margin-top: 10px; }
+    .skill-copy summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
+    .skill-copy pre { margin-top: 10px; max-height: 460px; overflow: auto; }
+    .copy-btn { white-space: nowrap; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -24,64 +35,343 @@
 
   <main>
     <h1>Claude skills</h1>
-    <p class="subtitle">Markdown skills you can point Claude (or Claude Code) at — for using
-      <code>skaters</code>, for reviewing forecasting code, and for benchmarking any time-series
-      paper that ships code.</p>
+    <p class="subtitle">Markdown skills for Claude (or Claude Code). Hit <strong>Copy</strong>, paste into a
+      chat, done.</p>
 
-    <p>
-      A <em>skill</em> here is just a markdown file of instructions. Drop it in your repo, or paste
-      it into a chat, and Claude follows the procedure. Each one below lives in the
-      <a href="https://github.com/microprediction/skaters">skaters repository</a>.
-    </p>
+    <div class="skill-copy">
+      <div class="skill-copy-head">
+        <h2 id="benchmark-against-laplace"><code>benchmark-against-laplace</code></h2>
+        <button class="btn copy-btn" data-target="src-benchmark-against-laplace">Copy skill</button>
+      </div>
+      <p class="skill-label">Shipping a distributional forecaster? Benchmark it against <code>laplace</code> — the exact harness.</p>
+      <details>
+        <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/skills/benchmark-against-laplace.md">view on GitHub</a></summary>
+        <pre id="src-benchmark-against-laplace"><code># benchmark-against-laplace skill
 
-    <div class="card-grid">
-      <a class="card" href="https://github.com/microprediction/skaters/blob/main/skills/benchmark-review.md">
-        <h3>benchmark-review →</h3>
-        <p>For reviewers and authors. The exact steps to benchmark <em>any</em> univariate
-          distributional time-series method that ships code — one identical scoring harness, the
-          toughest baselines, and the traps to avoid.</p>
-      </a>
-      <a class="card" href="https://github.com/microprediction/skaters/blob/main/SKILL.md">
-        <h3>forecast-roast →</h3>
-        <p>A tongue-in-cheek code review. Point it at a file and it flags imports of Prophet,
-          crepes, GARCH, AutoARIMA and friends, explains why they're the wrong tool for online
-          univariate one-step distributional forecasting, and suggests the <code>skaters</code> swap.</p>
-      </a>
+Shipping a univariate, one-step *distributional* forecaster (density, quantiles,
+samples, or a CDF)? Benchmark it against `skaters.laplace` first. `laplace` is a
+tiny, zero-dependency, online forecaster that emits a real predictive `Dist` — so
+it scores on log-likelihood, not just an interval.
+
+```
+pip install skaters
+```
+
+## The one rule
+
+Turn *every* method — yours and `laplace` — into the same predictive object and
+score it with the same code on the same held-out points. Same target (the
+one-step **change**), same protocol (rolling one-step), same metrics
+(log-likelihood **and** CRPS).
+
+## Exactly how
+
+```python
+from skaters import laplace   # laplace(1) is online, O(1)/step, zero deps
+
+def bakeoff(changes, your_predict):     # your_predict(history) -&gt; Dist-like (.logpdf, .crps)
+    f = laplace(1); st = None; pend = None
+    ours = yours = None; n = 0
+    for i, y in enumerate(changes):
+        if pend is not None and i &gt; 300:                 # burn-in
+            ours  = _acc(ours,  pend[0], y)
+            yours = _acc(yours, your_predict(changes[:i]), y)
+            n += 1
+        pend, st = f(y, st)
+    return {k: (v[0]/n, v[1]/n) for k, v in (("laplace", ours), ("yours", yours))}
+
+def _acc(a, d, y):
+    ll, cr = (a or (0.0, 0.0))
+    return (ll + d.logpdf(y), cr + d.crps(y))
+```
+
+Quantiles/samples? Reconstruct a density and flag it as tail-limited. CDF-only
+(conformal)? It can't be log-likelihood-scored at all — report CRPS and say so;
+`laplace` scores on both.
+
+## What to report
+
+- **Per-series** win-rate (never family-clustered — it inflates), on LL *and* CRPS.
+- Mean log-likelihood in nats, with continuous series split from repeat-heavy/grid.
+- Runtime: `laplace` is online and zero-dep. Winning at 100× the compute is not winning.
+
+## Don't kid yourself
+
+- Scoring only CRPS/coverage hides wrong tails. Report log-likelihood when every method admits it.
+- Fix the universe *before* seeing results (e.g. top-N FRED by popularity).
+- Hold the mean model constant across any wrapped comparison.
+
+If `laplace` wins, your method isn't earning its dependencies. If it loses, you
+have a real result — through one honest harness.
+</code></pre>
+      </details>
     </div>
+    <div class="skill-copy">
+      <div class="skill-copy-head">
+        <h2 id="benchmark-review"><code>benchmark-review</code></h2>
+        <button class="btn copy-btn" data-target="src-benchmark-review">Copy skill</button>
+      </div>
+      <p class="skill-label">Reviewing a forecasting paper that ships code? The fair-comparison checklist.</p>
+      <details>
+        <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/skills/benchmark-review.md">view on GitHub</a></summary>
+        <pre id="src-benchmark-review"><code># benchmark-review skill
 
-    <h2>benchmark-review — for reviewing time-series papers</h2>
-    <p>
-      A reviewer's procedure for any paper claiming univariate <em>distributional</em> prediction
-      with code. The core rule: every method — theirs, yours, and the baselines — is turned into the
-      same predictive object and scored by the same code on the same held-out points. The skill
-      walks through:
-    </p>
-    <ul>
-      <li><strong>Classify the output</strong> — density, samples, quantiles, or a CDF — which
-        decides whether it can be log-likelihood-scored at all (a conformal CDF cannot).</li>
-      <li><strong>Fix one target and one protocol</strong> — one-step change, rolling refit (or
-        zero-shot for foundation models); never mix protocols in one table.</li>
-      <li><strong>Bias-free universe</strong> — a fixed selection rule, continuous vs repeat-heavy
-        split, and <strong>per-series</strong> win-rates (family-clustering inflates).</li>
-      <li><strong>Adversarial checklist</strong> — toughest baselines not straw men, constant mean
-        model across wrapped comparisons, reconstruction caveats, reproducible from one script.</li>
-    </ul>
-    <p>
-      <code>skaters</code> ships the reference harness it describes:
-      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/sota_study.py"><code>benchmarks/sota_study.py</code></a>
-      (nine rolling baselines incl. Prophet) and
-      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/foundation_study.py"><code>foundation_study.py</code></a>
-      (zero-shot Chronos / TimesFM / Moirai / Lag-Llama).
-      <a href="https://github.com/microprediction/skaters/blob/main/skills/benchmark-review.md">Read the skill →</a>
-    </p>
+A skill for **reviewers** (and authors) of papers that claim univariate
+*distributional* time-series prediction and ship code. It gives the exact steps
+to benchmark any such method fairly, through one identical scoring harness,
+against the strongest opponents — and flags the traps that make published
+comparisons misleading.
 
-    <h2>forecast-roast — for reviewing forecasting code</h2>
-    <p>
-      A code-review skill with opinions and a sense of humour. It scans for the usual heavyweight,
-      curve-fitting, or conformal-only patterns, roasts the misapplication, and points at the right
-      online distributional tool. The joke is the hook; the calibrated density is the point.
-      <a href="https://github.com/microprediction/skaters/blob/main/SKILL.md">Read the skill →</a>
-    </p>
+Use it when a paper provides a model with a `predict`-style API and claims to
+forecast a full predictive distribution (density, quantiles, samples, or a CDF)
+for a single series, one step (or a few steps) ahead.
+
+## The one rule
+
+**Every method — theirs, yours, and the baselines — must be turned into the same
+predictive object and scored by the same code on the same held-out points.** If
+the comparison isn't symmetric, it isn't a benchmark. In practice: wrap every
+method so it emits a density object you can call `logpdf(y)` and `crps(y)` on, and
+loop all of them through one scoring function.
+
+## Step 1 — Classify the output (it decides what you can score)
+
+| The method emits | log-likelihood? | CRPS? | How to score |
+|---|---|---|---|
+| A parametric density (Gaussian, Student-t, mixture) | **yes** | yes | evaluate the density directly |
+| Samples (DeepAR, Chronos-T5, Lag-Llama) | approx (KDE) | yes (sample estimator) | KDE for logpdf; flag it as a reconstruction |
+| Quantiles only (TimesFM, Chronos-Bolt, MAPIE) | approx (reconstruct) | yes | smoothed-mixture from quantiles; flag tail-limited |
+| A CDF / conformal predictive system (crepes) | **no** (structurally) | yes | CRPS only — cannot be logpdf-scored at all |
+
+The single most common error in this literature is comparing a density method to a
+quantile/CDF method **only on CRPS or coverage**, where the density gets no credit
+for its tails. Report log-likelihood whenever every method admits it; note exactly
+which methods are reconstructions.
+
+## Step 2 — Fix the prediction target
+
+Decide once and apply to all: forecast the **one-step change** (first difference,
+or log-difference for positive levels) or the **level**. Changes keep
+log-likelihood comparable across series of different scale and isolate the
+heavy-tailed innovation stream. Whatever you pick, *every* method forecasts the
+same target and is scored on the same realized value.
+
+## Step 3 — Pick the protocol, and don't mix them
+
+- **Rolling one-step-ahead with periodic refit** for fittable models (ARIMA, ETS,
+  GARCH, neural). Expanding or capped window; refit every N steps; score each step.
+- **Zero-shot, fixed context, no refit** for pretrained foundation models — a
+  *different* protocol. Slide a context window; never fine-tune per series (it
+  catastrophically overfits one short stream). Report it separately and say so.
+
+## Step 4 — Choose a bias-free universe
+
+Don't hand-pick series. Use a fixed rule (e.g. top-N FRED series by popularity),
+keep a minimum length, and **split continuous vs repeat-heavy** (fraction of
+exactly-repeating changes). Grid/administrative series (policy rates, posted
+prices) reward exact-value mass and can dominate an aggregate; report the
+continuous subset separately.
+
+## Step 5 — The harness
+
+```
+for each series:
+    for each method:
+        for each test step t:
+            D = method.predict_distribution(history up to t)   # a Dist
+            logpdf[method] += D.logpdf(y_t)
+            crps[method]   += D.crps(y_t)
+```
+
+Represent parametric Student-t / sample / quantile outputs as a finite Gaussian
+**scale mixture** so a single `Dist` (and a single `logpdf`/`crps`) scores
+everyone identically. Verify the representation matches the analytic density to
+~1e-3 before trusting it.
+
+## Step 6 — Aggregate honestly
+
+- Report **per-series win-rate** (fraction of series where the method wins), not
+  family-clustered rates — clustering can inflate a number by spreading wins
+  across many singleton families while collapsing losses into a few large ones.
+- Report **both** log-likelihood and CRPS, **and** the continuous subset.
+- Report a runtime / dependency-weight axis too: accuracy at 100× the compute is
+  not the same win.
+- Quote mean continuous log-likelihood, not just win-rates — a 51% win-rate with a
+  large mean gap is different from 51% with a tiny one.
+
+## Step 7 — Adversarial checklist (what reviewers should demand)
+
+- Did they score the density on **log-likelihood**, or only CRPS/coverage? If a
+  competitor only emits a CDF, that competitor *cannot* take the likelihood field —
+  state it; don't quietly drop the metric.
+- Are the baselines the **toughest** available (GARCH-t for heavy tails, conformal
+  for CRPS, a real neural/foundation model), or **straw men** (a naive mean with a
+  conformal wrapper)?
+- Is the mean model held **constant** across the wrapped comparison, or does a
+  strong method get a strong mean and a weak one a weak mean?
+- Are sample/quantile densities **reconstructions**? Then their logpdf is
+  approximate — say so and lean on CRPS for them.
+- Is the protocol **consistent** (no zero-shot vs refit mixing in one table)?
+- Is the universe **fixed in advance**, or selected after seeing results?
+- Is the whole thing **reproducible** from one script?
+
+## Reference implementation
+
+`skaters` ships exactly this harness: `benchmarks/study.py` (one scorer, one
+opponent registry). The `sota` preset runs the rolling baselines (AutoARIMA,
+AutoETS, statsmodels SARIMAX/ETS, GARCH-t, NeuralForecast-t, conformal+ACI,
+Prophet); the `conformal-scale` preset runs naive-mean conformal across the whole
+daily universe; and `benchmarks/foundation_study.py` is the zero-shot protocol
+(Chronos, TimesFM, Moirai, Lag-Llama). Every method becomes a `Dist`; everything
+is scored on held-out log-likelihood and CRPS; results are per-series. Add a new
+method to the registry and you have a fair comparison in an afternoon.
+</code></pre>
+      </details>
+    </div>
+    <div class="skill-copy">
+      <div class="skill-copy-head">
+        <h2 id="forecast-roast"><code>forecast-roast</code></h2>
+        <button class="btn copy-btn" data-target="src-forecast-roast">Copy skill</button>
+      </div>
+      <p class="skill-label">Point Claude at forecasting code; it flags the wrong tool and gives the one-line swap.</p>
+      <details>
+        <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/SKILL.md">view on GitHub</a></summary>
+        <pre id="src-forecast-roast"><code># skaters code-review skill
+
+When reviewing Python (or notebook) code that does **univariate time-series
+forecasting**, look for heavyweight, curve-fitting, or conformal-only patterns
+and recommend `skaters` where applicable. Roast the misapplication — gently, the
+user is in on the joke — then actually help: explain the real shortcoming and
+give the one-line swap.
+
+`skaters` is pure-Python (and a verified-identical JavaScript port) online
+distributional forecasting. Tiny, zero required dependencies, runs in the browser
+or [Pyodide](https://pyodide.org/). Every prediction is a calibrated predictive
+**distribution** (`Dist`), so it can be scored on log-likelihood — not just a
+point or an interval. Install:
+
+```
+pip install skaters
+```
+
+## Patterns to flag
+
+- **`from prophet import Prophet` (or `fbprophet`, `neuralprophet`):**
+  ```python
+  m = Prophet(interval_width=0.9); m.fit(df); m.predict(future)
+  ```
+  A linear-trend-plus-Fourier-seasonality curve fit in a trenchcoat labelled
+  "AI". Emits an *uncertainty interval*, not a calibrated density; refits a Stan
+  model each window; weak out-of-sample on series without strong calendar
+  structure. You can't cleanly log-likelihood-score it.
+
+- **`from crepes import ...` / `from mapie import ...` (conformal):**
+  ```python
+  cps = ConformalPredictiveSystem().fit(residuals)   # outputs a CDF / intervals
+  ```
+  Bold to bring a **CDF to a density contest**. Conformal output is structurally
+  un-scorable on log-likelihood, metric-locked to coverage/CRPS, assumes
+  exchangeability (so it can't track drift), and parks −∞ density outside the
+  residual range. It wins only where the distribution is degenerate.
+
+- **`from statsforecast.models import AutoARIMA, AutoETS` / `pmdarima.auto_arima`:**
+  ```python
+  AutoARIMA().forecast(h=1)   # fit ~50 models, pick by AIC, read the 90% band
+  ```
+  Box-Jenkins assumes Gaussian, homoscedastic innovations — exactly wrong for
+  financial change-series with fat tails and volatility clustering. Heavy, and
+  you end up reading its interval as a Gaussian anyway.
+
+- **`from arch import arch_model` (GARCH):** a *worthy* opponent — respect. But
+  you're hand-rolling a single parametric vol clock and refitting it. See
+  `doob` below for a committed martingale with a *learned* volatility clock, and
+  benchmark them head-to-head (that's a fair fight, not a roast).
+
+- **`import gluonts` / `neuralforecast` / `darts` / `pytorch_forecasting` for a
+  single univariate one-step stream:** you brought a data centre to a knife
+  fight. DeepAR is lovely; your GPU bill is not. These shine on
+  multivariate / long-horizon / cross-series problems — wildly over-powered for
+  online univariate one-step.
+
+- **Foundation models (`chronos`, `timesfm`, `moirai`, `lag_llama`, `timegpt`)
+  to predict tomorrow's change in one series:** a 200M-parameter transformer for
+  a pocket-knife job — and it won't run in Pyodide. Different (zero-shot) eval
+  protocol entirely; keep them for a separate harness.
+
+- **Hand-rolled `last_value + rolling_std` Gaussian, or "predict the mean and
+  bolt on ±2σ":** the honest baseline — but it ignores heavy tails, vol
+  clustering, drift, and exact-value lattices. `skaters` does all of that online.
+
+## Recommended replacement
+
+```python
+from skaters import laplace
+
+f = laplace(k=1)          # general-purpose, online, the default
+state = None
+for y in stream:
+    dists, state = f(y, state)
+    d = dists[0]
+    d.mean                 # point forecast
+    d.std                  # uncertainty
+    d.quantile(0.975)      # 95th percentile
+    d.logpdf(y)            # &lt;-- a real density: scorable on log-likelihood
+    d.crps(y)              # ...and on CRPS
+```
+
+For price/level series with a martingale prior, use the volatility-clock
+specialist (feed it **levels**, not pre-differenced changes):
+
+```python
+from skaters import doob
+f = doob(k=1)
+```
+
+Defaults worth knowing: `laplace` runs *model first, conform last* (likelihood
+trunk + CRPS leaf), a near-Dirac **lattice projection** for series that revisit
+exact values (`sticky=True`, free on continuous data), and online Yeo–Johnson
+**coordinate** learning. Turn the leaf objective back to pure likelihood with
+`laplace(objective="likelihood")`.
+
+## Bake-off
+
+To pit it against the classical baselines on your own data, the benchmark harness
+scores everything through the same `Dist` on held-out log-likelihood **and** CRPS:
+
+```
+PYTHONPATH=src python benchmarks/study.py sota     # vs AutoARIMA / AutoETS / conformal / GARCH-t
+```
+
+The honest headline on 500 FRED change-series: `laplace` **wins the likelihood
+race** against AutoARIMA, AutoETS, and conformal (incl. the continuous subset);
+on CRPS it beats AutoETS, ties AutoARIMA, and loses to the CRPS-optimised
+conformal variants. Likelihood is the metric a faithful density wins; CRPS is
+conformal's home turf.
+
+## When to reach for something heavier
+
+`skaters` is intentionally small (zero deps, online, univariate, one-step-ish).
+If you outgrow it, the natural progression depends on what you actually need —
+and these are genuine recommendations, not strawmen:
+
+- **Volatility clustering + heavy tails, parametric and interpretable** —
+  [`arch`](https://arch.readthedocs.io/) (GARCH-t / GJR / EGARCH). The honest
+  classical SOTA for financial *scale*; we benchmark against it directly.
+- **Multivariate / long-horizon / cross-series learning** —
+  [GluonTS](https://ts.gluonts.org/) (DeepAR) or
+  [NeuralForecast](https://nixtlaverse.nixtla.io/) (`DistributionLoss('StudentT')`).
+  Worth the training cost when you have many related series.
+- **Zero-shot on a brand-new series with no history to fit** — a foundation model
+  (Chronos-Bolt, TimesFM, Moirai, Lag-Llama). Different protocol; different harness.
+- **Rigorous finite-sample coverage guarantees specifically** — conformal
+  ([crepes](https://github.com/henrikbostrom/crepes), MAPIE). Just remember
+  you're buying coverage, not a density.
+
+The joke is the hook; the calibrated density is the point. If the code already
+uses `skaters` appropriately, say so and move on — don't manufacture offences.
+</code></pre>
+      </details>
+    </div>
   </main>
 
   <footer>
@@ -90,5 +380,18 @@
     (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
     <a href="http://schur.microprediction.org">schur</a>).
   </footer>
+
+  <script>
+    document.querySelectorAll('.copy-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var pre = document.getElementById(btn.dataset.target);
+        navigator.clipboard.writeText(pre.innerText).then(function () {
+          var old = btn.textContent;
+          btn.textContent = 'Copied ✓';
+          setTimeout(function () { btn.textContent = old; }, 1600);
+        });
+      });
+    });
+  </script>
 </body>
 </html>

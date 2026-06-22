@@ -1,7 +1,7 @@
 """Zero-shot foundation-model study: laplace vs Chronos / TimesFM / Moirai /
 Lag-Llama.
 
-A *different protocol* from sota_study.py. Foundation models are pretrained and
+A *different protocol* from the rolling-refit study (study.py). Foundation models are pretrained and
 used **zero-shot**: at each test step we feed a fixed-length context window of the
 preceding one-step *changes* and ask for the next change --- no fitting, no
 refit. All test windows for a series are batched into a single inference call,

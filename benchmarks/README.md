@@ -8,6 +8,27 @@ zero-dependency and pure Python.
 python benchmarks/bench.py
 ```
 
+## One harness, many presets (`study.py`)
+
+There is a *single* study. Everything below is the same machine — one FRED
+change-series loader, one one-step `Dist` scorer (`bench_core.py`), one opponent
+registry (`opponents.py`) — differing only in **which opponents** and **how big a
+universe** (which is set by what the opponents can afford). Conformal isn't a
+separate study; it's `conformal(mean=…)` — naive-mean (cheap, scales to the whole
+universe) or AutoARIMA-mean (a refit per step, so small-N). Slow methods carry a
+per-method `max_series` budget: they cover fewer series (N reported), but always
+score a covered series fully — never a within-series shortcut (Prophet refits at
+*every* step, because reusing a fit scores multi-step-ahead as one-step).
+
+```bash
+PYTHONPATH=src python benchmarks/study.py conformal-scale   # ours vs naive-mean crepes, whole daily universe
+PYTHONPATH=src python benchmarks/study.py sota              # ours vs the heavy baselines, small universe
+PYTHONPATH=src python benchmarks/study.py <preset> summarize
+```
+
+The sections below describe each preset's opponents and the published numbers.
+(The older per-study entry points are being folded into `study.py`.)
+
 Everything is judged by **held-out predictive log-likelihood** (higher is
 better). Coverage is deliberately not a criterion: a method can hit nominal
 coverage with a terrible density.
@@ -36,7 +57,7 @@ pip install statsforecast # AutoARIMA/ETS mean models to pair conformal with
 The script prints which it found. These need network + heavy deps, so they are
 intentionally absent from the package's `pyproject.toml`.
 
-## Headline: vs eight distributional baselines (`sota_study.py`)
+## Headline: vs eight distributional baselines (`study.py sota`)
 
 The honest head-to-head against everything we could find that claims a
 *distributional* one-step forecast: `statsforecast`'s **AutoARIMA** and
@@ -90,8 +111,8 @@ We report per-series (not family-clustered) because on this universe the family
 heuristic *inflated* the numbers. Scope: 500 change-series, one-step horizon;
 Prophet and longer horizons are left for later. Zero-shot foundation models get
 their own protocol — see the next section. Run it (parallel across cores):
-`PYTHONPATH=src python benchmarks/sota_study.py` (conda env with `statsforecast`,
-`arch`, `statsmodels`, `neuralforecast`, and a FRED key).
+`PYTHONPATH=src python benchmarks/study.py sota` (venv with `statsforecast`,
+`arch`, `statsmodels`, `neuralforecast`, `crepes`, and a FRED key).
 
 ## Zero-shot foundation models (`foundation_study.py`)
 
@@ -131,7 +152,7 @@ own env (conflicting `gluonts`/`torch`/`jax` pins); the harness writes one
 `results_foundation_<tag>.csv` per run and `summarize()` merges them:
 `FM_MODELS=Chronos,Moirai FM_TAG=cm PYTHONPATH=src python benchmarks/foundation_study.py`.
 
-## Headline result: skaters vs crepes, on CRPS (`exhaustive_crps.py`)
+## Headline result: skaters vs crepes, on CRPS (curated 42-series; now `study.py conformal-scale`)
 
 The skater is a *pluggable proper-scoring-rule optimizer* — the leaf fits its
 scale-mixture weights by **a** score. Point it at log-likelihood and it models
@@ -155,38 +176,52 @@ is degenerate, not where there's forecasting skill.
 And crepes produces no log-likelihood at all (its docs: a CPS outputs *CDFs*),
 so on the economically-grounded, tail-sensitive metric it cannot compete; on
 CRPS, the metric it is built for, it still loses 93% of the time once we aim at
-it. Run it yourself: `PYTHONPATH=src python benchmarks/exhaustive_crps.py`.
+it. Run it yourself: `PYTHONPATH=src python benchmarks/study.py conformal-scale`.
 
-## At scale: 2,501 systematically-selected series (`large_study.py`)
+## At scale: 10,822 systematically-selected series (`study.py conformal-scale`)
 
 The 42-series result invites one fair objection — *you picked the series*. So we
-re-ran it on a **bias-free universe**: the top-N FRED series tagged `daily`,
-ordered by FRED's own popularity ranking (`fred_universe.enumerate_daily`) — a
-fixed rule chosen independently of the forecasters. Transform is automatic
-(log-diff for positive levels, else first-diff); series need ≥500 changes.
+re-ran it on a **bias-free universe**: every FRED series tagged `daily`, ordered
+by FRED's own popularity ranking (`fred_universe.enumerate_daily`) — a fixed rule
+chosen independently of the forecasters. Transform is automatic (log-diff for
+positive levels, else first-diff); series need ≥500 changes; each is scored on its
+most recent 6,000 changes.
 
-### Read the CRPS numbers honestly
+The opponent is `crepes` with a **naive (zero-change) mean** — the cheapest mean
+model, which is why this arm scales to ten thousand series. (A *fitted*-mean
+conformal — AutoARIMA + conformal — is the tougher CRPS opponent; it costs a refit
+per step, so it lives in the smaller `sota` preset. Same opponent family,
+different mean model, different feasible universe size.)
 
-On **2,501** such series, CRPS win-rate against crepes (best of three calibration
-windows). The single eye-catching number — *best-of-our-policies, 91.4%* — is
-**post-hoc selection** (whichever policy did best on each series) and is easy to
-over-read; the honest, de-correlated figure is **family-clustered** (195
-families, each correlated curve/panel counted once). So read it per-policy:
+### Read the CRPS numbers honestly — a single fixed policy, not best-of-ours
 
-| forecaster (same structure) | CRPS raw | CRPS family | mean logpdf |
+We report the **fixed default policy `laplace`** — not "best-of-ours," which would
+be post-hoc per-series cherry-picking and is not a win-rate. We give the *opponent*
+its best shot: `laplace` (one fixed config) beats crepes even when crepes is handed
+its **best calibration window per series**:
+
+> **`laplace` beats best-of-crepes on 96.6% of series** (95% CI 96.3–96.9), and
+> **64.8% family-clustered** (198 families, each correlated curve/panel counted
+> once; CI 58–72). It also beats each *fixed* window head-to-head — w250 96.6%,
+> w400 96.9%, w750 97.0% (family 64.8 / 66.7 / 66.8%) — so no retrospective choice
+> is doing the work.
+
+Per-policy (current 0.8.0 set; each a single fixed config), CRPS vs best-of-crepes:
+
+| policy | CRPS raw | CRPS family | mean logpdf |
 |---|---|---|---|
-| `laplace` — log trunk + **log** tail | 82.6% | 48.7% | 2.96 |
-| **log trunk + CRPS tail** — *model first, conform last* | 89.5% | **60.1%** | **3.01** |
-| bare `crps-leaf` (CRPS objective, no trunk) | 80.8% | 60.3% | 2.96 |
-| best-of-all policies *(post-hoc pick per series)* | 91.4% | 64.3% | — |
+| `laplace` — log trunk + **CRPS** tail + sticky *(the default)* | **96.6%** | **64.8%** | **2.988** |
+| `laplace-ll` — log trunk + **log** tail (`objective="likelihood"`) | 92.1% | 55.6% | 2.968 |
+| `laplace-nostick` — CRPS tail, lattice **off** (`sticky=False`) | 96.2% | 60.2% | 2.848 |
+| bare `crps-leaf` (CRPS objective, no trunk) | 92.6% | 61.0% | 2.824 |
 
 The point is the **first two rows**: same machine, repoint only the objective.
-A general likelihood policy (`laplace`) is essentially **even** with crepes on
-CRPS — 48.7% of families, a coin flip, because it is not aimed at CRPS. Swap the
-terminal leaf's objective to CRPS — keeping the likelihood-weighted trunk — and
-it jumps to **60.1% of families**, matching the dedicated CRPS specialist while
-*also* lifting likelihood (2.96 → 3.01). That is metric-agnosticism in one line:
-the objective is a knob, not a fixed cost.
+The likelihood policy (`laplace-ll`) already edges crepes on CRPS — 55.6% of
+families — even though it is not aimed at CRPS. Swap the terminal leaf's objective
+to CRPS — keeping the likelihood-weighted trunk — and it climbs to **64.8% of
+families**, matching the dedicated CRPS specialist while *also* lifting likelihood
+(2.968 → 2.988). That is metric-agnosticism in one line: the objective is a knob,
+not a fixed cost.
 
 **Model first, conform last.** The trunk's job is to *model* — get the mean and
 structure right — and the honest objective for that is likelihood (a proper,
@@ -197,21 +232,35 @@ both — likelihood trunk, CRPS leaf — beats the likelihood-only policy on **e
 axis (CRPS raw, CRPS family, *and* likelihood): a CRPS-fit leaf is more
 outlier-robust, so it even generalises slightly better on likelihood. No trade.
 
-As of **0.8.0 this is the package default**: `laplace(k)` *is* the "log trunk +
-CRPS tail" row; the "log trunk + log tail" row is `laplace(k,
-objective="likelihood")`. The table's `laplace` rows were scored before the
-default flipped, so they name the configuration explicitly.
+This is the **0.8.0 default**: `laplace(k)` *is* the top row (CRPS tail + sticky);
+`laplace(k, objective="likelihood")` is the log-tail row; `laplace(k,
+sticky=False)` turns off the lattice projection (the `laplace-nostick` row).
 
-By asset class (best-of-ours, keyword-approximate): equity 99% (n=1033),
-commodity 100%, rates 95%, credit 94%, fx 89%, other 81%.
+By asset class (laplace vs the hardest fixed window, keyword-approximate): equity
+98.6% (n=7125), fx 97.5% (n=1503), credit 97.2% (n=106), commodity 96.0% (n=25),
+rates 94.7% (n=323), other 88.1% (n=1740).
+
+### Crepes cannot be rescued by its calibration window
+
+The obvious objection — *did you give crepes a wide enough window?* — we tested.
+Crepes' mean CRPS is **U-shaped** in window length with a flat optimum near **250**
+(worse both shorter, where the empirical CDF goes noisy, and wider, where stale
+residuals can't track drift). On a 250-series sample, `laplace` beats crepes'
+*best-of-{60, 120, 200, 250, 350, 500, 750, 1500}* per series on **96.4%** — the
+same as against the three production windows. Widening or narrowing the window
+moves crepes by thousandths of a nat; the deficit is **structural** (recency-
+unweighted, exchangeability-assuming, no learned volatility clock), not a tuning
+choice.
 
 ### The win that is *not* on CRPS
 
 CRPS was never our metric. The robust, un-spinnable fact is on **log-likelihood**:
 
 - every skater emits a proper predictive *density* and is scored — `laplace`
-  ≈ **2.96 nats/obs**, `dirac` **3.49** (+0.46 over the best other policy,
-  because it alone places mass on exact repeats);
+  ≈ **2.99 nats/obs**. The lattice projection (`sticky`, on by default) places
+  near-Dirac mass on exact repeats; it is worth **+0.141 nats** over
+  `laplace-nostick`, realised on the **22%** of series that revisit values and
+  free (zero lift, no cost) on the continuous rest;
 - crepes emits a *CDF*, not a density, so it scores **nothing** — it cannot be
   evaluated on likelihood at all.
 
@@ -221,7 +270,31 @@ conformal predictive systems cannot take the field, and skaters can** — while
 *also* matching the CRPS specialist on its own metric, by conforming the tail
 last without touching the model.
 
-Run it: `PYTHONPATH=src python benchmarks/large_study.py` (needs the conda env
+### Downside protection (CRPS and log-likelihood are *symmetric*)
+
+CRPS and log-likelihood are **symmetric** proper scores: they penalize a forecast
+for the upside tail (mass on big favorable moves that didn't occur) and for
+calm-day width exactly as much as they credit downside protection. So the
+aggregate CRPS number does **not** isolate the thing you actually buy from a
+heavy-tailed forecaster — not getting blown up by adverse moves (the Kelly /
+ruin-avoidance reason). The honest downside view is **lower-tail pinball loss**
+(τ = 5%, 1%; proper for those quantiles) plus **VaR exceedance** (should equal τ).
+
+On a 60-series sample, `laplace` vs naive-mean crepes — where they roughly *tie*
+on symmetric CRPS — the downside-only picture separates them:
+
+| τ | lower-tail pinball (lower=better) | VaR exceedance (target τ) |
+|---|---|---|
+| 5% | `laplace` **0.0043** vs crepes 0.0063 | `laplace` 5.2% / crepes 4.9% |
+| 1% | `laplace` **0.0015** vs crepes 0.0027 | `laplace` 1.65% / crepes 0.98% |
+
+`laplace` is ~30–45% better on left-tail pinball and well-calibrated at 5% VaR;
+its only weak spot is the *deepest* 1% tail, where it slightly over-breaches
+(1.65% vs 1%) while crepes is conservative. So the symmetric CRPS understates
+`laplace`'s real edge — downside protection — which is the metric that matters for
+capital at risk.
+
+Run it: `PYTHONPATH=src python benchmarks/study.py conformal-scale` (needs a venv
 with `crepes` + a FRED key).
 
 ## On the table

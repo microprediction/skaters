@@ -101,9 +101,11 @@ everyone identically. Verify the representation matches the analytic density to
 
 ## Reference implementation
 
-`skaters` ships exactly this harness: `benchmarks/sota_study.py` (eight rolling
-baselines: AutoARIMA, AutoETS, statsmodels SARIMAX/ETS, GARCH-t, NeuralForecast-t,
-conformal, ACI) and `benchmarks/foundation_study.py` (zero-shot Chronos, TimesFM,
-Moirai, Lag-Llama). Every method becomes a `Dist`; everything is scored on
-held-out log-likelihood and CRPS; results are per-series. Point a new method at
-the same harness and you have a fair comparison in an afternoon.
+`skaters` ships exactly this harness: `benchmarks/study.py` (one scorer, one
+opponent registry). The `sota` preset runs the rolling baselines (AutoARIMA,
+AutoETS, statsmodels SARIMAX/ETS, GARCH-t, NeuralForecast-t, conformal+ACI,
+Prophet); the `conformal-scale` preset runs naive-mean conformal across the whole
+daily universe; and `benchmarks/foundation_study.py` is the zero-shot protocol
+(Chronos, TimesFM, Moirai, Lag-Llama). Every method becomes a `Dist`; everything
+is scored on held-out log-likelihood and CRPS; results are per-series. Add a new
+method to the registry and you have a fair comparison in an afternoon.

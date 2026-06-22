@@ -52,7 +52,7 @@ abstraction yields three things the paper develops in turn:
    and while vanishing on continuous data; an online *coordinate* search (§6)
    learns whether a series is simple in a log, root, or linear coordinate; and a
    committed *martingale* model (§7) learns only a volatility clock.
-3. **An honest, bias-free benchmark** (§8) on 2,500 systematically chosen FRED
+3. **An honest, bias-free benchmark** (§8) on 10,822 systematically chosen FRED
    series, with ablations (§9) showing that most of the conventional "named
    method" menu is redundant out of sample.
 
@@ -233,33 +233,40 @@ a different no-refit protocol — are left for an extended study.)*
 
 ## 8.2 Repointing the objective: model first, conform last
 
-On a larger **2,501**-series sweep we isolate the effect of the terminal-leaf
-objective against the `crepes` conformal-predictive-system (given its three best
-calibration windows and scored on its own CDF via the pinball decomposition of
-CRPS). Here the conformal opponent uses only a naive mean, so we read this as an
-*ablation of our own objective knob* rather than a SOTA claim.
+On a larger **10,822**-series sweep (every daily-tagged FRED series by
+popularity) we isolate the effect of the terminal-leaf objective against the
+`crepes` conformal-predictive-system (scored on its own CDF via the pinball
+decomposition of CRPS). Here the conformal opponent uses a naive (zero-change)
+mean, so we read this as an *ablation of our own objective knob* rather than a
+SOTA claim — the fitted-mean (AutoARIMA) conformal is a separate, smaller study.
 
-**Read the CRPS numbers honestly.** A single eye-catching figure — *best of our
-forecasters, 91.4 %* — is post-hoc selection. The honest, de-correlated number
-collapses each correlated curve/panel (yields by maturity, FX by counterparty) to
-one vote (195 families). Per-policy:
+**Read the CRPS numbers honestly — one fixed policy, not best-of-ours.** We report
+the single fixed `laplace` default (a per-series best-of would be post-hoc
+selection), and give the opponent its best window per series. De-correlating each
+correlated curve/panel (yields by maturity, FX by counterparty) to one vote (198
+families):
 
 | forecaster (same structure) | CRPS, raw | CRPS, family | mean logpdf |
 |---|---|---|---|
-| `laplace` — likelihood trunk + likelihood leaf | 82.6 % | 48.7 % | 2.96 |
-| **log trunk + CRPS leaf** (*model first, conform last*) | 89.5 % | **60.1 %** | **3.01** |
-| bare CRPS leaf (no trunk) | 80.8 % | 60.3 % | 2.96 |
+| likelihood trunk + likelihood leaf (`objective="likelihood"`) | 92.1 % | 55.6 % | 2.97 |
+| **`laplace` — log trunk + CRPS leaf + sticky** (*model first, conform last; the default*) | **96.6 %** | **64.8 %** | **2.99** |
+| bare CRPS leaf (no trunk) | 92.6 % | 61.0 % | 2.82 |
 
-A *general* likelihood policy is essentially even with conformal on CRPS — its
-home metric — over independent families. Repointing only the terminal-leaf
-objective to CRPS lifts that to 60 % *and* raises likelihood: matching the CRPS
-specialist while modelling honestly.
+`laplace` beats best-of-crepes (crepes given its best window per series) on
+**96.6 %** of series, and each fixed window head-to-head (96.6 / 96.9 / 97.0 %) —
+no retrospective choice does the work. A *general* likelihood policy already edges
+conformal on CRPS over independent families (55.6 %); repointing only the
+terminal-leaf objective to CRPS lifts that to 64.8 % *and* raises likelihood
+(2.97 → 2.99): matching the CRPS specialist while modelling honestly. Crepes' CRPS
+is U-shaped in window length (optimum ≈250); widening or narrowing moves it by
+thousandths of a nat — the gap is structural, not a tuning choice.
 
 **The win that is not on CRPS.** Every skater emits a density and is scored
-(`laplace` $\approx 2.96$ nats/obs; the lattice policy $\approx 3.49$); conformal
-emits a CDF and scores *nothing*. On the economically grounded, tail-sensitive
-metric — log-likelihood, the Kelly/log-growth criterion — conformal cannot take
-the field, and skaters can.
+(`laplace` $\approx 2.99$ nats/obs, the lattice projection on by default — worth
+$+0.14$ nats on the 22 % of series that revisit values, free elsewhere);
+conformal emits a CDF and scores *nothing*. On the economically grounded,
+tail-sensitive metric — log-likelihood, the Kelly/log-growth criterion —
+conformal cannot take the field, and skaters can.
 
 ## 8.3 Against zero-shot foundation models
 
