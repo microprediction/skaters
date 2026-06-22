@@ -84,6 +84,8 @@ def build_scenarios():
     # Named policies (the full shared-pool ensembles)
     for nm, fac in [("laplace", laplace), ("doob", doob), ("mean_revert", mean_revert)]:
         s.append((f"pol_{nm}", 1, fac(k=1)))
+    # laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
+    s.append(("pol_laplace_k3", 3, laplace(k=3)))
 
     # Adaptive-search engine (still public via skaters.search)
     s.append(("search_default", 1, adaptive_search(k=1, expand_interval=50)))

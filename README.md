@@ -62,8 +62,10 @@ prior matches your series; `laplace` if you're unsure.
 
 A likelihood-weighted Bayesian ensemble over a large candidate population (EMA,
 differencing, drift, Holt, AR, fractional differencing, seasonal, a Yeo-Johnson
-**coordinate** grid, a fast/slow two-systems block, …). Three things are on by
-default, each a free or near-free win:
+**coordinate** grid, a fast/slow two-systems block, and — at multi-step horizons
+(`k>1`) — an **Ornstein–Uhlenbeck mean-reversion** group; see `mean_revert`). The
+one-step pool is unchanged. Three things are on by default, each a free or
+near-free win:
 
 - **model first, conform last** — the trunk is weighted by **likelihood** (honest
   modelling); the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
