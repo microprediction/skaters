@@ -34,7 +34,7 @@ class Opponent:
 
 
 # ---- ours: online Dist-emitting policies --------------------------------------
-from skaters.api import laplace
+from skaters.api import laplace, doob
 from skaters.leaf import scale_mixture_leaf
 from crps_leaf import crps_leaf
 
@@ -44,6 +44,36 @@ def _ours(method, factory):
         lp, cr, n = bc.roll_dist_scores(factory, ch, start)
         return [(method, lp, cr, n)] if n else []
     return Opponent(method, predict)
+
+
+def doob_after_laplace(k=1):
+    """Distributional residual stacking: laplace removes the predictable part, so
+    its one-step residual e_t = y_t - mean_t is a driftless martingale-difference
+    — doob's home. We use laplace's MEAN and doob's residual DISTRIBUTION. doob is
+    fed the residual martingale M = cumsum(e); its predictive for the next level
+    M' (mean M) is shifted to laplace's next mean: D_y = doob_dist.shift(m_next-M).
+
+    EXPERIMENT — NEGATIVE RESULT (kept for reproducibility, not registered).
+    laplace's standardized residuals do retain volatility clustering (lag-1
+    ACF(z^2) ~0.13 vs ~0.25 raw; significant on ~79% of series), but stacking doob
+    nonetheless LOSES to plain laplace (beats it on LL 17%, CRPS 5% over 60 series;
+    mean LL 2.67 vs 2.70): it discards laplace's CRPS/likelihood-conformed tail for
+    doob's noisier residual vol-estimate, costing more than the leftover clustering
+    is worth. So it is not in any preset's opponent set."""
+    lap = laplace(k); db = doob(k)
+
+    def f(y, state):
+        st = state or {"lap": None, "db": None, "M": 0.0, "mprev": None}
+        if st["mprev"] is not None:
+            st["M"] += (y - st["mprev"])              # accrue the residual martingale
+        lap_d, st["lap"] = lap(y, st["lap"])          # laplace: the mean model
+        m_next = lap_d[0].mean
+        db_d, st["db"] = db(st["M"], st["db"])        # doob: the residual vol clock
+        D = db_d[0].shift(m_next - st["M"]) if st["mprev"] is not None else lap_d[0]
+        st["mprev"] = m_next
+        return [D], st
+    f.__name__ = f"doob_after_laplace(k={k})"
+    return f
 
 
 OURS = [
@@ -144,8 +174,10 @@ def _garch_predict(ch, start, refit):
         if (not have) or (t - start) % refit == 0:
             hist = ys[max(0, t - FIT_WIN):t]
             try:
-                r = arch_model(hist, mean="Constant", vol="GARCH", p=1, q=1, dist="t",
-                               rescale=False).fit(disp="off", options={"maxiter": 200})
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    r = arch_model(hist, mean="Constant", vol="GARCH", p=1, q=1, dist="t",
+                                   rescale=False).fit(disp="off", options={"maxiter": 200})
                 mu = r.params["mu"]; om = r.params["omega"]
                 al = r.params["alpha[1]"]; be = r.params["beta[1]"]; nu = r.params["nu"]
                 h_prev = float(r.conditional_volatility[-1]) ** 2
@@ -181,8 +213,10 @@ def _sarimax_predict(ch, start, refit):
         if res is None or (t - start) % refit == 0:
             hist = y[max(0, t - FIT_WIN):t]
             try:
-                res = SARIMAX(hist, order=(1, 0, 1), trend="c", enforce_stationarity=False,
-                              enforce_invertibility=False).fit(disp=False, maxiter=50)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    res = SARIMAX(hist, order=(1, 0, 1), trend="c", enforce_stationarity=False,
+                                  enforce_invertibility=False).fit(disp=False, maxiter=50)
             except Exception:                  # noqa: BLE001
                 if res is None:
                     return []
@@ -200,7 +234,9 @@ def _ets_predict(ch, start, refit):
         if level is None or (t - start) % refit == 0:
             hist = y[max(0, t - FIT_WIN):t]
             try:
-                fit = SimpleExpSmoothing(hist, initialization_method="estimated").fit()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    fit = SimpleExpSmoothing(hist, initialization_method="estimated").fit()
                 alpha = float(fit.params.get("smoothing_level", 0.3))
                 level = float(fit.forecast(1)[0]); se = float(np.std(fit.resid)) or 1e-9
             except Exception:                  # noqa: BLE001
