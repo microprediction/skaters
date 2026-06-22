@@ -221,6 +221,23 @@ def _build_candidates(k: int, leaf_fn=leaf):
             depths.append(2)
             groups["coordinate"].append(len(candidates) - 1)
 
+    # Mean-reversion prior (Ornstein-Uhlenbeck), MULTI-STEP ONLY. The reversion
+    # edge over a random walk grows with horizon (1 - phi^h); at one step it is
+    # redundant with the ema/random-walk mix and only adds cost, so it is gated on
+    # k > 1 to leave the one-step pool (and its speed) byte-identical. Composed
+    # under the sqrt (CIR) and log (geometric) coordinates. NFL-safe: a wrong
+    # reversion speed is down-weighted. See benchmarks/cir_ablation.py.
+    groups["mean_revert"] = []
+    if k > 1:
+        for L in (0.0, 0.5):
+            for kappa in (0.03, 0.1, 0.3):
+                candidates.append(
+                    conjugate(conjugate(leaf_fn(k=k), ou_transform(kappa, 0.02), k=k),
+                              yeo_johnson(L), k=k)
+                )
+                depths.append(2)
+                groups["mean_revert"].append(len(candidates) - 1)
+
     return candidates, depths, groups
 
 

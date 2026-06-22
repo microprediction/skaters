@@ -22,11 +22,11 @@ from skaters.ema import ema
 from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
-    difference, fractional_difference, standardize, ema_transform, theta,
+    difference, fractional_difference, standardize, ema_transform, ou_transform, theta,
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
     grouped_ar, yeo_johnson,
 )
-from skaters.api import laplace, doob
+from skaters.api import laplace, doob, mean_revert
 from skaters.sticky import sticky
 from skaters.search import search as adaptive_search
 from skaters import spec as S
@@ -71,6 +71,9 @@ def build_scenarios():
         s.append((f"grouped_ar{suf}", k, conjugate(leaf(k=k), grouped_ar(8), k=k)))
         s.append((f"yeojohnson_log{suf}", k, conjugate(leaf(k=k), yeo_johnson(0.0), k=k)))
         s.append((f"yeojohnson_half{suf}", k, conjugate(leaf(k=k), yeo_johnson(0.5), k=k)))
+        s.append((f"ou{suf}", k, conjugate(leaf(k=k), ou_transform(0.1), k=k)))
+        s.append((f"ou_sqrt{suf}", k,
+                  conjugate(conjugate(leaf(k=k), ou_transform(0.1), k=k), yeo_johnson(0.5), k=k)))
         s.append((f"ema_skater{suf}", k, ema(0.05, k=k)))
         s.append((f"pw_ensemble{suf}", k,
                   precision_weighted_ensemble([ema(0.05, k=k), ema(0.2, k=k)], k=k)))
@@ -79,8 +82,10 @@ def build_scenarios():
             k=k, learning_rate=0.5, complexity_penalty=0.02, depths=[1, 1])))
 
     # Named policies (the full shared-pool ensembles)
-    for nm, fac in [("laplace", laplace), ("doob", doob)]:
+    for nm, fac in [("laplace", laplace), ("doob", doob), ("mean_revert", mean_revert)]:
         s.append((f"pol_{nm}", 1, fac(k=1)))
+    # laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
+    s.append(("pol_laplace_k3", 3, laplace(k=3)))
 
     # Adaptive-search engine (still public via skaters.search)
     s.append(("search_default", 1, adaptive_search(k=1, expand_interval=50)))

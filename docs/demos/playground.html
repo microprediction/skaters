@@ -36,7 +36,12 @@
           <select id="policy">
             <option value="laplace">laplace (default)</option>
             <option value="doob">doob (martingale)</option>
+            <option value="mean_revert">mean_revert (reversion)</option>
           </select>
+        </div>
+        <div class="control">
+          <label for="horizon">Horizon <span class="val" id="horizonVal">6</span></label>
+          <input type="range" id="horizon" min="1" max="12" value="6" />
         </div>
         <div class="control">
           <label for="regime">Data</label>
@@ -44,6 +49,7 @@
             <option value="trend">trend + noise</option>
             <option value="seasonal">seasonal (period 7)</option>
             <option value="rw">random walk</option>
+            <option value="meanrevert">weak mean reversion</option>
             <option value="hetero">slowly-varying noise</option>
             <option value="jumps">level jumps</option>
           </select>
@@ -59,16 +65,21 @@
       <canvas class="plot" id="plot" width="940" height="420"></canvas>
       <div class="legend">
         <span><span class="swatch" style="background:#1a1a1a"></span>observation</span>
-        <span><span class="swatch" style="background:#4a3aff"></span>forecast mean</span>
-        <span><span class="swatch" style="background:#cdc7ff"></span>95% interval</span>
+        <span><span class="swatch" style="background:#4a3aff"></span>1-step mean</span>
+        <span><span class="swatch" style="background:#cdc7ff"></span>1-step 95%</span>
+        <span><span class="swatch" style="background:#ff8a3a"></span>k-step forecast fan</span>
       </div>
       <p class="status" id="status">—</p>
     </div>
 
     <p>
-      The model sees one observation at a time. At each step it emits a full
-      predictive distribution for the next step; we score it against what actually
-      happens. <span class="metric" id="metrics"></span>
+      The model sees one observation at a time and emits a full predictive
+      distribution for each of the next <em>k</em> steps. The dashed orange
+      <strong>fan</strong> is that k-step forecast projecting from the latest point
+      — on the <em>weak mean reversion</em> regime, watch <code>laplace</code> (at
+      <em>k&gt;1</em>) and <code>mean_revert</code> curve the fan back toward the
+      mean while <code>doob</code>'s martingale fan stays flat.
+      <span class="metric" id="metrics"></span>
     </p>
     <p>
       Open the console and <code>import</code> from
@@ -84,12 +95,14 @@
   </footer>
 
   <script type="module">
-    import { laplace, doob } from "../js/skaters/index.mjs";
+    import { laplace, doob, meanRevert } from "../js/skaters/index.mjs";
 
     const POLICIES = {
-      laplace: () => laplace(1),
-      doob: () => doob(1),
+      laplace: (k) => laplace(k),
+      doob: (k) => doob(k),
+      mean_revert: (k) => meanRevert(k),
     };
+    let K = 6;   // forecast horizon (set from the slider in compute)
 
     // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
     function rng(seed) {
@@ -115,6 +128,14 @@
         if (regime === "trend") s.push(0.06 * t + 2 * gauss(r));
         else if (regime === "seasonal") s.push(5 * Math.sin((2 * Math.PI * t) / 7) + gauss(r));
         else if (regime === "rw") { lvl += gauss(r); s.push(lvl); }
+        else if (regime === "meanrevert") {
+          // Weakly mean-reverting (Ornstein-Uhlenbeck): wanders like a random
+          // walk but is slowly pulled back to 0 — where doob's martingale prior
+          // is wrong. Small kappa = weak reversion.
+          const kappa = 0.04;
+          lvl += kappa * (0 - lvl) + 1.2 * gauss(r);
+          s.push(lvl);
+        }
         else if (regime === "hetero") {
           const sigma = Math.exp(Math.log(0.3) + (Math.log(3) - Math.log(0.3)) * (0.5 + 0.5 * Math.sin((2 * Math.PI * t) / 120)));
           s.push(gauss(r) * sigma);
@@ -133,7 +154,8 @@
     let rows = [], cursor = 0, timer = null, seed = 1, paused = false;
 
     function compute() {
-      const policy = POLICIES[document.getElementById("policy").value]();
+      K = parseInt(document.getElementById("horizon").value, 10);
+      const policy = POLICIES[document.getElementById("policy").value](K);
       const regime = document.getElementById("regime").value;
       const series = makeSeries(regime, seed);
       let state = null, pending = null;
@@ -145,9 +167,11 @@
           const d = pending[0];
           mean = d.mean; lo = d.quantile(0.025); hi = d.quantile(0.975); lp = d.logpdf(y);
         }
-        rows.push({ y, mean, lo, hi, lp });
         const [dists, st] = policy(y, state);
         state = st; pending = dists;
+        // Store the full k-step forecast fan made AFTER seeing y (predicts t+1..t+K).
+        const fan = dists.map((d) => ({ mean: d.mean, lo: d.quantile(0.025), hi: d.quantile(0.975) }));
+        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1] });
       }
       cursor = 1;
     }
@@ -160,6 +184,10 @@
         ymin = Math.min(ymin, r.y, isFinite(r.lo) ? r.lo : r.y);
         ymax = Math.max(ymax, r.y, isFinite(r.hi) ? r.hi : r.y);
       }
+      // The forward fan: the k-step forecast made at the last revealed point.
+      const fanRow = upto >= 1 ? rows[upto - 1] : null;
+      const fan = fanRow && fanRow.fan ? fanRow.fan : null;
+      if (fan) for (const f of fan) { ymin = Math.min(ymin, f.lo); ymax = Math.max(ymax, f.hi); }
       if (!isFinite(ymin)) { ymin = -1; ymax = 1; }
       const pad = (ymax - ymin) * 0.08 + 1e-9;
       ymin -= pad; ymax += pad;
@@ -201,6 +229,26 @@
       for (let i = 0; i < view.length; i++) {
         ctx.beginPath(); ctx.arc(X(i), Y(view[i].y), 1.7, 0, 2 * Math.PI); ctx.fill();
       }
+
+      // forward k-step forecast fan, projecting from the last revealed point.
+      // On a mean-reverting series the fan curves back toward the mean; a
+      // martingale (doob) fan stays flat. The band widens with the horizon.
+      if (fan) {
+        const anchorX = X(upto - 1), anchorY = Y(fanRow.y);
+        const fx = (h) => X(upto - 1 + h);   // h = 1..K maps to future x positions
+        // band
+        ctx.fillStyle = "rgba(255,138,58,0.18)";
+        ctx.beginPath();
+        ctx.moveTo(anchorX, anchorY);
+        for (let h = 1; h <= fan.length; h++) ctx.lineTo(fx(h), Y(fan[h - 1].hi));
+        for (let h = fan.length; h >= 1; h--) ctx.lineTo(fx(h), Y(fan[h - 1].lo));
+        ctx.closePath(); ctx.fill();
+        // mean trajectory (dashed)
+        ctx.strokeStyle = "#ff8a3a"; ctx.lineWidth = 1.8; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(anchorX, anchorY);
+        for (let h = 1; h <= fan.length; h++) ctx.lineTo(fx(h), Y(fan[h - 1].mean));
+        ctx.stroke(); ctx.setLineDash([]);
+      }
     }
 
     function updateMetrics(upto) {
@@ -210,11 +258,19 @@
         if (isFinite(r.lp)) { sumLp += r.lp; nLp++; se += (r.mean - r.y) ** 2; if (r.y >= r.lo && r.y <= r.hi) cov++; }
       }
       if (nLp === 0) { document.getElementById("metrics").textContent = ""; return; }
+      // k-step-ahead log-likelihood: score the horizon-K forecast against the
+      // value that actually arrived K steps later (where it has been revealed).
+      let sumLpK = 0, nLpK = 0;
+      for (let i = 10; i + K < upto; i++) {
+        const r = rows[i];
+        if (r.distK) { const v = r.distK.logpdf(rows[i + K].y); if (isFinite(v)) { sumLpK += v; nLpK++; } }
+      }
       const ll = (sumLp / nLp).toFixed(3);
       const rmse = Math.sqrt(se / nLp).toFixed(2);
       const c = ((cov / nLp) * 100).toFixed(0);
+      const llK = nLpK ? (sumLpK / nLpK).toFixed(3) : "—";
       document.getElementById("metrics").innerHTML =
-        `Mean log-likelihood <b>${ll}</b> · RMSE <b>${rmse}</b> · 95% coverage <b>${c}%</b> over ${nLp} steps.`;
+        `1-step LL <b>${ll}</b> · ${K}-step LL <b>${llK}</b> · RMSE <b>${rmse}</b> · 95% coverage <b>${c}%</b> over ${nLp} steps.`;
       document.getElementById("status").textContent = `step ${upto} / ${rows.length}`;
     }
 
@@ -241,6 +297,10 @@
     document.getElementById("speed").addEventListener("input", (e) => {
       document.getElementById("speedVal").textContent = e.target.value;
     });
+    document.getElementById("horizon").addEventListener("input", (e) => {
+      document.getElementById("horizonVal").textContent = e.target.value;
+    });
+    document.getElementById("horizon").addEventListener("change", start);
     document.getElementById("pause").addEventListener("click", (e) => {
       paused = !paused;
       e.target.textContent = paused ? "Resume" : "Pause";

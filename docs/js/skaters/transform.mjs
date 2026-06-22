@@ -146,6 +146,37 @@ export function emaTransform(alpha = 0.05) {
   return { forward, inverseK };
 }
 
+// Ornstein-Uhlenbeck mean-reversion (JS port of transform.ou_transform).
+// Reverts toward a running mean at speed kappa; phi = 1 - kappa. Multi-step
+// inverse uses the exact OU moments (phi^h mean decay, saturating variance).
+export function ouTransform(kappa = 0.1, alpha = 0.02) {
+  const phi = 1.0 - kappa;
+  function forward(y, state) {
+    if (state === null || state === undefined || !Number.isFinite(y)) {
+      const y0 = Number.isFinite(y) ? y : 0.0;
+      return [0.0, { m: y0, fc: y0, y: y0 }];
+    }
+    let resid = y - state.fc;
+    if (!Number.isFinite(resid)) resid = 0.0;
+    const m = state.m + alpha * (y - state.m);
+    const fc = m + phi * (y - m);
+    return [resid, { m, fc, y }];
+  }
+  function inverseK(dists, state) {
+    const m = state.m;
+    const ylast = state.y;
+    return dists.map((d, i) => {
+      const h = i + 1;
+      const center = m + Math.pow(phi, h) * (ylast - m);
+      const g = phi < 1.0 - 1e-9
+        ? Math.sqrt((1.0 - Math.pow(phi, 2 * h)) / (1.0 - phi * phi))
+        : Math.sqrt(h);
+      return d.scale(g).shift(center);
+    });
+  }
+  return { forward, inverseK };
+}
+
 // ---------------------------------------------------------------------------
 // Theta method (Assimakopoulos & Nikolopoulos, 2000)
 // ---------------------------------------------------------------------------
