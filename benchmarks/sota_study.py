@@ -246,37 +246,45 @@ def ets_scores(ch):
 
 
 PROPHET_Z90 = 1.6448536269514722
+# Prophet is ruinously slow (a fresh Stan fit has no cheap online update), so we
+# do NOT score every one of the TEST points. Instead we sample one one-step test
+# every PROPHET_STRIDE steps: fit on history-up-to-t, forecast the single next
+# step, score the realized y[t]. At stride 50 that's ~TEST/50 fits per series
+# instead of a fit every REFIT steps + 300 scores. It is a subsample of the same
+# rolling one-step test (noisier per-series, same expected per-step score), and
+# must be reported as such. Set PROPHET_STRIDE=1 for the full (interminable) sweep.
+PROPHET_STRIDE = int(os.environ.get("PROPHET_STRIDE", 50))
 
 
 def prophet_scores(ch):
-    """Facebook Prophet on the change series — the popular, heavy foil. Refit
-    every REFIT steps on the expanding window (Prophet has no cheap online
-    update); its 90% interval is read as a Gaussian predictive. Ruinously slow
-    (Stan), so in practice run it on a subset (SOTA_N small) rather than the full
-    sweep."""
+    """Facebook Prophet on the change series — the popular, heavy foil. A fresh
+    Stan fit has no cheap online update, so rather than the full TEST-point sweep
+    we sample one one-step test every PROPHET_STRIDE steps: fit on history-up-to-t,
+    forecast the single next step, read the 90% interval as a Gaussian predictive,
+    and score the realized y[t]. Returns the mean (logpdf, crps) over the sampled
+    points, or None if no point could be fit. Report it as a stride-subsampled
+    estimate (see PROPHET_STRIDE)."""
     import contextlib, io
     y = np.asarray(ch, float); n = len(y); start = n - TEST
     ds_all = pd.date_range("2000-01-01", periods=n, freq="D")
-    lp = cr = 0.0; m = 0; fc = None
-    for t in range(start, n):
-        if fc is None or (t - start) % REFIT == 0:
-            hist = pd.DataFrame({"ds": ds_all[:t], "y": y[:t]})
-            try:
-                mdl = Prophet(interval_width=0.90, daily_seasonality=False,
-                              weekly_seasonality=True, yearly_seasonality=True)
-                with contextlib.redirect_stdout(io.StringIO()), \
-                        contextlib.redirect_stderr(io.StringIO()):
-                    mdl.fit(hist)
-                    fc = mdl.predict(mdl.make_future_dataframe(
-                        periods=REFIT + 2, freq="D")).set_index("ds")
-            except Exception:           # noqa: BLE001
-                if fc is None:
-                    return None
-        row = fc.iloc[t]
+    lp = cr = 0.0; m = 0
+    for t in range(start, n, PROPHET_STRIDE):
+        hist = pd.DataFrame({"ds": ds_all[:t], "y": y[:t]})
+        try:
+            mdl = Prophet(interval_width=0.90, daily_seasonality=False,
+                          weekly_seasonality=True, yearly_seasonality=True)
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                mdl.fit(hist)
+                fc = mdl.predict(mdl.make_future_dataframe(
+                    periods=2, freq="D")).set_index("ds")
+        except Exception:               # noqa: BLE001
+            continue
+        row = fc.iloc[t]                # ds_all[t]: the one-step-ahead forecast
         sd = max((row["yhat_upper"] - row["yhat_lower"]) / (2 * PROPHET_Z90), 1e-9)
         a, b = score_dist(Dist.gaussian(float(row["yhat"]), sd), y[t])
         lp += a; cr += b; m += 1
-    return lp / m, cr / m
+    return (lp / m, cr / m, m) if m else None     # m = sampled points (<< TEST)
 
 
 NF_INPUT = int(os.environ.get("SOTA_NF_INPUT", 24))
@@ -383,7 +391,8 @@ def score_one(payload):
         except Exception:               # noqa: BLE001 — never let one opponent kill a series
             r = None
         if r is not None:
-            rows.append([sid, name, f"{r[0]:.6f}", f"{r[1]:.6f}", TEST])
+            nn = r[2] if len(r) > 2 else TEST     # methods may report their own n
+            rows.append([sid, name, f"{r[0]:.6f}", f"{r[1]:.6f}", nn])
     lp, cr = laplace_scores(ch)
     rows.append([sid, "laplace", f"{lp:.6f}", f"{cr:.6f}", TEST])
     return sid, rows

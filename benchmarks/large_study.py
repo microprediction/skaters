@@ -11,9 +11,11 @@ Pipeline:
      >= MIN_CHANGES usable changes.
   3. Score every (series, forecaster) in parallel; append to results_large.csv
      immediately, skipping series already fully scored (crash-safe resume).
-  4. Summarize: best-of-ours vs best-of-crepes CRPS win-rate with a bootstrap
-     CI, a family-clustered rate (correlated curves counted once), a per-class
-     breakdown, and dirac's log-likelihood lift.
+  4. Summarize: the fixed default policy `laplace` vs best-of-crepes CRPS
+     win-rate with a bootstrap CI (NOT best-of-ours — that is post-hoc per-series
+     selection, not an honest rate), a family-clustered rate (correlated curves
+     counted once), a per-class breakdown, and the sticky/lattice lift (laplace vs
+     laplace-nostick).
 
 Run (in the conda env with crepes + a FRED key):
     PYTHONPATH=src python benchmarks/large_study.py
@@ -45,6 +47,10 @@ RESULTS = os.environ.get("STUDY_RESULTS", os.path.join(_HERE, "results_large.csv
 N_CANDIDATES = int(os.environ.get("STUDY_N_CANDIDATES", 3500))  # consider (by popularity)
 MAX_QUALIFY = int(os.environ.get("STUDY_MAX_QUALIFY", 2500))    # stop once this many pass
 MIN_CHANGES = 500       # need a real history to score
+# Cap pathologically long series (some daily FRED series span decades) so crepes'
+# windowed CPS can't stall a worker for minutes on one series. Scores the most
+# recent MAX_CHANGES changes.
+MAX_CHANGES = int(os.environ.get("STUDY_MAX_CHANGES", 6000))
 MAX_WORKERS = int(os.environ.get("STUDY_WORKERS", min(8, (os.cpu_count() or 4))))
 CACHED_ONLY = os.environ.get("STUDY_CACHED_ONLY") == "1"        # smoke test: no network
 
@@ -55,9 +61,11 @@ def _cache_path(sid):
     return os.path.join(fred._CACHE, f"{sid}.csv")
 
 
-def qualify_universe():
-    """Resolve the universe and return [(sid, title)] for series that load and
-    have >= MIN_CHANGES changes. Fetches missing series with light throttling."""
+def iter_qualified():
+    """Yield (sid, title) as each series qualifies (>= MIN_CHANGES changes),
+    fetching misses with light throttling. A generator (not a batch return) so
+    scoring can start on the first qualifier instead of waiting for the whole
+    universe to download — see run()."""
     if CACHED_ONLY:
         # Score whatever is already cached (power-safe interim run). Pull titles
         # from the resolved universe so the class breakdown still works.
@@ -70,8 +78,7 @@ def qualify_universe():
         universe = [{"id": s, "title": tmap.get(s, "")} for s in ids][:MAX_QUALIFY]
     else:
         universe = fred_universe.enumerate_daily(N_CANDIDATES)
-    qualified = []
-    fetched = 0
+    n_qual = fetched = 0
     for i, meta in enumerate(universe):
         sid = meta["id"]
         miss = not os.path.exists(_cache_path(sid))
@@ -83,14 +90,14 @@ def qualify_universe():
             continue
         ch = fred._to_changes(levels)
         if len(ch) >= MIN_CHANGES:
-            qualified.append((sid, meta["title"]))
+            n_qual += 1
+            yield sid, meta["title"]
         if (i + 1) % 200 == 0:
-            print(f"  scanned {i+1}/{len(universe)}  qualified={len(qualified)}  "
+            print(f"  scanned {i+1}/{len(universe)}  qualified={n_qual}  "
                   f"fetched={fetched}", flush=True)
-        if len(qualified) >= MAX_QUALIFY:
+        if n_qual >= MAX_QUALIFY:
             break
-    print(f"qualified {len(qualified)} series (fetched {fetched} new)", flush=True)
-    return qualified
+    print(f"scan complete: qualified {n_qual} series (fetched {fetched} new)", flush=True)
 
 
 # ---- phase 2: parallel scoring -----------------------------------------------
@@ -103,6 +110,8 @@ def score_series(sid):
     rows = []
     if len(ch) < MIN_CHANGES:
         return sid, rows
+    if len(ch) > MAX_CHANGES:          # bound per-series cost; never stall on a giant
+        ch = ch[-MAX_CHANGES:]
     for name, spec in FORECASTERS.items():
         try:
             if spec[0] == "crepes":
@@ -132,45 +141,61 @@ def _completed_series():
 
 
 def run():
-    if not os.path.exists(RESULTS):
-        with open(RESULTS, "w") as f:
-            csv.writer(f).writerow(["series", "forecaster", "crps", "logpdf", "n"])
-
-    qualified = qualify_universe()
-    titles = dict(qualified)
+    """Pipeline: submit each series for scoring the moment it qualifies, draining
+    completed workers as we go, so scoring overlaps the (throttled) download
+    instead of waiting behind a full-universe barrier. Crash-safe — each series'
+    rows are appended and flushed immediately; already-scored series are skipped."""
+    new = not os.path.exists(RESULTS)
     done = _completed_series()
-    todo = [sid for sid, _ in qualified if sid not in done]
-    print(f"scoring {len(todo)} series ({len(done)} already done) "
-          f"on {MAX_WORKERS} workers", flush=True)
-
+    titles = {}
     t0 = time.time()
-    finished = 0
-    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futs = {pool.submit(score_series, sid): sid for sid in todo}
-        for fut in as_completed(futs):
-            sid = futs[fut]
+    submitted = finished = 0
+    with open(RESULTS, "a", newline="") as fh, \
+            ProcessPoolExecutor(max_workers=MAX_WORKERS) as pool:
+        w = csv.writer(fh)
+        if new:
+            w.writerow(["series", "forecaster", "crps", "logpdf", "n"]); fh.flush()
+        futs = {}
+
+        def collect(fut):
+            nonlocal finished
+            sid = futs.pop(fut)
             try:
                 _, rows = fut.result()
             except Exception as e:  # noqa: BLE001
-                print(f"  ERR {sid}: {e}", flush=True)
-                continue
+                print(f"  ERR {sid}: {e}", flush=True); return
             if rows:
-                with open(RESULTS, "a") as f:
-                    csv.writer(f).writerows(rows)
+                w.writerows(rows); fh.flush()
             finished += 1
-            if finished % 25 == 0 or finished == len(todo):
+            if finished % 25 == 0:
                 rate = finished / max(time.time() - t0, 1e-9)
-                eta = (len(todo) - finished) / max(rate, 1e-9)
-                print(f"  {finished}/{len(todo)} series  "
-                      f"({rate*60:.0f}/min, ETA {eta/60:.0f} min)", flush=True)
+                print(f"  scored {finished} (submitted {submitted}, in-flight "
+                      f"{len(futs)}) — {rate*60:.0f}/min", flush=True)
+
+        for sid, title in iter_qualified():
+            titles[sid] = title
+            if sid in done:
+                continue
+            futs[pool.submit(score_series, sid)] = sid
+            submitted += 1
+            for f in [f for f in list(futs) if f.done()]:   # drain, don't block
+                collect(f)
+            while len(futs) >= MAX_WORKERS * 4:              # backpressure
+                collect(next(as_completed(list(futs))))
+        for fut in as_completed(list(futs)):                 # drain the tail
+            collect(fut)
+
+    print(f"done: scored {finished} new series this run ({submitted} submitted)",
+          flush=True)
+    summarize(titles)
 
     summarize(titles)
 
 
 # ---- summary -----------------------------------------------------------------
 
-OURS = ["laplace", "kahneman", "scalemix-leaf",
-        "crps-leaf-0.3", "crps-leaf-0.6", "crps-leaf-1.0", "dirac"]
+OURS = ["laplace", "laplace-ll", "laplace-nostick", "scalemix-leaf",
+        "crps-leaf-0.3", "crps-leaf-0.6", "crps-leaf-1.0"]
 CREPES = ["crepes-w250", "crepes-w400", "crepes-w750"]
 
 
@@ -199,69 +224,111 @@ def summarize(titles=None):
     titles = titles or {}
     by = _load_results()
 
-    wins, fams, classes, lifts = [], [], [], []
-    for sid, d in by.items():
-        o = _best(d, OURS, 0)
-        c = _best(d, CREPES, 0)
-        if math.isnan(o) or math.isnan(c):
-            continue
-        win = 1.0 if o < c else 0.0
-        wins.append(win)
-        fams.append(fred_universe.family(sid))
-        classes.append(fred_universe.asset_class(titles.get(sid, "")))
-        if "dirac" in d and not math.isnan(d["dirac"][1]):
-            best_other = max((d[k][1] for k in OURS
-                              if k != "dirac" and k in d and not math.isnan(d[k][1])),
-                             default=float("nan"))
-            if not math.isnan(best_other):
-                lifts.append(d["dirac"][1] - best_other)
+    # Headline policy is the single fixed default, `laplace` — NOT best-of-ours.
+    # Best-of-ours is post-hoc per-series selection (cherry-picking the winning
+    # policy after seeing the answer), so it is not an honest win-rate. We give the
+    # opponent its best calibration window (best-of-crepes) — charitable to them.
+    rng = np.random.default_rng(0)
 
-    n = len(wins)
+    def boot(values):
+        vals = np.asarray(values, float)
+        if len(vals) == 0:
+            return float("nan"), float("nan")
+        idx = rng.integers(0, len(vals), size=(2000, len(vals)))
+        return tuple(np.percentile(vals[idx].mean(axis=1), [2.5, 97.5]))
+
+    def fam_rate(pairs):                       # pairs: [(family, win), ...]
+        fm = {}
+        for fam, x in pairs:
+            fm.setdefault(fam, []).append(x)
+        return np.asarray([np.mean(v) for v in fm.values()]), len(fm)
+
+    def compare(get_c):                        # laplace (fixed) vs one fixed column
+        wv, famp, clsp = [], [], []
+        for sid, d in by.items():
+            if "laplace" not in d or math.isnan(d["laplace"][0]):
+                continue
+            c = get_c(d)
+            if math.isnan(c):
+                continue
+            x = 1.0 if d["laplace"][0] < c else 0.0
+            wv.append(x)
+            famp.append((fred_universe.family(sid), x))
+            clsp.append((fred_universe.asset_class(titles.get(sid, "")), x))
+        return wv, famp, clsp
+
+    # sticky/lattice lift (independent of crepes): laplace vs laplace-nostick — the
+    # repeat-mass story the dropped `dirac` policy used to carry.
+    lifts = [d["laplace"][1] - d["laplace-nostick"][1] for d in by.values()
+             if "laplace" in d and "laplace-nostick" in d
+             and not math.isnan(d["laplace"][1]) and not math.isnan(d["laplace-nostick"][1])]
+
+    n = sum(1 for d in by.values() if "laplace" in d
+            and not math.isnan(d["laplace"][0]) and not math.isnan(_best(d, CREPES, 0)))
     if not n:
         print("no scored series yet")
         return
-    w = np.asarray(wins)
-    rng = np.random.default_rng(0)
 
-    def boot(values, weights=None):
-        vals = np.asarray(values)
-        idx = rng.integers(0, len(vals), size=(2000, len(vals)))
-        means = vals[idx].mean(axis=1)
-        return np.percentile(means, [2.5, 97.5])
-
-    lo, hi = boot(w)
     print(f"\n=== {n} systematically-selected daily FRED series ===")
-    print(f"CRPS  best-of-ours beats best-of-crepes: "
-          f"{w.mean()*100:.1f}%  (95% CI {lo*100:.1f}-{hi*100:.1f}%)")
+    # Headline (the strong story): laplace beats crepes even when crepes is handed
+    # its BEST calibration window PER SERIES — maximally charitable to the opponent.
+    # Beating that is harder than beating any single fixed window, so we feature it.
+    wb, _fb, _cb = compare(lambda d: _best(d, CREPES, 0))
+    frb, nfb = fam_rate(_fb)
+    lo, hi = boot(wb); flo, fhi = boot(frb)
+    print(f"CRPS  laplace (fixed default) beats best-of-crepes — crepes given its")
+    print(f"      best window PER SERIES — on {np.mean(wb)*100:.1f}% of series "
+          f"(CI {lo*100:.1f}-{hi*100:.1f}%); {frb.mean()*100:.1f}% family-clustered "
+          f"({nfb} families, CI {flo*100:.1f}-{fhi*100:.1f}%)")
+    print("      and laplace beats each FIXED window individually (raw / family):")
+    hardest = None
+    for k in CREPES:
+        wv, famp, _ = compare(lambda d, k=k: d[k][0] if k in d else float("nan"))
+        if not wv:
+            continue
+        raw = np.mean(wv) * 100
+        fr, _nf = fam_rate(famp)
+        print(f"        vs {k:12s} {raw:5.1f}% raw   {fr.mean()*100:5.1f}% family   (n={len(wv)})")
+        if hardest is None or raw < hardest[0]:
+            hardest = (raw, k)
 
-    # family-clustered: average within family, then over families
-    fam_means = {}
-    for f, x in zip(fams, wins):
-        fam_means.setdefault(f, []).append(x)
-    fam_rate = np.asarray([np.mean(v) for v in fam_means.values()])
-    flo, fhi = boot(fam_rate)
-    print(f"      family-clustered ({len(fam_means)} families): "
-          f"{fam_rate.mean()*100:.1f}%  (95% CI {flo*100:.1f}-{fhi*100:.1f}%)")
-
-    # per-class breakdown
-    print("\n  by asset class (approx):")
+    # per-class breakdown on the HARDEST fixed window (conservative single choice)
+    hw = hardest[1] if hardest else CREPES[0]
+    _wv, _fp, clsp = compare(lambda d: d[hw][0] if hw in d else float("nan"))
+    print(f"\n  by asset class (laplace vs hardest fixed window {hw}):")
     cls = {}
-    for c, x in zip(classes, wins):
+    for c, x in clsp:
         cls.setdefault(c, []).append(x)
     for c in sorted(cls, key=lambda k: -len(cls[k])):
         v = cls[c]
-        print(f"      {c:10s} n={len(v):4d}  ours win {np.mean(v)*100:5.1f}%")
+        print(f"      {c:10s} n={len(v):4d}  laplace win {np.mean(v)*100:5.1f}%")
 
     # likelihood: dirac lift + mean logpdf per forecaster (crepes has none)
     if lifts:
         la = np.asarray(lifts)
-        print(f"\n  dirac log-likelihood lift over best other-ours: "
+        print(f"\n  sticky (lattice) log-likelihood lift, laplace vs laplace-nostick: "
               f"mean {la.mean():+.3f} nats  (positive on {np.mean(la>0)*100:.0f}% of series)")
-    print("  mean logpdf per forecaster (ours; crepes emits no density):")
+    # per-policy CRPS win-rate vs best-of-crepes (raw + family-clustered) and mean logpdf
+    fam_of = {sid: fred_universe.family(sid) for sid in by}
+    print("\n  per-policy: CRPS win-rate vs best-of-crepes (raw / family) and mean logpdf:")
+    print(f"      {'policy':16s}{'CRPS raw':>10s}{'CRPS fam':>10s}{'mean LL':>10s}{'n':>7s}")
     for k in OURS:
-        v = [d[k][1] for d in by.values() if k in d and not math.isnan(d[k][1])]
-        if v:
-            print(f"      {k:16s} {sum(v)/len(v):7.3f}  (n={len(v)})")
+        per, fam_acc, lls = [], {}, []
+        for sid, d in by.items():
+            if k not in d:
+                continue
+            c = _best(d, CREPES, 0)
+            if not math.isnan(d[k][0]) and not math.isnan(c):
+                wv = 1.0 if d[k][0] < c else 0.0
+                per.append(wv); fam_acc.setdefault(fam_of[sid], []).append(wv)
+            if not math.isnan(d[k][1]):
+                lls.append(d[k][1])
+        if not per:
+            continue
+        raw = np.mean(per) * 100
+        fam = np.mean([np.mean(v) for v in fam_acc.values()]) * 100
+        mll = sum(lls) / len(lls) if lls else float("nan")
+        print(f"      {k:16s}{raw:9.1f}%{fam:9.1f}%{mll:10.3f}{len(per):7d}")
 
 
 if __name__ == "__main__":

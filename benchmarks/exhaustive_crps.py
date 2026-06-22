@@ -27,7 +27,7 @@ from crepes import ConformalPredictiveSystem
 
 import fred
 from crps_leaf import crps_leaf
-from skaters.api import laplace, kahneman, dirac
+from skaters.api import laplace
 from skaters.leaf import scale_mixture_leaf
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -106,18 +106,22 @@ def skater_scores(make, series, burn=300):
     return (cr / n, lp / n, n) if n else (float("nan"), float("nan"), 0)
 
 
-# forecaster name -> ("crepes", window) or ("skater", factory)
+# forecaster name -> ("crepes", window) or ("skater", factory).
+# Policy set on the current (0.8.0+) API: kahneman/dirac were dropped — dirac's
+# exact-repeat mass is now laplace's default sticky=True (lattice projection), so
+# the repeat-mass lift is recovered as laplace vs laplace-nostick. doob is
+# level-domain and excluded from this change-fed harness.
 FORECASTERS = {
     "crepes-w250": ("crepes", 250),
     "crepes-w400": ("crepes", 400),
     "crepes-w750": ("crepes", 750),
-    "laplace": ("skater", lambda: laplace(1)),
-    "kahneman": ("skater", lambda: kahneman(1)),
+    "laplace": ("skater", lambda: laplace(1)),                          # CRPS tail + sticky (default)
+    "laplace-ll": ("skater", lambda: laplace(1, objective="likelihood")),  # log trunk + log tail
+    "laplace-nostick": ("skater", lambda: laplace(1, sticky=False)),    # sticky off (isolates the lattice lift)
     "scalemix-leaf": ("skater", lambda: scale_mixture_leaf(1)),
     "crps-leaf-0.3": ("skater", lambda: crps_leaf(eta=0.3)),
     "crps-leaf-0.6": ("skater", lambda: crps_leaf(eta=0.6)),
     "crps-leaf-1.0": ("skater", lambda: crps_leaf(eta=1.0)),
-    "dirac": ("skater", lambda: dirac(1)),
 }
 
 
@@ -175,7 +179,8 @@ def summarize():
         r = csv.reader(f); next(r, None)
         for series, fc, crps, lp, n in r:
             rows.setdefault(series, {})[fc] = float(crps)
-    ours = ["laplace", "kahneman", "scalemix-leaf", "crps-leaf-0.3", "crps-leaf-0.6", "crps-leaf-1.0", "dirac"]
+    ours = ["laplace", "laplace-ll", "laplace-nostick", "scalemix-leaf",
+            "crps-leaf-0.3", "crps-leaf-0.6", "crps-leaf-1.0"]
     creps = ["crepes-w250", "crepes-w400", "crepes-w750"]
     wins = 0; total = 0
     print("\n=== summary: best-of-ours vs best-of-crepes CRPS (lower=better) ===")

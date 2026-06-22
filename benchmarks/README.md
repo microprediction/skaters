@@ -157,7 +157,7 @@ so on the economically-grounded, tail-sensitive metric it cannot compete; on
 CRPS, the metric it is built for, it still loses 93% of the time once we aim at
 it. Run it yourself: `PYTHONPATH=src python benchmarks/exhaustive_crps.py`.
 
-## At scale: 2,501 systematically-selected series (`large_study.py`)
+## At scale: 2,500 systematically-selected series (`large_study.py`)
 
 The 42-series result invites one fair objection — *you picked the series*. So we
 re-ran it on a **bias-free universe**: the top-N FRED series tagged `daily`,
@@ -167,26 +167,28 @@ fixed rule chosen independently of the forecasters. Transform is automatic
 
 ### Read the CRPS numbers honestly
 
-On **2,501** such series, CRPS win-rate against crepes (best of three calibration
-windows). The single eye-catching number — *best-of-our-policies, 91.4%* — is
-**post-hoc selection** (whichever policy did best on each series) and is easy to
-over-read; the honest, de-correlated figure is **family-clustered** (195
-families, each correlated curve/panel counted once). So read it per-policy:
+On **2,500** such series, CRPS win-rate against crepes (best of three calibration
+windows). The single eye-catching number — *best-of-ours, 92.0%* — is **post-hoc
+selection** (whichever policy did best on each series) and is easy to over-read;
+the honest, de-correlated figure is **family-clustered** (194 families, each
+correlated curve/panel counted once, 95% CI 58–71%). So read it per-policy
+(current 0.8.0 policy set):
 
-| forecaster (same structure) | CRPS raw | CRPS family | mean logpdf |
+| policy | CRPS raw | CRPS family | mean logpdf |
 |---|---|---|---|
-| `laplace` — log trunk + **log** tail | 82.6% | 48.7% | 2.96 |
-| **log trunk + CRPS tail** — *model first, conform last* | 89.5% | **60.1%** | **3.01** |
-| bare `crps-leaf` (CRPS objective, no trunk) | 80.8% | 60.3% | 2.96 |
-| best-of-all policies *(post-hoc pick per series)* | 91.4% | 64.3% | — |
+| `laplace` — log trunk + **CRPS** tail + sticky *(the default)* | **91.2%** | **64.1%** | **3.489** |
+| `laplace-ll` — log trunk + **log** tail (`objective="likelihood"`) | 85.2% | 55.2% | 3.440 |
+| `laplace-nostick` — CRPS tail, lattice **off** (`sticky=False`) | 89.5% | 59.9% | 3.014 |
+| bare `crps-leaf` (CRPS objective, no trunk) | 80.6% | 60.1% | 2.960 |
+| best-of-ours *(post-hoc pick per series)* | 92.0% | 64.8% | — |
 
 The point is the **first two rows**: same machine, repoint only the objective.
-A general likelihood policy (`laplace`) is essentially **even** with crepes on
-CRPS — 48.7% of families, a coin flip, because it is not aimed at CRPS. Swap the
-terminal leaf's objective to CRPS — keeping the likelihood-weighted trunk — and
-it jumps to **60.1% of families**, matching the dedicated CRPS specialist while
-*also* lifting likelihood (2.96 → 3.01). That is metric-agnosticism in one line:
-the objective is a knob, not a fixed cost.
+The likelihood policy (`laplace-ll`) already edges crepes on CRPS — 55.2% of
+families — even though it is not aimed at CRPS. Swap the terminal leaf's objective
+to CRPS — keeping the likelihood-weighted trunk — and it climbs to **64.1% of
+families**, matching the dedicated CRPS specialist while *also* lifting likelihood
+(3.440 → 3.489). That is metric-agnosticism in one line: the objective is a knob,
+not a fixed cost.
 
 **Model first, conform last.** The trunk's job is to *model* — get the mean and
 structure right — and the honest objective for that is likelihood (a proper,
@@ -197,21 +199,23 @@ both — likelihood trunk, CRPS leaf — beats the likelihood-only policy on **e
 axis (CRPS raw, CRPS family, *and* likelihood): a CRPS-fit leaf is more
 outlier-robust, so it even generalises slightly better on likelihood. No trade.
 
-As of **0.8.0 this is the package default**: `laplace(k)` *is* the "log trunk +
-CRPS tail" row; the "log trunk + log tail" row is `laplace(k,
-objective="likelihood")`. The table's `laplace` rows were scored before the
-default flipped, so they name the configuration explicitly.
+This is the **0.8.0 default**: `laplace(k)` *is* the top row (CRPS tail + sticky);
+`laplace(k, objective="likelihood")` is the log-tail row; `laplace(k,
+sticky=False)` turns off the lattice projection (the `laplace-nostick` row, below).
 
-By asset class (best-of-ours, keyword-approximate): equity 99% (n=1033),
-commodity 100%, rates 95%, credit 94%, fx 89%, other 81%.
+By asset class (best-of-ours, keyword-approximate): equity 98.9% (n=1030),
+commodity 100% (n=17), credit 98.1% (n=104), rates 96.4% (n=303), fx 88.9%
+(n=198), other 81.7% (n=848).
 
 ### The win that is *not* on CRPS
 
 CRPS was never our metric. The robust, un-spinnable fact is on **log-likelihood**:
 
 - every skater emits a proper predictive *density* and is scored — `laplace`
-  ≈ **2.96 nats/obs**, `dirac` **3.49** (+0.46 over the best other policy,
-  because it alone places mass on exact repeats);
+  ≈ **3.49 nats/obs**. The lattice projection (`sticky`, on by default) places
+  near-Dirac mass on exact repeats; it is worth **+0.474 nats** over
+  `laplace-nostick`, realised on the **35%** of series that revisit values and
+  free (zero lift, no cost) on the continuous rest;
 - crepes emits a *CDF*, not a density, so it scores **nothing** — it cannot be
   evaluated on likelihood at all.
 
@@ -221,8 +225,8 @@ conformal predictive systems cannot take the field, and skaters can** — while
 *also* matching the CRPS specialist on its own metric, by conforming the tail
 last without touching the model.
 
-Run it: `PYTHONPATH=src python benchmarks/large_study.py` (needs the conda env
-with `crepes` + a FRED key).
+Run it: `PYTHONPATH=src python benchmarks/large_study.py` (needs a venv with
+`crepes` + a FRED key).
 
 ## On the table
 

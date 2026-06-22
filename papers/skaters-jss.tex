@@ -436,13 +436,13 @@ zero-shot result as the headline.}
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
 
-A companion sweep on $2{,}501$ \proglang{FRED} series isolates the effect of the
+A companion sweep on $2{,}500$ \proglang{FRED} series isolates the effect of the
 terminal-leaf objective against the \pkg{crepes} conformal predictive system
 (given its three best calibration windows and scored on its own CDF via the
 pinball decomposition of CRPS). Because the conformal opponent there uses only a
 naive mean, we read this as an ablation of our own objective knob rather than a
 state-of-the-art claim. Reporting per-policy and de-correlating to one vote per
-correlated family (195 families):
+correlated family (194 families):
 
 \begin{table}[h!]
 \centering
@@ -450,16 +450,17 @@ correlated family (195 families):
 \toprule
 Forecaster (identical structure) & CRPS, raw & CRPS, family & Mean LL \\
 \midrule
-likelihood trunk + likelihood leaf & 82.6\,\% & 48.7\,\% & 2.96 \\
-likelihood trunk + CRPS leaf       & 89.5\,\% & \textbf{60.1\,\%} & \textbf{3.01} \\
-bare CRPS leaf (no trunk)          & 80.8\,\% & 60.3\,\% & 2.96 \\
+likelihood trunk + likelihood leaf & 85.2\,\% & 55.2\,\% & 3.44 \\
+likelihood trunk + CRPS leaf       & \textbf{91.2\,\%} & \textbf{64.1\,\%} & \textbf{3.49} \\
+bare CRPS leaf (no trunk)          & 80.6\,\% & 60.1\,\% & 2.96 \\
 \bottomrule
 \end{tabular}
 \caption{Effect of the terminal-leaf objective. The middle row is the
-\emph{model first, conform last} recipe. A general likelihood policy is
-essentially even with conformal on CRPS over independent families ($48.7\%$);
-repointing only the terminal leaf to CRPS lifts that to $60.1\%$ and raises
-log-likelihood, matching the dedicated CRPS specialist while modelling faithfully.}
+\emph{model first, conform last} recipe (the \code{laplace} default: CRPS leaf,
+lattice projection on). A general likelihood policy already edges conformal on
+CRPS over independent families ($55.2\%$); repointing only the terminal leaf to
+CRPS lifts that to $64.1\%$ and raises log-likelihood ($3.44 \rightarrow 3.49$),
+matching the dedicated CRPS specialist while modelling faithfully.}
 \label{tab:objective}
 \end{table}
 
