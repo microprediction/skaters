@@ -337,6 +337,13 @@ approximations otherwise. So `doob` is averaging a family of (approximate)
 Bayesian volatility filters rather than ad-hoc heuristics. See also Creal,
 Koopman & Lucas (2013) and Harvey (2013) for the score-driven / GAS framework.
 
+The same identity is the backbone of modern **denoising / score-based diffusion
+models**: the posterior mean of a clean signal given a noisy observation is
+"observation $+\ \sigma^2 \times$ score of the marginal density," which is what
+lets a diffusion denoiser be read as a score estimator (Efron 2011; Vincent 2011;
+Song & Ermon 2019). Each forecast step here is the time-series analogue —
+denoising the next observation toward the latent level or variance.
+
 ## Lineage
 
 This package distills ideas from timemachines, which provided a common skater interface for dozens of time series packages. This is a from-scratch rewrite focused on speed, distributional predictions, and browser compatibility.
