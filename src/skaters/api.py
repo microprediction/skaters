@@ -245,7 +245,7 @@ def _build_candidates(k: int, leaf_fn=leaf):
 # The two named forecasters
 # ---------------------------------------------------------------------------
 
-def laplace(k: int = 1, objective: str = "crps", sticky: bool = True):
+def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None):
     """The general forecaster.
 
     A likelihood-weighted Bayesian ensemble over the full candidate population
@@ -259,11 +259,14 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True):
             ``"likelihood"``.
         sticky: lattice projection for repeating values (default True; free on
             continuous data, a large win on grid/repeating series).
+        leaf: optional terminal-leaf factory overriding ``objective`` — e.g.
+            ``laplace(leaf=garch_leaf)`` for a GARCH(1,1) conditional variance on
+            price/return series. A factory ``leaf(k=...) -> skater``.
     """
     candidates, depths, _ = _build_candidates(k)
     f = terminal_leaf_ensemble(
         candidates, k=k,
-        leaf_fn=_objective_leaf(objective),
+        leaf_fn=leaf if leaf is not None else _objective_leaf(objective),
         learning_rate=0.8,
         complexity_penalty=0.005,
         depths=depths,

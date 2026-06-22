@@ -83,6 +83,20 @@ f = laplace(k=1, objective="likelihood")  # pure-likelihood leaf
 f = laplace(k=1, sticky=False)            # no lattice projection
 ```
 
+**Price/return series** (`garch_leaf`). The default terminal leaf tracks its scale
+with an EWMA (RiskMetrics/IGARCH — no variance mean-reversion). For series with
+volatility *clustering and reversion* (equity/fx/commodity returns), swap in a
+GARCH(1,1)-t terminal leaf:
+
+```python
+from skaters import laplace, garch_leaf
+f = laplace(k=1, leaf=garch_leaf)         # GARCH(1,1) conditional variance + Student-t tails
+```
+
+On the price population it recovers about half the held-out log-likelihood gap to
+a fitted GARCH-t and is neutral-to-positive elsewhere (see
+[`benchmarks/garch_leaf_threeway.py`](benchmarks/garch_leaf_threeway.py)).
+
 ### `doob` — the martingale specialist
 
 A committed, driftless **martingale** with a learned **volatility clock**: a
