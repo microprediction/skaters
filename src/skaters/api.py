@@ -23,7 +23,7 @@ from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.conjugate import conjugate
 from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
-    difference, fractional_difference, standardize, ema_transform,
+    difference, fractional_difference, standardize, ema_transform, ou_transform,
     garch, power_transform, drift, holt_linear, ar, theta,
     seasonal_difference, yeo_johnson,
 )
@@ -290,4 +290,49 @@ def doob(k: int = 1, objective: str = "crps"):
     f = bayesian_ensemble(cands, k=k, learning_rate=0.5, depths=[1, 2, 2, 2, 1],
                           max_components=30)
     f.__name__ = f"doob(k={k})"
+    return f
+
+
+def mean_revert(k: int = 1, kappas: tuple = (0.02, 0.05, 0.1, 0.2, 0.4),
+                alpha: float = 0.02, coordinate: float | None = None,
+                objective: str = "crps"):
+    """The mean-reverting counterpart of ``doob``: an online Bayesian average
+    over Ornstein-Uhlenbeck reversion speeds.
+
+    Where ``doob`` commits to a martingale (no reversion), this commits to
+    reversion toward a running mean and learns only *how fast* — averaging
+    candidates that differ in reversion speed ``kappa``, weighted online by
+    likelihood (*model first*, like ``laplace``: the candidates supply means, a
+    single terminal leaf shapes the residual). Built for the regime where
+    ``doob``'s prior is wrong.
+
+    The reversion edge over a random walk grows with horizon, so this is
+    primarily a **multi-step** tool (e.g. pairs-trading spreads). Feed it the
+    quantity that reverts:
+
+      * signed spreads (pairs trading) revert in *linear* space -> ``coordinate=None``;
+      * volatility / rates are positive -> ``coordinate=0.5`` (sqrt / CIR) or
+        ``0.0`` (log / geometric), reusing the Yeo-Johnson coordinate.
+
+    Args:
+        k: forecast horizon (use ``k > 1``; the edge is a multi-step effect).
+        kappas: grid of reversion speeds to average over, learned online.
+        alpha: EWMA rate for each candidate's running mean.
+        coordinate: optional Yeo-Johnson lambda; ``None`` = linear.
+        objective: terminal-leaf objective, ``"crps"`` (default) or ``"likelihood"``.
+    """
+    leaf_fn = _objective_leaf(objective)
+    cands, depths = [], []
+    for kp in kappas:
+        c = conjugate(leaf(k=k), ou_transform(kp, alpha), k=k)
+        depth = 1
+        if coordinate is not None:
+            c = conjugate(c, yeo_johnson(coordinate), k=k)
+            depth = 2
+        cands.append(c)
+        depths.append(depth)
+    f = terminal_leaf_ensemble(cands, k=k, leaf_fn=leaf_fn, learning_rate=0.8,
+                               complexity_penalty=0.005, depths=depths,
+                               max_components=20)
+    f.__name__ = f"mean_revert(k={k})"
     return f

@@ -14,13 +14,13 @@ from skaters.ensemble import precision_weighted_ensemble
 from skaters.bayesian import bayesian_ensemble
 from skaters.conjugate import conjugate
 from skaters.transform import (
-    difference, fractional_difference, standardize, ema_transform,
+    difference, fractional_difference, standardize, ema_transform, ou_transform,
     garch, seasonal_difference, power_transform, ar, grouped_ar, drift, holt_linear, theta,
     yeo_johnson,
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import laplace, doob
+from skaters.api import laplace, doob, mean_revert
 from skaters.sticky import sticky
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -35,6 +35,7 @@ __all__ = [
     # Search policies (the main user API)
     "laplace",
     "doob",
+    "mean_revert",
     "sticky",
     "period_detector",
     "top_periods",
@@ -48,6 +49,7 @@ __all__ = [
     "fractional_difference",
     "standardize",
     "ema_transform",
+    "ou_transform",
     "garch",
     "seasonal_difference",
     "power_transform",

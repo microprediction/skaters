@@ -195,6 +195,65 @@ def ema_transform(alpha: float = 0.05):
     return forward, inverse_k
 
 
+def ou_transform(kappa: float = 0.1, alpha: float = 0.02):
+    """Ornstein-Uhlenbeck mean-reversion as a bijective transform.
+
+    Maintains a running mean ``m`` (EMA, rate ``alpha``) and reverts the current
+    value toward it with persistence ``phi = 1 - kappa``:
+
+        forecast_t = m + phi * (y_t - m)        (one-step-ahead)
+        residual_t = y_t - forecast_{t-1}
+
+    ``kappa`` in (0, 1] is the reversion speed: ``kappa -> 0`` is a random walk
+    (no reversion), ``kappa = 1`` reverts fully to the mean in one step (which is
+    :func:`ema_transform`). The intermediate, partial reversion is what neither
+    ``ema_transform`` (full reversion, ``phi = 0``) nor ``ar`` (no intercept, so
+    reversion is toward zero, not a level) expresses, even composed. Reversion is
+    toward a *nonzero running level*, so it is meaningful in a positive coordinate
+    (compose under ``yeo_johnson(0.5)`` for the sqrt / CIR-flavoured coupling, or
+    ``yeo_johnson(0.0)`` for the log / geometric one).
+
+    The multi-step inverse uses the exact OU predictive moments: the h-step mean
+    decays geometrically toward ``m`` as ``phi**h``, and the h-step standard
+    deviation grows as ``sqrt((1 - phi**(2h)) / (1 - phi**2))``, saturating at the
+    stationary level (and reducing to ``sqrt(h)`` random-walk growth as
+    ``phi -> 1``). See ``benchmarks/cir_ablation.py`` for the validation: the edge
+    over the random-walk pool is a multi-step phenomenon, growing with horizon.
+
+    Args:
+        kappa: reversion speed in (0, 1].
+        alpha: EWMA rate for the running mean ``m``.
+    """
+    assert 0.0 < kappa <= 1.0
+    assert 0.0 < alpha < 1.0
+    phi = 1.0 - kappa
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None or not math.isfinite(y):
+            y0 = y if math.isfinite(y) else 0.0
+            return 0.0, {"m": y0, "fc": y0, "y": y0}
+        resid = y - state["fc"]
+        if not math.isfinite(resid):
+            resid = 0.0
+        m = state["m"] + alpha * (y - state["m"])
+        fc = m + phi * (y - m)
+        return resid, {"m": m, "fc": fc, "y": y}
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        m, ylast = state["m"], state["y"]
+        out = []
+        for h, d in enumerate(dists, start=1):
+            center = m + (phi ** h) * (ylast - m)
+            if phi < 1.0 - 1e-9:
+                g = math.sqrt((1.0 - phi ** (2 * h)) / (1.0 - phi * phi))
+            else:
+                g = math.sqrt(h)               # phi -> 1: random-walk variance growth
+            out.append(d.scale(g).shift(center))   # leaf is zero-mean: scale hits spread
+        return out
+
+    return forward, inverse_k
+
+
 # ---------------------------------------------------------------------------
 # Theta method (Assimakopoulos & Nikolopoulos, 2000)
 # ---------------------------------------------------------------------------
