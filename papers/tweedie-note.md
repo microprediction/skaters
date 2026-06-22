@@ -59,7 +59,7 @@ Both of the package's named forecasters are doing per-step denoising:
   observation — an EMA update, which is the constant-gain Kalman/Tweedie correction
   $\mu_t = \mu_{t-1} + \alpha\,(y_t - \mu_{t-1})$ with $\alpha = 1-\delta$.
 - **`doob`** pins the mean and denoises the *variance*, averaging a family of clock
-  candidates that are each the GARCH/Tweedie variance correction above.
+  candidates that are each the GARCH/Tweedie variance correction above.[^vf]
 
 So a forecast step in `skaters` is a single reverse-diffusion step in miniature:
 take the noisy next observation, move it toward the latent level (or latent
@@ -81,6 +81,17 @@ observation toward its latent cause — is the oldest trick in empirical Bayes, 
 engine of the Kalman filter, and the heartbeat of modern generative AI, all the
 same identity, finally introduced to the time-series recursions that had been
 quietly using it without a name.
+
+[^vf]: A natural next step — *decoupling* the mean coordinate from the variance
+    coordinate via a Tweedie variance function $V(\mu)=\mu^p$ (additive mean, but
+    predictive spread $\propto |\text{level}|^{p/2}$) — turns out to be subsumed by
+    the Yeo-Johnson coordinate grid already in `laplace`, since Yeo-Johnson with
+    $\lambda = 1 - p/2$ spans the same mean–variance coupling. A held-out one-step
+    ablation on FRED *levels* ([`benchmarks/tweedie_ablation.py`](../benchmarks/tweedie_ablation.py))
+    found it consistently but negligibly better on strictly-positive series
+    (+0.0006 nats, better on 93% of series) and net-negative once sign-changing
+    series are included, where $|\text{level}|^{p/2}$ is unstable. Filed as a
+    documented negative result.
 
 ---
 
