@@ -8,6 +8,7 @@ The formal write-up of `skaters` and the *model first, conform last* recipe.
 | `skaters.bib` | Bibliography. |
 | `compile_paper.sh` | One-command build (Tectonic). |
 | `skaters.md` | An informal markdown draft of the same material, for quick reading on GitHub. |
+| `tweedie-note.md` | A short essay: how Tweedie's formula ties the package's recursions to the Kalman filter, empirical Bayes, and diffusion models. |
 
 ## Build
 

@@ -342,7 +342,9 @@ models**: the posterior mean of a clean signal given a noisy observation is
 "observation $+\ \sigma^2 \times$ score of the marginal density," which is what
 lets a diffusion denoiser be read as a score estimator (Efron 2011; Vincent 2011;
 Song & Ermon 2019). Each forecast step here is the time-series analogue —
-denoising the next observation toward the latent level or variance.
+denoising the next observation toward the latent level or variance. A short essay
+on this — Kalman, empirical Bayes, and diffusion as one identity — is in
+[`papers/tweedie-note.md`](papers/tweedie-note.md).
 
 ## Lineage
 
