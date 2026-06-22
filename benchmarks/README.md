@@ -270,6 +270,30 @@ conformal predictive systems cannot take the field, and skaters can** — while
 *also* matching the CRPS specialist on its own metric, by conforming the tail
 last without touching the model.
 
+### Downside protection (CRPS and log-likelihood are *symmetric*)
+
+CRPS and log-likelihood are **symmetric** proper scores: they penalize a forecast
+for the upside tail (mass on big favorable moves that didn't occur) and for
+calm-day width exactly as much as they credit downside protection. So the
+aggregate CRPS number does **not** isolate the thing you actually buy from a
+heavy-tailed forecaster — not getting blown up by adverse moves (the Kelly /
+ruin-avoidance reason). The honest downside view is **lower-tail pinball loss**
+(τ = 5%, 1%; proper for those quantiles) plus **VaR exceedance** (should equal τ).
+
+On a 60-series sample, `laplace` vs naive-mean crepes — where they roughly *tie*
+on symmetric CRPS — the downside-only picture separates them:
+
+| τ | lower-tail pinball (lower=better) | VaR exceedance (target τ) |
+|---|---|---|
+| 5% | `laplace` **0.0043** vs crepes 0.0063 | `laplace` 5.2% / crepes 4.9% |
+| 1% | `laplace` **0.0015** vs crepes 0.0027 | `laplace` 1.65% / crepes 0.98% |
+
+`laplace` is ~30–45% better on left-tail pinball and well-calibrated at 5% VaR;
+its only weak spot is the *deepest* 1% tail, where it slightly over-breaches
+(1.65% vs 1%) while crepes is conservative. So the symmetric CRPS understates
+`laplace`'s real edge — downside protection — which is the metric that matters for
+capital at risk.
+
 Run it: `PYTHONPATH=src python benchmarks/study.py conformal-scale` (needs a venv
 with `crepes` + a FRED key).
 
