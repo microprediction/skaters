@@ -131,23 +131,12 @@ export function crpsLeaf(k = 1, eta = 1.0, scaleAlpha = 0.01, scales = FINE) {
 // conditional variance (variance-targeted QMLE refit over a fixed grid) + the
 // same Gaussian-scale-mixture (Student-t) tails.
 const GARCH_AB_GRID = [];
-for (const a of [0.02, 0.05, 0.08, 0.12, 0.18]) {
-  for (const b of [0.70, 0.80, 0.88, 0.93, 0.97]) {
+for (const a of [0.02, 0.04, 0.06, 0.09, 0.12, 0.16, 0.20]) {
+  for (const b of [0.72, 0.78, 0.84, 0.88, 0.92, 0.95, 0.97]) {
     if (a + b < 0.999) GARCH_AB_GRID.push([a, b]);
   }
 }
-
-function garchNll(resid, alpha, beta, s2) {
-  const omega = (1.0 - alpha - beta) * s2;
-  let h = s2, nll = 0.0;
-  for (let i = 0; i < resid.length; i++) {
-    const r = resid[i];
-    h = omega + alpha * (r * r) + beta * h;
-    if (h <= 1e-300) h = 1e-300;
-    nll += Math.log(h) + (r * r) / h;
-  }
-  return 0.5 * nll;
-}
+const GARCH_OMEGA_MULT = [0.5, 0.7, 1.0, 1.4, 2.0];
 
 export function garchLeaf(k = 1, gamma = 0.02, refitEvery = 40, minObs = 80,
                           window = 400, scales = SCALE_BASIS) {
@@ -182,13 +171,26 @@ export function garchLeaf(k = 1, gamma = 0.02, refitEvery = 40, minObs = 80,
       for (let i = 0; i < resid.length; i++) sum2 += resid[i] * resid[i];
       const s2 = sum2 / resid.length;
       if (s2 > 0) {
-        let bestNll = Infinity, ba = s.alpha, bb = s.beta;
+        // grid over (alpha, beta) AND a free omega multiplier (issue #25)
+        let bestV = Infinity, bom = s.omega, bal = s.alpha, bbe = s.beta;
         for (let gi = 0; gi < GARCH_AB_GRID.length; gi++) {
-          const ab = GARCH_AB_GRID[gi];
-          const nll = garchNll(resid, ab[0], ab[1], s2);
-          if (nll < bestNll) { bestNll = nll; ba = ab[0]; bb = ab[1]; }   // first-wins on tie
+          const al = GARCH_AB_GRID[gi][0], be = GARCH_AB_GRID[gi][1];
+          const base = (1.0 - al - be) * s2;
+          for (let ci = 0; ci < GARCH_OMEGA_MULT.length; ci++) {
+            let om = base * GARCH_OMEGA_MULT[ci];
+            if (om <= 1e-12) om = 1e-12;
+            let hh = om / (1.0 - al - be);          // unconditional-variance init
+            let v = 0.0;
+            for (let i = 0; i < resid.length; i++) {
+              const r = resid[i];
+              hh = om + al * (r * r) + be * hh;
+              if (hh <= 1e-300) hh = 1e-300;
+              v += Math.log(hh) + (r * r) / hh;
+            }
+            if (v < bestV) { bestV = v; bom = om; bal = al; bbe = be; }   // first-wins on tie
+          }
         }
-        s.alpha = ba; s.beta = bb; s.omega = (1.0 - ba - bb) * s2;
+        s.alpha = bal; s.beta = bbe; s.omega = bom;
       }
     }
 

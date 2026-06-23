@@ -194,8 +194,10 @@ def crps_leaf(k: int = 1, eta: float = 1.0, scale_alpha: float = 0.01, scales: t
 # variance instead of the EWMA/IGARCH scale of scale_mixture_leaf.
 # ---------------------------------------------------------------------------
 
-_GARCH_AB_GRID = [(a, b) for a in (0.02, 0.05, 0.08, 0.12, 0.18)
-                  for b in (0.70, 0.80, 0.88, 0.93, 0.97) if a + b < 0.999]
+_GARCH_AB_GRID = [(a, b) for a in (0.02, 0.04, 0.06, 0.09, 0.12, 0.16, 0.20)
+                  for b in (0.72, 0.78, 0.84, 0.88, 0.92, 0.95, 0.97) if a + b < 0.999]
+# omega multipliers on the variance-targeted base (free omega vs pure targeting).
+_GARCH_OMEGA_MULT = (0.5, 0.7, 1.0, 1.4, 2.0)
 
 
 def _garch_nll(resid, alpha, beta, s2):
@@ -270,9 +272,25 @@ def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
             resid = list(s["buf"])
             s2 = sum(r * r for r in resid) / len(resid)
             if s2 > 0:
-                best = min(_GARCH_AB_GRID, key=lambda ab: _garch_nll(resid, ab[0], ab[1], s2))
-                s["alpha"], s["beta"] = best
-                s["omega"] = (1.0 - best[0] - best[1]) * s2
+                # Grid over (alpha, beta) AND a free omega multiplier, minimizing
+                # the Gaussian QMLE NLL. Finer than pure variance targeting, which
+                # roughly halves the distance to a fitted GARCH(1,1) (issue #25).
+                best_om = best_al = best_be = None
+                best_v = float("inf")
+                for (al, be) in _GARCH_AB_GRID:
+                    base = (1.0 - al - be) * s2
+                    for c in _GARCH_OMEGA_MULT:
+                        om = base * c if base * c > 1e-12 else 1e-12
+                        hh = om / (1.0 - al - be)            # unconditional-variance init
+                        v = 0.0
+                        for r in resid:
+                            hh = om + al * (r * r) + be * hh
+                            if hh <= 1e-300:
+                                hh = 1e-300
+                            v += math.log(hh) + (r * r) / hh
+                        if v < best_v:                       # first-wins on ties
+                            best_v, best_om, best_al, best_be = v, om, al, be
+                s["omega"], s["alpha"], s["beta"] = best_om, best_al, best_be
 
         sigma = math.sqrt(h) if (math.isfinite(h) and h > 0) else max(abs(y), 1e-8)
         z = y / sigma
