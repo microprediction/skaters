@@ -187,3 +187,104 @@ def crps_leaf(k: int = 1, eta: float = 1.0, scale_alpha: float = 0.01, scales: t
 
     _leaf.__name__ = f"crps_leaf(k={k}, eta={eta})"
     return _leaf
+
+
+# ---------------------------------------------------------------------------
+# GARCH(1,1)-t leaf: same scale-mixture tails, but a genuine GARCH conditional
+# variance instead of the EWMA/IGARCH scale of scale_mixture_leaf.
+# ---------------------------------------------------------------------------
+
+_GARCH_AB_GRID = [(a, b) for a in (0.02, 0.05, 0.08, 0.12, 0.18)
+                  for b in (0.70, 0.80, 0.88, 0.93, 0.97) if a + b < 0.999]
+
+
+def _garch_nll(resid, alpha, beta, s2):
+    """Gaussian QMLE neg-log-lik of a variance-targeted GARCH(1,1) over ``resid``."""
+    omega = (1.0 - alpha - beta) * s2
+    h = s2
+    nll = 0.0
+    for r in resid:
+        h = omega + alpha * (r * r) + beta * h
+        if h <= 1e-300:
+            h = 1e-300
+        nll += math.log(h) + (r * r) / h
+    return 0.5 * nll
+
+
+def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
+               min_obs: int = 80, window: int = 400, scales: tuple = _SCALE_BASIS):
+    """Terminal leaf with a GARCH(1,1) conditional variance and Student-t tails.
+
+    Generalizes :func:`scale_mixture_leaf`. That leaf tracks scale with an EWMA of
+    squared residuals — RiskMetrics / IGARCH, the ``omega=0, alpha+beta=1`` corner
+    with no variance mean-reversion. ``garch_leaf`` instead runs a genuine GARCH
+    recursion ``h_t = omega + alpha r_{t-1}^2 + beta h_{t-1}`` with ``(alpha, beta)``
+    refit periodically by **variance-targeted** Gaussian QMLE (``omega = (1 - alpha
+    - beta) * S^2`` over a trailing window), keeping the same fixed Gaussian
+    scale-mixture (a scale mixture *is* a Student-t) for the tails. EWMA is the
+    ``alpha+beta=1`` corner, so this strictly generalizes the EWMA leaf.
+
+    Drop-in for the terminal-leaf slot (``leaf_fn``) of :func:`laplace`; pass it as
+    ``laplace(leaf=garch_leaf)``. On price/return series, where volatility clusters
+    but *reverts*, it recovers about half of the log-likelihood gap to a fitted
+    GARCH(1,1)-t and is neutral-to-positive elsewhere (see
+    ``benchmarks/garch_leaf_threeway.py``).
+
+    Args:
+        k: forecast horizon.
+        gamma: recency rate for the online-EM tail-weight update.
+        refit_every: steps between ``(alpha, beta)`` refits.
+        min_obs: observations before the first refit.
+        window: trailing window (observations) used for the refit.
+        scales: the fixed scale dictionary, relative to the conditional sd.
+    """
+    from collections import deque
+    C = tuple(scales)
+    K = len(C)
+    one_idx = min(range(K), key=lambda i: abs(C[i] - 1.0))
+
+    def _leaf(y: float, state: dict | None) -> tuple[list[Dist], dict]:
+        if state is None:
+            w = [1e-6] * K
+            w[one_idx] = 1.0
+            state = {"h": 0.0, "s2": 0.0, "n": 0, "omega": 0.0, "alpha": 0.05,
+                     "beta": 0.90, "buf": deque(maxlen=window), "w": w, "last_r2": 0.0}
+        s = state
+        s["n"] += 1
+        a0 = 0.02 if 0.02 > 1.0 / s["n"] else 1.0 / s["n"]
+        s["s2"] = (1 - a0) * s["s2"] + a0 * y * y
+        if s["s2"] <= 0:
+            s["s2"] = max(y * y, 1e-12)
+
+        if s["n"] == 1:
+            h = s["s2"]
+        else:
+            h = s["omega"] + s["alpha"] * s["last_r2"] + s["beta"] * s["h"]
+        if h <= 1e-300:
+            h = s["s2"]
+        s["h"] = h
+        s["last_r2"] = y * y
+        s["buf"].append(y)
+
+        if s["n"] >= min_obs and s["n"] % refit_every == 0 and len(s["buf"]) >= min_obs:
+            resid = list(s["buf"])
+            s2 = sum(r * r for r in resid) / len(resid)
+            if s2 > 0:
+                best = min(_GARCH_AB_GRID, key=lambda ab: _garch_nll(resid, ab[0], ab[1], s2))
+                s["alpha"], s["beta"] = best
+                s["omega"] = (1.0 - best[0] - best[1]) * s2
+
+        sigma = math.sqrt(h) if (math.isfinite(h) and h > 0) else max(abs(y), 1e-8)
+        z = y / sigma
+        w = s["w"]
+        dens = [w[i] * math.exp(-0.5 * z * z / (C[i] * C[i])) / C[i] for i in range(K)]
+        total = sum(dens)
+        if total > 0:
+            g = gamma if gamma > 1.0 / s["n"] else 1.0 / s["n"]
+            s["w"] = [(1 - g) * w[i] + g * dens[i] / total for i in range(K)]
+
+        d = Dist([(s["w"][i], 0.0, C[i] * sigma) for i in range(K)])
+        return [d] * k, s
+
+    _leaf.__name__ = f"garch_leaf(k={k})"
+    return _leaf
