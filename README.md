@@ -93,9 +93,9 @@ from skaters import laplace, garch_leaf
 f = laplace(k=1, leaf=garch_leaf)         # GARCH(1,1) conditional variance + Student-t tails
 ```
 
-On the price population it recovers about half the held-out log-likelihood gap to
-a fitted GARCH-t and is neutral-to-positive elsewhere (see
-[`benchmarks/garch_leaf_threeway.py`](benchmarks/garch_leaf_threeway.py)).
+On the price population it recovers ~60% of the held-out log-likelihood gap to a
+fitted GARCH-t (a finer (α,β) grid with a free ω) and is neutral-to-positive
+elsewhere (see [`benchmarks/garch_leaf_threeway.py`](benchmarks/garch_leaf_threeway.py)).
 
 ### `doob` — the martingale specialist
 
