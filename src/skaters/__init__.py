@@ -5,6 +5,13 @@ Point forecasts: dist.mean. Uncertainty: dist.std or dist.quantile().
 Log-likelihood: dist.logpdf(y_actual).
 """
 
+from importlib.metadata import version as _version, PackageNotFoundError
+
+try:
+    __version__ = _version("skaters")          # single source of truth: pyproject
+except PackageNotFoundError:                    # running from a source checkout
+    __version__ = "0.0.0+source"
+
 from skaters.dist import Dist
 from skaters.conventions import Skater
 from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf, garch_leaf
