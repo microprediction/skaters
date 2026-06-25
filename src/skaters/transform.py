@@ -151,11 +151,16 @@ def standardize(alpha: float = 0.05, eps: float = 1e-8):
         mu = state["mu"]
         var = state["var"]
         diff = y - mu
-        mu = mu + alpha * diff
-        var = (1 - alpha) * (var + alpha * diff * diff)
+        # Center against the PRIOR mean (centering by the post-update mean would
+        # shrink the residual by (1-alpha) — systematic overconfidence). Scale by
+        # the updated EWMA std, which avoids a cold-start divide-by-zero. The
+        # variance recursion is the standard EWMA var = (1-a) var + a diff^2; the
+        # previous (1-a)(var + a diff^2) biased the scale low by sqrt(1-a).
+        mu_new = mu + alpha * diff
+        var = (1 - alpha) * var + alpha * diff * diff
         sigma = math.sqrt(var) if var > eps * eps else eps
-        y_prime = (y - mu) / sigma
-        return y_prime, {"mu": mu, "var": var}
+        y_prime = diff / sigma
+        return y_prime, {"mu": mu_new, "var": var}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         mu = state["mu"]
@@ -184,8 +189,14 @@ def ema_transform(alpha: float = 0.05):
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
         if state is None:
             return 0.0, {"level": y}
-        level = state["level"] + alpha * (y - state["level"])
-        residual = y - level
+        # Residual is the one-step-ahead forecast error (against the PRIOR level),
+        # not the post-update smoothing residual. Using the post-update level would
+        # shrink the residual by (1-alpha), making the leaf's variance — and hence
+        # the predictive interval — too small by that factor (systematic
+        # overconfidence). The level update is unchanged, so point forecasts are
+        # identical; only the predictive spread is corrected.
+        residual = y - state["level"]
+        level = state["level"] + alpha * residual
         return residual, {"level": level}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
@@ -292,6 +303,12 @@ def theta(alpha: float = 0.1):
         s["t"] += 1
         t = s["t"]
 
+        # One-step-ahead theta forecast from the PRIOR state (SES + half the OLS
+        # slope), then update. Forecasting after folding y into ses/slope would
+        # leak y into its own residual and shrink the predictive interval.
+        forecast = s["ses"] + s.get("slope", 0.0) / 2
+        residual = y - forecast
+
         # Update SES
         s["ses"] = alpha * y + (1 - alpha) * s["ses"]
 
@@ -309,10 +326,6 @@ def theta(alpha: float = 0.1):
             slope = 0.0
 
         s["slope"] = slope
-
-        # One-step-ahead theta forecast: SES + slope/2
-        forecast = s["ses"] + slope / 2
-        residual = y - forecast
         return residual, s
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
@@ -368,8 +381,11 @@ def drift(alpha: float = 0.002, shrinkage: float = 0.001):
         if state is None:
             return 0.0, {"last": y, "mu": 0.0}
         dy = y - state["last"]
+        # Residual is the increment minus the PRIOR drift estimate (the one-step
+        # forecast error); subtracting the post-update drift would leak dy into its
+        # own residual and shrink the predictive interval. Drift update unchanged.
+        residual = dy - state["mu"]
         mu = decay * state["mu"] + alpha * dy
-        residual = dy - mu
         return residual, {"last": y, "mu": mu}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:

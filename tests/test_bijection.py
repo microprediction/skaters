@@ -166,9 +166,14 @@ class TestPredictionBijection:
 # state should recover y.
 # ---------------------------------------------------------------------------
 
+# Only genuinely point-wise transforms belong here: forward computes y' from y
+# and the current state, and inverse with that SAME state recovers y exactly.
+# ema_transform/standardize/theta/drift are NOT point-wise — they measure the
+# residual against the PRIOR state (the one-step forecast error) and the inverse
+# uses the post-update state (the prior for the *next* step), so immediate
+# self-inversion does not hold by design. Their correct, predictive roundtrip is
+# covered by TestBijection.test_k1_bijection / test_k3_bijection (snapshot state).
 POINTWISE_TRANSFORMS = [
-    ("ema_transform(0.1)", lambda: ema_transform(0.1)),
-    ("standardize(0.05)", lambda: standardize(0.05)),
     ("garch", lambda: garch()),
     ("power_transform(0.5)", lambda: power_transform(0.5)),
 ]
