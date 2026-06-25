@@ -113,14 +113,16 @@ export function fractionalDifference(d = 0.4, window = 50) {
 export function standardize(alpha = 0.05, eps = 1e-8) {
   function forward(y, state) {
     if (state === null || state === undefined) return [0.0, { mu: y, var: 0.0 }];
-    let mu = state.mu;
+    const mu = state.mu;
     let varr = state.var;
     const diff = y - mu;
-    mu = mu + alpha * diff;
-    varr = (1 - alpha) * (varr + alpha * diff * diff);
+    // Center against the PRIOR mean (post-update centering shrinks the residual
+    // by (1-alpha) -> overconfident intervals); standard EWMA variance recursion.
+    const muNew = mu + alpha * diff;
+    varr = (1 - alpha) * varr + alpha * diff * diff;
     const sigma = varr > eps * eps ? Math.sqrt(varr) : eps;
-    const yPrime = (y - mu) / sigma;
-    return [yPrime, { mu, var: varr }];
+    const yPrime = diff / sigma;
+    return [yPrime, { mu: muNew, var: varr }];
   }
   function inverseK(dists, state) {
     const varr = state.var;
@@ -137,8 +139,11 @@ export function standardize(alpha = 0.05, eps = 1e-8) {
 export function emaTransform(alpha = 0.05) {
   function forward(y, state) {
     if (state === null || state === undefined) return [0.0, { level: y }];
-    const level = state.level + alpha * (y - state.level);
-    return [y - level, { level }];
+    // Residual is the one-step forecast error (against the PRIOR level); using the
+    // post-update level would shrink it by (1-alpha) -> overconfident intervals.
+    const residual = y - state.level;
+    const level = state.level + alpha * residual;
+    return [residual, { level }];
   }
   function inverseK(dists, state) {
     return dists.map((d) => d.shift(state.level));
@@ -189,6 +194,10 @@ export function theta(alpha = 0.1) {
     const s = state;
     s.t += 1;
     const t = s.t;
+    // Forecast from the PRIOR state, then update (forecasting after folding y into
+    // ses/slope would leak y into its own residual -> overconfident interval).
+    const forecast = s.ses + (s.slope === undefined ? 0.0 : s.slope) / 2;
+    const residual = y - forecast;
     s.ses = alpha * y + (1 - alpha) * s.ses;
     s.sum_t += t;
     s.sum_t2 += t * t;
@@ -198,8 +207,7 @@ export function theta(alpha = 0.1) {
     const denom = n * s.sum_t2 - s.sum_t * s.sum_t;
     const slope = Math.abs(denom) > 1e-12 ? (n * s.sum_ty - s.sum_t * s.sum_y) / denom : 0.0;
     s.slope = slope;
-    const forecast = s.ses + slope / 2;
-    return [y - forecast, s];
+    return [residual, s];
   }
   function inverseK(dists, state) {
     const ses = state.ses;
@@ -227,8 +235,11 @@ export function drift(alpha = 0.002, shrinkage = 0.001) {
   function forward(y, state) {
     if (state === null || state === undefined) return [0.0, { last: y, mu: 0.0 }];
     const dy = y - state.last;
+    // Increment minus the PRIOR drift (one-step forecast error); the post-update
+    // drift would leak dy into its own residual -> overconfident interval.
+    const residual = dy - state.mu;
     const mu = decay * state.mu + alpha * dy;
-    return [dy - mu, { last: y, mu }];
+    return [residual, { last: y, mu }];
   }
   function inverseK(dists, state) {
     const anchor = state.last;
