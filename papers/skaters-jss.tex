@@ -535,11 +535,13 @@ distributions. The library is implemented twice --- pure \proglang{Python} and
 zero-dependency \proglang{JavaScript} --- and a parity suite checks roughly
 $90{,}000$ probe values to $10^{-6}$ on every run, so results are reproducible
 across both runtimes and in the browser via \pkg{Pyodide} \citep{pyodide2021}.
-The benchmark of Section~\ref{sec:experiments} is a single parallel script
-(\code{benchmarks/sota\_study.py}) that scores every method through the identical
-\code{Dist} interface; given a \proglang{FRED} key and the optional baselines
-(\pkg{statsforecast}, \pkg{arch}, \pkg{statsmodels}, \pkg{neuralforecast}) it
-reproduces Table~\ref{tab:sota} end to end.
+The benchmark of Section~\ref{sec:experiments} is a single parallel harness
+(\code{benchmarks/study.py}, invoked as \code{study.py sota}) that scores every
+method through the identical \code{Dist} interface; given a \proglang{FRED} key
+and the optional baselines (\pkg{statsforecast}, \pkg{arch}, \pkg{statsmodels},
+\pkg{neuralforecast}) it reproduces Table~\ref{tab:sota} end to end, and
+\code{study.py sota summarize} regenerates the reported win-rates from the
+committed result file.
 
 %% -------------------------------------------------------------------------
 \bibliographystyle{plainnat}
