@@ -234,3 +234,7 @@ benchmarks/results_finetune_*.csv
 # foundation fine-tune artifacts
 checkpoints/
 lightning_logs/
+benchmarks/results_nonprice.csv
+benchmarks/nonprice_study.log
+benchmarks/results_overnight.csv
+benchmarks/overnight_horserace.log
