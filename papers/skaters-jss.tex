@@ -416,6 +416,28 @@ can repoint the leaf (Section~\ref{sec:ablations}); a practitioner who cares abo
 the density --- for risk, sizing, or combination --- should prefer the
 log-likelihood column.
 
+\paragraph{Conformal prediction, specifically.}
+The conformal opponents deserve a separate word, because the comparison is
+two-sided and asymmetric. Against the \emph{naive} conformal predictive systems
+--- split-conformal pinball bands over the residuals at several window lengths ---
+\code{laplace} wins CRPS outright (on the order of $90$--$95\%$ of series,
+family-weighted), and the comparison is not even available on log-likelihood: a
+conformal predictive system emits a cumulative distribution function, not a
+density, so it assigns zero density --- and hence $-\infty$ log-likelihood --- to
+any outcome outside the observed residual range, and cannot be scored on the
+metric at all. Against the stronger \emph{fitted-mean} conformal variants
+(\pkg{AutoARIMA}-mean residuals, split-conformal and ACI), the split is clean and
+honest: \code{laplace} has the higher held-out log-likelihood on the large
+majority of series, while the conformal variants have the lower CRPS on a similar
+majority. That is exactly as it should be --- CRPS and marginal coverage are what
+conformal is constructed to optimise, and it has no density to surrender on
+likelihood --- and it is the empirical face of the \emph{model first, conform last}
+argument: the honest objective for \emph{modelling} is the density, and the one
+place a downstream score should get a vote is the terminal leaf. A user who needs
+conformal's CRPS can have it inside the same library by repointing that leaf to
+CRPS (Section~\ref{sec:ablations}), without giving up the density the conformal
+systems cannot provide.
+
 \paragraph{Scope.}
 Five hundred popularity-ranked daily change-series, one-step horizon. Multi-step
 horizons and raw levels are left for later; zero-shot foundation models get their
