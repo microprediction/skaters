@@ -1,6 +1,6 @@
 # skaters
 
-**One univariate time-series model to rule them all?** — Nah I think we need two, and they are both here. Their names are *Laplace* and *Doob* and you can watch them [here](https://skaters.microprediction.org/demos/playground.html). Only use the latter if your martingality prior is very strong. 
+**One univariate time-series model to rule them all?** — Nah. There's a general forecaster, *Laplace*, and two committed specialists, *Doob* (martingale) and *Mean-Revert*, and you can watch them [here](https://skaters.microprediction.org/demos/playground.html). Reach for a specialist only when its prior is strong; otherwise *Laplace*. 
 
 
 <p align="center">
@@ -13,7 +13,7 @@
 </p>
 
 
-Fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). Across thousands of economic series *Laplace* beats the heavier, slower competition — AutoARIMA, AutoETS, GARCH-t, conformal, even zero-shot foundation models — on held-out **log-likelihood**, and ties on CRPS, conformal's home turf and a goal-post that won't grow your wealth. ([Why likelihood is the metric that matters.](https://mechanisms.microprediction.org))
+Fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). Across thousands of economic series *Laplace* beats the heavier, slower competition — AutoARIMA, AutoETS, GARCH-t, conformal, even zero-shot foundation models — on held-out **log-likelihood**. On CRPS it is competitive but not dominant: it beats the mean-model baselines (ARIMA/ETS) and trades blows with the methods explicitly optimised for that metric (conformal, GARCH-t) — CRPS being conformal's home turf and a goal-post that won't grow your wealth. ([Why likelihood is the metric that matters.](https://mechanisms.microprediction.org))
 
 ## Install
 
