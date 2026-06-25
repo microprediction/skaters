@@ -311,7 +311,13 @@ one-step \emph{changes} (log-difference for strictly positive levels, else first
 difference) --- the stationary-ish innovation stream where heavy tails and regime
 shifts live, and which keeps log-likelihood comparable across series of different
 scale. We keep the last $1000$ changes per series and score the last $300$ as a
-rolling one-step-ahead test window after a burn-in.
+rolling one-step-ahead test window after a burn-in. Consistent with the scope set
+in Section~\ref{sec:intro}, the evaluation universe is the \emph{non-price}
+economic series: we classify each series a priori from its FRED title and exclude
+the asset-price classes (equity, foreign exchange, commodity), whose return
+series belong to the conditional-volatility regime and are treated separately in
+the price caveat below. The non-price universe is the general economic forecasting
+problem \pkg{skaters} is built for.
 
 \subsection{Against eight distributional baselines} \label{sec:sota}
 
