@@ -149,6 +149,7 @@ export function laplace(k = 1, objective = "crps", sticky = true) {
   const [candidates, depths] = buildCandidates(k);
   let f = terminalLeafEnsemble(candidates, {
     k, leafFn: objectiveLeaf(objective), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
+    forget: 0.99,
   });
   if (sticky) f = project(f, k);
   f.skaterName = `laplace(k=${k})`;

@@ -14,6 +14,7 @@ export function terminalLeafEnsemble(skaters, {
   depths = null,
   priorLogWeights = null,
   maxComponents = 20,
+  forget = 1.0,
 } = {}) {
   const n = skaters.length;
   const d = depths === null ? new Array(n).fill(0) : depths;
@@ -43,7 +44,7 @@ export function terminalLeafEnsemble(skaters, {
       const q = state.qdist[i];
       if (q.length) {
         const lp = Math.max(q.shift().logpdf(y), -20.0);
-        state.log_w[i] += learningRate * lp - complexityPenalty * d[i];
+        state.log_w[i] = forget * state.log_w[i] + learningRate * lp - complexityPenalty * d[i];
       }
       q.push(allDists[i][0]);
     }
