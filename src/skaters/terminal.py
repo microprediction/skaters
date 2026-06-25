@@ -38,6 +38,7 @@ def terminal_leaf_ensemble(
     depths: list[int] | None = None,
     prior_log_weights: list[float] | None = None,
     max_components: int = 20,
+    forget: float = 1.0,
 ):
     """Create a terminal-leaf ensemble.
 
@@ -50,6 +51,10 @@ def terminal_leaf_ensemble(
         complexity_penalty: per-depth penalty (as in bayesian_ensemble).
         depths, prior_log_weights: optional, one per sub-model.
         max_components: prune the warm-up fallback mixture to this many.
+        forget: geometric discount on accumulated log-evidence per step. 1.0 is
+            exact cumulative updating (the ensemble converges to a fixed winner);
+            values just below 1 (e.g. 0.99) keep it adaptive to regime change at
+            negligible steady-state cost.
     """
     n = len(skaters)
     assert n > 0
@@ -74,12 +79,16 @@ def terminal_leaf_ensemble(
             di, state["sub"][i] = f(y, state["sub"][i])
             all_dists.append(di)
 
-        # Update model weights from the resolved one-step prediction.
+        # Update model weights from the resolved one-step prediction. The `forget`
+        # factor (< 1) geometrically discounts past log-evidence so the ensemble
+        # stays adaptive to regime change and the weight gap cannot diverge; at
+        # forget == 1.0 this is exact cumulative updating (the historical default).
         for i in range(n):
             q = state["qdist"][i]
             if q:
                 lp = max(q.popleft().logpdf(y), -20.0)
-                state["log_w"][i] += learning_rate * lp - complexity_penalty * depths[i]
+                state["log_w"][i] = (forget * state["log_w"][i]
+                                     + learning_rate * lp - complexity_penalty * depths[i])
             q.append(all_dists[i][0])
 
         log_w = state["log_w"]
