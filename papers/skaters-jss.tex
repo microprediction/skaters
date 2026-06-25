@@ -45,8 +45,14 @@ conformal-prediction literatures tend to merge: fitting the model, judged by
 likelihood, and conforming the predictive tail to a downstream score such as
 CRPS. We call the arrangement \emph{model first, conform last}. The library is written twice, in pure \proglang{Python} and in
 zero-dependency \proglang{JavaScript} that agrees to within $10^{-6}$, so a model
-runs unchanged on a server or in a browser. We evaluate it against classical,
-neural, and pretrained foundation-model baselines on \proglang{FRED} series.
+runs unchanged on a server or in a browser. We position \pkg{skaters} as a
+general-purpose forecaster for economic and other non-price time series, and
+evaluate it there against classical, neural, and pretrained foundation-model
+baselines on \proglang{FRED} series, where it leads on held-out log-likelihood.
+On asset-price and return series --- the home of conditional-volatility models
+--- there is no free lunch: a \pkg{GARCH}-$t$ model is the better choice, and we
+report that comparison honestly rather than averaging the two regimes into one
+headline.
 }
 
 \begin{document}
@@ -125,6 +131,17 @@ seriously: every ``method'' is a prior, and averaged over all series none
 dominates. The right response is not to pick one but to make the priors
 explicit, weight them online, and bound the cost of a wrong prior by how fast the
 weighting abandons it.
+
+No-Free-Lunch also fixes the scope of our claim. We position \pkg{skaters} as a
+general-purpose forecaster for economic and other non-price series, and that is
+where the benchmark of Section~\ref{sec:experiments} is run. Asset-price and
+return series are a different regime --- their changes exhibit the volatility
+clustering and heavy tails that conditional-volatility models are built for --- and
+there we do not claim to win: a \pkg{GARCH}-$t$ model is the better choice, which
+we confirm and report rather than dilute by averaging the two regimes into a
+single number. Where the volatility regime dominates, the committed
+martingale-plus-clock model of Section~\ref{sec:doob} is the natural in-library
+specialist.
 
 %% -------------------------------------------------------------------------
 \section{The \code{Dist} abstraction and composable transforms} \label{sec:dist}
