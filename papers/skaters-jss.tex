@@ -139,9 +139,11 @@ return series are a different regime --- their changes exhibit the volatility
 clustering and heavy tails that conditional-volatility models are built for --- and
 there we do not claim to win: a \pkg{GARCH}-$t$ model is the better choice, which
 we confirm and report rather than dilute by averaging the two regimes into a
-single number. Where the volatility regime dominates, the committed
-martingale-plus-clock model of Section~\ref{sec:doob} is the natural in-library
-specialist.
+single number, and which we recommend for price work. The library's committed
+martingale-plus-clock model (Section~\ref{sec:doob}) is the natural \emph{shape}
+of an in-library volatility specialist, but in its current form it does not match
+\pkg{GARCH}-$t$ on price series; closing that gap is future work, not a present
+claim.
 
 %% -------------------------------------------------------------------------
 \section{The \code{Dist} abstraction and composable transforms} \label{sec:dist}
