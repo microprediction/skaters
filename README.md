@@ -13,7 +13,7 @@
 </p>
 
 
-Fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). Across thousands of economic series *Laplace* beats the heavier, slower competition — AutoARIMA, AutoETS, GARCH-t, conformal, even zero-shot foundation models — on held-out **log-likelihood**. On CRPS it is competitive but not dominant: it beats the mean-model baselines (ARIMA/ETS) and trades blows with the methods explicitly optimised for that metric (conformal, GARCH-t) — CRPS being conformal's home turf and a goal-post that won't grow your wealth. ([Why likelihood is the metric that matters.](https://mechanisms.microprediction.org))
+Fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: across ~900 such FRED series *Laplace* has the highest mean held-out **log-likelihood** and the best per-series win-rate against every baseline — AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot foundation models, **and GARCH-t** (68% / 65% family-weighted). On CRPS it beats the mean-model baselines and loses only to the CRPS-specialists (conformal, GARCH-t) — their home turf, and a goal-post that won't grow your wealth. **No free lunch on price/returns:** there GARCH-t wins, and you should use it. ([Why likelihood is the metric that matters.](https://mechanisms.microprediction.org))
 
 ## Install
 
