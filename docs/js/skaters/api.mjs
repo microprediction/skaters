@@ -1,6 +1,6 @@
 // User-facing API — JS port of skaters/api.py (named search policies).
 //
-// Two named forecasters: laplace (general) and doob (martingale specialist).
+// One forecaster: laplace (general). Volatility/mean-reversion are composable transforms.
 
 import { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
