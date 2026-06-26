@@ -116,7 +116,9 @@ turn:
   projection that places atoms on the exact values a series revisits without
   moving the ensemble mean and vanishes on continuous data; an online coordinate
   search over whether a series is simple in a log, root, or linear coordinate; and
-  a committed martingale model that learns only a volatility clock.
+  composable volatility and mean-reversion transforms (a \pkg{GARCH}-$t$ leaf, an
+  Ornstein--Uhlenbeck group) that specialise the one forecaster without adding a
+  second.
 \item \emph{A benchmark against eight distributional baselines}
   (Section~\ref{sec:experiments}), chosen as the strongest available opponents:
   the heavy-tail state of the art (\pkg{GARCH}-$t$), a neural density model
@@ -139,11 +141,10 @@ return series are a different regime --- their changes exhibit the volatility
 clustering and heavy tails that conditional-volatility models are built for --- and
 there we do not claim to win: a \pkg{GARCH}-$t$ model is the better choice, which
 we confirm and report rather than dilute by averaging the two regimes into a
-single number, and which we recommend for price work. The library's committed
-martingale-plus-clock model (Section~\ref{sec:doob}) is the natural \emph{shape}
-of an in-library volatility specialist, but in its current form it does not match
-\pkg{GARCH}-$t$ on price series; closing that gap is future work, not a present
-claim.
+single number, and which we recommend for price work. The library's
+conditional-variance building blocks (Section~\ref{sec:doob}) narrow but do not
+close that gap; matching \pkg{GARCH}-$t$ on price series with an online,
+dependency-free recursion is future work, not a present claim.
 
 %% -------------------------------------------------------------------------
 \section{The \code{Dist} abstraction and composable transforms} \label{sec:dist}
@@ -270,25 +271,21 @@ note that because the \code{Dist} is a Gaussian mixture the inverse uses the
 delta-method linearisation, so non-negativity is approximate rather than exact.
 
 %% -------------------------------------------------------------------------
-\section{A martingale with a learned volatility clock} \label{sec:doob}
+\section{Volatility and mean reversion as composable transforms} \label{sec:doob}
 
-For near-martingale \emph{levels} we provide a committed model, \code{doob}: the
-mean is pinned to the last value (a driftless martingale) and only the volatility
-clock is learned, as a Bayesian average over martingale predictives that differ
-in their volatility model (constant, \pkg{GARCH}, slowly varying, heavy-tailed).
-Because every candidate shares the same mean, plain averaging blends the clocks
-\emph{without} washing out kurtosis --- the committed mean is exactly what makes
-model averaging the right tool here, in contrast to Section~\ref{sec:trunk}. By
-the Dambis--Dubins--Schwarz theorem
-\citep{dambis1965decomposition,dubins1965continuous,doob1953stochastic} a
-continuous martingale is a time-changed Brownian motion, so the model is
-literally ``Brownian motion on a stochastic clock''. It beats the general
-forecaster on near-martingale levels by committing the mean and spending its
-capacity on the clock; on genuinely mean-reverting series the martingale prior is
-wrong and it gives ground --- a sharp, single-purpose instrument, fed \emph{levels}
-rather than pre-differenced changes.
+The same compositional vocabulary expresses conditional volatility and mean
+reversion without a separate forecaster. A \pkg{GARCH}-style scaling transform
+divides by a learned conditional standard deviation; an Ornstein--Uhlenbeck
+transform (\code{ou\_transform}) reverts the level toward a running mean at a
+learned speed; and a \pkg{GARCH}$(1,1)$-$t$ terminal leaf (\code{garch\_leaf})
+gives the conform-last stage a conditional-variance recursion with Student-$t$
+tails. These are building blocks: \code{laplace} already carries an OU group in
+its multi-step ($k>1$) candidate pool, and \code{laplace(leaf=garch\_leaf)} swaps
+in the conditional-variance leaf for heavy-tailed series --- no second named model
+required. (On asset-price/return series the right tool remains a fitted
+\pkg{GARCH}-$t$; see the price caveat of Section~\ref{sec:experiments}.)
 
-The clock candidates have a Bayesian reading. Each is a \emph{score-driven}
+These volatility recursions have a Bayesian reading. Each is a \emph{score-driven}
 update \citep{creal2013generalized,harvey2013dynamic}: the \pkg{GARCH} variance
 recursion $h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$ is, term for term, the
 inverse-Fisher-scaled conditional score, and \citet{hansen2026tweedie} show via
@@ -568,8 +565,9 @@ while on heavy-tailed and stochastic-volatility processes it helps (up to
 $+0.04$); real data lives in the second regime. And the lattice projection is free
 when unused. Together these justify exposing exactly one general forecaster
 (uniform prior, CRPS leaf, lattice projection and coordinate learning on by
-default) plus one committed martingale specialist; the remaining structural ideas
-do not pay their way out of sample.
+default), with volatility and mean-reversion left to composable transforms rather
+than separate named models; the remaining structural ideas do not pay their way
+out of sample.
 
 %% -------------------------------------------------------------------------
 \section{Discussion} \label{sec:discussion}

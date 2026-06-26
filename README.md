@@ -1,6 +1,6 @@
 # skaters
 
-**One univariate time-series model to rule them all?** — Nah. There's a general forecaster, *Laplace*, and two committed specialists, *Doob* (martingale) and *Mean-Revert*, and you can watch them [here](https://skaters.microprediction.org/demos/playground.html). Reach for a specialist only when its prior is strong; otherwise *Laplace*. 
+**One univariate time-series model to rule them all?** — For non-price economic series, near enough. There's exactly one forecaster, *Laplace*, and you can watch it [here](https://skaters.microprediction.org/demos/playground.html). Everything else is a composable building block. (No free lunch on price/returns — use GARCH-t there.) 
 
 
 <p align="center">
@@ -39,33 +39,24 @@ for y in observations:
 
 Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
-## The named forecasters
+## `laplace` — the one forecaster
 
-`skaters` exposes a general forecaster plus two committed specialists —
-everything else is a building block (transforms, leaves, ensembles) you can
-compose. ("skater" is the *concept* — any `(y, state) -> ([Dist], state)`
-function, borrowed from the old timemachines package)
+`skaters` exposes **exactly one forecaster**, `laplace`. Everything else is a
+building block (transforms, leaves, ensembles) you can compose. ("skater" is the
+*concept* — any `(y, state) -> ([Dist], state)` function, borrowed from the old
+timemachines package.)
 
 ```python
-from skaters import laplace, doob, mean_revert
+from skaters import laplace
 
-f = laplace(k=1)         # general purpose — the default
-f = doob(k=1)            # committed martingale + volatility clock (feed levels)
-f = mean_revert(k=10)    # committed mean reversion — multi-step (spreads, vol, rates)
+f = laplace(k=1)
 ```
-
-`doob` and `mean_revert` are opposite priors: `doob` commits to a martingale (no
-reversion), `mean_revert` to reversion toward a running mean. Pick the one whose
-prior matches your series; `laplace` if you're unsure.
-
-### `laplace` — the general forecaster
 
 A likelihood-weighted Bayesian ensemble over a large candidate population (EMA,
 differencing, drift, Holt, AR, fractional differencing, seasonal, a Yeo-Johnson
 **coordinate** grid, a fast/slow two-systems block, and — at multi-step horizons
-(`k>1`) — an **Ornstein–Uhlenbeck mean-reversion** group; see `mean_revert`). The
-one-step pool is unchanged. Three things are on by default, each a free or
-near-free win:
+(`k>1`) — an **Ornstein–Uhlenbeck mean-reversion** group). Three things are on by
+default, each a free or near-free win:
 
 - **model first, conform last** — the trunk is weighted by **likelihood** (honest
   modelling); the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
@@ -96,41 +87,28 @@ f = laplace(k=1, leaf=garch_leaf)         # GARCH(1,1) conditional variance + St
 On the price population it recovers ~60% of the held-out log-likelihood gap to a
 fitted GARCH-t (a finer (α,β) grid with a free ω) and is neutral-to-positive
 elsewhere (see [`benchmarks/garch_leaf_threeway.py`](benchmarks/garch_leaf_threeway.py)).
+**No free lunch on price/returns, though** — there a fitted GARCH-t still wins;
+use it for asset returns.
 
-### `doob` — the martingale specialist
+### Specialist behaviour by composition
 
-A committed, driftless **martingale** with a learned **volatility clock**: a
-Bayesian average over martingale predictives that differ only in their volatility
-model (constant, GARCH, slowly-varying, heavy-tailed). Because every candidate
-shares the same mean, plain averaging blends the clocks without washing out
-kurtosis. By Dambis–Dubins–Schwarz a continuous martingale is a *time-changed
-Brownian motion* — "BM on a stochastic clock".
-
-Feed it the **level** series (prices, indices, rates), not pre-differenced
-changes. When the martingale prior holds it edges `laplace` by committing the
-mean and spending its capacity on the clock; on genuinely mean-reverting series
-(e.g. the VIX) the prior is wrong and it gives ground — a deliberately sharp tool.
-
-### `mean_revert` — the mean-reversion specialist
-
-The counterpart to `doob`: where `doob` commits to a martingale, `mean_revert`
-commits to **Ornstein–Uhlenbeck reversion toward a running mean** and learns only
-*how fast*, averaging candidates over a grid of reversion speeds (online,
-likelihood-weighted). It's built for exactly the regime where `doob` gives ground.
+There's only one forecaster, but the building blocks compose into specialists when
+you have a strong prior. **Mean reversion** (e.g. pairs-trading spreads): the
+`ou_transform` reverts to a running mean and its edge grows with the horizon, so
+feed it `k>1` —
 
 ```python
-f = mean_revert(k=10)                  # signed spreads (pairs trading) — linear space
-f = mean_revert(k=10, coordinate=0.5)  # positive series (vol, rates) — sqrt / CIR space
-f = mean_revert(k=10, coordinate=0.0)  # positive series — log / geometric reversion
+from skaters.conjugate import conjugate
+from skaters.leaf import leaf
+from skaters.transform import ou_transform, yeo_johnson
+
+f = conjugate(leaf(k=10), ou_transform(kappa=0.1), k=10)                       # linear (spreads)
+f = conjugate(conjugate(leaf(k=10), ou_transform(0.1), k=10), yeo_johnson(0.5), k=10)  # positive (vol/rates)
 ```
 
-The reversion edge over a random walk **grows with the horizon** ($1-\phi^h$), so
-this is primarily a **multi-step** tool — feed it `k>1`. (At one step, mean
-reversion is nearly indistinguishable from predicting the running level, which the
-general pool already does.) The mechanism is `ou_transform`, a reusable
-mean-reversion transform; the math is the OU-on-a-coordinate reading of CIR — see
-[`papers/tweedie-note.md`](papers/tweedie-note.md) and the validation in
-[`benchmarks/cir_ablation.py`](benchmarks/cir_ablation.py).
+`laplace(k>1)` already carries an OU group in its pool, so the general forecaster
+picks up reversion automatically at multi-step horizons. The OU-on-a-coordinate
+math (the CIR reading) is in [`papers/tweedie-note.md`](papers/tweedie-note.md).
 
 ## Architecture
 
@@ -369,16 +347,16 @@ Interactive demos (forecasting playground in native JS, and the real Python pack
 
 The online recursions here are **score-driven updates** with a Bayesian reading.
 The EMA level update $\mu_t = \mu_{t-1} + \alpha\,(y_t - \mu_{t-1})$ and the GARCH
-variance update $h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$ — the heart of
-`doob`'s volatility clock — are both inverse-Fisher-scaled conditional-score
-corrections. Via **Tweedie's formula**, Hansen & Tong (2026,
+variance update $h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$ — the `ema_transform`
+and `garch`/`garch_leaf` building blocks — are both inverse-Fisher-scaled
+conditional-score corrections. Via **Tweedie's formula**, Hansen & Tong (2026,
 [arXiv:2605.15902](https://arxiv.org/abs/2605.15902)) show these are the *exact*
 Bayesian posterior-mean corrections under a conjugate prior with local precision
 discounting (with the smoothing factor identified as $\alpha = 1-\delta$, the
 Gaussian-location case recovering the Kalman filter), and tractable local
-approximations otherwise. So `doob` is averaging a family of (approximate)
-Bayesian volatility filters rather than ad-hoc heuristics. See also Creal,
-Koopman & Lucas (2013) and Harvey (2013) for the score-driven / GAS framework.
+approximations otherwise. So the volatility transforms are (approximate) Bayesian
+filters rather than ad-hoc heuristics. See also Creal, Koopman & Lucas (2013) and
+Harvey (2013) for the score-driven / GAS framework.
 
 The same identity is the backbone of modern **denoising / score-based diffusion
 models**: the posterior mean of a clean signal given a noisy observation is

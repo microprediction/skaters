@@ -109,25 +109,23 @@ for y in observations:
       facets of the same object.
     </p>
 
-    <h2>The named forecasters</h2>
+    <h2>One forecaster</h2>
     <p>
-      <code>skaters</code> exposes a general forecaster plus two committed specialists;
-      everything else is a building block you can compose. ("skater" is the <em>concept</em> — any
+      <code>skaters</code> exposes <strong>exactly one forecaster</strong>, <code>laplace</code>.
+      Everything else is a building block you can compose. ("skater" is the <em>concept</em> — any
       <code>(y, state) → ([Dist], state)</code> function — not a function name.)
     </p>
-<pre><code>from skaters import laplace, doob, mean_revert
+<pre><code>from skaters import laplace
 
-f = laplace(k=1)       # general purpose — the default
-f = doob(k=1)          # committed martingale + volatility clock (feed levels)
-f = mean_revert(k=10)  # committed mean reversion — multi-step (spreads, vol, rates)</code></pre>
-    <table>
-      <thead><tr><th>Forecaster</th><th>What it is</th><th>Best for</th></tr></thead>
-      <tbody>
-        <tr><td><code>laplace</code></td><td>Likelihood-weighted ensemble over the full candidate pool; <em>model first, conform last</em> + lattice projection on by default</td><td><strong>General purpose (default)</strong></td></tr>
-        <tr><td><code>doob</code></td><td>Committed martingale + learned volatility clock (time-changed Brownian motion)</td><td>Series where the <strong>martingale prior holds</strong> (random-walk levels). Not a price-volatility specialist — use GARCH-t for returns.</td></tr>
-        <tr><td><code>mean_revert</code></td><td>Committed Ornstein–Uhlenbeck reversion to a running mean; learns the speed</td><td>Multi-step <strong>mean reversion</strong> (spreads, vol, rates)</td></tr>
-      </tbody>
-    </table>
+f = laplace(k=1)</code></pre>
+    <p>
+      A likelihood-weighted ensemble over the full candidate pool — <em>model first, conform
+      last</em>, with the lattice projection on by default, and an Ornstein–Uhlenbeck mean-reversion
+      group in the multi-step (<code>k&gt;1</code>) pool. Specialist behaviour (mean reversion,
+      GARCH-style volatility) is reachable by composition (<code>ou_transform</code>,
+      <code>garch_leaf</code>) when you have a strong prior. <strong>For price/return series there's
+      no free lunch — use GARCH-t.</strong>
+    </p>
 
     <div class="card-grid">
       <a class="card" href="/guide.html">

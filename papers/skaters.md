@@ -50,8 +50,8 @@ abstraction yields three things the paper develops in turn:
    lattice projection* (§5) places atoms on the exact values a series revisits —
    capturing quantised/administrative series — without moving the ensemble mean
    and while vanishing on continuous data; an online *coordinate* search (§6)
-   learns whether a series is simple in a log, root, or linear coordinate; and a
-   committed *martingale* model (§7) learns only a volatility clock.
+   learns whether a series is simple in a log, root, or linear coordinate; and
+   volatility & mean-reversion live in composable transforms (§7), not a second model.
 3. **An honest, bias-free benchmark** (§8) on 10,822 systematically chosen FRED
    series, with ablations (§9) showing that most of the conventional "named
    method" menu is redundant out of sample.
@@ -147,19 +147,18 @@ mechanism expresses a non-negativity prior ($\lambda=0$, log) — though we note
 that because the `Dist` is a Gaussian mixture, the inverse is the delta-method
 linearisation, so non-negativity is *approximate*, not exact.
 
-# 7. A martingale with a learned volatility clock
+# 7. Volatility and mean reversion as composable transforms
 
-For near-martingale *levels* we provide a committed model: the mean is pinned to
-the last value (a driftless martingale) and only the volatility clock is learned,
-as a Bayesian average over martingale predictives that differ in their volatility
-model (constant, GARCH, slowly varying, heavy-tailed). Because every candidate
-shares the same mean, plain averaging blends the clocks *without* washing out
-kurtosis — the committed mean is exactly what makes BMA the right tool. By the
-Dambis–Dubins–Schwarz theorem a continuous martingale is a time-changed Brownian
-motion, so the model is literally "Brownian motion on a stochastic clock". It
-beats the general forecaster on near-martingale levels by committing the mean and
-spending capacity on the clock; on mean-reverting series the prior is wrong and
-it gives ground — a deliberately sharp instrument.
+Conditional volatility and mean reversion need no separate forecaster — they are
+transforms. A GARCH-style scaling divides by a learned conditional standard
+deviation; an Ornstein–Uhlenbeck transform (`ou_transform`) reverts the level
+toward a running mean at a learned speed; and a GARCH(1,1)-t terminal leaf
+(`garch_leaf`) gives the conform-last stage a conditional-variance recursion with
+Student-t tails. `laplace` already carries an OU group in its multi-step (`k>1`)
+pool, and `laplace(leaf=garch_leaf)` swaps in the conditional-variance leaf for
+heavy-tailed series — so the one forecaster specialises by composition, no second
+model required. (On asset-price/return series the right tool remains a fitted
+GARCH-t; see the price caveat in §8.)
 
 The clock candidates have a Bayesian reading. Each is a *score-driven* update
 (Creal, Koopman, and Lucas 2013; Harvey 2013): the GARCH variance recursion

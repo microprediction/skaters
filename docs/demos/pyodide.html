@@ -38,13 +38,6 @@
 
     <div class="panel">
       <div class="controls">
-        <div class="control">
-          <label for="policy">Policy</label>
-          <select id="policy">
-            <option value="doob">doob</option>
-            <option value="laplace">laplace</option>
-          </select>
-        </div>
         <button class="btn" id="run">Load Pyodide &amp; run</button>
       </div>
       <p class="status" id="status">Pyodide is ~10&nbsp;MB; the first run downloads it.</p>
@@ -123,17 +116,16 @@ for y in series:           # one observation at a time
           await pyodide.loadPackage("micropip");
           await pyodide.runPythonAsync(`import micropip\nawait micropip.install("skaters")`);
         }
-        const policy = document.getElementById("policy").value;
         statusEl.textContent = "Running the Python package…";
         const json = await pyodide.runPythonAsync(`
 import random, math, json
-from skaters import ${policy}
+from skaters import laplace
 random.seed(7)
 series, lvl = [], 0.0
 for t in range(180):
     lvl += random.gauss(0, 0.25)
     series.append(lvl + 2.0*math.sin(2*math.pi*t/12) + random.gauss(0, 1.0))
-f = ${policy}(k=1)
+f = laplace(k=1)
 state, pending, rows = None, None, []
 for y in series:
     if pending is not None:

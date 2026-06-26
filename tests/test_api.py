@@ -2,12 +2,12 @@
 
 import math
 import random
-from skaters.api import laplace, doob
+from skaters.api import laplace
 from skaters.conventions import Skater
 from skaters.dist import Dist
 
 
-ALL_POLICIES = [laplace, doob]
+ALL_POLICIES = [laplace]
 
 
 def test_all_policies_return_skaters():

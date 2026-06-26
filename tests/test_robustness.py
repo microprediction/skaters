@@ -11,9 +11,9 @@ import pytest
 
 from skaters.dist import Dist
 from skaters.transform import yeo_johnson
-from skaters.api import laplace, doob
+from skaters.api import laplace
 
-POLICIES = [laplace, doob]
+POLICIES = [laplace]
 
 DEGENERATE_SERIES = {
     "constant": [3.0] * 40,

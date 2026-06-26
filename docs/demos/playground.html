@@ -32,14 +32,6 @@
     <div class="panel">
       <div class="controls">
         <div class="control">
-          <label for="policy">Policy</label>
-          <select id="policy">
-            <option value="laplace">laplace (default)</option>
-            <option value="doob">doob (martingale)</option>
-            <option value="mean_revert">mean_revert (reversion)</option>
-          </select>
-        </div>
-        <div class="control">
           <label for="horizon">Horizon <span class="val" id="horizonVal">6</span></label>
           <input type="range" id="horizon" min="1" max="12" value="6" />
         </div>
@@ -76,9 +68,9 @@
       The model sees one observation at a time and emits a full predictive
       distribution for each of the next <em>k</em> steps. The dashed orange
       <strong>fan</strong> is that k-step forecast projecting from the latest point
-      — on the <em>weak mean reversion</em> regime, watch <code>laplace</code> (at
-      <em>k&gt;1</em>) and <code>mean_revert</code> curve the fan back toward the
-      mean while <code>doob</code>'s martingale fan stays flat.
+      — on the <em>weak mean reversion</em> regime, raise the horizon and watch
+      <code>laplace</code> (at <em>k&gt;1</em>, via its Ornstein–Uhlenbeck pool
+      group) curve the fan back toward the mean.
       <span class="metric" id="metrics"></span>
     </p>
     <p>
@@ -95,13 +87,7 @@
   </footer>
 
   <script type="module">
-    import { laplace, doob, meanRevert } from "../js/skaters/index.mjs";
-
-    const POLICIES = {
-      laplace: (k) => laplace(k),
-      doob: (k) => doob(k),
-      mean_revert: (k) => meanRevert(k),
-    };
+    import { laplace } from "../js/skaters/index.mjs";
     let K = 6;   // forecast horizon (set from the slider in compute)
 
     // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
@@ -130,7 +116,7 @@
         else if (regime === "rw") { lvl += gauss(r); s.push(lvl); }
         else if (regime === "meanrevert") {
           // Weakly mean-reverting (Ornstein-Uhlenbeck): wanders like a random
-          // walk but is slowly pulled back to 0 — where doob's martingale prior
+          // walk but is slowly pulled back to 0 — where a martingale prior
           // is wrong. Small kappa = weak reversion.
           const kappa = 0.04;
           lvl += kappa * (0 - lvl) + 1.2 * gauss(r);
@@ -155,7 +141,7 @@
 
     function compute() {
       K = parseInt(document.getElementById("horizon").value, 10);
-      const policy = POLICIES[document.getElementById("policy").value](K);
+      const policy = laplace(K);
       const regime = document.getElementById("regime").value;
       const series = makeSeries(regime, seed);
       let state = null, pending = null;
@@ -235,7 +221,7 @@
 
       // forward k-step forecast fan, projecting from the last revealed point.
       // On a mean-reverting series the fan curves back toward the mean; a
-      // martingale (doob) fan stays flat. The band widens with the horizon.
+      // The band widens with the horizon.
       if (fan) {
         const anchorX = X(upto - 1), anchorY = Y(fanRow.y);
         const fx = (h) => X(upto - 1 + h);   // h = 1..K maps to future x positions
@@ -295,7 +281,6 @@
     }
 
     document.getElementById("run").addEventListener("click", () => { seed++; start(); });
-    document.getElementById("policy").addEventListener("change", start);
     document.getElementById("regime").addEventListener("change", start);
     document.getElementById("speed").addEventListener("input", (e) => {
       document.getElementById("speedVal").textContent = e.target.value;

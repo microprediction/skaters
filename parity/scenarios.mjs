@@ -9,7 +9,7 @@ import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
 } from "../docs/js/skaters/transform.mjs";
-import { laplace, doob, meanRevert } from "../docs/js/skaters/api.mjs";
+import { laplace } from "../docs/js/skaters/api.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
 import {
@@ -47,8 +47,7 @@ export function buildScenarios() {
   }
 
   // Named policies
-  const pols = { laplace, doob, mean_revert: meanRevert };
-  for (const [nm, fac] of Object.entries(pols)) s.push([`pol_${nm}`, 1, fac(1)]);
+  s.push(["pol_laplace", 1, laplace(1)]);
   // laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
   s.push(["pol_laplace_k3", 3, laplace(3)]);
 

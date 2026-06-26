@@ -19,7 +19,7 @@ export { terminalLeafEnsemble } from "./terminal.mjs";
 export { search, TRANSFORMS } from "./search.mjs";
 export { periodDetector, topPeriods, DEFAULT_LAGS } from "./periodicity.mjs";
 export {
-  buildCandidates, laplace, doob, meanRevert,
+  buildCandidates, laplace,
 } from "./api.mjs";
 export { sticky } from "./sticky.mjs";
 export {
