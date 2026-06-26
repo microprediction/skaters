@@ -319,15 +319,10 @@ for y in stream:
     d.crps(y)              # ...and on CRPS
 ```
 
-For near-random-walk **levels** where the martingale prior genuinely holds, the
-committed `doob` model (feed it levels, not pre-differenced changes) spends its
-capacity on the volatility clock. Note `doob` is *not* a price-returns specialist —
-for asset returns with volatility clustering, GARCH-t is the better choice.
-
-```python
-from skaters import doob
-f = doob(k=1)
-```
+For **price/return series** with volatility clustering, there's no free lunch —
+use a fitted **GARCH-t** rather than `laplace`. (`laplace(leaf=garch_leaf)` is the
+dependency-free option that recovers roughly half the gap, but the specialist
+still wins on returns.)
 
 Defaults worth knowing: `laplace` runs *model first, conform last* (likelihood
 trunk + CRPS leaf), a near-Dirac **lattice projection** for series that revisit
