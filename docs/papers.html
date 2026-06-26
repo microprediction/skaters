@@ -49,30 +49,37 @@
       <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters.md">Markdown draft</a>
     </p>
 
-    <h2>Benchmark 1 — eight distributional baselines</h2>
+    <h2>Benchmark 1 — the non-price universe</h2>
     <p>
-      A fair rolling one-step-ahead comparison on 500 FRED change-series (309 continuous). Every
-      method — ours and theirs — is turned into the same <code>Dist</code> and scored on held-out
-      log-likelihood <em>and</em> CRPS. Per-series win-rate of <code>laplace</code> (all / continuous):
+      A fair rolling one-step-ahead comparison on the <strong>non-price</strong> FRED universe —
+      894 continuous daily change-series (57 correlated families); equity/fx/commodity returns are
+      excluded and treated separately in the price caveat below. Every method — ours and theirs — is
+      turned into the same <code>Dist</code> and scored on held-out log-likelihood <em>and</em> CRPS.
+      Per-series win-rate of <code>laplace</code>, reported <em>raw</em> and <em>family-weighted</em>
+      (one vote per correlated family):
     </p>
     <table>
-      <thead><tr><th>Baseline</th><th>LL (all / cont)</th><th>CRPS (all / cont)</th><th>mean LL (cont)</th></tr></thead>
+      <thead><tr><th>Baseline</th><th>LL (raw / fam)</th><th>CRPS (raw / fam)</th><th>mean LL</th></tr></thead>
       <tbody>
-        <tr><td>AutoARIMA</td><td>78 / 64%</td><td>51 / 47%</td><td>2.09</td></tr>
-        <tr><td>AutoETS</td><td>92 / 88%</td><td>68 / 67%</td><td>2.20</td></tr>
-        <tr><td>SARIMAX (statsmodels)</td><td>82 / 72%</td><td>53 / 49%</td><td>2.13</td></tr>
-        <tr><td>ETS (statsmodels)</td><td>93 / 89%</td><td>69 / 68%</td><td>2.12</td></tr>
-        <tr><td>GARCH(1,1)-t (<code>arch</code>)</td><td>79 / 67%</td><td>76 / 66%</td><td>2.72</td></tr>
+        <tr><td>AutoARIMA</td><td>82 / 90%</td><td>53 / 65%</td><td>2.80</td></tr>
+        <tr><td>AutoETS</td><td>97 / 99%</td><td>83 / 92%</td><td>2.79</td></tr>
+        <tr><td>SARIMAX (statsmodels)</td><td>87 / 86%</td><td>53 / 64%</td><td>2.92</td></tr>
+        <tr><td>ETS (statsmodels)</td><td>96 / 98%</td><td>81 / 90%</td><td>2.89</td></tr>
+        <tr><td>GARCH(1,1)-t (<code>arch</code>)</td><td>68 / 65%</td><td>54 / 45%</td><td>3.03</td></tr>
+        <tr><td>AutoARIMA + conformal</td><td>86 / 88%</td><td>31 / 31%</td><td>2.27</td></tr>
+        <tr><td>AutoARIMA + ACI</td><td>88 / 88%</td><td>29 / 29%</td><td>2.51</td></tr>
+        <tr><td>naive conformal</td><td>— (CDF)</td><td>92 / 93%</td><td>—</td></tr>
         <tr><td>NF-StudentT (NeuralForecast)</td><td>100 / 100%</td><td>78 / 76%</td><td>0.82</td></tr>
-        <tr><td>AutoARIMA + conformal</td><td>84 / 75%</td><td>37 / 29%</td><td>1.47</td></tr>
-        <tr><td>AutoARIMA + ACI</td><td>87 / 80%</td><td>36 / 28%</td><td>1.89</td></tr>
       </tbody>
     </table>
     <p>
-      <code>laplace</code> (mean continuous logpdf <strong>2.855</strong>) wins the likelihood race
-      against all eight. The real test is <strong>GARCH-t</strong>, the heavy-tail SOTA: it still
-      edges it (2.86 vs 2.72). On CRPS it beats the smoothing/GARCH/neural baselines, ties the ARIMA
-      family, and loses to the CRPS-optimised conformal variants.
+      <code>laplace</code> (mean log-likelihood <strong>3.20</strong>) wins the likelihood race
+      against every baseline on non-price series — including <strong>GARCH-t</strong>, the heavy-tail
+      SOTA (68% raw / 65% family-weighted; mean LL 3.20 vs 3.03). On CRPS it beats the mean-model
+      baselines and loses only to the CRPS-specialists (fitted conformal ~30%, GARCH-t 45%
+      family-weighted) — their home turf. <strong>No free lunch on price/returns:</strong> on
+      equity/fx/commodity return series GARCH-t has the higher log-likelihood, and we recommend it
+      there rather than averaging the two regimes into one number.
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
     </p>
 

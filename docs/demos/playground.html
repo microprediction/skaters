@@ -192,7 +192,10 @@
       const pad = (ymax - ymin) * 0.08 + 1e-9;
       ymin -= pad; ymax += pad;
       const n = rows.length;
-      const X = (i) => PAD + (i / (n - 1)) * (W - 2 * PAD);
+      // Reserve room on the right for the K-step forecast fan so it never runs off
+      // the plot: map the index domain over [0, n-1+K] rather than [0, n-1].
+      const span = (n - 1) + (fan ? fan.length : 0);
+      const X = (i) => PAD + (i / span) * (W - 2 * PAD);
       const Y = (v) => H - PAD - ((v - ymin) / (ymax - ymin)) * (H - 2 * PAD);
 
       // axes

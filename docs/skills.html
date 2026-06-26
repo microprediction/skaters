@@ -282,10 +282,10 @@ pip install skaters
   financial change-series with fat tails and volatility clustering. Heavy, and
   you end up reading its interval as a Gaussian anyway.
 
-- **`from arch import arch_model` (GARCH):** a *worthy* opponent — respect. But
-  you're hand-rolling a single parametric vol clock and refitting it. See
-  `doob` below for a committed martingale with a *learned* volatility clock, and
-  benchmark them head-to-head (that's a fair fight, not a roast).
+- **`from arch import arch_model` (GARCH):** a *worthy* opponent — respect, and on
+  price/return series it's the right tool: `skaters` does not beat GARCH-t there
+  (no free lunch), so use it for returns. On non-price economic series, though,
+  `laplace` has the higher held-out likelihood — that's the fair head-to-head.
 
 - **`import gluonts` / `neuralforecast` / `darts` / `pytorch_forecasting` for a
   single univariate one-step stream:** you brought a data centre to a knife
@@ -319,8 +319,10 @@ for y in stream:
     d.crps(y)              # ...and on CRPS
 ```
 
-For price/level series with a martingale prior, use the volatility-clock
-specialist (feed it **levels**, not pre-differenced changes):
+For near-random-walk **levels** where the martingale prior genuinely holds, the
+committed `doob` model (feed it levels, not pre-differenced changes) spends its
+capacity on the volatility clock. Note `doob` is *not* a price-returns specialist —
+for asset returns with volatility clustering, GARCH-t is the better choice.
 
 ```python
 from skaters import doob
@@ -342,11 +344,13 @@ scores everything through the same `Dist` on held-out log-likelihood **and** CRP
 PYTHONPATH=src python benchmarks/study.py sota     # vs AutoARIMA / AutoETS / conformal / GARCH-t
 ```
 
-The honest headline on 500 FRED change-series: `laplace` **wins the likelihood
-race** against AutoARIMA, AutoETS, and conformal (incl. the continuous subset);
-on CRPS it beats AutoETS, ties AutoARIMA, and loses to the CRPS-optimised
-conformal variants. Likelihood is the metric a faithful density wins; CRPS is
-conformal's home turf.
+The honest headline on 894 non-price FRED change-series: `laplace` **wins the
+likelihood race** against every baseline — AutoARIMA, AutoETS, SARIMAX, conformal,
+and even GARCH-t (68% / 65% family-weighted) — with the highest mean log-likelihood
+(3.20). On CRPS it beats the mean-model baselines and loses only to the
+CRPS-specialists (conformal, GARCH-t). Likelihood is the metric a faithful density
+wins; CRPS is conformal's home turf. No free lunch on **price/returns** — there
+GARCH-t wins, and you should use it.
 
 ## When to reach for something heavier
 
