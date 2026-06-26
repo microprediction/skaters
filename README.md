@@ -1,5 +1,6 @@
 # skaters ( [demo](https://skaters.microprediction.org/demos/playground.html))
 
+One univariate time-series model to rule them all?** — For non-price economic series, near enough. There's exactly one forecaster, *Laplace*, and you can watch it [here](https://skaters.microprediction.org/demos/playground.html).
 
 
 
@@ -8,14 +9,14 @@
   <a href="#javascript--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript-1a8c4a?style=for-the-badge" alt="Python and JavaScript"></a>
 </p>
 
+Laplace beats everything.
+
 <p align="center">
   <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 894 non-price FRED series: laplace has both the highest held-out log-likelihood and the highest forecasts-per-second, alone in the top-right, while AutoARIMA, AutoETS, SARIMAX, GARCH-t, conformal and NeuralForecast trade accuracy for far more compute." width="680">
 </p>
 
 
-**One univariate time-series model to rule them all?** — For non-price economic series, near enough. There's exactly one forecaster, *Laplace*, and you can watch it [here](https://skaters.microprediction.org/demos/playground.html). Everything else is a composable building block. (No free lunch on price/returns — use GARCH-t there.) 
-
-Fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: across ~900 such FRED series *Laplace* has the highest mean held-out **log-likelihood** and the best per-series win-rate against every baseline — AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot foundation models, **and GARCH-t** (68% / 65% family-weighted). On CRPS it beats the mean-model baselines and loses only to the CRPS-specialists (conformal, GARCH-t) — their home turf, and a goal-post that won't grow your wealth. **No free lunch on price/returns:** there GARCH-t wins, and you should use it. ([Why likelihood is the metric that matters.](https://mechanisms.microprediction.org))
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: across ~900 such FRED series *Laplace* has the highest mean held-out **log-likelihood** and the best per-series win-rate against every baseline — AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot foundation models, **and GARCH-t** (68% / 65% family-weighted). On CRPS it beats the mean-model baselines and loses only to the CRPS-specialists (conformal, GARCH-t) — their home turf, and a goal-post that won't grow your wealth. **No free lunch on price/returns:** there GARCH-t wins, and you should use it. ([Why likelihood is the metric that matters.](https://mechanisms.microprediction.org))
 
 ## Install
 
