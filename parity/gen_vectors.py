@@ -26,7 +26,7 @@ from skaters.transform import (
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
     grouped_ar, yeo_johnson,
 )
-from skaters.api import laplace, doob, mean_revert
+from skaters.api import laplace
 from skaters.sticky import sticky
 from skaters.search import search as adaptive_search
 from skaters import spec as S
@@ -82,8 +82,7 @@ def build_scenarios():
             k=k, learning_rate=0.5, complexity_penalty=0.02, depths=[1, 1])))
 
     # Named policies (the full shared-pool ensembles)
-    for nm, fac in [("laplace", laplace), ("doob", doob), ("mean_revert", mean_revert)]:
-        s.append((f"pol_{nm}", 1, fac(k=1)))
+    s.append(("pol_laplace", 1, laplace(k=1)))
     # laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
     s.append(("pol_laplace_k3", 3, laplace(k=3)))
 

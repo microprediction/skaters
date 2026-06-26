@@ -27,7 +27,7 @@ from skaters.transform import (
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import laplace, doob, mean_revert
+from skaters.api import laplace
 from skaters.sticky import sticky
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -41,8 +41,6 @@ __all__ = [
     "Skater",
     # Search policies (the main user API)
     "laplace",
-    "doob",
-    "mean_revert",
     "sticky",
     "period_detector",
     "top_periods",

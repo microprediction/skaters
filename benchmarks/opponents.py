@@ -34,7 +34,7 @@ class Opponent:
 
 
 # ---- ours: online Dist-emitting policies --------------------------------------
-from skaters.api import laplace, doob
+from skaters.api import laplace
 from skaters.leaf import scale_mixture_leaf
 from crps_leaf import crps_leaf
 
@@ -44,36 +44,6 @@ def _ours(method, factory):
         lp, cr, n = bc.roll_dist_scores(factory, ch, start)
         return [(method, lp, cr, n)] if n else []
     return Opponent(method, predict)
-
-
-def doob_after_laplace(k=1):
-    """Distributional residual stacking: laplace removes the predictable part, so
-    its one-step residual e_t = y_t - mean_t is a driftless martingale-difference
-    — doob's home. We use laplace's MEAN and doob's residual DISTRIBUTION. doob is
-    fed the residual martingale M = cumsum(e); its predictive for the next level
-    M' (mean M) is shifted to laplace's next mean: D_y = doob_dist.shift(m_next-M).
-
-    EXPERIMENT — NEGATIVE RESULT (kept for reproducibility, not registered).
-    laplace's standardized residuals do retain volatility clustering (lag-1
-    ACF(z^2) ~0.13 vs ~0.25 raw; significant on ~79% of series), but stacking doob
-    nonetheless LOSES to plain laplace (beats it on LL 17%, CRPS 5% over 60 series;
-    mean LL 2.67 vs 2.70): it discards laplace's CRPS/likelihood-conformed tail for
-    doob's noisier residual vol-estimate, costing more than the leftover clustering
-    is worth. So it is not in any preset's opponent set."""
-    lap = laplace(k); db = doob(k)
-
-    def f(y, state):
-        st = state or {"lap": None, "db": None, "M": 0.0, "mprev": None}
-        if st["mprev"] is not None:
-            st["M"] += (y - st["mprev"])              # accrue the residual martingale
-        lap_d, st["lap"] = lap(y, st["lap"])          # laplace: the mean model
-        m_next = lap_d[0].mean
-        db_d, st["db"] = db(st["M"], st["db"])        # doob: the residual vol clock
-        D = db_d[0].shift(m_next - st["M"]) if st["mprev"] is not None else lap_d[0]
-        st["mprev"] = m_next
-        return [D], st
-    f.__name__ = f"doob_after_laplace(k={k})"
-    return f
 
 
 OURS = [

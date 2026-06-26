@@ -1,9 +1,10 @@
-"""Tests for the Ornstein-Uhlenbeck mean-reversion transform and mean_revert."""
+"""Tests for the Ornstein-Uhlenbeck mean-reversion transform (a building block)
+and the OU group inside laplace's multi-step pool."""
 
 import math
 import random
 
-from skaters import mean_revert, ou_transform
+from skaters import ou_transform
 from skaters.leaf import leaf
 from skaters.conjugate import conjugate
 
@@ -65,53 +66,21 @@ class TestOuTransform:
         assert abs(sds[9] / sds[0] - expect) < 1e-6
 
 
-class TestMeanRevert:
-
-    def test_runs_and_emits_dists(self):
-        f = mean_revert(k=3)
-        state = None
-        out = None
-        for y in _ou_series(seed=3):
-            out, state = f(y, state)
-        assert len(out) == 3
-        assert all(math.isfinite(d.mean) and d.std > 0 for d in out)
-
-    def test_beats_random_walk_on_reverting_series_multistep(self):
-        """On a mean-reverting series, mean_revert should out-log-likelihood a
-        committed random walk at a multi-step horizon."""
-        k = 5
-        series = _ou_series(n=2500, kappa=0.1, seed=4)
-
-        def rw():   # committed random walk: predict last value, h-step
-            from skaters.transform import difference
-            return conjugate(leaf(k=k), difference(), k=k)
-
-        def run(make):
-            f = make()
-            st = None
-            preds = {}
-            lp = n = 0.0
-            for t, y in enumerate(series):
-                if (t - k) in preds and t > 400:
-                    v = preds[t - k][k - 1].logpdf(y)
-                    lp += v if math.isfinite(v) else -20.0
-                    n += 1
-                d, st = f(y, st)
-                preds[t] = d
-            return lp / n
-
-        assert run(lambda: mean_revert(k=k)) > run(rw)
+class TestLaplaceOuPool:
 
     def test_pool_gated_on_multistep(self):
-        """laplace's pool gains the mean-reversion group only for k > 1."""
+        """laplace's candidate pool gains the OU mean-reversion group only for
+        k > 1 (the one-step pool is unchanged; the edge is a multi-step effect)."""
         from skaters.api import _build_candidates
         _, _, g1 = _build_candidates(1)
         _, _, g3 = _build_candidates(3)
-        assert g1["mean_revert"] == []          # k=1 pool byte-identical to before
+        assert g1["mean_revert"] == []          # k=1 pool byte-identical
         assert len(g3["mean_revert"]) == 6      # k>1 adds the OU group
 
-    def test_coordinate_option_positive_series(self):
-        f = mean_revert(k=2, coordinate=0.5)        # sqrt coordinate for positive data
+    def test_ou_under_coordinate_runs(self):
+        # the building-block composition mean_revert used: OU under a sqrt coordinate
+        from skaters.transform import yeo_johnson
+        f = conjugate(conjugate(leaf(k=2), ou_transform(0.1, 0.02), k=2), yeo_johnson(0.5), k=2)
         state = None
         out = None
         for y in _ou_series(mu=20.0, sig=1.0, seed=5):
