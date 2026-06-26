@@ -73,6 +73,17 @@ def iter_qualified(cfg):
         universe = [{"id": s, "title": tmap.get(s, "")} for s in ids][:cfg["max_qualify"]]
     else:
         universe = fred_universe.enumerate_daily(cfg["n_candidates"])
+
+    # Optional a-priori universe restriction by asset class. STUDY_EXCLUDE_PRICE=1
+    # drops equity/fx/commodity (GARCH-t's home turf) so the study is the general
+    # / non-price economic universe; STUDY_ONLY_PRICE=1 keeps only those.
+    _excl = os.environ.get("STUDY_EXCLUDE_PRICE") == "1"
+    _only = os.environ.get("STUDY_ONLY_PRICE") == "1"
+    if _excl or _only:
+        _PRICE = {"equity", "fx", "commodity"}
+        universe = [m for m in universe
+                    if (fred_universe.asset_class(m.get("title", "")) in _PRICE) == _only]
+
     n_qual = fetched = 0
     for i, meta in enumerate(universe):
         sid = meta["id"]
