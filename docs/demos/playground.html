@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — forecasting playground</title>
   <link rel="stylesheet" href="../academic.css" />
+  <style>
+    .weights-panel { margin-top: 14px; }
+    .weights-title { font-size: 0.82rem; font-weight: 600; color: #333; margin-bottom: 6px; }
+    .weights-sub { font-weight: 400; color: #888; }
+    .weights { display: flex; flex-direction: column; gap: 3px; }
+    .wrow { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
+    .wlabel { flex: 0 0 96px; text-align: right; color: #444; }
+    .wtrack { flex: 1 1 auto; height: 11px; background: #f0f0f3; border-radius: 3px; overflow: hidden; }
+    .wbar { display: block; height: 100%; background: #4a3aff; border-radius: 3px; transition: width 0.12s linear; }
+    .wval { flex: 0 0 34px; text-align: right; color: #666; font-variant-numeric: tabular-nums; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -62,6 +73,11 @@
         <span><span class="swatch" style="background:#ff8a3a"></span>k-step forecast fan</span>
       </div>
       <p class="status" id="status">—</p>
+      <div class="weights-panel">
+        <div class="weights-title">What the model is betting on
+          <span class="weights-sub">— live ensemble weight by candidate family</span></div>
+        <div class="weights" id="weights"></div>
+      </div>
     </div>
 
     <p>
@@ -72,6 +88,14 @@
       <code>laplace</code> (at <em>k&gt;1</em>, via its Ornstein–Uhlenbeck pool
       group) curve the fan back toward the mean.
       <span class="metric" id="metrics"></span>
+    </p>
+    <p>
+      The bars above are <strong>live</strong>: <code>laplace</code> is a Bayesian
+      average over ~50 candidate models, and the panel shows how much weight it
+      currently places on each <em>family</em> (random walk, drift, AR, Holt trend,
+      seasonal, mean reversion, …). Watch it <em>search</em> — switch the data
+      regime and the model re-weights toward the family that fits, abandoning a
+      wrong prior as fast as the evidence accumulates.
     </p>
     <p>
       Open the console and <code>import</code> from
@@ -87,8 +111,30 @@
   </footer>
 
   <script type="module">
-    import { laplace } from "../js/skaters/index.mjs";
+    import { buildCandidates, terminalLeafEnsemble, crpsLeaf } from "../js/skaters/index.mjs";
     let K = 6;   // forecast horizon (set from the slider in compute)
+
+    // Build laplace's candidate pool + terminal ensemble directly, so we can read
+    // the live per-candidate weights and show which families the model is betting
+    // on. (This is laplace minus the lattice projection — a no-op on the demo's
+    // continuous regimes.) families[i] is the human family label of candidate i.
+    let FAMILIES = [];
+    function buildLaplace(k) {
+      const [cands, depths, , families] = buildCandidates(k);
+      FAMILIES = families;
+      return terminalLeafEnsemble(cands, {
+        k, leafFn: crpsLeaf, learningRate: 0.8, complexityPenalty: 0.005,
+        depths, maxComponents: 20, forget: 0.99,
+      });
+    }
+    // Aggregate the ensemble's normalized candidate weights by family.
+    function familyWeights(state) {
+      const lw = state.log_w; const mx = Math.max(...lw);
+      let tot = 0; const w = lw.map((x) => { const e = Math.exp(x - mx); tot += e; return e; });
+      const fam = {};
+      for (let i = 0; i < w.length; i++) fam[FAMILIES[i]] = (fam[FAMILIES[i]] || 0) + w[i] / tot;
+      return fam;
+    }
 
     // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
     function rng(seed) {
@@ -141,7 +187,7 @@
 
     function compute() {
       K = parseInt(document.getElementById("horizon").value, 10);
-      const policy = laplace(K);
+      const policy = buildLaplace(K);
       const regime = document.getElementById("regime").value;
       const series = makeSeries(regime, seed);
       let state = null, pending = null;
@@ -157,7 +203,7 @@
         state = st; pending = dists;
         // Store the full k-step forecast fan made AFTER seeing y (predicts t+1..t+K).
         const fan = dists.map((d) => ({ mean: d.mean, lo: d.quantile(0.025), hi: d.quantile(0.975) }));
-        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1] });
+        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1], fam: familyWeights(st) });
       }
       cursor = 1;
     }
@@ -263,12 +309,29 @@
       document.getElementById("status").textContent = `step ${upto} / ${rows.length}`;
     }
 
+    // Live "what the model is betting on": the ensemble's family weights at the
+    // current step, as a ranked bar list. Watch it shift as the regime changes.
+    function renderWeights(upto) {
+      const row = upto >= 1 ? rows[upto - 1] : null;
+      const fam = row && row.fam;
+      const el = document.getElementById("weights");
+      if (!fam) { el.innerHTML = ""; return; }
+      const ranked = Object.entries(fam).filter(([, w]) => w > 0.004)
+        .sort((a, b) => b[1] - a[1]).slice(0, 8);
+      const max = ranked.length ? ranked[0][1] : 1;
+      el.innerHTML = ranked.map(([name, w]) =>
+        `<div class="wrow"><span class="wlabel">${name}</span>` +
+        `<span class="wtrack"><span class="wbar" style="width:${(100 * w / max).toFixed(1)}%"></span></span>` +
+        `<span class="wval">${(100 * w).toFixed(0)}%</span></div>`).join("");
+    }
+
     function tick() {
       if (paused) return;
       const step = parseInt(document.getElementById("speed").value, 10);
       cursor = Math.min(rows.length, cursor + step);
       draw(cursor);
       updateMetrics(cursor);
+      renderWeights(cursor);
       if (cursor < rows.length) timer = requestAnimationFrame(tick);
     }
 
