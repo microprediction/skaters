@@ -37,8 +37,9 @@
   <main>
     <h1>Forecasting playground</h1>
     <p class="subtitle">
-      The real JavaScript port, running live in your browser. Every number here is
-      produced by the same code that matches the Python package to 1e-6.
+      A live demonstration of the <strong>Laplace</strong> algorithm — so named
+      because it places a weak prior over trees of transforms and lets the data
+      speak.
     </p>
 
     <div class="panel">
@@ -87,28 +88,14 @@
     <p>
       The model sees one observation at a time and emits a full predictive
       distribution for each of the next <em>k</em> steps. The dashed orange
-      <strong>fan</strong> is that k-step forecast projecting from the latest point
-      — on the <em>weak mean reversion</em> regime, raise the horizon and watch
-      <code>laplace</code> (at <em>k&gt;1</em>, via its Ornstein–Uhlenbeck pool
-      group) curve the fan back toward the mean.
-      <span class="metric" id="metrics"></span>
+      <strong>fan</strong> is that k-step forecast projecting from the latest point.
     </p>
     <p>
       The bars above are <strong>live</strong>: <code>laplace</code> searches a
       <em>tree of transform compositions</em> — every candidate is a path
       <code>y → [transforms] → leaf</code> (e.g. <code>seasonal → EMA</code>,
       <code>fractional differencing → EMA</code>, <code>Yeo-Johnson coordinate</code>,
-      <code>OU reversion</code>). Each is judged by its full predictive distribution
-      <strong>K&nbsp;steps&nbsp;ahead</strong> — and that horizon matters: the
-      structural transforms earn their keep in the residual <em>shape</em> and over
-      multiple steps, not the one-step mean. Try <em>multiplicative</em> or
-      <em>√-variance</em> data to watch the Yeo-Johnson coordinate take over, or
-      <em>long memory</em> with a low horizon to surface fractional differencing.
-      Switch regime and the weight flows to the paths that fit.
-    </p>
-    <p>
-      Open the console and <code>import</code> from
-      <code>../js/skaters/index.mjs</code> to drive it yourself — it is a zero-dependency ES module.
+      <code>OU reversion</code>).
     </p>
   </main>
 
@@ -331,25 +318,6 @@
     }
 
     function updateMetrics(upto) {
-      let sumLp = 0, nLp = 0, cov = 0, se = 0;
-      for (let i = 10; i < upto; i++) {
-        const r = rows[i];
-        if (isFinite(r.lp)) { sumLp += r.lp; nLp++; se += (r.mean - r.y) ** 2; if (r.y >= r.lo && r.y <= r.hi) cov++; }
-      }
-      if (nLp === 0) { document.getElementById("metrics").textContent = ""; return; }
-      // k-step-ahead log-likelihood: score the horizon-K forecast against the
-      // value that actually arrived K steps later (where it has been revealed).
-      let sumLpK = 0, nLpK = 0;
-      for (let i = 10; i + K < upto; i++) {
-        const r = rows[i];
-        if (r.distK) { const v = r.distK.logpdf(rows[i + K].y); if (isFinite(v)) { sumLpK += v; nLpK++; } }
-      }
-      const ll = (sumLp / nLp).toFixed(3);
-      const rmse = Math.sqrt(se / nLp).toFixed(2);
-      const c = ((cov / nLp) * 100).toFixed(0);
-      const llK = nLpK ? (sumLpK / nLpK).toFixed(3) : "—";
-      document.getElementById("metrics").innerHTML =
-        `1-step LL <b>${ll}</b> · ${K}-step LL <b>${llK}</b> · RMSE <b>${rmse}</b> · 95% coverage <b>${c}%</b> over ${nLp} steps.`;
       document.getElementById("status").textContent = `step ${upto} / ${rows.length}`;
     }
 
