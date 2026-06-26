@@ -63,45 +63,45 @@ export function buildCandidates(k) {
   // Depth 2: Seasonal differencing + EMA
   for (const period of [7, 12, 24]) {
     for (const alpha of [0.05, 0.1]) {
-      push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), seasonalDifference(period), k), 2, "seasonal");
+      push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), seasonalDifference(period), k), 2, "seasonal → EMA");
     }
   }
 
   // Depth 2: differencing + EMA
   for (const alpha of [0.05, 0.1, 0.3]) {
-    groups.diff.push(push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), difference(), k), 2, "random walk"));
+    groups.diff.push(push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), difference(), k), 2, "random walk → EMA"));
   }
 
   // Depth 2: standardize + EMA
   for (const alpha of [0.05, 0.1]) {
-    push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), standardize(), k), 2, "EMA");
+    push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), standardize(), k), 2, "standardize → EMA");
   }
 
   // Depth 2: fractional diff + EMA
   groups.frac = [];
   for (const d of [0.2, 0.4]) {
-    groups.frac.push(push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), fractionalDifference(d, 30), k), 2, "frac diff"));
+    groups.frac.push(push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), fractionalDifference(d, 30), k), 2, "frac-diff → EMA"));
   }
 
   // Depth 2: drift + EMA
   for (const [aDrift, sDrift] of [[0.002, 0.001], [0.0005, 0.0002]]) {
     for (const aEma of [0.05, 0.1]) {
-      groups.drift.push(push(conjugate(conjugate(leaf(k), emaTransform(aEma), k), drift(aDrift, sDrift), k), 2, "drift"));
+      groups.drift.push(push(conjugate(conjugate(leaf(k), emaTransform(aEma), k), drift(aDrift, sDrift), k), 2, "drift → EMA"));
     }
   }
 
   // Depth 2: drift + Holt linear
   {
-    const idx = push(conjugate(conjugate(leaf(k), holtLinear(0.1, 0.05), k), drift(0.001, 0.0005), k), 2, "Holt trend");
+    const idx = push(conjugate(conjugate(leaf(k), holtLinear(0.1, 0.05), k), drift(0.001, 0.0005), k), 2, "drift → Holt");
     groups.drift.push(idx);
     groups.holt.push(idx);
   }
 
   // Depth 2: GARCH + EMA
-  push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), garch(), k), 2, "GARCH vol");
+  push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), garch(), k), 2, "GARCH vol → EMA");
 
   // Depth 2: power transform + EMA
-  push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), powerTransform(0.5), k), 2, "power coord");
+  push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), powerTransform(0.5), k), 2, "power → EMA");
 
   // Depth 2: thinking fast and slow (fast tracker outside, slow scale inside)
   const fastTrackers = () => [
@@ -118,7 +118,7 @@ export function buildCandidates(k) {
   groups.coordinate = [];
   for (const L of [0.0, 0.5]) {
     for (const innerTx of [difference(), emaTransform(0.1)]) {
-      groups.coordinate.push(push(conjugate(conjugate(leaf(k), innerTx, k), yeoJohnson(L), k), 2, "coordinate"));
+      groups.coordinate.push(push(conjugate(conjugate(leaf(k), innerTx, k), yeoJohnson(L), k), 2, "coordinate (Yeo-Johnson)"));
     }
   }
 
@@ -129,7 +129,7 @@ export function buildCandidates(k) {
     for (const L of [0.0, 0.5]) {
       for (const kappa of [0.03, 0.1, 0.3]) {
         groups.mean_revert.push(push(
-          conjugate(conjugate(leaf(k), ouTransform(kappa, 0.02), k), yeoJohnson(L), k), 2, "mean reversion"));
+          conjugate(conjugate(leaf(k), ouTransform(kappa, 0.02), k), yeoJohnson(L), k), 2, "mean reversion (OU)"));
       }
     }
   }

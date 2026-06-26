@@ -11,7 +11,8 @@
     .weights-sub { font-weight: 400; color: #888; }
     .weights { display: flex; flex-direction: column; gap: 3px; }
     .wrow { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
-    .wlabel { flex: 0 0 96px; text-align: right; color: #444; }
+    .wlabel { flex: 0 0 200px; text-align: right; color: #444; white-space: nowrap;
+              overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
     .wtrack { flex: 1 1 auto; height: 11px; background: #f0f0f3; border-radius: 3px; overflow: hidden; }
     .wbar { display: block; height: 100%; background: #4a3aff; border-radius: 3px; transition: width 0.12s linear; }
     .wval { flex: 0 0 34px; text-align: right; color: #666; font-variant-numeric: tabular-nums; }
@@ -74,8 +75,8 @@
       </div>
       <p class="status" id="status">—</p>
       <div class="weights-panel">
-        <div class="weights-title">What the model is betting on
-          <span class="weights-sub">— live ensemble weight by candidate family</span></div>
+        <div class="weights-title">The paths it's weighting
+          <span class="weights-sub">— live ensemble weight on each transform composition (y → transforms → leaf)</span></div>
         <div class="weights" id="weights"></div>
       </div>
     </div>
@@ -91,11 +92,12 @@
     </p>
     <p>
       The bars above are <strong>live</strong>: <code>laplace</code> is a Bayesian
-      average over ~50 candidate models, and the panel shows how much weight it
-      currently places on each <em>family</em> (random walk, drift, AR, Holt trend,
-      seasonal, mean reversion, …). Watch it <em>search</em> — switch the data
-      regime and the model re-weights toward the family that fits, abandoning a
-      wrong prior as fast as the evidence accumulates.
+      average over a <em>tree of transform compositions</em> — every candidate is a
+      path <code>y → [transforms] → leaf</code> (e.g. <code>random walk → EMA</code>,
+      <code>standardize → AR</code>, <code>Yeo-Johnson → OU</code>). The panel shows
+      the weight on each path. Watch it <em>search</em> — switch the data regime and
+      the weight flows to the paths that fit, abandoning a wrong prior as fast as
+      the evidence accumulates.
     </p>
     <p>
       Open the console and <code>import</code> from
@@ -127,13 +129,17 @@
         depths, maxComponents: 20, forget: 0.99,
       });
     }
-    // Aggregate the ensemble's normalized candidate weights by family.
-    function familyWeights(state) {
+    // Each candidate is a PATH through a tree of transform compositions: a
+    // structural transform applied to the raw data (random walk, EMA, standardize,
+    // Yeo-Johnson coordinate, OU, …) and sometimes a second one above the leaf. We
+    // aggregate the ensemble's normalized weight by composition path, so the panel
+    // shows exactly which paths the model is weighting as it searches.
+    function pathWeights(state) {
       const lw = state.log_w; const mx = Math.max(...lw);
       let tot = 0; const w = lw.map((x) => { const e = Math.exp(x - mx); tot += e; return e; });
-      const fam = {};
-      for (let i = 0; i < w.length; i++) fam[FAMILIES[i]] = (fam[FAMILIES[i]] || 0) + w[i] / tot;
-      return fam;
+      const paths = {};
+      for (let i = 0; i < w.length; i++) paths[FAMILIES[i]] = (paths[FAMILIES[i]] || 0) + w[i] / tot;
+      return paths;
     }
 
     // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
@@ -203,7 +209,7 @@
         state = st; pending = dists;
         // Store the full k-step forecast fan made AFTER seeing y (predicts t+1..t+K).
         const fan = dists.map((d) => ({ mean: d.mean, lo: d.quantile(0.025), hi: d.quantile(0.975) }));
-        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1], fam: familyWeights(st) });
+        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1], paths: pathWeights(st) });
       }
       cursor = 1;
     }
@@ -313,14 +319,15 @@
     // current step, as a ranked bar list. Watch it shift as the regime changes.
     function renderWeights(upto) {
       const row = upto >= 1 ? rows[upto - 1] : null;
-      const fam = row && row.fam;
+      const paths = row && row.paths;
       const el = document.getElementById("weights");
-      if (!fam) { el.innerHTML = ""; return; }
-      const ranked = Object.entries(fam).filter(([, w]) => w > 0.004)
+      if (!paths) { el.innerHTML = ""; return; }
+      const ranked = Object.entries(paths).filter(([, w]) => w > 0.004)
         .sort((a, b) => b[1] - a[1]).slice(0, 8);
       const max = ranked.length ? ranked[0][1] : 1;
+      // each label is a path through the transform tree: y → [transforms] → leaf
       el.innerHTML = ranked.map(([name, w]) =>
-        `<div class="wrow"><span class="wlabel">${name}</span>` +
+        `<div class="wrow"><span class="wlabel">${name} → leaf</span>` +
         `<span class="wtrack"><span class="wbar" style="width:${(100 * w / max).toFixed(1)}%"></span></span>` +
         `<span class="wval">${(100 * w).toFixed(0)}%</span></div>`).join("");
     }
