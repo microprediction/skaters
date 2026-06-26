@@ -58,8 +58,8 @@ Both of the package's named forecasters are doing per-step denoising:
 - **`laplace`** carries a running level and corrects it toward each new
   observation — an EMA update, which is the constant-gain Kalman/Tweedie correction
   $\mu_t = \mu_{t-1} + \alpha\,(y_t - \mu_{t-1})$ with $\alpha = 1-\delta$.
-- **`doob`** pins the mean and denoises the *variance*, averaging a family of clock
-  candidates that are each the GARCH/Tweedie variance correction above.[^vf]
+- The **`garch`/`garch_leaf`** transforms denoise the *variance*: each is the
+  GARCH/Tweedie variance correction above, applied in the conform-last leaf.[^vf]
 
 So a forecast step in `skaters` is a single reverse-diffusion step in miniature:
 take the noisy next observation, move it toward the latent level (or latent
