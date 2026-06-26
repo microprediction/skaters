@@ -321,8 +321,9 @@ problem \pkg{skaters} is built for.
 
 \subsection{Against eight distributional baselines} \label{sec:sota}
 
-On $500$ such series we compare the general forecaster \code{laplace} against
-every distributional one-step baseline we could assemble:
+On the non-price universe ($1{,}249$ qualifying daily series) we compare the
+general forecaster \code{laplace} against every distributional one-step baseline
+we could assemble:
 \pkg{statsforecast}'s \citep{garza2022statsforecast} \pkg{AutoARIMA} and
 \pkg{AutoETS}; \pkg{statsmodels} \pkg{SARIMAX}$(1,0,1)$ and simple exponential
 smoothing, which emit \emph{exact} closed-form Gaussian predictives;
@@ -341,38 +342,46 @@ log-likelihood \emph{and} CRPS over the same test window. The parametric
 Student-$t$ predictives (\pkg{GARCH}, \pkg{NeuralForecast}) are represented as
 finite Gaussian scale mixtures, matching the analytic $t$ density to $\sim
 10^{-3}$. We report per-series win-rates (the fraction of series on
-which \code{laplace} scores better), and additionally restrict to the $389$
-continuous series --- those with under $5\%$ exactly-repeating one-step
-changes --- since on repeating/grid series the lattice projection
-(Section~\ref{sec:lattice}) gives a large but metric-specific advantage that
-would otherwise dominate the aggregate. Table~\ref{tab:sota} reports the result
-(the unified \code{study.py sota} run).
+which \code{laplace} scores better) on the $894$ continuous series --- those with
+under $5\%$ exactly-repeating one-step changes --- since on repeating/grid series
+the lattice projection (Section~\ref{sec:lattice}) gives a large but
+metric-specific advantage that would otherwise dominate the aggregate. Because
+many \proglang{FRED} families are panels (a yield curve, an index family) that are
+far from independent, we report each win-rate both \emph{raw} and
+\emph{family-weighted} (one vote per leading-letter family). Table~\ref{tab:sota}
+reports the result (the unified \code{study.py sota} run with
+\code{STUDY\_EXCLUDE\_PRICE}).
 
 \begin{table}[t!]
 \centering
 \begin{tabular}{lccc}
 \toprule
-Baseline & LL (all / cont.) & CRPS (all / cont.) & Mean LL (cont.) \\
+Baseline & LL (raw / fam.) & CRPS (raw / fam.) & Mean LL \\
 \midrule
-\pkg{AutoARIMA}             & \textbf{88 / 85\,\%} & 68 / 64\,\% & 2.79 \\
-\pkg{AutoETS}               & \textbf{95 / 94\,\%} & 77 / 73\,\% & 2.76 \\
-\pkg{SARIMAX} (statsmodels) & \textbf{89 / 86\,\%} & 64 / 59\,\% & 2.88 \\
-ETS (statsmodels)           & \textbf{93 / 92\,\%} & 74 / 70\,\% & 2.87 \\
-\pkg{GARCH}$(1,1)$-$t$      & 59 / 51\,\% & 40 / 33\,\% & \textbf{2.92} \\
-\pkg{AutoARIMA} + conformal & \textbf{87 / 83\,\%} & 31 / 21\,\% & 2.39 \\
-\pkg{AutoARIMA} + ACI       & \textbf{89 / 86\,\%} & 31 / 21\,\% & 2.52 \\
-Prophet$^{\dagger}$         & \textbf{100 / 100\,\%} & 100 / 100\,\% & 1.86 \\
+\pkg{AutoARIMA}             & \textbf{82 / 90\,\%} & 53 / 65\,\% & 2.80 \\
+\pkg{AutoETS}               & \textbf{97 / 99\,\%} & \textbf{83 / 92\,\%} & 2.79 \\
+\pkg{SARIMAX} (statsmodels) & \textbf{87 / 86\,\%} & 53 / 64\,\% & 2.92 \\
+ETS (statsmodels)           & \textbf{96 / 98\,\%} & \textbf{81 / 90\,\%} & 2.89 \\
+\pkg{GARCH}$(1,1)$-$t$      & \textbf{68 / 65\,\%} & 54 / 45\,\% & 3.03 \\
+\pkg{AutoARIMA} + conformal & \textbf{86 / 88\,\%} & 31 / 31\,\% & 2.27 \\
+\pkg{AutoARIMA} + ACI       & \textbf{88 / 88\,\%} & 29 / 29\,\% & 2.51 \\
+naive conformal$^{\dagger}$ & --- (CDF) & 92 / 93\,\% & --- \\
 NF-Student$t^{\ddagger}$    & \textbf{100 / 100\,\%} & 78 / 76\,\% & 0.82 \\
 \bottomrule
 \end{tabular}
-\caption{Per-series win-rate of \code{laplace} versus each baseline on 500
-popularity-ranked daily \proglang{FRED} change-series, all and on the 389
-continuous series. LL counts series where \code{laplace} has the higher held-out
-log-likelihood; CRPS where it has the lower CRPS. The final column is each
-baseline's mean continuous log-likelihood (\code{laplace}: 3.10). Higher is better
-for LL; lower for CRPS. $^{\dagger}$Prophet refits at every step ($n=30$; a fresh
-Stan fit has no online update). $^{\ddagger}$NF-Student$t$ is carried from the
-prior run --- it requires \pkg{torch} and was not re-scored in this run.}
+\caption{Per-series win-rate of \code{laplace} versus each baseline on the
+\textbf{non-price} \proglang{FRED} universe --- $894$ continuous daily
+change-series ($57$ correlated families); the fittable baselines cover a $637$
+subset under their compute budget, GARCH-$t$ all $894$. Win-rates are reported
+\emph{raw} (per series) and \emph{family-weighted} (one vote per leading-letter
+family, the de-correlation of Section~\ref{sec:ablations}). LL counts series where
+\code{laplace} has the higher held-out log-likelihood; CRPS where it has the lower
+CRPS; bold marks a \code{laplace} win ($>50\%$). The final column is each
+baseline's mean log-likelihood (\code{laplace}: $\mathbf{3.20}$). Higher is better
+for LL, lower for CRPS. $^{\dagger}$Naive split-conformal pinball bands (best of
+three window lengths); a conformal CDF has no density, so it is unscored on LL.
+$^{\ddagger}$NF-Student$t$ is carried from the prior run --- it requires
+\pkg{torch} and was not re-scored here.}
 \label{tab:sota}
 \end{table}
 
@@ -418,10 +427,11 @@ $100\%$ is a real calibration gap, not a degenerate score.
 
 \paragraph{CRPS.}
 As ever, CRPS tells a mixed story. \code{laplace} beats the mean-model baselines
-on CRPS --- the \pkg{ARIMA} family (\pkg{AutoARIMA} $64\%$, \pkg{SARIMAX} $59\%$),
-the smoothing models (\pkg{AutoETS} $73\%$, ETS $70\%$), and Prophet --- but
-\emph{loses} to \pkg{GARCH}-$t$ ($33\%$) and the conformal variants ($21\%$),
-which are CRPS-optimised (or volatility-specialised) by construction. This is
+on CRPS --- family-weighted, the \pkg{ARIMA} family (\pkg{AutoARIMA} $65\%$,
+\pkg{SARIMAX} $64\%$) and the smoothing models (\pkg{AutoETS} $92\%$, ETS $90\%$)
+--- but \emph{loses} to the fitted-mean conformal variants ($\sim 30\%$) and, on
+the family-weighted count, to \pkg{GARCH}-$t$ ($45\%$), which are CRPS-optimised
+(or volatility-specialised) by construction. This is
 exactly the thesis of Section~\ref{sec:leaf}: likelihood is the metric where a
 faithful density wins; CRPS is conformal's and \pkg{GARCH}'s home turf, where we
 are competitive but not dominant. A practitioner who truly only cares about CRPS
@@ -452,9 +462,11 @@ CRPS (Section~\ref{sec:ablations}), without giving up the density the conformal
 systems cannot provide.
 
 \paragraph{Scope.}
-Five hundred popularity-ranked daily change-series, one-step horizon. Multi-step
-horizons and raw levels are left for later; zero-shot foundation models get their
-own protocol in Section~\ref{sec:foundation}.
+The non-price economic universe ($894$ continuous daily change-series),
+one-step horizon. The price/return regime is reported as the explicit caveat
+above and is not part of the general-purpose claim; multi-step horizons and raw
+levels are left for later; zero-shot foundation models get their own protocol in
+Section~\ref{sec:foundation}.
 
 \subsection{Against zero-shot foundation models} \label{sec:foundation}
 
