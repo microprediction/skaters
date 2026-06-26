@@ -54,6 +54,9 @@
             <option value="seasonal">seasonal (period 7)</option>
             <option value="rw">random walk</option>
             <option value="meanrevert">weak mean reversion</option>
+            <option value="multiplicative">multiplicative (log coord)</option>
+            <option value="sqrtvar">variance ∝ level (√ coord)</option>
+            <option value="longmem">long memory (fractional)</option>
             <option value="hetero">slowly-varying noise</option>
             <option value="jumps">level jumps</option>
           </select>
@@ -75,8 +78,8 @@
       </div>
       <p class="status" id="status">—</p>
       <div class="weights-panel">
-        <div class="weights-title">The paths it's weighting
-          <span class="weights-sub">— live ensemble weight on each transform composition (y → transforms → leaf)</span></div>
+        <div class="weights-title">The paths that fit
+          <span class="weights-sub">— each transform composition (y → transforms → leaf) judged by its full predictive likelihood, K steps ahead</span></div>
         <div class="weights" id="weights"></div>
       </div>
     </div>
@@ -91,13 +94,17 @@
       <span class="metric" id="metrics"></span>
     </p>
     <p>
-      The bars above are <strong>live</strong>: <code>laplace</code> is a Bayesian
-      average over a <em>tree of transform compositions</em> — every candidate is a
-      path <code>y → [transforms] → leaf</code> (e.g. <code>random walk → EMA</code>,
-      <code>standardize → AR</code>, <code>Yeo-Johnson → OU</code>). The panel shows
-      the weight on each path. Watch it <em>search</em> — switch the data regime and
-      the weight flows to the paths that fit, abandoning a wrong prior as fast as
-      the evidence accumulates.
+      The bars above are <strong>live</strong>: <code>laplace</code> searches a
+      <em>tree of transform compositions</em> — every candidate is a path
+      <code>y → [transforms] → leaf</code> (e.g. <code>seasonal → EMA</code>,
+      <code>fractional differencing → EMA</code>, <code>Yeo-Johnson coordinate</code>,
+      <code>OU reversion</code>). Each is judged by its full predictive distribution
+      <strong>K&nbsp;steps&nbsp;ahead</strong> — and that horizon matters: the
+      structural transforms earn their keep in the residual <em>shape</em> and over
+      multiple steps, not the one-step mean. Try <em>multiplicative</em> or
+      <em>√-variance</em> data to watch the Yeo-Johnson coordinate take over, or
+      <em>long memory</em> with a low horizon to surface fractional differencing.
+      Switch regime and the weight flows to the paths that fit.
     </p>
     <p>
       Open the console and <code>import</code> from
@@ -116,30 +123,32 @@
     import { buildCandidates, terminalLeafEnsemble, crpsLeaf } from "../js/skaters/index.mjs";
     let K = 6;   // forecast horizon (set from the slider in compute)
 
-    // Build laplace's candidate pool + terminal ensemble directly, so we can read
-    // the live per-candidate weights and show which families the model is betting
-    // on. (This is laplace minus the lattice projection — a no-op on the demo's
-    // continuous regimes.) families[i] is the human family label of candidate i.
     let FAMILIES = [];
-    function buildLaplace(k) {
-      const [cands, depths, , families] = buildCandidates(k);
-      FAMILIES = families;
-      return terminalLeafEnsemble(cands, {
-        k, leafFn: crpsLeaf, learningRate: 0.8, complexityPenalty: 0.005,
-        depths, maxComponents: 20, forget: 0.99,
-      });
-    }
-    // Each candidate is a PATH through a tree of transform compositions: a
-    // structural transform applied to the raw data (random walk, EMA, standardize,
-    // Yeo-Johnson coordinate, OU, …) and sometimes a second one above the leaf. We
-    // aggregate the ensemble's normalized weight by composition path, so the panel
-    // shows exactly which paths the model is weighting as it searches.
-    function pathWeights(state) {
-      const lw = state.log_w; const mx = Math.max(...lw);
-      let tot = 0; const w = lw.map((x) => { const e = Math.exp(x - mx); tot += e; return e; });
-      const paths = {};
-      for (let i = 0; i < w.length; i++) paths[FAMILIES[i]] = (paths[FAMILIES[i]] || 0) + w[i] / tot;
-      return paths;
+    // The panel scorer. laplace combines its candidates as MEAN forecasters
+    // (mean-only), which hides the interesting transforms — a Yeo-Johnson
+    // coordinate, fractional differencing or an OU reversion earns its keep in the
+    // residual *shape* and at multi-step horizons, not the one-step mean. So we
+    // judge each candidate PATH by its OWN full predictive distribution, K steps
+    // ahead (the horizon slider): score += logpdf of the h=K forecast it made K
+    // steps ago, recency-weighted. That surfaces which transform composition
+    // actually explains the data. Each candidate runs on its own state, independent
+    // of the ensemble that drives the forecast.
+    function makePathScorer(cands, k) {
+      const R = cands.map((f) => ({ f, st: null, q: [], score: 0 }));
+      return function step(y) {
+        for (const r of R) {
+          if (r.q.length >= k) {
+            const v = r.q.shift().logpdf(y);
+            r.score = 0.985 * r.score + (isFinite(v) ? Math.max(v, -20) : -20);
+          }
+          const [d, s] = r.f(y, r.st); r.st = s; r.q.push(d[k - 1]);
+        }
+        const mx = Math.max(...R.map((r) => r.score));
+        let tot = 0; const w = R.map((r) => { const e = Math.exp(r.score - mx); tot += e; return e; });
+        const paths = {};
+        for (let i = 0; i < R.length; i++) paths[FAMILIES[i]] = (paths[FAMILIES[i]] || 0) + w[i] / tot;
+        return paths;
+      };
     }
 
     // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
@@ -160,19 +169,39 @@
 
     function makeSeries(regime, seed, n = 240) {
       const r = rng(seed);
+      // Long memory: ARFIMA(0,d,0) — white noise convolved with the (1-B)^{-d}
+      // filter. Plain differencing over-differences it; fractional differencing is
+      // the path that fits. (Precomputed outside the per-step loop.)
+      if (regime === "longmem") {
+        const d = 0.42, Wn = 140;
+        const wt = [1]; for (let k = 1; k < Wn; k++) wt.push(wt[k - 1] * (d + k - 1) / k);
+        const eps = []; for (let i = 0; i < n + Wn; i++) eps.push(gauss(r));
+        const out = [];
+        for (let t = 0; t < n; t++) { let acc = 0; for (let j = 0; j < Wn; j++) acc += wt[j] * eps[t + Wn - 1 - j]; out.push(acc); }
+        return out;
+      }
       const s = [];
-      let lvl = 0;
+      let lvl = 0, logv = Math.log(40), sq = 200;
       for (let t = 0; t < n; t++) {
         if (regime === "trend") s.push(0.06 * t + 2 * gauss(r));
         else if (regime === "seasonal") s.push(5 * Math.sin((2 * Math.PI * t) / 7) + gauss(r));
         else if (regime === "rw") { lvl += gauss(r); s.push(lvl); }
         else if (regime === "meanrevert") {
           // Weakly mean-reverting (Ornstein-Uhlenbeck): wanders like a random
-          // walk but is slowly pulled back to 0 — where a martingale prior
-          // is wrong. Small kappa = weak reversion.
-          const kappa = 0.04;
-          lvl += kappa * (0 - lvl) + 1.2 * gauss(r);
+          // walk but is slowly pulled back to 0. Small kappa = weak reversion.
+          lvl += 0.04 * (0 - lvl) + 1.2 * gauss(r);
           s.push(lvl);
+        }
+        else if (regime === "multiplicative") {
+          // Multiplicative volatility (variance scales with level²): a geometric
+          // random walk. Simple in the LOG coordinate — the Yeo-Johnson path wins.
+          logv += 0.06 * gauss(r);
+          s.push(Math.exp(logv));
+        }
+        else if (regime === "sqrtvar") {
+          // Variance grows with the level (√-coordinate): step size ~ √level.
+          sq = Math.max(sq + 1.2 * Math.sqrt(Math.max(sq, 1)) * gauss(r), 1);
+          s.push(sq);
         }
         else if (regime === "hetero") {
           const sigma = Math.exp(Math.log(0.3) + (Math.log(3) - Math.log(0.3)) * (0.5 + 0.5 * Math.sin((2 * Math.PI * t) / 120)));
@@ -193,7 +222,15 @@
 
     function compute() {
       K = parseInt(document.getElementById("horizon").value, 10);
-      const policy = buildLaplace(K);
+      const [cands, depths, , families] = buildCandidates(K);
+      FAMILIES = families;
+      // laplace itself (terminal ensemble) drives the forecast + the fan/metrics;
+      // a parallel per-candidate scorer drives the "paths" panel (see above).
+      const policy = terminalLeafEnsemble(cands, {
+        k: K, leafFn: crpsLeaf, learningRate: 0.8, complexityPenalty: 0.005,
+        depths, maxComponents: 20, forget: 0.99,
+      });
+      const scorePaths = makePathScorer(cands, K);
       const regime = document.getElementById("regime").value;
       const series = makeSeries(regime, seed);
       let state = null, pending = null;
@@ -205,11 +242,12 @@
           const d = pending[0];
           mean = d.mean; lo = d.quantile(0.025); hi = d.quantile(0.975); lp = d.logpdf(y);
         }
+        const paths = scorePaths(y);   // judge each path's full k-step predictive
         const [dists, st] = policy(y, state);
         state = st; pending = dists;
         // Store the full k-step forecast fan made AFTER seeing y (predicts t+1..t+K).
         const fan = dists.map((d) => ({ mean: d.mean, lo: d.quantile(0.025), hi: d.quantile(0.975) }));
-        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1], paths: pathWeights(st) });
+        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1], paths });
       }
       cursor = 1;
     }
