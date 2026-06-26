@@ -1,6 +1,6 @@
 # skaters ([demo](https://skaters.microprediction.org/demos/playground.html))
 
-One univariate time-series model to rule them all?** — For non-price economic series, near enough. There's exactly one forecaster, *Laplace*, and you can watch it [here](https://skaters.microprediction.org/demos/playground.html).
+One univariate time-series model to rule them all? For non-price economic series, near enough and you can watch *Laplace* [here](https://skaters.microprediction.org/demos/playground.html).
 
 
 
