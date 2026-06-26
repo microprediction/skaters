@@ -16,7 +16,15 @@ Laplace beats everything.
 </p>
 
 
-Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: across ~900 such FRED series *Laplace* has the highest mean held-out **log-likelihood** and the best per-series win-rate against every baseline — AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot foundation models, **and GARCH-t** (68% / 65% family-weighted). On CRPS it beats the mean-model baselines and loses only to the CRPS-specialists (conformal, GARCH-t) — their home turf, and a goal-post that won't grow your wealth. **No free lunch on price/returns:** there GARCH-t wins, and you should use it. ([Why likelihood is the metric that matters.](https://mechanisms.microprediction.org))
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: across ~900 such FRED series *Laplace* has the highest mean held-out **log-likelihood** and the best per-series win-rate against every baseline — AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot foundation models, **and GARCH-t** (68% / 65% family-weighted). 
+
+**Not for price/return series:** 
+We recomment GARCH-t there instead. 
+
+**Not really for CRPS targets**
+On CRPS Laplace still beats most of the competition. However if you really like CRPS you should pick a method like
+conformal prediction. This comes with the warning that the CRPS goalpost is not suited for things like growing your wealth. 
+
 
 ## Install
 
@@ -87,11 +95,7 @@ from skaters import laplace, garch_leaf
 f = laplace(k=1, leaf=garch_leaf)         # GARCH(1,1) conditional variance + Student-t tails
 ```
 
-On the price population it recovers ~60% of the held-out log-likelihood gap to a
-fitted GARCH-t (a finer (α,β) grid with a free ω) and is neutral-to-positive
-elsewhere (see [`benchmarks/garch_leaf_threeway.py`](benchmarks/garch_leaf_threeway.py)).
-**No free lunch on price/returns, though** — there a fitted GARCH-t still wins;
-use it for asset returns.
+**Not for price/returns, though** — there a fitted GARCH-t still wins
 
 ### Specialist behaviour by composition
 
