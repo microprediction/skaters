@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 500 FRED series: laplace has both the highest held-out log-likelihood and the highest forecasts-per-second, alone in the top-right, while AutoARIMA, AutoETS, SARIMAX, GARCH-t, conformal, NeuralForecast and Prophet trade accuracy for far more compute." width="680">
+  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 894 non-price FRED series: laplace has both the highest held-out log-likelihood and the highest forecasts-per-second, alone in the top-right, while AutoARIMA, AutoETS, SARIMAX, GARCH-t, conformal and NeuralForecast trade accuracy for far more compute." width="680">
 </p>
 
 

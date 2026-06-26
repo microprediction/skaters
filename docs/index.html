@@ -32,9 +32,11 @@
       time-series prediction.</p>
 
     <p class="lead">One call, zero dependencies, every prediction a full probability
-      <em>distribution</em> computed online in O(1) — in pure Python and JavaScript alike. On
-      held-out likelihood <code>laplace</code> beats AutoARIMA, AutoETS, GARCH-t, conformal, and
-      even zero-shot foundation models like Chronos and TimesFM — all of them heavier and slower.</p>
+      <em>distribution</em> computed online in O(1) — in pure Python and JavaScript alike. A
+      general-purpose forecaster for <strong>non-price economic series</strong>: on held-out
+      likelihood <code>laplace</code> beats AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot
+      foundation models like Chronos and TimesFM, <em>and</em> GARCH-t — all heavier and slower.
+      (No free lunch on price/returns: there GARCH-t wins, and you should use it.)</p>
 
     <div class="tag-row">
       <span class="tag">distributional</span>
@@ -47,8 +49,8 @@
     <figure class="hero-figure">
       <img src="./assets/frontier.svg" alt="Accuracy vs speed frontier: laplace dominates the
         baselines, with higher held-out likelihood at a fraction of the runtime." />
-      <figcaption>Held-out accuracy vs. runtime on 500 FRED series. <code>laplace</code> sits alone
-        in the top-left — best likelihood, lowest cost — while the classical, neural, and
+      <figcaption>Held-out accuracy vs. runtime on 894 non-price FRED series. <code>laplace</code>
+        sits alone in the top-right — best likelihood, fastest — while the classical, neural, and
         foundation-model baselines trade accuracy for orders of magnitude more compute.
         <a href="/papers.html">The benchmarks →</a></figcaption>
     </figure>
@@ -62,13 +64,14 @@
     </div>
 
     <div class="callout">
-      <strong>It wins the likelihood race against eight distributional baselines.</strong> On 500
-      FRED series (rolling one-step-ahead, per series), <code>laplace</code> beats
-      <strong>AutoARIMA</strong>, <strong>AutoETS</strong>, statsmodels <strong>SARIMAX/ETS</strong>,
-      <strong>GARCH-t</strong>, <strong>NeuralForecast-StudentT</strong>, and AutoARIMA-with-<em>conformal</em>
-      on held-out <strong>log-likelihood</strong> — the decision-relevant metric — including on the
-      continuous series. The real test is <strong>GARCH-t</strong>, the heavy-tail SOTA: laplace
-      still edges it (mean continuous logpdf 2.86 vs 2.72).
+      <strong>It wins the likelihood race against every baseline on non-price series.</strong> On
+      894 continuous non-price FRED series (rolling one-step-ahead, per series), <code>laplace</code>
+      has the highest mean held-out <strong>log-likelihood</strong> (3.20) and the best win-rate
+      against <strong>AutoARIMA</strong> (82%), <strong>AutoETS</strong> (97%), statsmodels
+      <strong>SARIMAX</strong> (87%), <em>conformal</em>, and — the real test — the heavy-tail SOTA
+      <strong>GARCH-t</strong> (68% raw / 65% family-weighted; mean LL 3.20 vs 3.03). On CRPS it
+      loses only to the CRPS-specialists (conformal, GARCH-t). <strong>No free lunch on
+      price/returns</strong> — there GARCH-t wins, and we recommend it.
       <a href="/papers.html">The benchmarks →</a>
     </div>
 
@@ -121,7 +124,7 @@ f = mean_revert(k=10)  # committed mean reversion — multi-step (spreads, vol, 
       <thead><tr><th>Forecaster</th><th>What it is</th><th>Best for</th></tr></thead>
       <tbody>
         <tr><td><code>laplace</code></td><td>Likelihood-weighted ensemble over the full candidate pool; <em>model first, conform last</em> + lattice projection on by default</td><td><strong>General purpose (default)</strong></td></tr>
-        <tr><td><code>doob</code></td><td>Committed martingale + learned volatility clock (time-changed Brownian motion)</td><td>Near-martingale <strong>levels</strong> (prices, indices)</td></tr>
+        <tr><td><code>doob</code></td><td>Committed martingale + learned volatility clock (time-changed Brownian motion)</td><td>Series where the <strong>martingale prior holds</strong> (random-walk levels). Not a price-volatility specialist — use GARCH-t for returns.</td></tr>
         <tr><td><code>mean_revert</code></td><td>Committed Ornstein–Uhlenbeck reversion to a running mean; learns the speed</td><td>Multi-step <strong>mean reversion</strong> (spreads, vol, rates)</td></tr>
       </tbody>
     </table>
