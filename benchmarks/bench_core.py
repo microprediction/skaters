@@ -96,6 +96,26 @@ def conformal_dist(point, resid_window, scale=1.0, nq=41):
     return Dist([(1.0 / nq, point + scale * q, h) for q in qs])
 
 
+def grid_dist(taus, qs):
+    """Dist from predictive quantile *values* `qs` at probability levels `taus`
+    (0<tau<1) — for a baseline whose predictive is genuinely non-Gaussian (ADAM,
+    NNETAR, GARCH-t, BSTS). Each node gets mass = its tau-midpoint gap and a
+    Silverman kernel, so the density is scored on its real shape, not a
+    Gaussian-from-band flattening of it. Returns None on too few finite nodes."""
+    taus = np.asarray(taus, float); qs = np.asarray(qs, float)
+    ok = np.isfinite(taus) & np.isfinite(qs)
+    taus, qs = taus[ok], qs[ok]
+    if qs.size < 5:
+        return None
+    o = np.argsort(taus); taus, qs = taus[o], np.sort(qs[o])   # quantiles monotone in tau
+    edges = np.concatenate(([0.0], (taus[:-1] + taus[1:]) / 2.0, [1.0]))
+    w = np.diff(edges); w = w / w.sum()                        # trapezoidal tau mass
+    iqr = np.interp(0.75, taus, qs) - np.interp(0.25, taus, qs)
+    spread = (iqr / 1.349) if iqr > 0 else (qs[-1] - qs[0]) or 1.0
+    h = max(0.9 * spread * qs.size ** (-0.2), 1e-9)            # Silverman bandwidth
+    return Dist([(float(wi), float(v), h) for wi, v in zip(w, qs)])
+
+
 def student_t_dist(mu, var, nu, K=24):
     """Location-scale Student-t as a Gaussian scale mixture Dist (so it scores
     through the same logpdf/crps). Matches the analytic t logpdf to ~1e-3 at K=24."""
