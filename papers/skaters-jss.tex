@@ -141,14 +141,17 @@ weighting abandons it.
 No-Free-Lunch also fixes the scope of our claim. We position \pkg{skaters} as a
 general-purpose forecaster for economic and other non-price series, and that is
 where the benchmark of Section~\ref{sec:experiments} is run. Asset-price and
-return series are a different regime --- their changes exhibit the volatility
-clustering and heavy tails that conditional-volatility models are built for --- and
-there we do not claim to win: a \pkg{GARCH}-$t$ model is the better choice, which
-we confirm and report rather than dilute by averaging the two regimes into a
-single number, and which we recommend for price work. The sharper statement,
-developed in Section~\ref{sec:martingality}, is that the \pkg{GARCH}-$t$ frontier
-is governed by how \emph{martingale-like} a series is, not by the price label
-itself: prices are simply the random-walk-heavy extreme of that axis. The library's
+return series are the hard case --- but not because of heavy tails, which the
+scale-mixture leaf (Section~\ref{sec:leaf}) already models. They are hard because
+they are close to \emph{martingales}: the conditional mean carries almost no
+signal, so what forecasting skill remains lives in the conditional \emph{variance},
+where the dedicated recursion of a \pkg{GARCH}$(1,1)$-$t$ still tracks volatility
+clustering better than our online scale. There we do not claim to win, recommend
+\pkg{GARCH}-$t$, and report the result as a split rather than dilute it into a
+pooled average. The distinction is not the price label but the martingality axis
+itself (Section~\ref{sec:martingality}): prices are merely its random-walk-heavy
+extreme, and the \pkg{GARCH}-$t$ contest is governed by where a series falls along
+it. The library's
 conditional-variance building blocks (Section~\ref{sec:doob}) narrow but do not
 close that gap; matching \pkg{GARCH}-$t$ on price series with an online,
 dependency-free recursion is future work, not a present claim.
