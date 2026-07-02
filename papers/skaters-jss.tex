@@ -28,22 +28,26 @@
   \url{https://skaters.microprediction.org}
 }
 
-\title{\pkg{skaters}: Model First, Conform Last --- A Composition-Based Automatic Online Distributional Forecaster}
+\title{\pkg{skaters}: Transforms All the Way Down --- Automatic Online Distributional Time-Series Forecasting by Conjugation}
 
-\Plaintitle{skaters: Model First, Conform Last - A Composition-Based Automatic Online Distributional Forecaster}
-\Shorttitle{\pkg{skaters}: Model First, Conform Last}
+\Plaintitle{skaters: Transforms All the Way Down - Automatic Online Distributional Time-Series Forecasting by Conjugation}
+\Shorttitle{\pkg{skaters}: Transforms All the Way Down}
 
 \newcommand{\skatersabstract}{
 The \proglang{Python} package \pkg{skaters} performs online univariate
 time-series forecasting in which every prediction is a full probability
 distribution rather than a point. A forecaster
-is built by composition: invertible transforms chain together above a single
-distributional leaf, and ensembles combine such chains. The leaf fits its shape
-by optimising a proper scoring rule, so its objective is a choice rather than a
-fixed property of the method. This separates two concerns the forecasting and
-conformal-prediction literatures tend to merge: fitting the model, judged by
-likelihood, and conforming the predictive tail to a downstream score such as
-CRPS. We call the arrangement \emph{model first, conform last}. The library is written twice, in pure \proglang{Python} and in
+is built by \emph{conjugation}: an invertible transform wraps an inner
+forecaster --- pushing each observation forward, forecasting in the transformed
+space, and pulling the whole predictive distribution back through the inverse.
+Because the inner forecaster is itself a conjugation, models nest
+\emph{transforms all the way down} onto a single distributional leaf, and an
+ensemble is just another forecaster that combines forecasters. One closed
+abstraction, composed recursively. The leaf fits its shape by optimising a proper
+scoring rule, so the objective is a choice rather than a fixed property of the
+method: pointed at likelihood the recursion models the conditional density,
+pointed at CRPS it matches a conformal specialist on that specialist's own metric
+--- fitting and tail-shaping are two settings of one machine, not two machines. The library is written twice, in pure \proglang{Python} and in
 zero-dependency \proglang{JavaScript} that agrees to within $10^{-6}$, so a model
 runs unchanged on a server or in a browser. We position \pkg{skaters} as a
 general-purpose forecaster for economic and other non-price time series, and
@@ -99,18 +103,19 @@ browser.
 --- is a function \code{(y, state) -> ([Dist], state)} that consumes one
 observation and emits a list of \code{Dist} objects, one per forecast horizon,
 where a \code{Dist} is a weighted Gaussian mixture. Because the type is closed
-under composition, an entire model is a chain of invertible transforms with one
-distributional leaf at the bottom, and ensembles are simply skaters that combine
-other skaters. This single abstraction yields three contributions developed in
-turn:
+under composition, an entire model is a stack of invertible transforms ---
+transforms all the way down --- with one distributional leaf at the bottom, and
+ensembles are simply skaters that combine other skaters. This single abstraction
+yields three contributions developed in turn:
 
 \begin{enumerate}
 \item \emph{A pluggable objective} (Sections~\ref{sec:trunk}--\ref{sec:leaf}).
   The leaf fits its mixture weights by a proper scoring rule. Pointed at
-  log-likelihood it models the conditional distribution directly; with its
-  terminal copy pointed at CRPS while the trunk stays likelihood-weighted, the
-  result is \emph{model first, conform last}, which is competitive with a CRPS
-  specialist on CRPS and stronger on likelihood.
+  log-likelihood it models the conditional distribution directly; with the
+  terminal leaf instead pointed at CRPS while the likelihood-weighted trunk is
+  unchanged, the same forecaster becomes competitive with a CRPS specialist on
+  CRPS and stronger on likelihood --- the objective is a knob at the base of the
+  recursion, not a property of the method.
 \item \emph{Distributional structure that survives composition}
   (Sections~\ref{sec:lattice}--\ref{sec:doob}): a mean-preserving lattice
   projection that places atoms on the exact values a series revisits without
@@ -177,7 +182,10 @@ y \;\xrightarrow{\;T\;}\; y' \;\to\; \text{inner} \;\to\; D'
 \]
 and because every step is online and the inverse propagates the full mixture,
 multi-step uncertainty accumulates correctly --- for example variance grows as
-$\sum_{h}\sigma_h^2$ under differencing.
+$\sum_{h}\sigma_h^2$ under differencing. The inner skater is unconstrained: it may
+itself be a conjugation, or an ensemble of conjugations, so a model is
+\emph{transforms all the way down}, bottoming out at a single distributional leaf
+--- the one non-transform in the stack.
 
 \paragraph{Numerical note.}
 Mixture variance is computed in centred form,
@@ -187,7 +195,7 @@ component sits at a large mean, silently producing $\sigma=0$ and an invalid
 predictive. Running moments use Welford's recurrence \citep{welford1962note}.
 
 %% -------------------------------------------------------------------------
-\section{The terminal-leaf ensemble: model first} \label{sec:trunk}
+\section{The terminal-leaf ensemble: modelling the mean} \label{sec:trunk}
 
 Bayesian model averaging over a heterogeneous pool
 \citep{hoeting1999bayesian,raftery2005using} combines full predictive
@@ -205,15 +213,16 @@ the combined residual with a single terminal leaf:
  \hat D = D \text{ shifted by } \hat\mu .
 \]
 Because exactly one leaf reaches the output, its shape --- heavy tails, learned
-online --- survives undiluted. This is the \emph{model first} half of the recipe:
-a likelihood-weighted trunk whose only job is to get the conditional mean right.
+online --- survives undiluted. The trunk is a likelihood-weighted ensemble whose
+only job is to get the conditional mean right; the shaping of the distribution is
+left to the base of the recursion.
 The candidate pool spans exponential smoothing, differencing, drift, Holt's
 linear trend, autoregression, grouped long-lag autoregression, fractional
 differencing, a seasonal block, a Yeo--Johnson coordinate grid
 (Section~\ref{sec:coord}), and a fast/slow two-systems block.
 
 %% -------------------------------------------------------------------------
-\section{Metric-agnostic leaves: conform last} \label{sec:leaf}
+\section{Metric-agnostic leaves: a pluggable base} \label{sec:leaf}
 
 The leaf is itself a fixed Gaussian \emph{scale mixture} --- components
 $\mathcal N(0, c_k\,\hat\sigma)$ over a fixed log-spaced dictionary $\{c_k\}$,
@@ -230,13 +239,13 @@ a proper scoring rule \citep{gneiting2007strictly}:
   since the mixture CRPS is a finite sum of $\mathbb E\,|\mathcal N(m,s^2)|$ terms.
 \end{itemize}
 
-Placing the CRPS leaf at the terminal of a likelihood-weighted trunk gives
-\emph{model first, conform last}. The trunk's job is to model, and the right
+Because the leaf is where the whole conjugation bottoms out, it is exactly where a
+downstream metric should get its vote. The trunk's job is to model, and the right
 objective for modelling is likelihood, a proper, tail-sensitive score that is,
 up to a constant, the Kelly log-growth criterion \citep{kelly1956new}; corrupting
 it to chase CRPS would repeat the conformal mistake of discarding the density.
-The tail's job is to be shaped, and that is the only place a downstream metric
-(CRPS) should get a vote. Section~\ref{sec:ablations} shows this configuration
+Pointing only the terminal leaf at CRPS shapes the residual tail without touching
+the model above it. Section~\ref{sec:ablations} shows this configuration
 improving on a pure-likelihood policy on CRPS and on likelihood alike: a CRPS-fit
 leaf is more outlier-robust, so it even generalises slightly better in
 log-likelihood.
@@ -456,9 +465,10 @@ honest: \code{laplace} has the higher held-out log-likelihood on the large
 majority of series, while the conformal variants have the lower CRPS on a similar
 majority. That is exactly as it should be --- CRPS and marginal coverage are what
 conformal is constructed to optimise, and it has no density to surrender on
-likelihood --- and it is the empirical face of the \emph{model first, conform last}
-argument: the honest objective for \emph{modelling} is the density, and the one
-place a downstream score should get a vote is the terminal leaf. A user who needs
+likelihood --- and it is the empirical face of the pluggable-base argument: the
+honest objective for \emph{modelling} is the density, and the one place a
+downstream score should get a vote is the terminal leaf where the conjugation
+bottoms out. A user who needs
 conformal's CRPS can have it inside the same library by repointing that leaf to
 CRPS (Section~\ref{sec:ablations}), without giving up the density the conformal
 systems cannot provide.
@@ -610,9 +620,8 @@ bare CRPS leaf (no trunk)          & 92.6\,\% & 61.0\,\% & 2.82 \\
 \bottomrule
 \end{tabular}
 \caption{Effect of the terminal-leaf objective (fixed \code{laplace} vs
-best-of-crepes, $10{,}822$ series). The middle row is the \emph{model first,
-conform last} recipe (the \code{laplace} default: CRPS leaf, lattice projection
-on). A general likelihood policy already edges conformal on CRPS over independent
+best-of-crepes, $10{,}822$ series). The middle row is the \code{laplace} default
+(CRPS leaf, lattice projection on). A general likelihood policy already edges conformal on CRPS over independent
 families ($55.6\%$); repointing only the terminal leaf to CRPS lifts that to
 $64.8\%$ and raises log-likelihood ($2.97 \rightarrow 2.99$), matching the
 dedicated CRPS specialist while modelling faithfully. Crepes' CRPS is U-shaped in
