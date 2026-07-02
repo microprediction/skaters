@@ -51,8 +51,10 @@ zero-dependency \proglang{JavaScript} that agrees to within $10^{-6}$, so a mode
 runs unchanged on a server or in a browser. \pkg{skaters} was first envisaged as a
 \emph{collection} of forecasters differing by prior; the study reported here
 pushed the other way, collapsing that collection into a single forecast function
-with no tuning parameters. We position that function as a general-purpose
-forecaster for economic and other non-price time series, and evaluate it there
+with no tuning parameters, which we call \code{laplace} after the weak
+(indifference) prior it places over its candidate pool. We position it as a
+general-purpose forecaster for economic and other non-price time series, and
+evaluate it there
 against classical, neural, and pretrained foundation-model baselines on
 \proglang{FRED} series, where it leads on held-out log-likelihood.
 On asset-price and return series --- the home of conditional-volatility models
