@@ -439,7 +439,7 @@ tail, which is exactly the martingality effect of Section~\ref{sec:martingality}
 for the heavy tails and volatility clustering of financial change-series. On the
 non-price universe it is the only baseline \code{laplace} does not clearly beat on
 likelihood --- a $51/50\%$ coin-flip --- and that near-tie hides the real
-structure: unlike every other baseline, the \pkg{GARCH}-$t$ contest is governed
+structure: more than for any other baseline, the \pkg{GARCH}-$t$ contest is governed
 almost entirely by how
 \emph{martingale-like} the series is, which we make precise in
 Section~\ref{sec:martingality}. The honest other half is the price regime.
@@ -512,37 +512,58 @@ $\mathrm{VR}(q) = \operatorname{Var}\!\big(\sum_{i=1}^{q}\Delta_{t+i}\big) /
 $\mathrm{VR}<1$ mean reversion, $\mathrm{VR}>1$ momentum. We score martingality
 $m = \exp(-\lvert\ln \mathrm{VR}(5)\rvert) \in (0,1]$, with $m\to 1$ the pure
 random walk. Binning the daily-continuous non-price series into martingality
-terciles, the \pkg{GARCH}-$t$ contest is monotone and stark (Table~\ref{tab:mart}):
-\code{laplace} wins the held-out log-likelihood on $98\%$ of the most
-mean-predictable series and only $5\%$ of the near-random-walks. The aggregate
-($\approx 50\%$) is therefore not a close-run tie but the average of a decisive win
-and a decisive loss. The effect is specific to the volatility specialist: the
-\pkg{AutoARIMA} contest shows \emph{no} such gradient ($66$--$92\%$ across the same
-terciles), because \pkg{AutoARIMA} has no conditional-variance model to reward on
-the random walks. This is the mechanism behind the price caveat --- price/return
-series are simply the martingale-heavy extreme of the same axis --- and it locates
-the recommendation precisely: reach for \pkg{GARCH}-$t$ not ``on prices'' but ``on
-whatever is close to a random walk.''
+terciles exposes the same axis in \emph{every} contest, with a sign that reveals
+what each baseline models (Table~\ref{tab:mart}). The \pkg{GARCH}-$t$ (\pkg{arch})
+contest is the extreme: \code{laplace} wins the held-out log-likelihood on $98\%$
+of the most mean-predictable series and only $5\%$ of the near-random-walks, so its
+aggregate ($\approx 50\%$) is not a close-run tie but the average of a decisive win
+and a decisive loss. The gradient is not unique to it, though. It runs the
+\emph{same} way, more mildly, for every conditional-variance or trend model --- the
+\pkg{rugarch} \pkg{GARCH}-$t$ ($100 \!\to\! 73\%$), \pkg{thetaf} ($98 \!\to\! 69\%$),
+\pkg{AutoETS} ($98 \!\to\! 85\%$) --- because a random walk leaves only the variance
+to model, their comparative strength. It runs the \emph{other} way for the mean
+models: against \pkg{AutoARIMA}, \code{laplace} wins \emph{least} on the
+mean-predictable end ($67\%$, where an \pkg{ARIMA} mean genuinely fits) and
+\emph{more} toward the random walk ($87\%$). And it is flat, near $100\%$
+throughout, for the strong general models (\pkg{ADAM}, \pkg{nnetar}, CSP).
+Martingality is thus a general organising axis --- it sorts the opponents by what
+they model, variance specialists one way, mean specialists the other, generalists
+not at all --- and \pkg{GARCH}-$t$ is simply its sharpest case. This is also the
+mechanism behind the price caveat: price/return series are the martingale-heavy
+extreme of the axis, so the recommendation is precise --- reach for \pkg{GARCH}-$t$
+not ``on prices'' but ``on whatever is close to a random walk.''
 
 \begin{table}[t!]
 \centering
 \begin{tabular}{lccc}
 \toprule
-Martingality tercile & $m$ range & vs \pkg{GARCH}-$t$ & vs \pkg{AutoARIMA} \\
+Opponent (what it models) & low $m$ & mid & high $m$ \\
 \midrule
-low (mean-predictable)        & $0.10$--$0.27$ & \textbf{98\,\%} & \textbf{66\,\%} \\
-mid                           & $0.27$--$0.88$ & $46\,\%$        & \textbf{92\,\%} \\
-high ($\approx$ random walk)  & $0.88$--$1.00$ & $5\,\%$         & \textbf{87\,\%} \\
+\pkg{GARCH}-$t$ (\pkg{arch}) --- variance    & \textbf{98} & $42$ & $5$ \\
+\pkg{GARCH}-$t$ (\pkg{rugarch}) --- variance & \textbf{100} & \textbf{86} & \textbf{73} \\
+\pkg{thetaf} --- trend                        & \textbf{98} & \textbf{92} & \textbf{69} \\
+\pkg{AutoETS} --- smoothing                   & \textbf{98} & \textbf{96} & \textbf{85} \\
+\midrule
+\pkg{ADAM} --- state-space                    & \textbf{100} & \textbf{100} & \textbf{99} \\
+\pkg{nnetar} --- neural AR                    & \textbf{100} & \textbf{99} & \textbf{97} \\
+CSP, CSP-adaptive --- conformal pool          & \textbf{100} & \textbf{100} & \textbf{100} \\
+\pkg{AutoARIMA} + conformal                   & \textbf{82} & \textbf{80} & \textbf{83} \\
+\pkg{AutoARIMA} + ACI                         & \textbf{83} & \textbf{86} & \textbf{86} \\
+\midrule
+\pkg{auto.arima} (\proglang{R}) --- mean      & \textbf{68} & \textbf{85} & \textbf{77} \\
+\pkg{AutoARIMA} (\pkg{statsforecast}) --- mean & \textbf{67} & \textbf{93} & \textbf{87} \\
 \bottomrule
 \end{tabular}
-\caption{Per-series held-out log-likelihood win-rate of \code{laplace} by
-martingality tercile, daily-continuous non-price series ($n\approx 209$ per
-tercile). Martingality $m=\exp(-\lvert\ln\mathrm{VR}(5)\rvert)$ from the
-Lo--MacKinlay variance ratio ($m\to1$ = random walk). The \pkg{GARCH}-$t$ contest
-is monotone in martingality --- \code{laplace} wins decisively where there is a
-conditional mean to model and loses decisively on near-random-walks --- while the
-\pkg{AutoARIMA} contest, lacking a volatility model, shows no such gradient. Bold
-marks a \code{laplace} win ($>50\%$).}
+\caption{Per-series held-out log-likelihood win-rate of \code{laplace} (\%) by
+martingality tercile, daily-continuous non-price series ($n = 1{,}299$, $\approx
+433$ per tercile); $m=\exp(-\lvert\ln\mathrm{VR}(5)\rvert)$ from the Lo--MacKinlay
+variance ratio, $m\to1$ = random walk. Martingality modulates \emph{every}
+contest, with a sign set by what the baseline models: for conditional-variance and
+trend models (top block) \code{laplace}'s edge \emph{shrinks} toward the
+random-walk end; for \pkg{ARIMA} mean models (bottom) it \emph{grows}; for the
+strong general and conformal opponents (middle) it is flat near $100\%$.
+\pkg{GARCH}-$t$ (\pkg{arch}) is the sharpest case. Bold marks a \code{laplace} win
+($>50\%$).}
 \label{tab:mart}
 \end{table}
 
