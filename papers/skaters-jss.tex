@@ -28,16 +28,15 @@
   \url{https://skaters.microprediction.org}
 }
 
-\title{\pkg{skaters}: Transforms All the Way Down --- Automatic Online Distributional Time-Series Forecasting by Conjugation}
+\title{Transforms All the Way Down --- Automatic Online Distributional Time-Series Forecasting by Conjugation}
 
-\Plaintitle{skaters: Transforms All the Way Down - Automatic Online Distributional Time-Series Forecasting by Conjugation}
-\Shorttitle{\pkg{skaters}: Transforms All the Way Down}
+\Plaintitle{Transforms All the Way Down - Automatic Online Distributional Time-Series Forecasting by Conjugation}
+\Shorttitle{Transforms All the Way Down}
 
 \newcommand{\skatersabstract}{
-The \proglang{Python} package \pkg{skaters} performs online univariate
-time-series forecasting in which every prediction is a full probability
-distribution rather than a point. A forecaster
-is built by \emph{conjugation}: an invertible transform wraps an inner
+The \proglang{Python} package \pkg{skaters} is an online, distributional,
+univariate time-series forecaster built by \emph{conjugation}: an invertible
+transform wraps an inner
 forecaster --- pushing each observation forward, forecasting in the transformed
 space, and pulling the whole predictive distribution back through the inverse.
 Because the inner forecaster is itself a conjugation, models nest
@@ -669,7 +668,12 @@ and is recoverable by repointing a single knob.
 \citep{cotton2021timemachines}, an earlier competition-tested online-forecasting
 package, and builds on years of running live distributional-prediction contests
 at Microprediction, where forecasts are scored continuously as full
-distributions. The library is implemented twice --- pure \proglang{Python} and
+distributions. The conjugation recursion has a direct antecedent there:
+Microprediction's \emph{multi-level distributional prediction} routed each stream
+into derived residual streams --- the so-called \emph{z-streams} --- that were
+themselves predicted distributionally and composed back, ``transforms all the way
+down'' avant la lettre; \pkg{skaters} distils that platform mechanism into a
+single online, dependency-free abstraction. The library is implemented twice --- pure \proglang{Python} and
 zero-dependency \proglang{JavaScript} --- and a parity suite checks roughly
 $90{,}000$ probe values to $10^{-6}$ on every run, so results are reproducible
 across both runtimes and in the browser via \pkg{Pyodide} \citep{pyodide2021}.
