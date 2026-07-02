@@ -141,7 +141,10 @@ return series are a different regime --- their changes exhibit the volatility
 clustering and heavy tails that conditional-volatility models are built for --- and
 there we do not claim to win: a \pkg{GARCH}-$t$ model is the better choice, which
 we confirm and report rather than dilute by averaging the two regimes into a
-single number, and which we recommend for price work. The library's
+single number, and which we recommend for price work. The sharper statement,
+developed in Section~\ref{sec:martingality}, is that the \pkg{GARCH}-$t$ frontier
+is governed by how \emph{martingale-like} a series is, not by the price label
+itself: prices are simply the random-walk-heavy extreme of that axis. The library's
 conditional-variance building blocks (Section~\ref{sec:doob}) narrow but do not
 close that gap; matching \pkg{GARCH}-$t$ on price series with an online,
 dependency-free recursion is future work, not a present claim.
@@ -397,10 +400,12 @@ Table~\ref{tab:sota}.}
 \paragraph{\pkg{GARCH}-$t$, and the price caveat.}
 \pkg{GARCH}$(1,1)$-$t$ is the strongest opponent on log-likelihood, purpose-built
 for the heavy tails and volatility clustering of financial change-series. On the
-non-price economic universe that structure is largely absent, and \code{laplace}
-has the higher held-out log-likelihood on roughly $70\%$ of series
-(family-weighted), with a clearly higher mean log-likelihood as well. The honest
-other half is the price regime. Restricting instead to the asset-price classes we
+non-price universe \code{laplace} has the higher held-out log-likelihood on the
+majority of series, but the aggregate hides the real structure: unlike every other
+baseline, the \pkg{GARCH}-$t$ contest is governed almost entirely by how
+\emph{martingale-like} the series is, which we make precise in
+Section~\ref{sec:martingality}. The honest other half is the price regime.
+Restricting instead to the asset-price classes we
 excluded --- equity, FX, commodity returns --- reverses the verdict: there the
 volatility clustering is real, \pkg{GARCH}-$t$ has the higher log-likelihood on
 the majority of series, and \code{laplace} is competitive only on the mean (it
@@ -464,6 +469,68 @@ one-step horizon. The price/return regime is reported as the explicit caveat
 above and is not part of the general-purpose claim; multi-step horizons and raw
 levels are left for later; zero-shot foundation models get their own protocol in
 Section~\ref{sec:foundation}.
+
+\subsection{The martingality gradient} \label{sec:martingality}
+
+The one baseline \code{laplace} does not simply dominate is \pkg{GARCH}-$t$, and
+the reason is not the price/non-price label per se but a property that varies
+\emph{within} the non-price universe: how close each change-series is to a
+martingale. A pure martingale difference has no exploitable conditional mean ---
+only its conditional \emph{variance} can be modelled, which is exactly what
+\pkg{GARCH} specialises in; a series with mean structure (mean reversion,
+momentum) hands a forecaster signal that \pkg{GARCH}'s constant mean discards.
+
+We quantify this with the Lo--MacKinlay variance ratio \citep{lo1988stock},
+$\mathrm{VR}(q) = \operatorname{Var}\!\big(\sum_{i=1}^{q}\Delta_{t+i}\big) /
+\big(q\operatorname{Var}(\Delta_t)\big)$: $\mathrm{VR}=1$ is a random walk,
+$\mathrm{VR}<1$ mean reversion, $\mathrm{VR}>1$ momentum. We score martingality
+$m = \exp(-\lvert\ln \mathrm{VR}(5)\rvert) \in (0,1]$, with $m\to 1$ the pure
+random walk. Binning the daily-continuous non-price series into martingality
+terciles, the \pkg{GARCH}-$t$ contest is monotone and stark (Table~\ref{tab:mart}):
+\code{laplace} wins the held-out log-likelihood on $98\%$ of the most
+mean-predictable series and only $5\%$ of the near-random-walks. The aggregate
+($\approx 50\%$) is therefore not a close-run tie but the average of a decisive win
+and a decisive loss. The effect is specific to the volatility specialist: the
+\pkg{AutoARIMA} contest shows \emph{no} such gradient ($66$--$92\%$ across the same
+terciles), because \pkg{AutoARIMA} has no conditional-variance model to reward on
+the random walks. This is the mechanism behind the price caveat --- price/return
+series are simply the martingale-heavy extreme of the same axis --- and it locates
+the recommendation precisely: reach for \pkg{GARCH}-$t$ not ``on prices'' but ``on
+whatever is close to a random walk.''
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{lccc}
+\toprule
+Martingality tercile & $m$ range & vs \pkg{GARCH}-$t$ & vs \pkg{AutoARIMA} \\
+\midrule
+low (mean-predictable)        & $0.10$--$0.27$ & \textbf{98\,\%} & \textbf{66\,\%} \\
+mid                           & $0.27$--$0.88$ & $46\,\%$        & \textbf{92\,\%} \\
+high ($\approx$ random walk)  & $0.88$--$1.00$ & $5\,\%$         & \textbf{87\,\%} \\
+\bottomrule
+\end{tabular}
+\caption{Per-series held-out log-likelihood win-rate of \code{laplace} by
+martingality tercile, daily-continuous non-price series ($n\approx 209$ per
+tercile). Martingality $m=\exp(-\lvert\ln\mathrm{VR}(5)\rvert)$ from the
+Lo--MacKinlay variance ratio ($m\to1$ = random walk). The \pkg{GARCH}-$t$ contest
+is monotone in martingality --- \code{laplace} wins decisively where there is a
+conditional mean to model and loses decisively on near-random-walks --- while the
+\pkg{AutoARIMA} contest, lacking a volatility model, shows no such gradient. Bold
+marks a \code{laplace} win ($>50\%$).}
+\label{tab:mart}
+\end{table}
+
+\paragraph{Robustness of the win.}
+The likelihood win is not an artefact of one slice of the universe. It holds
+across observation frequency --- \code{laplace} wins the log-likelihood race
+against every baseline on daily, weekly, \emph{and} monthly non-price series --- and
+across sequence length (from the $200$-change minimum upward) and stickiness (the
+fraction of exactly-repeating, zero-change steps, where the lattice projection of
+Section~\ref{sec:lattice} contributes). An interactive companion recomputes every
+per-series win-rate and the accuracy/speed frontier live over any user-selected
+subset --- sampled at random, balanced by category, or filtered by frequency,
+length, stickiness, or martingality --- at
+\url{https://skaters.microprediction.org/robustness.html}.
 
 \subsection{Against zero-shot foundation models} \label{sec:foundation}
 

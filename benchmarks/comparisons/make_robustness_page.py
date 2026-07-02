@@ -79,10 +79,29 @@ def _stats(changes):
     for z in zeros:
         run = run + 1 if z else 0
         max_run = max(max_run, run)
+
+    # martingality: variance ratio VR(q) = Var(q-step sum) / (q * Var(1-step)).
+    # VR = 1 => martingale / random walk (GARCH-t's turf — pure volatility, no
+    # exploitable mean structure); VR < 1 mean-reverting, VR > 1 trending. Score
+    # mart = exp(-|ln VR|) in (0,1]: 1 = perfect martingale, lower = more
+    # predictable mean structure for a model to exploit.
+    def var_ratio(series, q):
+        m = sum(series) / len(series)
+        v1 = sum((s - m) ** 2 for s in series) / len(series)
+        if v1 <= 0 or len(series) <= q:
+            return 1.0
+        mq = q * m
+        sums = [math.fsum(series[i:i + q]) for i in range(len(series) - q + 1)]
+        vq = sum((s - mq) ** 2 for s in sums) / len(sums)
+        return (vq / (q * v1)) or 1.0
+
+    vr5 = var_ratio(x, 5)
+    mart = math.exp(-abs(math.log(vr5))) if vr5 > 0 else 0.0
     return {
         "n": n, "vol": sd, "kurt": kurt, "gridMass": grid_mass,
         "ac1": ac1, "absac1": absac1, "seas5": seas5,
         "zeroFrac": zero_frac, "maxZeroRun": max_run,
+        "vr5": vr5, "mart": mart,
     }
 
 
@@ -127,7 +146,7 @@ def build(results_csv):
                 gaps = [(ds[i + 1] - ds[i]).days for i in range(len(ds) - 1)]
                 gaps = [g for g in gaps if g > 0]
                 gap = sum(gaps) / len(gaps) if gaps else None
-        keep = {"n", "vol", "kurt", "absac1", "seas5", "zeroFrac", "maxZeroRun"}
+        keep = {"n", "vol", "kurt", "absac1", "seas5", "zeroFrac", "maxZeroRun", "mart"}
         series.append({
             "id": sid,
             "title": title,
@@ -139,8 +158,15 @@ def build(results_csv):
         })
 
     methods = sorted({r["method"] for r in rows if r["method"] != "laplace"})
+    # global quintile edges for the martingality axis (skewed toward 1, so
+    # quantile bins beat fixed ones); labels built client-side from these.
+    mv = sorted(s["mart"] for s in series if s.get("mart") is not None)
+    mart_edges = None
+    if len(mv) >= 10:
+        mart_edges = [round(mv[min(len(mv) - 1, int(i / 5 * len(mv)))], 3) for i in range(6)]
+        mart_edges[-1] = round(mv[-1] + 1e-6, 3)
     return {"series": series, "scores": scores, "methods": methods,
-            "speed": SPEED_MS, "window": WINDOW}
+            "speed": SPEED_MS, "window": WINDOW, "martEdges": mart_edges}
 
 
 PAGE = r"""<title>Non-price robustness explorer — skaters</title>
@@ -364,6 +390,7 @@ const BUCKETS = [
   {key:"seas5",   label:"Weekly autocorr (lag-5)"},
   {key:"absac1",  label:"Vol clustering (|Δ| lag-1)"},
   {key:"zeroFrac",label:"Stickiness (zero-change %)"},
+  {key:"mart",label:"Martingality (→ random walk)"},
   {key:"histYears",label:"History length"},
 ].map(b=>{const t=terciles(b.key);return {...b,lo:t[0],hi:t[1]}});
 const bucketState = {}; // key -> Set of {low,mid,high}
@@ -503,9 +530,13 @@ const BINSPEC={
   zeroFrac:{edges:[-1,1e-9,0.01,0.05,0.20,0.50,1.01], labs:["none","<1%","1–5%","5–20%","20–50%","50%+"]},
   maxZeroRun:{edges:[-1,0.5,2.5,5.5,10.5,30.5,1e15], labs:["0","1–2","3–5","6–10","11–30","30+"]},
 };
+if(DATA.martEdges){ const e=DATA.martEdges;
+  BINSPEC.mart={edges:e.slice(), labs:e.slice(0,-1).map((lo,i)=>lo.toFixed(2)+"–"+e[i+1].toFixed(2))}; }
 const axisSel=document.getElementById("binaxis");
-[["n","sequence length"],["zeroFrac","stickiness (zero-change %)"],["maxZeroRun","stickiness (longest zero run)"]]
-  .forEach(([k,l])=>{const o=document.createElement("option");o.value=k;o.textContent=l;axisSel.appendChild(o);});
+const AXIS_OPTS=[["n","sequence length"],["mart","martingality (→ random walk)"],
+  ["zeroFrac","stickiness (zero-change %)"],["maxZeroRun","stickiness (longest zero run)"]]
+  .filter(([k])=>k!=="mart"||DATA.martEdges);
+AXIS_OPTS.forEach(([k,l])=>{const o=document.createElement("option");o.value=k;o.textContent=l;axisSel.appendChild(o);});
 const focusSel=document.getElementById("focus");
 METHODS.forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=m;focusSel.appendChild(o);});
 focusSel.value=METHODS.includes("GARCH-t")?"GARCH-t":METHODS[0];
