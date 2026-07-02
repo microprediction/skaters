@@ -1,22 +1,22 @@
 Importing plotly failed. Interactive plots will not work.
 results: /Users/petercotton/github/skaters/benchmarks/comparisons/_shared_R25_nonprice.csv
-continuous series: 1934  ->  555 families  (total series scored: 2771)
+continuous series: 5402  ->  1213 families  (total series scored: 7607)
 
 laplace win-rate vs each baseline (continuous):
   method                    LL raw/fam   CRPS raw/fam   meanLL      N
-  ADAM-R@25                     98/97%         80/82%    +0.99   1871
+  ADAM-R@25                     98/97%         80/82%    +0.98   1918
   AutoARIMA+ACI@25              84/81%         36/49%    +0.45   1685
   AutoARIMA+conformal@25        82/80%         36/49%    +0.28   1685
   AutoARIMA@25                  87/87%         58/63%    +1.18   1688
   AutoETS@25                    95/94%         77/78%    +1.26   1688
-  CSP                           98/97%         98/97%    -0.12   1934
-  CSP-adaptive                  98/97%         98/97%    +0.15   1934
+  CSP                           98/97%         98/97%    -0.30   5402
+  CSP-adaptive                  98/97%         98/97%    -0.09   5402
   GARCH-t                       51/50%         46/48%    +1.69   1742
-  GARCH-t-R@25                  90/91%         60/62%    +0.27   1871
-  Theta-R@25                    92/95%         74/78%    +1.25   1871
-  auto.arima-R@25               84/86%         51/60%    +1.16   1871
-  nnetar-R@25                   97/96%         65/64%    -4.53   1871
-  laplace (mean LL)                                      +1.73   1934
+  GARCH-t-R@25                  90/91%         60/62%    +0.27   1918
+  Theta-R@25                    92/95%         74/79%    +1.24   1918
+  auto.arima-R@25               84/85%         51/60%    +1.15   1918
+  nnetar-R@25                   97/95%         64/63%    -4.56   1918
+  laplace (mean LL)                                      +1.56   5402
 
 GARCH-t — the No-Free-Lunch split (laplace vs GARCH-t):
   NON-PRICE (rates/macro)  n=1742 (495 fam)  laplace LL-win raw 51% / family 50%   mean LL  laplace +1.80 vs GARCH +1.69
