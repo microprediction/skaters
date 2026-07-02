@@ -145,6 +145,10 @@ def _done_methods(results):
 def run(preset):
     cfg = _cfg(preset)
     opps = opp.resolve(opp.SETS[cfg["opponents"]])
+    only = os.environ.get("STUDY_ONLY")            # restrict to these opponent names
+    if only:                                       # (comparison folders use this)
+        keep = {s.strip() for s in only.split(",") if s.strip()}
+        opps = [o for o in opps if o.name in keep]
     results = cfg["results"]
     print(f"[{preset}] opponents: {[o.name for o in opps]}", flush=True)
     print(f"[{preset}] {WORKERS} workers, window={cfg['window']}"
@@ -277,8 +281,9 @@ def summarize(preset, titles=None):
             return min(vs) if vs else float("nan")
         wins = [1.0 if by[s]["laplace"][1] < best_crepes(by[s]) else 0.0
                 for s in by if "laplace" in by[s] and not math.isnan(best_crepes(by[s]))]
-        print(f"\n  laplace beats best-of-crepes (its best window per series): "
-              f"{100*sum(wins)/len(wins):.1f}% of {len(wins)} series")
+        if wins:                               # crepes may be listed but uninstalled (N=0)
+            print(f"\n  laplace beats best-of-crepes (its best window per series): "
+                  f"{100*sum(wins)/len(wins):.1f}% of {len(wins)} series")
 
     print("\n  mean logpdf (ours; crepes emits no density):")
     for m in OURS:

@@ -57,6 +57,36 @@ pip install statsforecast # AutoARIMA/ETS mean models to pair conformal with
 The script prints which it found. These need network + heavy deps, so they are
 intentionally absent from the package's `pyproject.toml`.
 
+### The R stack (`forecast`, `smooth`) — the real thing, not a port
+
+`statsforecast`'s AutoARIMA is a Python *reimplementation* of Hyndman's
+`auto.arima`. To benchmark against the **actual** R packages, install R and:
+
+```r
+install.packages(c("forecast", "smooth"))   # forecast = auto.arima/ETS/thetaf; smooth = ADAM
+```
+
+Gated on `Rscript` being on `PATH` (and each method gated inside R on its
+package). One `Rscript` per series runs the rolling one-step CV in R and prints
+`mean, sd` per step; we rebuild a Gaussian `Dist` (sd from the 90 % band) and
+score it through the *same* one scorer as everything else. It adds three
+opponents Python has no clean equivalent for: **auto.arima-R** (the real
+Hyndman), **Theta-R** (`thetaf`, the M3 winner), and **ADAM-R** (Svetunkov's
+state-space auto-ETS/ARIMA). Because auto.arima and ADAM reuse the fitted model
+between refits, each is registered at several **refit cadences**
+(`BENCH_R_REFITS`, default `5,25,100`) so the frontier plot shows each model's
+own accuracy-vs-speed curve rather than one point.
+
+### CSP — Conformal Seasonal Pools (arXiv:2605.03789)
+
+A training-free seasonal-pool sampler: mixes same-season empirical draws with
+signed residual draws around a seasonal-naive forecast. Pure numpy (zero deps),
+so it always loads. Like the fitted conformal foil we KDE-smooth its sample pool
+into a `Dist` and score it on **both** log-likelihood and CRPS — a CRPS-tuned
+method doesn't get to duck the density test here. `CSP-adaptive` rescales the
+pool by recent 90 % hit-rate (the paper's adaptive variant). Season period is
+weekly by default on daily FRED (`BENCH_CSP_M=7`).
+
 ## Headline: vs eight distributional baselines (`study.py sota`)
 
 The honest head-to-head against everything we could find that claims a
