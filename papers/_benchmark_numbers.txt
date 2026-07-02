@@ -1,23 +1,23 @@
 Importing plotly failed. Interactive plots will not work.
 results: /Users/petercotton/github/skaters/benchmarks/comparisons/_shared_R25_nonprice.csv
-continuous series: 1162  ->  252 families  (total series scored: 1667)
+continuous series: 1934  ->  555 families  (total series scored: 2771)
 
 laplace win-rate vs each baseline (continuous):
   method                    LL raw/fam   CRPS raw/fam   meanLL      N
-  ADAM-R@25                     98/97%         79/85%    +1.71   1137
-  AutoARIMA+ACI@25              84/80%         31/42%    +1.26   1134
-  AutoARIMA+conformal@25        83/80%         32/42%    +1.09   1134
-  AutoARIMA@25                  86/87%         57/63%    +1.76   1137
-  AutoETS@25                    94/94%         76/79%    +1.81   1137
-  CSP                           98/96%         99/97%    +0.67   1162
-  CSP-adaptive                  98/96%         99/97%    +0.96   1162
-  GARCH-t                       52/51%         45/49%    +2.15   1162
-  GARCH-t-R@25                  89/90%         58/62%    +1.27   1137
-  Theta-R@25                    90/93%         71/81%    +1.90   1137
-  auto.arima-R@25               82/85%         50/62%    +1.84   1137
-  nnetar-R@25                   98/98%         68/68%    -2.99   1137
-  laplace (mean LL)                                      +2.27   1162
+  ADAM-R@25                     98/97%         80/82%    +0.99   1871
+  AutoARIMA+ACI@25              84/81%         36/49%    +0.45   1685
+  AutoARIMA+conformal@25        82/80%         36/49%    +0.28   1685
+  AutoARIMA@25                  87/87%         58/63%    +1.18   1688
+  AutoETS@25                    95/94%         77/78%    +1.26   1688
+  CSP                           98/97%         98/97%    -0.12   1934
+  CSP-adaptive                  98/97%         98/97%    +0.15   1934
+  GARCH-t                       51/50%         46/48%    +1.69   1742
+  GARCH-t-R@25                  90/91%         60/62%    +0.27   1871
+  Theta-R@25                    92/95%         74/78%    +1.25   1871
+  auto.arima-R@25               84/86%         51/60%    +1.16   1871
+  nnetar-R@25                   97/96%         65/64%    -4.53   1871
+  laplace (mean LL)                                      +1.73   1934
 
 GARCH-t — the No-Free-Lunch split (laplace vs GARCH-t):
-  NON-PRICE (rates/macro)  n=1162 (252 fam)  laplace LL-win raw 52% / family 51%   mean LL  laplace +2.27 vs GARCH +2.15
+  NON-PRICE (rates/macro)  n=1742 (495 fam)  laplace LL-win raw 51% / family 50%   mean LL  laplace +1.80 vs GARCH +1.69
   PRICE/returns            n=   0 (0 fam)  laplace LL-win raw nan% / family nan%   mean LL  laplace +nan vs GARCH +nan
