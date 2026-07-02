@@ -35,6 +35,48 @@ if `Rscript` is absent they simply drop out. Budgets (`BENCH_R_MAX`, `BENCH_SF_M
 …) and cadences (`BENCH_R_REFITS`, `BENCH_SF_REFITS`) are the same env vars as the
 main study.
 
+## The long sweep (`overnight_sweep.sh`)
+
+`overnight_sweep.sh` is the auto-resuming volume runner behind the results here. It
+appends to a resumable CSV (`STUDY_RESULTS`, per series+method — a kill never loses
+or re-scores work) and relaunches the study on any non-zero exit. Every knob is an
+env override; defaults are the lean max-N config (`laplace,R@25,statsforecast@25,CSP,GARCH-t`,
+`bsts-R` skipped).
+
+```bash
+# macOS (prevent sleep):  caffeinate keeps it awake; the loop resumes on any kill
+caffeinate -is bash benchmarks/comparisons/overnight_sweep.sh &
+# Linux:
+nohup bash benchmarks/comparisons/overnight_sweep.sh &
+```
+
+## Running on another machine (transfer)
+
+The code travels with the branch; two things don't and must be moved by hand:
+
+1. **The FRED cache** — `benchmarks/data/` (~146 MB, ~2600 CSVs, gitignored). Either
+   rsync it, or set a `FRED_API_KEY` and run with `STUDY_CACHED_ONLY=0` to re-fetch.
+   ```bash
+   rsync -av this-machine:~/github/skaters/benchmarks/data/ ./benchmarks/data/
+   ```
+2. **The in-progress results** — `benchmarks/comparisons/_shared_R25.csv` (gitignored).
+   Copy it over to *continue* the accumulation; omit it to start fresh.
+   ```bash
+   rsync -av this-machine:~/github/skaters/benchmarks/comparisons/_shared_R25.csv \
+             ./benchmarks/comparisons/
+   ```
+
+Then install deps and launch:
+```bash
+Rscript -e 'install.packages(c("forecast","smooth","rugarch","bsts"), repos="https://cloud.r-project.org")'
+pip install statsforecast arch statsmodels    # Python opponents (absent ones drop out)
+caffeinate -is bash benchmarks/comparisons/overnight_sweep.sh &   # or nohup on Linux
+```
+
+**Run on one machine at a time.** Two machines appending to the same-named CSV will
+duplicate rows and skew `summarize`. To split work, give each a distinct
+`STUDY_RESULTS`, then concatenate and de-dup on `(series,method)` before summarizing.
+
 ## The rule (unchanged)
 
 Every method — ours and theirs — is turned into the same predictive `Dist` and
