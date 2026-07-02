@@ -57,7 +57,7 @@ against classical, neural, and pretrained foundation-model baselines on
 \proglang{FRED} series, where it leads on held-out log-likelihood.
 On asset-price and return series --- the home of conditional-volatility models
 --- there is no free lunch: a \pkg{GARCH}-$t$ model is the better choice, and we
-report that comparison honestly rather than averaging the two regimes into one
+report that comparison rather than averaging the two regimes into one
 headline.
 }
 
@@ -431,7 +431,7 @@ margin --- the \pkg{ARIMA} family (both \pkg{statsforecast} and the real
 (\pkg{nnetar}), the \pkg{rugarch} \pkg{GARCH}-$t$, and both conformal families ---
 typically on $82$--$98\%$ of series, and the win survives family-clustering. The
 lone exception is the \pkg{arch} \pkg{GARCH}$(1,1)$-$t$, a $50/50$ tie treated
-next. One honesty note on the mean-log-likelihood column of Table~\ref{tab:sota}:
+next. One caveat on the mean-log-likelihood column of Table~\ref{tab:sota}:
 it is the \emph{opponent's}, and on this frequency-spanning universe the \pkg{arch}
 \pkg{GARCH}-$t$ actually edges \code{laplace} on the mean ($1.69$ vs $1.56$) even
 as it ties per-series --- a discrepancy driven entirely by the near-random-walk
@@ -445,7 +445,7 @@ likelihood --- a $51/50\%$ coin-flip --- and that near-tie hides the real
 structure: more than for any other baseline, the \pkg{GARCH}-$t$ contest is governed
 almost entirely by how
 \emph{martingale-like} the series is, which we make precise in
-Section~\ref{sec:martingality}. The honest other half is the price regime.
+Section~\ref{sec:martingality}. The other half is the price regime.
 Restricting instead to the asset-price classes we
 excluded --- equity, FX, commodity returns --- reverses the verdict: there the
 volatility clustering is real, \pkg{GARCH}-$t$ has the higher log-likelihood on
@@ -478,13 +478,13 @@ observed residual range --- CSP \emph{can} be scored on likelihood. \code{laplac
 beats it on both metrics ($97\%$ family-weighted on each), because a recency-blind
 seasonal pool tracks neither drift nor the volatility clock. Against the stronger
 \emph{fitted-mean} conformal variants (\pkg{AutoARIMA}-mean residuals,
-split-conformal and ACI) the split is clean and honest: \code{laplace} has the
+split-conformal and ACI) the split is clean: \code{laplace} has the
 higher held-out log-likelihood on the large majority ($80$--$81\%$
 family-weighted), while the conformal variants roughly match it on CRPS
 ($\sim 49\%$). That is exactly as it should be --- CRPS and marginal coverage are
 what conformal is constructed to optimise, and it has no density to surrender on
 likelihood --- and it is the empirical face of the pluggable-base argument: the
-honest objective for \emph{modelling} is the density, and the one place a
+right objective for \emph{modelling} is the density, and the one place a
 downstream score should get a vote is the terminal leaf where the conjugation
 bottoms out. A user who needs
 conformal's CRPS can have it inside the same library by repointing that leaf to
