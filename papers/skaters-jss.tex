@@ -45,7 +45,7 @@ ensemble is just another forecaster that combines forecasters. One closed
 abstraction, composed recursively. The leaf fits its shape by optimising a proper
 scoring rule, so the objective is a choice rather than a fixed property of the
 method: pointed at likelihood the recursion models the conditional density,
-pointed at CRPS it matches a conformal specialist on that specialist's own metric
+pointed at CRPS it is competitive with the CRPS specialists on their own metric
 --- fitting and tail-shaping are two settings of one machine, not two machines. The library is written twice, in pure \proglang{Python} and in
 zero-dependency \proglang{JavaScript} that agrees to within $10^{-6}$, so a model
 runs unchanged on a server or in a browser. We position \pkg{skaters} as a
