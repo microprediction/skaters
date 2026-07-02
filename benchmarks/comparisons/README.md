@@ -14,6 +14,7 @@ Each subfolder is one matchup:
 | `laplace-vs-theta/` | `Theta-R@*` | the M3 winner; cheap, hard to beat |
 | `laplace-vs-nnetar/` | `nnetar-R@*` | a nonlinear (neural AR) opponent with no clean Python twin |
 | `laplace-vs-garch/` | `GARCH-t`, `GARCH-t-R@*` | heavy-tail volatility SOTA (its home turf is price/returns) |
+| `laplace-vs-bsts/` | `bsts-R@*` | Bayesian structural time series — full posterior predictive |
 | `laplace-vs-csp/` | `CSP`, `CSP-adaptive` | training-free Conformal Seasonal Pools (arXiv:2605.03789) |
 
 ## Reproduce a matchup

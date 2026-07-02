@@ -19,14 +19,14 @@ PYTHONPATH=src python benchmarks/comparisons/run_comparison.py \
 # (R@* runs the whole R stack; ADAM-R@* is the row that matters here)
 ```
 
-**Result** _(provisional — N=44, 39 continuous; first-scored cached slice; R@25)._
+**Result** _(N=120 R-covered, 167 continuous; still growing overnight. R@25.)_
 
 laplace **win-rate**:
 
 | method | CRPS all/cont | LL all/cont | N |
 |---|---|---|---|
-| ADAM-R@25 | 82/82% | **98/97%** | 44 |
+| ADAM-R@25 | 82/81% | **96/95%** | 120 |
 
-Scored on ADAM's **real predictive quantiles**, not a Gaussian band. laplace wins ~98%
+Scored on ADAM's **real predictive quantiles**, not a Gaussian band. laplace wins ~96%
 on log-likelihood and ~82% on CRPS. ADAM is the strongest classical distributional
 forecaster in the field, so this is the most meaningful of the R matchups.

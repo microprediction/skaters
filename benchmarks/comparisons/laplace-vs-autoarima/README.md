@@ -17,16 +17,16 @@ PYTHONPATH=src python benchmarks/comparisons/run_comparison.py \
     laplace-vs-autoarima R@5 R@25 R@100 statsforecast@5 statsforecast@25 statsforecast@100
 ```
 
-**Result** _(provisional — N=44, 39 continuous; the first-scored cached slice, which
-is rates/FX/credit-heavy and not yet representative; R@25 cadence)._
+**Result** _(N=120 R-covered, 167 continuous; still growing overnight toward the full
+universe. R@25 cadence.)_
 
 laplace **win-rate** (fraction of series where laplace scores better):
 
 | method | CRPS all/cont | LL all/cont | N |
 |---|---|---|---|
-| auto.arima-R@25 | 55/51% | **82/79%** | 44 |
+| auto.arima-R@25 | 51/50% | **79/78%** | 120 |
 
-laplace beats the *real R* auto.arima on **log-likelihood** (82%) while it's a near-tie
-on **CRPS** (55%) — the CRPS-vs-likelihood distinction in a single row: a method can
-match the density's spread yet lose on the density itself. Full-universe run and the
-Python `AutoARIMA@*` port (same refit axis) still pending.
+laplace beats the *real R* auto.arima on **log-likelihood** (~79%) while it's a coin-flip
+on **CRPS** (~51%) — the CRPS-vs-likelihood distinction in a single row: a method can
+match the density's spread yet lose on the density itself. The Python `AutoARIMA@*` port
+(same refit axis) is scoring overnight for a like-for-like port-vs-real comparison.

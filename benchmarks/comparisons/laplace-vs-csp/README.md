@@ -19,14 +19,14 @@ PYTHONPATH=src python benchmarks/comparisons/run_comparison.py \
     laplace-vs-csp CSP
 ```
 
-**Result** _(provisional — N=44, 39 continuous; first-scored cached slice; weekly season)._
+**Result** _(N=194, 167 continuous; still growing overnight; weekly season.)_
 
 laplace **win-rate**:
 
 | method | CRPS all/cont | LL all/cont | N |
 |---|---|---|---|
-| CSP | 100/100% | 100/100% | 44 |
-| CSP-adaptive | 100/100% | 100/100% | 44 |
+| CSP | 100/100% | 99/99% | 194 |
+| CSP-adaptive | 100/100% | 99/99% | 194 |
 
 A clean sweep on both metrics — but read it fairly: daily FRED *change*-series has only a
 weak weekly signal, so CSP is off the strongly-seasonal turf (electricity/traffic) it was

@@ -15,14 +15,14 @@ PYTHONPATH=src python benchmarks/comparisons/run_comparison.py \
     laplace-vs-theta R@25
 ```
 
-**Result** _(provisional — N=44, 39 continuous; first-scored cached slice; R@25)._
+**Result** _(N=120 R-covered, 167 continuous; still growing overnight. R@25.)_
 
 laplace **win-rate**:
 
 | method | CRPS all/cont | LL all/cont | N |
 |---|---|---|---|
-| Theta-R@25 | 68/67% | **91/90%** | 44 |
+| Theta-R@25 | 63/61% | **87/87%** | 120 |
 
-laplace clears the M3-winner sanity check — 91% on log-likelihood — while Theta stays
-the most CRPS-competitive of the cheap baselines (68%). Passing this is the minimum bar
+laplace clears the M3-winner sanity check — ~87% on log-likelihood — while Theta stays
+the most CRPS-competitive of the cheap baselines (~63%). Passing this is the minimum bar
 for a new distributional forecaster; laplace passes comfortably on the density metric.
