@@ -41,8 +41,8 @@ forecaster --- pushing each observation forward, forecasting in the transformed
 space, and pulling the whole predictive distribution back through the inverse.
 Because the inner forecaster is itself a conjugation, models nest
 \emph{transforms all the way down} onto a single distributional leaf, and an
-ensemble is just another forecaster that combines forecasters. One closed
-abstraction, composed recursively. The leaf fits its shape by optimising a proper
+ensemble is just another forecaster that combines forecasters. The leaf fits its
+shape by optimising a proper
 scoring rule, so the objective is a choice rather than a fixed property of the
 method: pointed at likelihood the recursion models the conditional density,
 pointed at CRPS it is competitive with the CRPS specialists on their own metric
