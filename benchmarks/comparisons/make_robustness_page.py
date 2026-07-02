@@ -72,9 +72,17 @@ def _stats(changes):
     absx = [abs(v) for v in x]
     absac1 = acf(absx, 1) if n > 2 else 0.0
     seas5 = acf(x, 5) if n > 6 else 0.0
+    # stickiness: zero (no-change) steps and the longest consecutive run of them
+    zeros = [abs(v) <= 1e-12 for v in x]
+    zero_frac = sum(zeros) / n
+    max_run = run = 0
+    for z in zeros:
+        run = run + 1 if z else 0
+        max_run = max(max_run, run)
     return {
         "n": n, "vol": sd, "kurt": kurt, "gridMass": grid_mass,
         "ac1": ac1, "absac1": absac1, "seas5": seas5,
+        "zeroFrac": zero_frac, "maxZeroRun": max_run,
     }
 
 
@@ -92,7 +100,7 @@ def build(results_csv):
         except (ValueError, KeyError):
             continue
         scores.setdefault(r["series"], {})[r["method"]] = {
-            "logpdf": lp, "crps": cr, "n": int(float(r.get("n", 0) or 0)),
+            "logpdf": round(lp, 4), "crps": round(cr, 6),
         }
 
     series = []
@@ -119,16 +127,15 @@ def build(results_csv):
                 gaps = [(ds[i + 1] - ds[i]).days for i in range(len(ds) - 1)]
                 gaps = [g for g in gaps if g > 0]
                 gap = sum(gaps) / len(gaps) if gaps else None
+        keep = {"n", "vol", "kurt", "absac1", "seas5", "zeroFrac", "maxZeroRun"}
         series.append({
             "id": sid,
             "title": title,
             "cls": fu.asset_class(title),
-            "fam": fu.family(sid),
             "letter": sid[0].upper() if sid else "?",
-            "histYears": round(st["n"] / 252.0, 1),
-            **{k: round(v, 6) for k, v in st.items()},
-            "gap": round(gap, 2) if gap else None,
             "freq": _freq(gap),
+            "histYears": round(st["n"] / 252.0, 1),
+            **{k: round(v, 6) for k, v in st.items() if k in keep},
         })
 
     methods = sorted({r["method"] for r in rows if r["method"] != "laplace"})
@@ -219,6 +226,12 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
   .frontier{padding:14px 16px}
   #frontcv{width:100%;height:340px;display:block}
   @media(max-width:520px){#frontcv{height:280px}}
+  .lenrow{display:grid;grid-template-columns:92px 1fr 84px;gap:10px;align-items:center;padding:5px 0}
+  .lenrow .lab{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .lenrow .cnt{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:right}
+  select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    font-family:var(--mono);font-size:12px;border-radius:6px;padding:3px 7px;cursor:pointer}
+  select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 </style>
 
 <div class="wrap">
@@ -290,6 +303,14 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
       </div>
 
       <div class="viewhead">
+        <h2>Robustness vs. <select id="binaxis"></select></h2>
+        <span class="cap">laplace win-rate per bin · vs <select id="focus"></select></span>
+      </div>
+      <div class="panel" style="padding:12px 16px">
+        <div id="binchart"></div>
+      </div>
+
+      <div class="viewhead">
         <h2>Head-to-head win-rate</h2>
         <span class="cap">per-series, laplace vs each opponent</span>
       </div>
@@ -342,7 +363,7 @@ const BUCKETS = [
   {key:"kurt",    label:"Tail weight (kurtosis)"},
   {key:"seas5",   label:"Weekly autocorr (lag-5)"},
   {key:"absac1",  label:"Vol clustering (|Δ| lag-1)"},
-  {key:"gridMass",label:"Repeat / grid mass"},
+  {key:"zeroFrac",label:"Stickiness (zero-change %)"},
   {key:"histYears",label:"History length"},
 ].map(b=>{const t=terciles(b.key);return {...b,lo:t[0],hi:t[1]}});
 const bucketState = {}; // key -> Set of {low,mid,high}
@@ -476,6 +497,37 @@ function drawFrontier(ids){
   ctx.textAlign="left";
 }
 
+// ---- robustness-vs-X binned view (shared filter drives it) ----
+const BINSPEC={
+  n:{edges:[0,350,500,1000,2000,4000,1e15], labs:["<350","350–500","500–1k","1k–2k","2k–4k","4k+"]},
+  zeroFrac:{edges:[-1,1e-9,0.01,0.05,0.20,0.50,1.01], labs:["none","<1%","1–5%","5–20%","20–50%","50%+"]},
+  maxZeroRun:{edges:[-1,0.5,2.5,5.5,10.5,30.5,1e15], labs:["0","1–2","3–5","6–10","11–30","30+"]},
+};
+const axisSel=document.getElementById("binaxis");
+[["n","sequence length"],["zeroFrac","stickiness (zero-change %)"],["maxZeroRun","stickiness (longest zero run)"]]
+  .forEach(([k,l])=>{const o=document.createElement("option");o.value=k;o.textContent=l;axisSel.appendChild(o);});
+const focusSel=document.getElementById("focus");
+METHODS.forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=m;focusSel.appendChild(o);});
+focusSel.value=METHODS.includes("GARCH-t")?"GARCH-t":METHODS[0];
+axisSel.addEventListener("change",render); focusSel.addEventListener("change",render);
+function winPair(sid,focus,met){ const s=SC[sid]; if(!s||!s.laplace||!s[focus])return null; const a=s.laplace[met],b=s[focus][met]; if(a==null||b==null||isNaN(a)||isNaN(b))return null; return met==="logpdf"?(a>b):(a<b); }
+function drawBinned(ids){
+  const spec=BINSPEC[axisSel.value], key=axisSel.value, focus=focusSel.value, met=metric;
+  const box=document.getElementById("binchart"); box.innerHTML="";
+  for(let i=0;i<spec.labs.length;i++){
+    const lo=spec.edges[i], hi=spec.edges[i+1]; let n=0,w=0;
+    for(const id of ids){ const d=byId[id]; if(!d||d[key]==null||isNaN(d[key]))continue; const v=d[key];
+      const inbin=i<spec.labs.length-1?(v>=lo&&v<hi):(v>=lo&&v<=hi); if(!inbin)continue;
+      const r=winPair(id,focus,met); if(r==null)continue; n++; if(r)w++; }
+    const rate=n?w/n:null, col=rate==null?"var(--neutral)":(rate>=0.5?"var(--win)":"var(--loss)");
+    const row=document.createElement("div"); row.className="lenrow";
+    row.innerHTML=`<span class="lab">${spec.labs[i]}</span>`+
+      `<div class="track">${rate!=null?`<div class="fill" style="width:${(rate*100).toFixed(1)}%;background:${col}"></div>`:""}<div class="mid"></div><span class="ratetag">${rate!=null?(rate*100).toFixed(0)+"%":"—"}</span></div>`+
+      `<span class="cnt">${n} series</span>`;
+    box.appendChild(row);
+  }
+}
+
 // ---- render ----
 let LAST_IDS=[];
 function render(){
@@ -488,7 +540,7 @@ function render(){
 
   const tb=document.getElementById("tbody"); tb.innerHTML="";
   const empty=document.getElementById("empty");
-  if(!sel.length){ empty.style.display="block"; document.getElementById("nbeat").textContent="–"; document.getElementById("mll").textContent="–"; drawFrontier(ids); return; }
+  if(!sel.length){ empty.style.display="block"; document.getElementById("nbeat").textContent="–"; document.getElementById("mll").textContent="–"; drawFrontier(ids); drawBinned(ids); return; }
   empty.style.display="none";
 
   const results=METHODS.map(mth=>{ const wr=winForSubset(ids,mth,metric); return {mth,...wr,ci:bootstrapCI(ids,mth,metric)}; })
@@ -511,7 +563,7 @@ function render(){
     tb.appendChild(tr);
   });
   document.getElementById("nbeat").innerHTML=beaten+"<small> / "+results.length+"</small>";
-  drawFrontier(ids);
+  drawFrontier(ids); drawBinned(ids);
 }
 let _rz; window.addEventListener("resize",()=>{ clearTimeout(_rz); _rz=setTimeout(()=>drawFrontier(LAST_IDS),120); });
 
