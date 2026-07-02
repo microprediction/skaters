@@ -28,9 +28,9 @@
   \url{https://skaters.microprediction.org}
 }
 
-\title{Transforms All the Way Down --- Automatic Online Distributional Time-Series Forecasting by Conjugation}
+\title{Transforms All the Way Down --- Automatic Online Distributional Forecasting by Conjugation}
 
-\Plaintitle{Transforms All the Way Down - Automatic Online Distributional Time-Series Forecasting by Conjugation}
+\Plaintitle{Transforms All the Way Down - Automatic Online Distributional Forecasting by Conjugation}
 \Shorttitle{Transforms All the Way Down}
 
 \newcommand{\skatersabstract}{
@@ -48,10 +48,13 @@ method: pointed at likelihood the recursion models the conditional density,
 pointed at CRPS it is competitive with the CRPS specialists on their own metric
 --- fitting and tail-shaping are two settings of one machine, not two machines. The library is written twice, in pure \proglang{Python} and in
 zero-dependency \proglang{JavaScript} that agrees to within $10^{-6}$, so a model
-runs unchanged on a server or in a browser. We position \pkg{skaters} as a
-general-purpose forecaster for economic and other non-price time series, and
-evaluate it there against classical, neural, and pretrained foundation-model
-baselines on \proglang{FRED} series, where it leads on held-out log-likelihood.
+runs unchanged on a server or in a browser. \pkg{skaters} was first envisaged as a
+\emph{collection} of forecasters differing by prior; the study reported here
+pushed the other way, collapsing that collection into a single forecast function
+with no tuning parameters. We position that function as a general-purpose
+forecaster for economic and other non-price time series, and evaluate it there
+against classical, neural, and pretrained foundation-model baselines on
+\proglang{FRED} series, where it leads on held-out log-likelihood.
 On asset-price and return series --- the home of conditional-volatility models
 --- there is no free lunch: a \pkg{GARCH}-$t$ model is the better choice, and we
 report that comparison honestly rather than averaging the two regimes into one
