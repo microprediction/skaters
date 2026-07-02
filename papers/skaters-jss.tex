@@ -123,13 +123,15 @@ yields three contributions developed in turn:
   composable volatility and mean-reversion transforms (a \pkg{GARCH}-$t$ leaf, an
   Ornstein--Uhlenbeck group) that specialise the one forecaster without adding a
   second.
-\item \emph{A benchmark against eight distributional baselines}
+\item \emph{A benchmark against twelve distributional baselines}
   (Section~\ref{sec:experiments}), chosen as the strongest available opponents:
-  the heavy-tail state of the art (\pkg{GARCH}-$t$), a neural density model
-  (\pkg{NeuralForecast}), and \pkg{AutoARIMA} paired with split- and
-  adaptive-conformal residuals --- the CRPS-optimised methods that are hardest to
-  beat on that metric. Every method is scored on held-out log-likelihood and CRPS
-  through a single, identical \code{Dist}-based protocol.
+  the heavy-tail state of the art (\pkg{GARCH}-$t$, both \pkg{arch} and
+  \pkg{rugarch}), the reference \proglang{R} forecasters (the real Hyndman
+  \pkg{auto.arima}, \pkg{thetaf}, Svetunkov's \pkg{ADAM}, \pkg{nnetar}), and
+  \pkg{AutoARIMA} paired with split- and adaptive-conformal residuals plus
+  conformal seasonal pools --- the CRPS-optimised methods hardest to beat on that
+  metric. Every method is scored on held-out log-likelihood and CRPS through a
+  single, identical \code{Dist}-based protocol.
 \end{enumerate}
 
 The unifying premise is the No-Free-Lunch theorem \citep{wolpert1997no} taken
@@ -188,6 +190,17 @@ $\sum_{h}\sigma_h^2$ under differencing. The inner skater is unconstrained: it m
 itself be a conjugation, or an ensemble of conjugations, so a model is
 \emph{transforms all the way down}, bottoming out at a single distributional leaf
 --- the one non-transform in the stack.
+
+Structurally this is the recipe of a normalizing flow
+\citep{rezende2015variational} --- a base density pushed through invertible maps
+--- but the regime is inverted. A flow \emph{learns} its coupling layers by
+stochastic gradient descent over a batch; here the transforms are \emph{fixed and
+analytically invertible}, their few parameters adapting \emph{online} by
+score-driven, Tweedie-style updates \citep{creal2013generalized} one observation
+at a time, in $O(1)$, with no training phase and no gradients. The base is a
+weighted mixture with a pluggable proper-scoring objective, not a fixed Gaussian.
+It is a flow's compositional structure carried into a streaming, closed-form,
+univariate-forecasting regime.
 
 \paragraph{Numerical note.}
 Mixture variance is computed in centred form,
@@ -330,31 +343,37 @@ series belong to the conditional-volatility regime and are treated separately in
 the price caveat below. The non-price universe is the general economic forecasting
 problem \pkg{skaters} is built for.
 
-\subsection{Against eight distributional baselines} \label{sec:sota}
+\subsection{Against twelve distributional baselines} \label{sec:sota}
 
-On the non-price universe ($1{,}249$ qualifying daily series) we compare the
-general forecaster \code{laplace} against every distributional one-step baseline
-we could assemble:
-\pkg{statsforecast}'s \citep{garza2022statsforecast} \pkg{AutoARIMA} and
-\pkg{AutoETS}; \pkg{statsmodels} \pkg{SARIMAX}$(1,0,1)$ and simple exponential
-smoothing, which emit \emph{exact} closed-form Gaussian predictives;
-a constant-mean \pkg{GARCH}$(1,1)$ model with Student-$t$ innovations
-\citep{bollerslev1986generalized,bollerslev1987conditionally} from the \pkg{arch}
-package, the classical heavy-tail / volatility-clustering state of the art; a
-\pkg{NeuralForecast} \citep{olivares2022neuralforecast} multilayer perceptron
-with a Student-$t$ distribution head; and \pkg{AutoARIMA} paired with conformal
-residual quantiles \citep{vovk2019conformal} in both a split-conformal and an
-adaptive-conformal (ACI, \citealp{gibbs2021adaptive}) variant.
+On the non-price universe we compare the general forecaster \code{laplace}
+against every distributional one-step baseline we could run on CPU. From
+\pkg{statsforecast} \citep{garza2022statsforecast}: \pkg{AutoARIMA} and
+\pkg{AutoETS}. From the \proglang{R} forecasting ecosystem --- the reference
+implementations, not Python ports --- the actual Hyndman \pkg{auto.arima} and
+\pkg{thetaf} (the \pkg{forecast} package \citep{hyndman2008automatic}; the Theta
+method \citep{assimakopoulos2000theta} won the M3 competition), Svetunkov's
+\pkg{ADAM} auto state-space model \citep{svetunkov2023adam}, a neural
+autoregression (\pkg{nnetar}), and a \pkg{rugarch} \pkg{GARCH}$(1,1)$-$t$
+\citep{ghalanos2022rugarch}. From \pkg{arch}, a constant-mean \pkg{GARCH}$(1,1)$
+with Student-$t$ innovations
+\citep{bollerslev1986generalized,bollerslev1987conditionally}, the classical
+heavy-tail / volatility-clustering state of the art. And four conformal opponents:
+\pkg{AutoARIMA} paired with split-conformal residual quantiles
+\citep{vovk2019conformal} and its adaptive variant (ACI,
+\citealp{gibbs2021adaptive}), plus conformal seasonal pools (CSP,
+\citealp{manokhin2026csp}) in a fixed and a coverage-adaptive form, each
+KDE-smoothed into a density so it is scored on likelihood as well as CRPS.
 
 The protocol is a \emph{fair rolling one-step-ahead}: each baseline is fit on an
 expanding or rolling window with periodic refit, and every method --- ours and
 theirs --- is turned into the \emph{same} \code{Dist} and scored on held-out
-log-likelihood \emph{and} CRPS over the same test window. The parametric
-Student-$t$ predictives (\pkg{GARCH}, \pkg{NeuralForecast}) are represented as
-finite Gaussian scale mixtures, matching the analytic $t$ density to $\sim
-10^{-3}$. We report per-series win-rates (the fraction of series on
-which \code{laplace} scores better) on the $894$ continuous series --- those with
-under $5\%$ exactly-repeating one-step changes --- since on repeating/grid series
+log-likelihood \emph{and} CRPS over the same test window. Parametric Student-$t$
+predictives (\pkg{arch} and \pkg{rugarch} \pkg{GARCH}, \pkg{ADAM}) are represented
+as finite Gaussian scale mixtures matching the analytic $t$ density to $\sim
+10^{-3}$; sample- or quantile-based emitters (\pkg{nnetar}, CSP) are
+kernel-smoothed into the same \code{Dist}. We report per-series win-rates (the
+fraction of series on which \code{laplace} scores better) on the $5{,}402$
+continuous series --- those with under $5\%$ exactly-repeating one-step changes --- since on repeating/grid series
 the lattice projection (Section~\ref{sec:lattice}) gives a large but
 metric-specific advantage that would otherwise dominate the aggregate. Because
 many \proglang{FRED} families are panels (a yield curve, an index family) that are
@@ -365,55 +384,63 @@ reports the result (the unified \code{study.py sota} run with
 
 \begin{table}[t!]
 \centering
-\begin{tabular}{lccc}
+\begin{tabular}{lcccc}
 \toprule
-Baseline & LL (raw / fam.) & CRPS (raw / fam.) & Mean LL \\
+Baseline & LL (raw / fam.) & CRPS (raw / fam.) & Mean LL & $N$ \\
 \midrule
-\pkg{AutoARIMA}             & \textbf{82 / 90\,\%} & 53 / 65\,\% & 2.80 \\
-\pkg{AutoETS}               & \textbf{97 / 99\,\%} & \textbf{83 / 92\,\%} & 2.79 \\
-\pkg{SARIMAX} (statsmodels) & \textbf{87 / 86\,\%} & 53 / 64\,\% & 2.92 \\
-ETS (statsmodels)           & \textbf{96 / 98\,\%} & \textbf{81 / 90\,\%} & 2.89 \\
-\pkg{GARCH}$(1,1)$-$t$      & \textbf{68 / 65\,\%} & 54 / 45\,\% & 3.03 \\
-\pkg{AutoARIMA} + conformal & \textbf{86 / 88\,\%} & 31 / 31\,\% & 2.27 \\
-\pkg{AutoARIMA} + ACI       & \textbf{88 / 88\,\%} & 29 / 29\,\% & 2.51 \\
-naive conformal$^{\dagger}$ & --- (CDF) & 92 / 93\,\% & --- \\
-NF-Student$t^{\ddagger}$    & \textbf{100 / 100\,\%} & 78 / 76\,\% & 0.82 \\
+\pkg{AutoARIMA} (\pkg{statsforecast})  & \textbf{87 / 87\,\%} & 58 / 63\,\% & $1.18$ & $1688$ \\
+\pkg{AutoETS} (\pkg{statsforecast})    & \textbf{95 / 94\,\%} & \textbf{77 / 78\,\%} & $1.26$ & $1688$ \\
+\pkg{auto.arima} (\proglang{R})        & \textbf{84 / 85\,\%} & 51 / 60\,\% & $1.15$ & $1918$ \\
+\pkg{thetaf} (\proglang{R})            & \textbf{92 / 95\,\%} & \textbf{74 / 79\,\%} & $1.24$ & $1918$ \\
+\pkg{ADAM} (\proglang{R})              & \textbf{98 / 97\,\%} & \textbf{80 / 82\,\%} & $0.98$ & $1918$ \\
+\pkg{nnetar} (\proglang{R})            & \textbf{97 / 95\,\%} & \textbf{64 / 63\,\%} & $-4.56$ & $1918$ \\
+\pkg{GARCH}$(1,1)$-$t$ (\pkg{arch})    & $51 / 50\,\%$ & $46 / 48\,\%$ & $1.69$ & $1742$ \\
+\pkg{GARCH}$(1,1)$-$t$ (\pkg{rugarch}) & \textbf{90 / 91\,\%} & \textbf{60 / 62\,\%} & $0.27$ & $1918$ \\
+\pkg{AutoARIMA} + conformal            & \textbf{82 / 80\,\%} & 36 / 49\,\% & $0.28$ & $1685$ \\
+\pkg{AutoARIMA} + ACI                  & \textbf{84 / 81\,\%} & 36 / 49\,\% & $0.45$ & $1685$ \\
+CSP                                    & \textbf{98 / 97\,\%} & \textbf{98 / 97\,\%} & $-0.30$ & $5402$ \\
+CSP-adaptive                           & \textbf{98 / 97\,\%} & \textbf{98 / 97\,\%} & $-0.09$ & $5402$ \\
 \bottomrule
 \end{tabular}
 \caption{Per-series win-rate of \code{laplace} versus each baseline on the
-\textbf{non-price} \proglang{FRED} universe --- $894$ continuous daily
-change-series ($57$ correlated families); the fittable baselines cover a $637$
-subset under their compute budget, GARCH-$t$ all $894$. Win-rates are reported
-\emph{raw} (per series) and \emph{family-weighted} (one vote per leading-letter
-family, the de-correlation of Section~\ref{sec:ablations}). LL counts series where
-\code{laplace} has the higher held-out log-likelihood; CRPS where it has the lower
-CRPS; bold marks a \code{laplace} win ($>50\%$). The final column is each
-baseline's mean log-likelihood (\code{laplace}: $\mathbf{3.20}$). Higher is better
-for LL, lower for CRPS. $^{\dagger}$Naive split-conformal pinball bands (best of
-three window lengths); a conformal CDF has no density, so it is unscored on LL.
-$^{\ddagger}$NF-Student$t$ is carried from the prior run --- it requires
-\pkg{torch} and was not re-scored here.}
+\textbf{non-price} \proglang{FRED} universe --- $5{,}402$ continuous daily
+change-series ($1{,}213$ correlated families), from a $7{,}607$-series sweep
+spanning daily, weekly, and monthly frequencies. Slower baselines cover a
+per-method subset under their compute budget (column $N$); \code{laplace} and CSP
+cover all $5{,}402$. Win-rates are \emph{raw} (per series) and
+\emph{family-weighted} (one vote per leading-letter family,
+Section~\ref{sec:ablations}). LL counts series where \code{laplace} has the higher
+held-out log-likelihood, CRPS where it has the lower CRPS; bold marks a
+\code{laplace} win ($>50\%$). ``Mean LL'' is the \emph{baseline's} mean held-out
+log-likelihood (\code{laplace}: $\mathbf{1.56}$; higher is better). Only
+\pkg{GARCH}-$t$ (\pkg{arch}) escapes a \code{laplace} per-series likelihood win
+--- a $50/50$ coin-flip that Section~\ref{sec:martingality} resolves by
+martingality.}
 \label{tab:sota}
 \end{table}
 
 \paragraph{The likelihood race.}
 On the non-price universe \code{laplace} wins the per-series held-out
-log-likelihood race against \emph{every} baseline by a wide margin --- the
-\pkg{ARIMA} family, the smoothing models, and, importantly, \pkg{GARCH}-$t$ ---
-including the two exact-Gaussian references (\pkg{SARIMAX}, statsmodels ETS) for
-which there is no band-reconstruction approximation to blame. The win is on the
-order of $70$--$98\%$ of series depending on the opponent, and survives
-family-clustering (one vote per correlated FRED family).%
-\footnote{Win-rates are reported both raw and family-clustered; the families are
-the leading-letter groups of Section~\ref{sec:ablations}. Exact figures are in
-Table~\ref{tab:sota}.}
+log-likelihood race against \emph{eleven of the twelve} baselines by a wide
+margin --- the \pkg{ARIMA} family (both \pkg{statsforecast} and the real
+\proglang{R} \pkg{auto.arima}), the smoothing and state-space models
+(\pkg{AutoETS}, \pkg{thetaf}, \pkg{ADAM}), the neural autoregression
+(\pkg{nnetar}), the \pkg{rugarch} \pkg{GARCH}-$t$, and both conformal families ---
+typically on $82$--$98\%$ of series, and the win survives family-clustering. The
+lone exception is the \pkg{arch} \pkg{GARCH}$(1,1)$-$t$, a $50/50$ tie treated
+next. One honesty note on the mean-log-likelihood column of Table~\ref{tab:sota}:
+it is the \emph{opponent's}, and on this frequency-spanning universe the \pkg{arch}
+\pkg{GARCH}-$t$ actually edges \code{laplace} on the mean ($1.69$ vs $1.56$) even
+as it ties per-series --- a discrepancy driven entirely by the near-random-walk
+tail, which is exactly the martingality effect of Section~\ref{sec:martingality}.
 
 \paragraph{\pkg{GARCH}-$t$, and the price caveat.}
 \pkg{GARCH}$(1,1)$-$t$ is the strongest opponent on log-likelihood, purpose-built
 for the heavy tails and volatility clustering of financial change-series. On the
-non-price universe \code{laplace} has the higher held-out log-likelihood on the
-majority of series, but the aggregate hides the real structure: unlike every other
-baseline, the \pkg{GARCH}-$t$ contest is governed almost entirely by how
+non-price universe it is the only baseline \code{laplace} does not clearly beat on
+likelihood --- a $51/50\%$ coin-flip --- and that near-tie hides the real
+structure: unlike every other baseline, the \pkg{GARCH}-$t$ contest is governed
+almost entirely by how
 \emph{martingale-like} the series is, which we make precise in
 Section~\ref{sec:martingality}. The honest other half is the price regime.
 Restricting instead to the asset-price classes we
@@ -424,27 +451,14 @@ avoids the worst tail blow-ups but loses the per-series race). We therefore make
 no general-purpose claim on price series and recommend \pkg{GARCH}-$t$ there; this
 is No-Free-Lunch, reported as a split rather than hidden inside a pooled average.
 
-\paragraph{The neural result, in context.}
-\code{laplace} beats NF-Student$t$ on $100\%$ of series (carried from the prior
-run; the unified run omits NF, which requires \pkg{torch}), but the comparison
-needs reading carefully. NF here is \pkg{NeuralForecast} run in the matched online
-univariate one-step protocol, a small per-series multilayer perceptron with
-periodic refit, which is its weak regime. Neural and foundation forecasters
-\citep{salinas2020deepar, olivares2022neuralforecast} are built for global
-cross-series training, where they amortise structure across thousands of related
-series. The result says nothing about \pkg{DeepAR}-style models in that setting,
-and we do not claim it does; it says only that a single short univariate stream
-does not give a neural density head enough to beat an online ensemble. The NF
-densities are well formed (median log-likelihood $0.50$, none floored), so the
-$100\%$ is a real calibration gap, not a degenerate score.
-
 \paragraph{CRPS.}
-As ever, CRPS tells a mixed story. \code{laplace} beats the mean-model baselines
-on CRPS --- family-weighted, the \pkg{ARIMA} family (\pkg{AutoARIMA} $65\%$,
-\pkg{SARIMAX} $64\%$) and the smoothing models (\pkg{AutoETS} $92\%$, ETS $90\%$)
---- but \emph{loses} to the fitted-mean conformal variants ($\sim 30\%$) and, on
-the family-weighted count, to \pkg{GARCH}-$t$ ($45\%$), which are CRPS-optimised
-(or volatility-specialised) by construction. This is
+As ever, CRPS tells a mixed story. \code{laplace} beats the mean-model and
+state-space baselines on CRPS --- family-weighted, \pkg{AutoARIMA} $63\%$,
+\pkg{AutoETS} $78\%$, \pkg{thetaf} $79\%$, \pkg{ADAM} $82\%$, and the
+density-emitting CSP $97\%$ --- but the split tightens against the specialists: it
+is roughly even with the \pkg{arch} \pkg{GARCH}-$t$ ($48\%$) and \emph{below} the
+fitted-mean conformal variants ($49\%$), which are CRPS-optimised (or
+volatility-specialised) by construction. This is
 exactly the thesis of Section~\ref{sec:leaf}: likelihood is the metric where a
 faithful density wins; CRPS is conformal's and \pkg{GARCH}'s home turf, where we
 are competitive but not dominant. A practitioner who truly only cares about CRPS
@@ -453,20 +467,19 @@ the density --- for risk, sizing, or combination --- should prefer the
 log-likelihood column.
 
 \paragraph{Conformal prediction, specifically.}
-The conformal opponents deserve a separate word, because the comparison is
-two-sided and asymmetric. Against the \emph{naive} conformal predictive systems
---- split-conformal pinball bands over the residuals at several window lengths ---
-\code{laplace} wins CRPS outright (on the order of $90$--$95\%$ of series,
-family-weighted), and the comparison is not even available on log-likelihood: a
-conformal predictive system emits a cumulative distribution function, not a
-density, so it assigns zero density --- and hence $-\infty$ log-likelihood --- to
-any outcome outside the observed residual range, and cannot be scored on the
-metric at all. Against the stronger \emph{fitted-mean} conformal variants
-(\pkg{AutoARIMA}-mean residuals, split-conformal and ACI), the split is clean and
-honest: \code{laplace} has the higher held-out log-likelihood on the large
-majority of series, while the conformal variants have the lower CRPS on a similar
-majority. That is exactly as it should be --- CRPS and marginal coverage are what
-conformal is constructed to optimise, and it has no density to surrender on
+The conformal opponents deserve a separate word; two kinds appear here. Conformal
+seasonal pools (CSP) sample a seasonal residual pool and KDE-smooth it into a
+density, so --- unlike a raw conformal predictive system, whose cumulative
+distribution assigns zero density, and hence $-\infty$ log-likelihood, outside the
+observed residual range --- CSP \emph{can} be scored on likelihood. \code{laplace}
+beats it on both metrics ($97\%$ family-weighted on each), because a recency-blind
+seasonal pool tracks neither drift nor the volatility clock. Against the stronger
+\emph{fitted-mean} conformal variants (\pkg{AutoARIMA}-mean residuals,
+split-conformal and ACI) the split is clean and honest: \code{laplace} has the
+higher held-out log-likelihood on the large majority ($80$--$81\%$
+family-weighted), while the conformal variants roughly match it on CRPS
+($\sim 49\%$). That is exactly as it should be --- CRPS and marginal coverage are
+what conformal is constructed to optimise, and it has no density to surrender on
 likelihood --- and it is the empirical face of the pluggable-base argument: the
 honest objective for \emph{modelling} is the density, and the one place a
 downstream score should get a vote is the terminal leaf where the conjugation
@@ -476,8 +489,9 @@ CRPS (Section~\ref{sec:ablations}), without giving up the density the conformal
 systems cannot provide.
 
 \paragraph{Scope.}
-The non-price economic universe ($894$ continuous daily change-series),
-one-step horizon. The price/return regime is reported as the explicit caveat
+The non-price economic universe ($5{,}402$ continuous change-series of a
+$7{,}607$-series sweep spanning daily, weekly, and monthly frequencies), one-step
+horizon. The price/return regime is reported as the explicit caveat
 above and is not part of the general-purpose claim; multi-step horizons and raw
 levels are left for later; zero-shot foundation models get their own protocol in
 Section~\ref{sec:foundation}.
@@ -683,8 +697,9 @@ across both runtimes and in the browser via \pkg{Pyodide} \citep{pyodide2021}.
 The benchmark of Section~\ref{sec:experiments} is a single parallel harness
 (\code{benchmarks/study.py}, invoked as \code{study.py sota}) that scores every
 method through the identical \code{Dist} interface; given a \proglang{FRED} key
-and the optional baselines (\pkg{statsforecast}, \pkg{arch}, \pkg{statsmodels},
-\pkg{neuralforecast}) it reproduces Table~\ref{tab:sota} end to end, and
+and the optional baselines (\pkg{statsforecast}, \pkg{arch}, the \proglang{R}
+\pkg{forecast}/\pkg{smooth}/\pkg{rugarch} stack, and pure-\proglang{numpy} CSP) it
+reproduces Table~\ref{tab:sota} end to end, and
 \code{study.py sota summarize} regenerates the reported win-rates from the
 committed result file.
 
