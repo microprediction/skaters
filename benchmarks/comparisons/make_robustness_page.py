@@ -187,7 +187,7 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
     padding:10px 0 18px;font-family:var(--mono);font-size:12px;color:var(--muted)}
   .topbar a{color:var(--accent);text-decoration:none}
   .topbar a:hover{text-decoration:underline}
-  .topbar .mid{color:var(--faint);letter-spacing:.08em;text-transform:uppercase}
+  .topbar .crumb{color:var(--faint);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
   header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px}
   .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
     color:var(--accent);margin:0 0 8px}
@@ -263,7 +263,7 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
 <div class="wrap">
   <nav class="topbar">
     <a href="/">← skaters</a>
-    <span class="mid">non-price robustness explorer</span>
+    <span class="crumb">non-price robustness explorer</span>
     <a href="https://github.com/microprediction/skaters">GitHub</a>
   </nav>
   <header>
