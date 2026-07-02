@@ -23,6 +23,28 @@ import fred_universe as fu
 
 CAP = 6000  # match study.py's most-recent-N window
 
+# Measured single-core runtime (ms/series at TEST=300), from make_frontier.py —
+# universe-independent, so the accuracy/speed frontier is (fixed speed-x,
+# subset-dependent accuracy-y). Method names here are the bare (refit-suffix
+# stripped) forms; the page normalizes "@25" etc. before lookup.
+SPEED_MS = {
+    "laplace": 196, "GARCH-t": 226, "AutoETS": 275, "ETS-sm": 300,
+    "SARIMAX": 1178, "AutoARIMA": 863, "AutoARIMA+ACI": 900,
+    "AutoARIMA+conformal": 900, "NF-StudentT": 1897,
+}
+WINDOW = 300  # one-step forecasts per series (for forecasts/sec on the frontier)
+
+
+def _freq(gap):
+    """Observation frequency from mean calendar-day gap between observations."""
+    if gap is None:
+        return "daily"
+    if gap < 3:
+        return "daily"
+    if gap < 14:
+        return "weekly"
+    return "monthly"
+
 
 def _stats(changes):
     x = changes[-CAP:]
@@ -106,10 +128,12 @@ def build(results_csv):
             "histYears": round(st["n"] / 252.0, 1),
             **{k: round(v, 6) for k, v in st.items()},
             "gap": round(gap, 2) if gap else None,
+            "freq": _freq(gap),
         })
 
     methods = sorted({r["method"] for r in rows if r["method"] != "laplace"})
-    return {"series": series, "scores": scores, "methods": methods}
+    return {"series": series, "scores": scores, "methods": methods,
+            "speed": SPEED_MS, "window": WINDOW}
 
 
 PAGE = r"""<title>Non-price robustness explorer — skaters</title>
@@ -189,6 +213,12 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
   .empty{color:var(--loss);font-family:var(--mono);font-size:13px;padding:18px 0}
   .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:10px;align-items:center;flex-wrap:wrap}
   .swatch{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:middle;margin-right:5px}
+  .viewhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:22px 0 10px}
+  .viewhead h2{font-size:15px;font-weight:620;margin:0;letter-spacing:-.005em}
+  .viewhead .cap{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .frontier{padding:14px 16px}
+  #frontcv{width:100%;height:340px;display:block}
+  @media(max-width:520px){#frontcv{height:280px}}
 </style>
 
 <div class="wrap">
@@ -220,6 +250,10 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
         </div>
       </div>
       <div class="grp">
+        <h3>Frequency</h3>
+        <div class="chips" id="freqs"></div>
+      </div>
+      <div class="grp">
         <h3>Category</h3>
         <div class="chips" id="cats"></div>
       </div>
@@ -247,6 +281,18 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
         <div class="stat"><div class="k">Opponents beaten (LL &gt;50%)</div><div class="v" id="nbeat">–</div></div>
       </div>
 
+      <div class="viewhead">
+        <h2>Accuracy vs. speed frontier</h2>
+        <span class="cap">mean held-out log-likelihood over the selected subset · speed measured, fixed</span>
+      </div>
+      <div class="panel frontier">
+        <canvas id="frontcv"></canvas>
+      </div>
+
+      <div class="viewhead">
+        <h2>Head-to-head win-rate</h2>
+        <span class="cap">per-series, laplace vs each opponent</span>
+      </div>
       <div class="legend">
         <span>metric
           <span class="metricbar">
@@ -277,8 +323,12 @@ PAGE = r"""<title>Non-price robustness explorer — skaters</title>
 <script>
 const DATA = __DATA__;
 const S = DATA.series, SC = DATA.scores, METHODS = DATA.methods;
+const SPEED = DATA.speed, WIN = DATA.window;
 const byId = Object.fromEntries(S.map(d=>[d.id,d]));
 let metric = "logpdf";
+// forecasts/sec for a method: strip a @NN refit suffix, look up measured runtime
+function fps(method){ const base=method.replace(/@\d+$/,""); const ms=SPEED[base]; return ms?1000*WIN/ms:null; }
+const FREQ_ORDER = {daily:0, weekly:1, monthly:2};
 let randomPick = null;  // cached id set for random/balanced modes
 
 // ---- bucket definitions (terciles computed from the data) ----
@@ -305,6 +355,14 @@ cats.forEach(c=>{
   const el=document.createElement("span"); el.className="chip on"; el.textContent=c+" ("+S.filter(d=>d.cls===c).length+")";
   el.onclick=()=>{ if(catSel.has(c)){catSel.delete(c);el.classList.remove("on")}else{catSel.add(c);el.classList.add("on")} render(); };
   catBox.appendChild(el);
+});
+const freqs=[...new Set(S.map(d=>d.freq))].sort((a,b)=>FREQ_ORDER[a]-FREQ_ORDER[b]);
+const freqSel=new Set(freqs);
+const freqBox=document.getElementById("freqs");
+freqs.forEach(fq=>{
+  const el=document.createElement("span"); el.className="chip on"; el.textContent=fq+" ("+S.filter(d=>d.freq===fq).length+")";
+  el.onclick=()=>{ if(freqSel.has(fq)){freqSel.delete(fq);el.classList.remove("on")}else{freqSel.add(fq);el.classList.add("on")} randomPick=null; render(); };
+  freqBox.appendChild(el);
 });
 const letters=[...new Set(S.map(d=>d.letter))].sort();
 const letSel=new Set();
@@ -333,6 +391,7 @@ function bucketOf(d,b){ if(d[b.key]==null) return null; return d[b.key]<=b.lo?"l
 function baseFiltered(){
   const kw=document.getElementById("kw").value.trim().toLowerCase();
   return S.filter(d=>{
+    if(!freqSel.has(d.freq)) return false;
     if(!catSel.has(d.cls)) return false;
     if(letSel.size && !letSel.has(d.letter)) return false;
     if(kw && !(d.title.toLowerCase().includes(kw)||d.id.toLowerCase().includes(kw))) return false;
@@ -384,9 +443,43 @@ function bootstrapCI(ids,method,met,B=300){
   return [rates[Math.floor(.05*B)], rates[Math.floor(.95*B)]];
 }
 
+// ---- accuracy/speed frontier (shared filter drives it too) ----
+function meanLL(ids,method){ let s=0,n=0; for(const id of ids){ const r=SC[id]; if(r&&r[method]&&r[method].logpdf!=null&&!isNaN(r[method].logpdf)){s+=r[method].logpdf;n++;} } return n?s/n:null; }
+function star(ctx,cx,cy,r){ ctx.beginPath(); for(let i=0;i<10;i++){ const a=Math.PI/5*i-Math.PI/2, rad=i%2?r*0.45:r; const x=cx+Math.cos(a)*rad,y=cy+Math.sin(a)*rad; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.closePath(); ctx.fill(); }
+function drawFrontier(ids){
+  const cv=document.getElementById("frontcv"); if(!cv) return;
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  cv.width=w*dpr; cv.height=h*dpr; const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  const pad={l:52,r:18,t:14,b:38};
+  const pts=[];
+  for(const m of ["laplace",...METHODS]){ const sp=fps(m); if(sp==null) continue; const acc=meanLL(ids,m); if(acc==null) continue; pts.push({m,sp,acc,ours:m==="laplace"}); }
+  if(!pts.length){ ctx.fillStyle="#8493a5"; ctx.font="13px ui-monospace"; ctx.fillText("no timed methods in this selection",pad.l,h/2); return; }
+  const xs=pts.map(p=>Math.log10(p.sp)), ys=pts.map(p=>p.acc);
+  let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  if(x1-x0<0.4){x0-=0.4;x1+=0.4}else{const m=(x1-x0)*0.14;x0-=m;x1+=m}
+  if(y1-y0<0.3){y0-=0.5;y1+=0.5}else{const m=(y1-y0)*0.20;y0-=m;y1+=m}
+  const X=v=>pad.l+(Math.log10(v)-x0)/(x1-x0)*(w-pad.l-pad.r), Y=v=>h-pad.b-(v-y0)/(y1-y0)*(h-pad.t-pad.b);
+  ctx.lineWidth=1; ctx.font="10px ui-monospace";
+  for(let e=Math.floor(x0);e<=Math.ceil(x1);e++){ const xv=Math.pow(10,e),px=X(xv); if(px<pad.l-1||px>w-pad.r+1)continue;
+    ctx.strokeStyle="#243040"; ctx.globalAlpha=.5; ctx.beginPath(); ctx.moveTo(px,pad.t); ctx.lineTo(px,h-pad.b); ctx.stroke(); ctx.globalAlpha=1;
+    ctx.fillStyle="#5b6672"; ctx.fillText(xv>=1000?(xv/1000)+"k":String(xv),px-5,h-pad.b+14); }
+  for(let i=0;i<=4;i++){ const yv=y0+(y1-y0)*i/4,py=Y(yv); ctx.strokeStyle="#243040"; ctx.globalAlpha=.5; ctx.beginPath(); ctx.moveTo(pad.l,py); ctx.lineTo(w-pad.r,py); ctx.stroke(); ctx.globalAlpha=1; ctx.fillStyle="#5b6672"; ctx.fillText(yv.toFixed(1),8,py+3); }
+  ctx.fillStyle="#8493a5"; ctx.font="10.5px ui-sans-serif"; ctx.textAlign="left"; ctx.fillText("forecasts / sec  (log — faster →)",pad.l,h-3);
+  ctx.save(); ctx.translate(12,pad.t+(h-pad.t-pad.b)/2); ctx.rotate(-Math.PI/2); ctx.textAlign="center"; ctx.fillText("mean log-likelihood  ↑",0,0); ctx.restore();
+  const lp=pts.find(p=>p.ours);
+  if(lp){ ctx.strokeStyle="rgba(90,162,255,.30)"; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(X(lp.sp),pad.t); ctx.lineTo(X(lp.sp),h-pad.b); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad.l,Y(lp.acc)); ctx.lineTo(w-pad.r,Y(lp.acc)); ctx.stroke(); ctx.setLineDash([]); }
+  for(const p of pts){ const px=X(p.sp),py=Y(p.acc);
+    if(p.ours){ ctx.fillStyle="#5aa2ff"; star(ctx,px,py,9); ctx.font="bold 12px ui-sans-serif"; ctx.textAlign="right"; ctx.fillText("laplace",px-11,py-7); }
+    else{ ctx.fillStyle="#8493a5"; ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fill(); ctx.fillStyle="#c3cdd9"; ctx.font="10px ui-sans-serif"; ctx.textAlign="left"; ctx.fillText(p.m.replace(/@\d+$/,""),px+7,py+3); } }
+  ctx.textAlign="left";
+}
+
 // ---- render ----
+let LAST_IDS=[];
 function render(){
-  const sel=selection(), ids=sel.map(d=>d.id);
+  const sel=selection(), ids=sel.map(d=>d.id); LAST_IDS=ids;
   document.getElementById("nsel").firstChild.nodeValue=String(sel.length);
   document.getElementById("ntot").textContent=" / "+S.length;
   // laplace mean logpdf
@@ -395,7 +488,7 @@ function render(){
 
   const tb=document.getElementById("tbody"); tb.innerHTML="";
   const empty=document.getElementById("empty");
-  if(!sel.length){ empty.style.display="block"; document.getElementById("nbeat").textContent="–"; document.getElementById("mll").textContent="–"; return; }
+  if(!sel.length){ empty.style.display="block"; document.getElementById("nbeat").textContent="–"; document.getElementById("mll").textContent="–"; drawFrontier(ids); return; }
   empty.style.display="none";
 
   const results=METHODS.map(mth=>{ const wr=winForSubset(ids,mth,metric); return {mth,...wr,ci:bootstrapCI(ids,mth,metric)}; })
@@ -418,7 +511,9 @@ function render(){
     tb.appendChild(tr);
   });
   document.getElementById("nbeat").innerHTML=beaten+"<small> / "+results.length+"</small>";
+  drawFrontier(ids);
 }
+let _rz; window.addEventListener("resize",()=>{ clearTimeout(_rz); _rz=setTimeout(()=>drawFrontier(LAST_IDS),120); });
 
 // ---- wiring ----
 document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener("change",()=>{
@@ -432,6 +527,7 @@ document.querySelectorAll(".metricbar button").forEach(b=>b.addEventListener("cl
   metric=b.dataset.metric; document.querySelectorAll(".metricbar button").forEach(x=>x.classList.toggle("on",x===b)); render();
 }));
 document.getElementById("reset").addEventListener("click",()=>{
+  freqs.forEach(f=>freqSel.add(f)); freqBox.querySelectorAll(".chip").forEach(c=>c.classList.add("on"));
   cats.forEach(c=>catSel.add(c)); catBox.querySelectorAll(".chip").forEach(c=>c.classList.add("on"));
   letSel.clear(); letBox.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
   Object.values(bucketState).forEach(s=>s.clear()); bBox.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
@@ -440,9 +536,11 @@ document.getElementById("reset").addEventListener("click",()=>{
 });
 document.getElementById("foot").innerHTML =
   `Baked from <code>__CSV__</code> · __NSER__ non-price series scored so far · win-rate = fraction of the selected series where `+
-  `laplace's held-out score beats the opponent's (log-likelihood: higher wins; CRPS: lower wins). Price series `+
-  `(equity/fx/commodity) are excluded by construction — laplace is not a price-series model. As more series `+
-  `score, re-generate to widen the sample; bands tighten accordingly.`;
+  `laplace's held-out score beats the opponent's (log-likelihood: higher wins; CRPS: lower wins). One filter `+
+  `drives both artefacts — the accuracy/speed frontier (speed is measured and fixed per method; accuracy is the `+
+  `mean log-likelihood over your selection) and the head-to-head bars. Frequency is inferred from observation `+
+  `cadence. Price series (equity/fx/commodity) are excluded by construction — laplace is not a price-series model. `+
+  `As more series score, re-generate to widen the sample; bands tighten accordingly.`;
 render();
 </script>
 """

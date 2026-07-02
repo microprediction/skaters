@@ -29,7 +29,7 @@ import bench_core as bc
 import opponents as opp
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-MIN_CHANGES = 500
+MIN_CHANGES = int(os.environ.get("STUDY_MIN_CHANGES", 500))   # relax (e.g. 200) to admit weekly/monthly
 MAX_CHANGES = int(os.environ.get("STUDY_MAX_CHANGES", 6000))   # never stall on a giant series
 WORKERS = int(os.environ.get("STUDY_WORKERS", min(16, (os.cpu_count() or 4))))
 CACHED_ONLY = os.environ.get("STUDY_CACHED_ONLY") == "1"
@@ -50,6 +50,7 @@ def _cfg(preset):
     c = dict(PRESETS[preset])
     c["n_candidates"] = int(os.environ.get("STUDY_N_CANDIDATES", c["n_candidates"]))
     c["max_qualify"] = int(os.environ.get("STUDY_MAX_QUALIFY", c["max_qualify"]))
+    c["test"] = int(os.environ.get("STUDY_TEST", c["test"]))   # scored window; relax to 200 for low-freq
     c["results"] = os.environ.get("STUDY_RESULTS", os.path.join(_HERE, c["csv"]))
     return c
 
