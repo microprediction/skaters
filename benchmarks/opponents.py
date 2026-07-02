@@ -372,6 +372,11 @@ qgrid <- function(point, lower, upper, levels) {
   out
 }
 
+# BENCH_R_SKIP=name1,name2 drops those methods (e.g. skip the slow bsts-R for a
+# high-throughput sweep). Empty by default -> run everything available.
+SKIP <- strsplit(Sys.getenv("BENCH_R_SKIP", ""), ",")[[1]]
+skip <- function(nm) nm %in% SKIP
+
 have_forecast <- requireNamespace("forecast", quietly = TRUE)
 have_smooth   <- requireNamespace("smooth",   quietly = TRUE)
 have_rugarch  <- requireNamespace("rugarch",  quietly = TRUE)
@@ -385,6 +390,7 @@ if (have_bsts)     suppressMessages(library(bsts))
 # history; the realized value python-y[t] is scored on the Python side. fc_fn(m)
 # returns list(mu,sd) -> emitG, or list(q=<TAUS-ordered values>) -> emitQ.
 run_reuse <- function(name, refit_fn, reuse_fn, fc_fn) {
+  if (skip(name)) return(invisible())
   fit <- NULL
   for (t in start:(n - 1)) {
     win <- y[max(1L, t - fitwin + 1L):t]
@@ -413,7 +419,7 @@ if (have_forecast) {
                        sd = sdband(as.numeric(f$lower)[1], as.numeric(f$upper)[1])) })
 
   # Theta (M3 winner): Gaussian predictive; cheap, refit every step.
-  for (t in start:(n - 1)) {
+  if (!skip("Theta-R")) for (t in start:(n - 1)) {
     win <- y[max(1L, t - fitwin + 1L):t]
     if (length(win) < 20) next
     f <- tryCatch(thetaf(win, h = 1, level = 90), error = function(e) NULL)
@@ -442,7 +448,7 @@ if (have_smooth) {
                                  as.numeric(f$lower[1, ]), as.numeric(f$upper[1, ]), LEVELS)) })
 }
 
-if (have_rugarch) {
+if (have_rugarch && !skip("GARCH-t-R")) {
   # GARCH(1,1)-t: heavy-tail conditional predictive; quantiles straight from the
   # fitted Student-t (mu + sigma * t_nu quantile). The R counterpart to arch's GARCH-t.
   spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
@@ -465,7 +471,7 @@ if (have_rugarch) {
   }
 }
 
-if (have_bsts) {
+if (have_bsts && !skip("bsts-R")) {
   # BSTS (Bayesian local level): posterior-predictive draws => sample quantiles.
   # No online update — a fresh short MCMC each step, so keep its max_series tiny.
   niter <- as.integer(Sys.getenv("BENCH_BSTS_NITER", "300"))
