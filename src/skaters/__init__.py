@@ -28,6 +28,7 @@ from skaters.transform import (
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
 from skaters.api import laplace
+from skaters.multiscale import multiscale
 from skaters.sticky import sticky
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -69,6 +70,7 @@ __all__ = [
     "precision_weighted_ensemble",
     "bayesian_ensemble",
     "terminal_leaf_ensemble",
+    "multiscale",
     "search",
     # Spec system
     "build",

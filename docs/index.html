@@ -110,9 +110,11 @@ for y in observations:
       facets of the same object.
     </p>
 
-    <h2>One forecaster</h2>
+    <h2>One general forecaster</h2>
     <p>
       <code>skaters</code> exposes <strong>exactly one forecaster</strong>, <code>laplace</code>.
+      At multi-step horizons (<code>k&gt;1</code>) it is <strong>multi-scale by default</strong>,
+      mixing instances on decimated clocks by likelihood (opt out with <code>scales=[1]</code>).
       Everything else is a building block you can compose. ("skater" is the <em>concept</em> — any
       <code>(y, state) → ([Dist], state)</code> function — not a function name.)
     </p>

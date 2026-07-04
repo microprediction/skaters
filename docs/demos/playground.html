@@ -78,6 +78,11 @@
         <span><span class="swatch" style="background:#ff8a3a"></span>k-step forecast fan</span>
       </div>
       <p class="status" id="status">—</p>
+      <div class="weights-panel" id="scalesPanel" style="display:none">
+        <div class="weights-title">The clocks being mixed
+          <span class="weights-sub">— one full model per decimation stride (every s-th observation), weighted by its trailing one-step likelihood on its own clock; horizon h draws on strides s ≤ h</span></div>
+        <div class="weights" id="scales"></div>
+      </div>
       <div class="weights-panel">
         <div class="weights-title">The paths that fit
           <span class="weights-sub">— each transform composition (y → transforms → leaf) judged by its full predictive likelihood, K steps ahead</span></div>
@@ -107,7 +112,7 @@
   </footer>
 
   <script type="module">
-    import { buildCandidates, terminalLeafEnsemble, crpsLeaf } from "../js/skaters/index.mjs";
+    import { buildCandidates, terminalLeafEnsemble, crpsLeaf, laplace } from "../js/skaters/index.mjs";
     let K = 6;   // forecast horizon (set from the slider in compute)
 
     let FAMILIES = [];
@@ -211,12 +216,10 @@
       K = parseInt(document.getElementById("horizon").value, 10);
       const [cands, depths, , families] = buildCandidates(K);
       FAMILIES = families;
-      // laplace itself (terminal ensemble) drives the forecast + the fan/metrics;
+      // laplace drives the forecast + the fan/metrics (multi-scale by default at
+      // K > 1: one instance per decimation stride, mixed by likelihood);
       // a parallel per-candidate scorer drives the "paths" panel (see above).
-      const policy = terminalLeafEnsemble(cands, {
-        k: K, leafFn: crpsLeaf, learningRate: 0.8, complexityPenalty: 0.005,
-        depths, maxComponents: 20, forget: 0.99,
-      });
+      const policy = laplace(K);
       const scorePaths = makePathScorer(cands, K);
       const regime = document.getElementById("regime").value;
       const series = makeSeries(regime, seed);
@@ -232,9 +235,23 @@
         const paths = scorePaths(y);   // judge each path's full k-step predictive
         const [dists, st] = policy(y, state);
         state = st; pending = dists;
+        // per-scale softmax weights from the multi-scale wrapper (K > 1 only):
+        // each decimation stride is scored by its trailing one-step logpdf on
+        // its own clock; the horizon then mixes eligible scales by these weights.
+        let scaleW = null;
+        if (st && st.score) {
+          const entries = Object.entries(st.score);
+          const vals = entries.map(([, m]) => m).filter((m) => m !== null);
+          if (vals.length) {
+            const top = Math.max(...vals);
+            const raw = entries.map(([s, m]) => [s, Math.exp((m === null ? top : m) - top)]);
+            const tot = raw.reduce((a, [, e]) => a + e, 0);
+            scaleW = raw.map(([s, e]) => [s, e / tot]);
+          }
+        }
         // Store the full k-step forecast fan made AFTER seeing y (predicts t+1..t+K).
         const fan = dists.map((d) => ({ mean: d.mean, lo: d.quantile(0.025), hi: d.quantile(0.975) }));
-        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1], paths });
+        rows.push({ y, mean, lo, hi, lp, fan, distK: dists[dists.length - 1], paths, scaleW });
       }
       cursor = 1;
     }
@@ -338,6 +355,19 @@
         `<span class="wval">${(100 * w).toFixed(0)}%</span></div>`).join("");
     }
 
+    function renderScales(upto) {
+      const row = upto >= 1 ? rows[upto - 1] : null;
+      const panel = document.getElementById("scalesPanel");
+      const el = document.getElementById("scales");
+      if (!row || !row.scaleW) { panel.style.display = "none"; el.innerHTML = ""; return; }
+      panel.style.display = "";
+      const max = Math.max(...row.scaleW.map(([, w]) => w));
+      el.innerHTML = row.scaleW.map(([s, w]) =>
+        `<div class="wrow"><span class="wlabel">stride ${s} (every ${s === "1" ? "obs" : s + "th obs"})</span>` +
+        `<span class="wtrack"><span class="wbar" style="width:${(100 * w / max).toFixed(1)}%; background:#ff8a3a"></span></span>` +
+        `<span class="wval">${(100 * w).toFixed(0)}%</span></div>`).join("");
+    }
+
     function tick() {
       if (paused) return;
       const step = parseInt(document.getElementById("speed").value, 10);
@@ -345,6 +375,7 @@
       draw(cursor);
       updateMetrics(cursor);
       renderWeights(cursor);
+      renderScales(cursor);
       if (cursor < rows.length) timer = requestAnimationFrame(tick);
     }
 

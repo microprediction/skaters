@@ -1,6 +1,6 @@
 // Residual distribution estimator (the leaf) — JS port of skaters/leaf.py.
 
-import { Dist, erf } from "./dist.mjs";
+import { fsum, Dist, erf } from "./dist.mjs";
 import { runningVarInit, runningVarUpdate, runningVarGet } from "./runstats.mjs";
 
 // A skater is a function (y, state) -> [dists, state].
@@ -58,11 +58,10 @@ export function scaleMixtureLeaf(k = 1, gamma = 0.02, scaleAlpha = 0.01, scales 
     const z = y / sigma;
     const w = state.w;
     const dens = new Array(K);
-    let total = 0.0;
     for (let i = 0; i < K; i++) {
       dens[i] = w[i] * Math.exp(-0.5 * z * z / (C[i] * C[i])) / C[i];
-      total += dens[i];
     }
+    const total = fsum(dens);
     if (total > 0) {
       const g = gamma > 1.0 / state.n ? gamma : 1.0 / state.n;
       state.w = w.map((wi, i) => (1 - g) * wi + g * dens[i] / total);
@@ -111,13 +110,14 @@ export function crpsLeaf(k = 1, eta = 1.0, scaleAlpha = 0.01, scales = FINE) {
     const g = new Array(K);
     for (let c = 0; c < K; c++) {
       let dot = 0.0;
-      for (let j = 0; j < K; j++) dot += w[j] * B[c][j];
+      dot = fsum(w.map((wj, j) => wj * B[c][j]));
       g[c] = absNormal(-z, C[c]) - dot;
     }
-    let gm = 0.0; for (let c = 0; c < K; c++) gm += g[c]; gm /= K;
+    const gm = fsum(g) / K;
     const nw = new Array(K);
     let Z = 0.0;
-    for (let c = 0; c < K; c++) { nw[c] = w[c] * Math.exp(-eta * (g[c] - gm)); Z += nw[c]; }
+    for (let c = 0; c < K; c++) nw[c] = w[c] * Math.exp(-eta * (g[c] - gm));
+    Z = fsum(nw);
     state.w = nw.map((x) => x / Z);
     const comps = C.map((c, i) => [state.w[i], 0.0, c * sig]);
     return [new Array(k).fill(new Dist(comps)), state];
@@ -167,9 +167,7 @@ export function garchLeaf(k = 1, gamma = 0.02, refitEvery = 40, minObs = 80,
 
     if (s.n >= minObs && s.n % refitEvery === 0 && s.buf.length >= minObs) {
       const resid = s.buf;
-      let sum2 = 0.0;
-      for (let i = 0; i < resid.length; i++) sum2 += resid[i] * resid[i];
-      const s2 = sum2 / resid.length;
+      const s2 = fsum(resid.map((r) => r * r)) / resid.length;
       if (s2 > 0) {
         // grid over (alpha, beta) AND a free omega multiplier (issue #25)
         let bestV = Infinity, bom = s.omega, bal = s.alpha, bbe = s.beta;
@@ -199,7 +197,8 @@ export function garchLeaf(k = 1, gamma = 0.02, refitEvery = 40, minObs = 80,
     const w = s.w;
     const dens = new Array(K);
     let total = 0.0;
-    for (let i = 0; i < K; i++) { dens[i] = w[i] * Math.exp(-0.5 * z * z / (C[i] * C[i])) / C[i]; total += dens[i]; }
+    for (let i = 0; i < K; i++) dens[i] = w[i] * Math.exp(-0.5 * z * z / (C[i] * C[i])) / C[i];
+    total = fsum(dens);
     if (total > 0) {
       const g = gamma > 1.0 / s.n ? gamma : 1.0 / s.n;
       s.w = w.map((wi, i) => (1 - g) * wi + g * dens[i] / total);

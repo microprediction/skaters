@@ -32,14 +32,18 @@ tectonic skaters-jss.tex
 
 ## Reproducing the empirical results
 
-Table 1 (the eight-baseline study) is produced end-to-end by
-`benchmarks/sota_study.py`. With a `FRED_API_KEY` and the optional baselines
-installed (`statsforecast`, `arch`, `statsmodels`, `neuralforecast`):
+Table 1 (the twelve-baseline study) is produced end-to-end by
+`benchmarks/study.py` with the `sota` preset. With a `FRED_API_KEY` and the
+optional baselines installed (`statsforecast`, `arch`, the R
+`forecast`/`smooth`/`rugarch` stack, CSP):
 
 ```bash
-PYTHONPATH=src python benchmarks/sota_study.py        # parallel across cores
-PYTHONPATH=src python benchmarks/sota_study.py summarize   # reprint the table
+PYTHONPATH=src python benchmarks/study.py sota             # parallel across cores
+PYTHONPATH=src python benchmarks/study.py sota summarize   # reprint the table
 ```
+
+The multi-step table is produced by `benchmarks/multistep_study.py` under the
+same `Dist` protocol.
 
 Every method — ours and theirs — is scored through the identical `Dist`
 interface on held-out log-likelihood and CRPS.

@@ -3,7 +3,7 @@
 // terminal leaf (default the scale-mixture leaf), so its shape reaches the
 // output undiluted.
 
-import { Dist } from "./dist.mjs";
+import { fsum, Dist } from "./dist.mjs";
 import { crpsLeaf } from "./leaf.mjs";
 
 export function terminalLeafEnsemble(skaters, {
@@ -51,14 +51,11 @@ export function terminalLeafEnsemble(skaters, {
 
     const maxLw = Math.max(...state.log_w);
     const w = state.log_w.map((lw) => Math.exp(lw - maxLw));
-    let tot = 0.0;
-    for (const x of w) tot += x;
+    const tot = fsum(w);
 
     const combined = [];
     for (let h = 0; h < k; h++) {
-      let muH = 0.0;
-      for (let i = 0; i < n; i++) muH += w[i] * allDists[i][h].mean;
-      muH /= tot;
+      const muH = fsum(w.map((wi, i) => wi * allDists[i][h].mean)) / tot;
 
       const mq = state.meanQ[h];
       if (mq.length >= h + 1) {
@@ -73,7 +70,7 @@ export function terminalLeafEnsemble(skaters, {
         pred = state.leafPred[h].shift(muH);
       } else {
         pred = Dist.combine(allDists.map((di) => di[h]), w);
-        if (pred.length > maxComponents) pred = pred.prune(maxComponents);
+        if (pred.components.length > maxComponents) pred = pred.prune(maxComponents);
       }
       combined.push(pred);
       mq.push(muH);

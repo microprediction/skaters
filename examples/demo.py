@@ -1,182 +1,114 @@
-"""Demo: compare skater configurations on synthetic series."""
+"""Demo: the ``laplace`` forecaster on synthetic series.
 
-import random
+Runs ``laplace`` online over a few synthetic regimes (random walk with
+drift, mean reversion, level shift) and prints per-step forecast
+summaries: point forecast (dist.mean), an 80% quantile interval, and the
+logpdf of the realized value. Ends with a multi-step ``laplace(k=3)``
+example (k=3), scored per horizon.
+
+Usage:
+    PYTHONPATH=src python examples/demo.py
+"""
+
 import math
+import random
 
-from skaters.ema import ema
-from skaters.conjugate import conjugate
-from skaters.transform import difference, fractional_difference, standardize
-from skaters.ensemble import precision_weighted_ensemble
-from skaters.calibrated import calibrated_envelope
-from skaters.api import ensemble
+from skaters import laplace
 
 
-def mae(errors):
-    return sum(abs(e) for e in errors) / len(errors)
+def run_online(name, f, series, burn=50, print_every=100):
+    """Run a skater online, printing periodic per-step summaries and totals.
+
+    Convention: f(y, state) -> (dists, state), where dists[0] is the
+    predictive distribution for the NEXT observation. So each incoming y
+    is scored against the prediction issued one step earlier.
+    """
+    state = None
+    prev = None                       # last one-step-ahead predictive Dist
+    abs_errors, logpdfs, covered = [], [], []
+
+    print(f"\n{'='*70}")
+    print(f"  {name}  ({len(series)} observations, burn-in={burn})")
+    print(f"{'='*70}")
+    print(f"  {'t':>5} {'y':>9} {'mean':>9} {'q10':>9} {'q90':>9} {'logpdf':>8}")
+
+    for t, y in enumerate(series):
+        if prev is not None and t > burn:
+            abs_errors.append(abs(prev.mean - y))
+            lp = prev.logpdf(y)
+            if math.isfinite(lp):
+                logpdfs.append(lp)
+            lo, hi = prev.quantile(0.1), prev.quantile(0.9)
+            covered.append(1 if lo <= y <= hi else 0)
+            if t % print_every == 0:
+                print(f"  {t:>5} {y:9.3f} {prev.mean:9.3f} {lo:9.3f} {hi:9.3f} {lp:8.3f}")
+
+        dists, state = f(y, state)
+        prev = dists[0]
+
+    print(f"  {'-'*58}")
+    print(f"  MAE {sum(abs_errors)/len(abs_errors):.4f}"
+          f"   mean logpdf {sum(logpdfs)/len(logpdfs):.4f}"
+          f"   80% coverage {sum(covered)/len(covered):.1%}")
 
 
-def run_comparison(name, series, models, k=1, burn=50):
-    """Run all models on a series, report MAE and coverage."""
-    states = {n: None for n in models}
-    errors = {n: [] for n in models}
-    coverage = {n: [] for n in models}
+def run_multistep(name, f, series, k, burn=50):
+    """Run a multi-step skater online, scoring each horizon separately.
 
-    for i, y in enumerate(series):
-        for n, f in models.items():
-            out, states[n] = f(y, states[n])
+    A prediction issued at time t for horizon h is scored against
+    series[t + h], so forecasts are buffered until their target arrives.
+    """
+    state = None
+    pending = {}                      # target time -> list of (h, Dist)
+    abs_errors = {h: [] for h in range(1, k + 1)}
+    logpdfs = {h: [] for h in range(1, k + 1)}
+    covered = {h: [] for h in range(1, k + 1)}
 
-            # Determine if this is an envelope (dict output) or raw skater (list)
-            if isinstance(out, dict):
-                pred = out["mean"][0]
-                std = out["std"][0]
-            else:
-                pred = out[0]
-                std = None
+    for t, y in enumerate(series):
+        for h, d in pending.pop(t, []):
+            if t > burn:
+                abs_errors[h].append(abs(d.mean - y))
+                lp = d.logpdf(y)
+                if math.isfinite(lp):
+                    logpdfs[h].append(lp)
+                covered[h].append(1 if d.quantile(0.1) <= y <= d.quantile(0.9) else 0)
+        dists, state = f(y, state)
+        for h, d in enumerate(dists, start=1):
+            pending[t + h] = pending.get(t + h, []) + [(h, d)]
 
-            if i > burn:
-                errors[n].append(pred - y)
-                if std is not None and math.isfinite(std) and std > 0:
-                    coverage[n].append(1 if abs(pred - y) <= std else 0)
-
-    print(f"\n{'='*60}")
-    print(f"  {name}")
-    print(f"  {len(series)} observations, k={k}, burn-in={burn}")
-    print(f"{'='*60}")
-    print(f"  {'Model':<40} {'MAE':>8} {'Coverage':>10}")
-    print(f"  {'-'*40} {'-'*8} {'-'*10}")
-    for n in models:
-        m = mae(errors[n])
-        if coverage[n]:
-            cov = sum(coverage[n]) / len(coverage[n])
-            print(f"  {n:<40} {m:8.4f} {cov:9.1%}")
-        else:
-            print(f"  {n:<40} {m:8.4f}       n/a")
-    print()
+    print(f"\n{'='*70}")
+    print(f"  {name}  ({len(series)} observations, k={k}, burn-in={burn})")
+    print(f"{'='*70}")
+    print(f"  {'horizon':>8} {'MAE':>9} {'mean logpdf':>12} {'80% coverage':>13}")
+    for h in range(1, k + 1):
+        mae = sum(abs_errors[h]) / len(abs_errors[h])
+        mlp = sum(logpdfs[h]) / len(logpdfs[h])
+        cov = sum(covered[h]) / len(covered[h])
+        print(f"  {h:>8} {mae:9.4f} {mlp:12.4f} {cov:12.1%}")
 
 
 def main():
     random.seed(42)
 
-    # --- Series 1: Random walk with drift ---
-    print("\n" + "#" * 60)
-    print("  SERIES 1: Random walk with drift")
-    print("#" * 60)
+    # --- Regime 1: random walk with drift ---
     rw = [0.0]
-    for _ in range(999):
+    for _ in range(699):
         rw.append(rw[-1] + 0.3 + random.gauss(0, 1))
+    run_online("laplace on random walk + drift", laplace(k=1), rw)
 
-    k = 1
-    run_comparison("Random walk + drift", rw, {
-        "plain EMA(0.1)": ema(alpha=0.1, k=k),
-        "plain EMA(0.3)": ema(alpha=0.3, k=k),
-        "diff + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), difference(), k=k),
-        "diff + EMA(0.3)": conjugate(ema(alpha=0.3, k=k), difference(), k=k),
-        "frac(0.3) + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), fractional_difference(d=0.3), k=k),
-        "std + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), standardize(), k=k),
-        "diff + ensemble": conjugate(ensemble(k=k), difference(), k=k),
-        "ensemble (no transform)": ensemble(k=k),
-    }, k=k)
-
-    # --- Series 2: Mean-reverting (Ornstein-Uhlenbeck) ---
-    print("#" * 60)
-    print("  SERIES 2: Mean-reverting (OU process)")
-    print("#" * 60)
+    # --- Regime 2: mean-reverting (Ornstein-Uhlenbeck) ---
     ou = [0.0]
-    for _ in range(999):
+    for _ in range(699):
         ou.append(ou[-1] * 0.95 + random.gauss(0, 1))
+    run_online("laplace on mean-reverting (OU)", laplace(k=1), ou)
 
-    run_comparison("Mean-reverting (OU)", ou, {
-        "plain EMA(0.1)": ema(alpha=0.1, k=k),
-        "plain EMA(0.3)": ema(alpha=0.3, k=k),
-        "diff + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), difference(), k=k),
-        "frac(0.4) + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), fractional_difference(d=0.4), k=k),
-        "ensemble (no transform)": ensemble(k=k),
-        "diff + ensemble": conjugate(ensemble(k=k), difference(), k=k),
-    }, k=k)
+    # --- Regime 3: level shift halfway through ---
+    shift = [10.0 + random.gauss(0, 2) if t < 350 else 50.0 + random.gauss(0, 2)
+             for t in range(700)]
+    run_online("laplace on level shift at t=350", laplace(k=1), shift)
 
-    # --- Series 3: Regime change ---
-    print("#" * 60)
-    print("  SERIES 3: Regime change (level shift at t=500)")
-    print("#" * 60)
-    regime = []
-    for i in range(1000):
-        level = 10.0 if i < 500 else 50.0
-        regime.append(level + random.gauss(0, 2))
-
-    run_comparison("Regime change", regime, {
-        "plain EMA(0.1)": ema(alpha=0.1, k=k),
-        "plain EMA(0.3)": ema(alpha=0.3, k=k),
-        "diff + EMA(0.3)": conjugate(ema(alpha=0.3, k=k), difference(), k=k),
-        "std + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), standardize(), k=k),
-        "ensemble (no transform)": ensemble(k=k),
-    }, k=k)
-
-    # --- Series 4: Composing transforms (chain) ---
-    print("#" * 60)
-    print("  SERIES 4: Trending + heteroskedastic noise")
-    print("#" * 60)
-    hetero = []
-    level = 0.0
-    for i in range(1000):
-        level += 0.1
-        noise_scale = 1.0 + 0.01 * i  # growing volatility
-        hetero.append(level + random.gauss(0, noise_scale))
-
-    run_comparison("Trending + heteroskedastic", hetero, {
-        "plain EMA(0.1)": ema(alpha=0.1, k=k),
-        "diff + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), difference(), k=k),
-        "std + diff + EMA(0.1)": conjugate(
-            conjugate(ema(alpha=0.1, k=k), difference(), k=k),
-            standardize(alpha=0.01),
-            k=k,
-        ),
-        "ensemble": ensemble(k=k),
-        "diff + ensemble": conjugate(ensemble(k=k), difference(), k=k),
-    }, k=k)
-
-    # --- Series 5: Multi-step prediction ---
-    print("#" * 60)
-    print("  SERIES 5: Multi-step (k=5) on random walk + drift")
-    print("#" * 60)
-    k = 5
-    run_comparison("Random walk + drift (k=5)", rw, {
-        "plain EMA(0.1)": ema(alpha=0.1, k=k),
-        "diff + EMA(0.1)": conjugate(ema(alpha=0.1, k=k), difference(), k=k),
-        "diff + ensemble": conjugate(ensemble(k=k), difference(), k=k),
-        "frac(0.3) + ensemble": conjugate(ensemble(k=k), fractional_difference(d=0.3), k=k),
-    }, k=k)
-
-    # --- Calibrated envelope demo ---
-    print("#" * 60)
-    print("  CALIBRATED ENVELOPE: coverage check on OU process")
-    print("#" * 60)
-    k = 1
-    run_comparison("OU with calibrated envelope", ou, {
-        "calibrated(ensemble)": calibrated_envelope(ensemble(k=k), k=k),
-        "calibrated(diff+ens)": calibrated_envelope(
-            conjugate(ensemble(k=k), difference(), k=k), k=k
-        ),
-    }, k=k)
-
-    # --- Meta-ensemble: let transforms compete ---
-    print("#" * 60)
-    print("  META-ENSEMBLE: transforms compete via precision weighting")
-    print("#" * 60)
-    meta = precision_weighted_ensemble([
-        ema(alpha=0.1, k=1),
-        conjugate(ema(alpha=0.1, k=1), difference(), k=1),
-        conjugate(ema(alpha=0.1, k=1), fractional_difference(d=0.3), k=1),
-        conjugate(ema(alpha=0.1, k=1), standardize(), k=1),
-        ensemble(k=1),
-        conjugate(ensemble(k=1), difference(), k=1),
-    ], k=1)
-
-    run_comparison("Random walk + drift (meta-ensemble)", rw, {
-        "plain EMA(0.1)": ema(alpha=0.1, k=1),
-        "ensemble": ensemble(k=1),
-        "diff + ensemble": conjugate(ensemble(k=1), difference(), k=1),
-        "META-ENSEMBLE (6 models)": meta,
-    }, k=1)
+    # --- Multi-step: laplace(k>1) is multi-scale by default ---
+    run_multistep("laplace(k=3) on random walk + drift", laplace(k=3), rw, k=3)
 
 
 if __name__ == "__main__":

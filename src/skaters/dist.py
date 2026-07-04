@@ -167,18 +167,34 @@ class Dist:
     def prune(self, max_components: int = 20) -> Dist:
         """Reduce component count by merging closest pairs."""
         max_components = max(1, max_components)   # a Dist needs >=1 component
-        comps = list(self.components)
+        if len(self.components) <= max_components:
+            return self
+        # Sort first so the merge path (and hence the result) is independent of
+        # component order — mixtures are order-free but the closest-pair scan
+        # is not, and ties at equal means are common (lattice atoms).
+        comps = sorted(self.components, key=lambda c: (c[1], c[2], c[0]))
+        # Pair selection tolerates last-ulp noise in the means: pick the FIRST
+        # pair within a hair of the true minimum distance, so platforms that
+        # disagree at the ulp level (e.g. libm erf vs a polynomial) still merge
+        # the same pairs in the same order. Exact argmin would amplify ulp
+        # noise into macroscopically different mixtures.
+        scale = abs(comps[0][1]) + abs(comps[-1][1]) + 1e-12
         while len(comps) > max_components:
-            # Find closest pair (by mean distance, weighted by mass)
             best_dist = float("inf")
-            best_i = 0
-            best_j = 1
             for i in range(len(comps)):
                 for j in range(i + 1, len(comps)):
                     d = abs(comps[i][1] - comps[j][1])
                     if d < best_dist:
                         best_dist = d
+            thresh = best_dist + 1e-9 * scale
+            best_i = best_j = None
+            for i in range(len(comps)):
+                for j in range(i + 1, len(comps)):
+                    if abs(comps[i][1] - comps[j][1]) <= thresh:
                         best_i, best_j = i, j
+                        break
+                if best_i is not None:
+                    break
             # Merge the pair (moment-matching)
             wi, mi, si = comps[best_i]
             wj, mj, sj = comps[best_j]
