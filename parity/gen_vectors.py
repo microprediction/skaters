@@ -27,6 +27,7 @@ from skaters.transform import (
     grouped_ar, yeo_johnson,
 )
 from skaters.api import laplace
+from skaters.multiscale import multiscale
 from skaters.sticky import sticky
 from skaters.search import search as adaptive_search
 from skaters import spec as S
@@ -77,6 +78,8 @@ def build_scenarios():
         s.append((f"ema_skater{suf}", k, ema(0.05, k=k)))
         s.append((f"pw_ensemble{suf}", k,
                   precision_weighted_ensemble([ema(0.05, k=k), ema(0.2, k=k)], k=k)))
+        s.append((f"multiscale{suf}", k, multiscale(
+            lambda kk: conjugate(leaf(k=kk), ema_transform(0.1), k=kk), k)))
         s.append((f"bayes_ensemble{suf}", k, bayesian_ensemble(
             [ema(0.05, k=k), conjugate(leaf(k=k), difference(), k=k)],
             k=k, learning_rate=0.5, complexity_penalty=0.02, depths=[1, 1])))

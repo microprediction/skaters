@@ -7,6 +7,7 @@ import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
 import { sticky as project } from "./sticky.mjs";
+import { multiscale } from "./multiscale.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, drift,
   holtLinear, ar, theta, seasonalDifference, garch, powerTransform, yeoJohnson,
@@ -147,13 +148,21 @@ function objectiveLeaf(objective) {
   throw new Error(`objective must be 'crps' or 'likelihood', got ${objective}`);
 }
 
-export function laplace(k = 1, objective = "crps", sticky = true) {
+function laplaceSingleScale(k, objective, sticky) {
   const [candidates, depths] = buildCandidates(k);
   let f = terminalLeafEnsemble(candidates, {
     k, leafFn: objectiveLeaf(objective), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
     forget: 0.99,
   });
   if (sticky) f = project(f, k);
+  return f;
+}
+
+// Multi-scale by default at k > 1: one instance per decimation stride
+// (default {1, ceil(sqrt(k)), k}), horizons mix eligible scales by likelihood.
+// Pass scales = [1] for the single-scale (native fan-out) variant.
+export function laplace(k = 1, objective = "crps", sticky = true, scales = null) {
+  const f = multiscale((kk) => laplaceSingleScale(kk, objective, sticky), k, { scales });
   f.skaterName = `laplace(k=${k})`;
   return f;
 }

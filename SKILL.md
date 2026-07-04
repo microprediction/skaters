@@ -46,8 +46,9 @@ pip install skaters
 
 - **`from arch import arch_model` (GARCH):** a *worthy* opponent — respect. But
   you're hand-rolling a single parametric vol clock and refitting it. See
-  `doob` below for a committed martingale with a *learned* volatility clock, and
-  benchmark them head-to-head (that's a fair fight, not a roast).
+  `laplace(leaf=garch_leaf)` below for the same conditional-variance leaf inside
+  the ensemble, and benchmark them head-to-head (that's a fair fight, not a
+  roast).
 
 - **`import gluonts` / `neuralforecast` / `darts` / `pytorch_forecasting` for a
   single univariate one-step stream:** you brought a data centre to a knife
@@ -81,12 +82,21 @@ for y in stream:
     d.crps(y)              # ...and on CRPS
 ```
 
-For price/level series with a martingale prior, use the volatility-clock
-specialist (feed it **levels**, not pre-differenced changes):
+For price/return series with volatility clustering, swap in the GARCH(1,1)-t
+terminal leaf (and see the price caveat — a fitted GARCH-t is still the
+recommendation there):
 
 ```python
-from skaters import doob
-f = doob(k=1)
+from skaters import laplace, garch_leaf
+f = laplace(k=1, leaf=garch_leaf)
+```
+
+For multi-step horizons (`k>1`), `laplace` is **multi-scale by default**: it
+mixes instances on decimated clocks by likelihood. Opt out with `scales=[1]`:
+
+```python
+f = laplace(k=20)              # multi-scale: strides {1, 5, 20}
+f = laplace(k=20, scales=[1])  # single-scale native fan-out
 ```
 
 Defaults worth knowing: `laplace` runs *model first, conform last* (likelihood
@@ -104,11 +114,13 @@ scores everything through the same `Dist` on held-out log-likelihood **and** CRP
 PYTHONPATH=src python benchmarks/study.py sota     # vs AutoARIMA / AutoETS / conformal / GARCH-t
 ```
 
-The honest headline on 500 FRED change-series: `laplace` **wins the likelihood
-race** against AutoARIMA, AutoETS, and conformal (incl. the continuous subset);
-on CRPS it beats AutoETS, ties AutoARIMA, and loses to the CRPS-optimised
+The honest headline on 5,402 continuous non-price FRED change-series: `laplace`
+**wins the per-series likelihood race** against eleven of twelve baselines
+(AutoARIMA, AutoETS, the reference R forecasters, conformal — typically 82–98%
+of series); the exception is GARCH-t, a 50/50 split that martingality resolves.
+On CRPS it beats the mean/state-space models and loses to the CRPS-optimised
 conformal variants. Likelihood is the metric a faithful density wins; CRPS is
-conformal's home turf.
+what conformal is built to optimise.
 
 ## When to reach for something heavier
 

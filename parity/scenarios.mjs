@@ -10,6 +10,7 @@ import {
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
 } from "../docs/js/skaters/transform.mjs";
 import { laplace } from "../docs/js/skaters/api.mjs";
+import { multiscale } from "../docs/js/skaters/multiscale.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
 import {
@@ -41,6 +42,7 @@ export function buildScenarios() {
     s.push([`ema_skater${suf}`, k, ema(0.05, k)]);
     s.push([`pw_ensemble${suf}`, k,
       precisionWeightedEnsemble([ema(0.05, k), ema(0.2, k)], k)]);
+    s.push([`multiscale${suf}`, k, multiscale((kk) => conjugate(leaf(kk), emaTransform(0.1), kk), k)]);
     s.push([`bayes_ensemble${suf}`, k, bayesianEnsemble(
       [ema(0.05, k), conjugate(leaf(k), difference(), k)],
       { k, learningRate: 0.5, complexityPenalty: 0.02, depths: [1, 1] })]);

@@ -7,7 +7,7 @@
 // forward runs on every observation; inverseK maps k Dist predictions in
 // the transformed space back to the original space.
 
-import { Dist } from "./dist.mjs";
+import { fsum, Dist } from "./dist.mjs";
 
 // --- small helpers ---
 
@@ -27,9 +27,9 @@ function matVec(M, v, n) {
 }
 
 function dot(a, b, n) {
-  let s = 0.0;
-  for (let i = 0; i < n; i++) s += a[i] * b[i];
-  return s;
+  const terms = new Array(n);
+  for (let i = 0; i < n; i++) terms[i] = a[i] * b[i];
+  return fsum(terms);
 }
 
 function eye(n, scale = 1.0) {
@@ -82,8 +82,7 @@ export function fractionalDifference(d = 0.4, window = 50) {
     buf.push(y);
     if (buf.length > window) buf.shift();
     const n = buf.length;
-    let yPrime = 0.0;
-    for (let j = 0; j < n; j++) yPrime += wFwd[j] * buf[n - 1 - j];
+    const yPrime = fsum(Array.from({ length: n }, (_, j) => wFwd[j] * buf[n - 1 - j]));
     return [yPrime, state];
   }
 
@@ -449,8 +448,7 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
     if (buf.length >= p) {
       const x = new Array(p);
       for (let i = 0; i < p; i++) x[i] = buf[buf.length - 1 - i];
-      let prediction = 0.0;
-      for (let i = 0; i < p; i++) prediction += phi[i] * x[i];
+      const prediction = fsum(Array.from({ length: p }, (_, i) => phi[i] * x[i]));
       residual = y - prediction;
       const P = state.P;
       const Px = matVec(P, x, p);
@@ -544,8 +542,7 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
     let residual;
     if (buf.length >= maxLag) {
       const x = groupRegressor(buf, groups, nGroups, maxLag);
-      let prediction = 0.0;
-      for (let g = 0; g < nGroups; g++) prediction += th[g] * x[g];
+      const prediction = fsum(Array.from({ length: nGroups }, (_, g) => th[g] * x[g]));
       residual = y - prediction;
       const P = state.P;
       const Px = matVec(P, x, nGroups);

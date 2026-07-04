@@ -239,9 +239,9 @@ decomposition of CRPS). Here the conformal opponent uses a naive (zero-change)
 mean, so we read this as an *ablation of our own objective knob* rather than a
 SOTA claim — the fitted-mean (AutoARIMA) conformal is a separate, smaller study.
 
-**Read the CRPS numbers honestly — one fixed policy, not best-of-ours.** We report
-the single fixed `laplace` default (a per-series best-of would be post-hoc
-selection), and give the opponent its best window per series. De-correlating each
+**Read the CRPS numbers plainly — one fixed configuration, no per-series
+tuning.** `laplace` runs in its fixed default configuration on every series,
+while the opponent gets its best calibration window per series. De-correlating each
 correlated curve/panel (yields by maturity, FX by counterparty) to one vote (198
 families):
 
@@ -328,10 +328,11 @@ indistinguishable from the base forecaster; on repeating series it is a large
 win.
 
 Together these justify a radical simplification: the package's user-facing API is
-**one** general forecaster (uniform prior, CRPS leaf, lattice projection, and
-coordinate learning, all on by default) plus **one** committed martingale
-specialist. The remaining structural ideas — adaptive search, prior bundles — do
-not pay their way out of sample.
+**one** general forecaster (uniform prior, CRPS leaf, lattice projection,
+coordinate learning, and — at multi-step horizons — the multi-scale granularity
+mixture, all on by default). The remaining structural ideas — adaptive search,
+prior bundles, a separate martingale specialist — do not pay their way out of
+sample.
 
 # 10. Discussion
 
@@ -351,7 +352,7 @@ competition-winning forecasting package by Peter Cotton, and builds on years of
 running live distributional-prediction contests at Microprediction, where
 forecasts are scored continuously as full distributions. The library is
 implemented twice — pure Python and zero-dependency JavaScript — and a parity
-suite checks ~90,000 probe values to 1e-6 on every run, so results are
+suite checks ~100,000 probe values to 1e-6 on every run, so results are
 reproducible across both runtimes and in the browser via Pyodide.
 
 # References

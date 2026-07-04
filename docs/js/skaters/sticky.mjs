@@ -4,7 +4,7 @@
 // single-spike behaviour is the max_atoms=1 case. Uses a Map so numeric-key
 // insertion order (hence the sort tie-break) matches Python's dict.
 
-import { Dist } from "./dist.mjs";
+import { fsum, Dist } from "./dist.mjs";
 
 export function sticky(base, k = 1, propensityAlpha = 0.05, spikeFrac = 0.005,
                        threshMult = 1.8, maxAtoms = 6, pruneEps = 1e-6) {
@@ -42,10 +42,10 @@ export function sticky(base, k = 1, propensityAlpha = 0.05, spikeFrac = 0.005,
         out.push(d);
         continue;
       }
-      const sw = atoms.reduce((acc, a) => acc + a[1], 0);
+      const sw = fsum(atoms.map((a) => a[1]));
       const P = Math.min(sw, 0.999);
       const pc = 1.0 - P;
-      const atomMean = atoms.reduce((acc, a) => acc + a[1] * a[0], 0) / sw;
+      const atomMean = fsum(atoms.map((a) => a[1] * a[0])) / sw;
       const spikeStd = Math.max(spikeFrac * d.std, 1e-9);
       if (pc <= 1e-9) {
         out.push(new Dist(atoms.map(([v, w]) => [w / sw, v, spikeStd])));

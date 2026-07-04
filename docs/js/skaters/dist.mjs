@@ -80,14 +80,27 @@ function absExpectation(m, s) {
   return m * (2.0 * gaussianCdf(z, 0.0, 1.0) - 1.0) + 2.0 * s * gaussianPdf(z, 0.0, 1.0);
 }
 
+// Neumaier-compensated sum, matching CPython 3.12+'s built-in sum() on floats
+// (the Python reference uses sum() for Dist normalisation and moments; the port
+// must reproduce it bit-for-bit or pruning tie-breaks diverge).
+export function fsum(values) {
+  let s = 0.0, c = 0.0;
+  for (const x of values) {
+    const t = s + x;
+    if (Math.abs(s) >= Math.abs(x)) c += (s - t) + x;
+    else c += (x - t) + s;
+    s = t;
+  }
+  return s + c;
+}
+
 export class Dist {
   // components: array of [weight, mean, std]
   constructor(components) {
     if (!components || components.length === 0) {
       throw new Error("Dist requires at least one component");
     }
-    let wTotal = 0.0;
-    for (const c of components) wTotal += c[0];
+    const wTotal = fsum(components.map((c) => c[0]));
     if (!(wTotal > 0)) throw new Error("Dist weights must sum to > 0");
     this.components = components.map(([w, m, s]) => [w / wTotal, m, s]);
   }
@@ -101,8 +114,7 @@ export class Dist {
   static combine(dists, weights = null) {
     const n = dists.length;
     if (weights === null) weights = new Array(n).fill(1.0 / n);
-    let wTotal = 0.0;
-    for (const w of weights) wTotal += w;
+    const wTotal = fsum(weights);
     const components = [];
     for (let i = 0; i < n; i++) {
       const wOuter = weights[i];
@@ -162,18 +174,14 @@ export class Dist {
   }
 
   get mean() {
-    let total = 0.0;
-    for (const [w, m] of this.components) total += w * m;
-    return total;
+    return fsum(this.components.map(([w, m]) => w * m));
   }
 
   get var() {
     // centered form: avoids catastrophic cancellation when means are large
     // relative to spreads (which would otherwise yield var=0, std=0).
     const mu = this.mean;
-    let total = 0.0;
-    for (const [w, m, s] of this.components) total += w * (s * s + (m - mu) * (m - mu));
-    return total;
+    return fsum(this.components.map(([w, m, s]) => w * (s * s + (m - mu) * (m - mu))));
   }
 
   get std() {
@@ -198,25 +206,40 @@ export class Dist {
     return new Dist(this.components.map(([w, m, s]) => [w, a * m + b, Math.abs(a) * s]));
   }
 
+  // Number of mixture components (mirrors Python's __len__).
+  get length() {
+    return this.components.length;
+  }
+
   // --- pruning ---
 
   prune(maxComponents = 20) {
     maxComponents = Math.max(1, maxComponents);   // a Dist needs >=1 component
-    let comps = this.components.map((c) => c.slice());
+    if (this.components.length <= maxComponents) return this;
+    // Sort first so the merge path (and hence the result) is independent of
+    // component order — mixtures are order-free but the closest-pair scan
+    // is not, and ties at equal means are common (lattice atoms).
+    let comps = this.components.map((c) => c.slice())
+      .sort((a, b) => (a[1] - b[1]) || (a[2] - b[2]) || (a[0] - b[0]));
+    // Pair selection tolerates last-ulp noise in the means: pick the FIRST
+    // pair within a hair of the true minimum distance, so platforms that
+    // disagree at the ulp level (e.g. libm erf vs a polynomial) still merge
+    // the same pairs in the same order. Exact argmin would amplify ulp
+    // noise into macroscopically different mixtures.
+    const scale = Math.abs(comps[0][1]) + Math.abs(comps[comps.length - 1][1]) + 1e-12;
     while (comps.length > maxComponents) {
       let bestDist = Infinity;
-      let bestI = 0;
-      let bestJ = 1;
-      for (let i = 0; i < comps.length; i++) {
+      for (let i = 0; i < comps.length; i++)
         for (let j = i + 1; j < comps.length; j++) {
           const d = Math.abs(comps[i][1] - comps[j][1]);
-          if (d < bestDist) {
-            bestDist = d;
-            bestI = i;
-            bestJ = j;
-          }
+          if (d < bestDist) bestDist = d;
         }
-      }
+      const thresh = bestDist + 1e-9 * scale;
+      let bestI = null, bestJ = null;
+      outer:
+      for (let i = 0; i < comps.length; i++)
+        for (let j = i + 1; j < comps.length; j++)
+          if (Math.abs(comps[i][1] - comps[j][1]) <= thresh) { bestI = i; bestJ = j; break outer; }
       const [wi, mi, si] = comps[bestI];
       const [wj, mj, sj] = comps[bestJ];
       const wNew = wi + wj;

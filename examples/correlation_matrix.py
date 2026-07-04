@@ -8,7 +8,7 @@ on the same series types — they're redundant. Low or negative
 correlation means they complement each other.
 
 Usage:
-    uv run python examples/correlation_matrix.py
+    PYTHONPATH=src python examples/correlation_matrix.py
 """
 
 import math
@@ -199,43 +199,49 @@ def _mean_revert_garch(n, seed):
     return y
 
 
-def run_policy(factory, series, burn=300):
-    """Run a policy on a series, return mean logpdf after burn-in."""
-    from skaters.dist import Dist
+def run_policy(factory, series, burn=200):
+    """Run a policy on a series, return mean logpdf after burn-in.
+
+    Each incoming y is scored against the one-step-ahead predictive Dist
+    issued at the previous step (dists[0]).
+    """
     f = factory(k=1)
     state = None
-    prev_mean = prev_std = None
+    prev = None
     logpdfs = []
     for i, y in enumerate(series):
-        dists, state = f(y, state)
-        if i > burn and prev_mean is not None and prev_std and prev_std > 0:
-            lp = Dist.gaussian(prev_mean, prev_std).logpdf(y)
+        if i > burn and prev is not None:
+            lp = prev.logpdf(y)
             if math.isfinite(lp):
                 logpdfs.append(lp)
-        prev_mean = dists[0].mean
-        prev_std = dists[0].std
+        dists, state = f(y, state)
+        prev = dists[0]
     return sum(logpdfs) / len(logpdfs) if logpdfs else float("-inf")
 
 
 def main():
-    from skaters.api import (
-        bachelier, samuelson, yule, brown, holt,
-        hosking, laplace, wald, dantzig, skater,
+    from skaters import (
+        laplace, leaf, conjugate,
+        ema_transform, difference, ou_transform, fractional_difference,
+        holt_linear, theta,
     )
 
+    # The named forecasters plus hand-composed specialists: a single
+    # transform conjugated over the plain Gaussian leaf. Each is a factory
+    # taking k; lap_ms3 runs laplace at k=3 (multi-scale default; pool includes the OU
+    # group) but is still scored on its one-step-ahead predictive.
     policies = {
-        "bachelier": bachelier,
-        "samuelson": samuelson,
-        "yule": yule,
-        "brown": brown,
-        "holt": holt,
-        "hosking": hosking,
-        "laplace": laplace,
-        "wald": wald,
-        "dantzig": dantzig,
+        "laplace": lambda k: laplace(k=k),
+        "lap_ms3": lambda k: laplace(k=3),
+        "ema": lambda k: conjugate(leaf(k=k), ema_transform(0.1), k=k),
+        "rwalk": lambda k: conjugate(leaf(k=k), difference(), k=k),
+        "ou": lambda k: conjugate(leaf(k=k), ou_transform(kappa=0.1), k=k),
+        "frac": lambda k: conjugate(leaf(k=k), fractional_difference(d=0.4), k=k),
+        "holt": lambda k: conjugate(leaf(k=k), holt_linear(0.1, 0.05), k=k),
+        "theta": lambda k: conjugate(leaf(k=k), theta(0.1), k=k),
     }
 
-    all_series = generate_series(n=2000)
+    all_series = generate_series(n=1000)
     series_names = sorted(all_series.keys())
     policy_names = list(policies.keys())
 

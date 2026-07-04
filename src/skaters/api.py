@@ -28,6 +28,7 @@ from skaters.transform import (
     seasonal_difference, yeo_johnson,
 )
 from skaters.terminal import terminal_leaf_ensemble
+from skaters.multiscale import multiscale
 from skaters.sticky import sticky as _project  # lattice projection (handles repeats)
 
 
@@ -242,27 +243,12 @@ def _build_candidates(k: int, leaf_fn=leaf):
 
 
 # ---------------------------------------------------------------------------
-# The two named forecasters
+# The named forecaster
 # ---------------------------------------------------------------------------
 
-def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None):
-    """The general forecaster.
-
-    A likelihood-weighted Bayesian ensemble over the full candidate population
-    (*model first*), with a CRPS terminal leaf (*conform last*) and the lattice
-    projection for repeating values — both on by default. After Pierre-Simon
-    Laplace: a uniform prior, let the data speak.
-
-    Args:
-        k: forecast horizon.
-        objective: terminal-leaf objective — ``"crps"`` (default) or
-            ``"likelihood"``.
-        sticky: lattice projection for repeating values (default True; free on
-            continuous data, a large win on grid/repeating series).
-        leaf: optional terminal-leaf factory overriding ``objective`` — e.g.
-            ``laplace(leaf=garch_leaf)`` for a GARCH(1,1) conditional variance on
-            price/return series. A factory ``leaf(k=...) -> skater``.
-    """
+def _laplace_single_scale(k, objective, sticky, leaf):
+    """One laplace instance on one clock: the likelihood-weighted trunk with a
+    terminal leaf, plus the lattice projection."""
     candidates, depths, _ = _build_candidates(k)
     f = terminal_leaf_ensemble(
         candidates, k=k,
@@ -278,5 +264,40 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None)
     )
     if sticky:
         f = _project(f, k=k)
+    return f
+
+
+def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
+            scales: list[int] | None = None):
+    """The general forecaster.
+
+    A likelihood-weighted Bayesian ensemble over the full candidate population
+    (*model first*), with a CRPS terminal leaf (*conform last*) and the lattice
+    projection for repeating values — both on by default. After Pierre-Simon
+    Laplace: a uniform prior, let the data speak.
+
+    At multi-step horizons (``k > 1``) the ensemble is **multi-scale** by
+    default: one full instance runs per decimation stride (default
+    ``{1, ceil(sqrt(k)), k}``) and each horizon mixes the eligible scales'
+    predictive distributions under likelihood softmax weights, so the horizon
+    selects its effective sampling granularity online (see
+    :mod:`skaters.multiscale`). At ``k == 1`` there is only one scale and no
+    wrapper. Pass ``scales=[1]`` for the single-scale (native fan-out) variant.
+
+    Args:
+        k: forecast horizon.
+        objective: terminal-leaf objective — ``"crps"`` (default) or
+            ``"likelihood"``.
+        sticky: lattice projection for repeating values (default True; free on
+            continuous data, a large win on grid/repeating series).
+        leaf: optional terminal-leaf factory overriding ``objective`` — e.g.
+            ``laplace(leaf=garch_leaf)`` for a GARCH(1,1) conditional variance on
+            price/return series. A factory ``leaf(k=...) -> skater``.
+        scales: decimation strides for the multi-scale mixture (stride s serves
+            horizons h >= s). Default ``{1, ceil(sqrt(k)), k}``; ``[1]`` opts
+            out of multi-scale.
+    """
+    f = multiscale(lambda kk: _laplace_single_scale(kk, objective, sticky, leaf),
+                   k=k, scales=scales)
     f.__name__ = f"laplace(k={k})"
     return f

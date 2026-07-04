@@ -9,17 +9,17 @@ One univariate time-series model to rule them all? For non-price economic series
   <a href="#javascript--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript-1a8c4a?style=for-the-badge" alt="Python and JavaScript"></a>
 </p>
 
-Laplace beats everything.
+Laplace beats (almost) everything.
 
 <p align="center">
   <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 894 non-price FRED series: laplace has both the highest held-out log-likelihood and the highest forecasts-per-second, alone in the top-right, while AutoARIMA, AutoETS, SARIMAX, GARCH-t, conformal and NeuralForecast trade accuracy for far more compute." width="680">
 </p>
 
 
-Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: across ~900 such FRED series *Laplace* has the highest mean held-out **log-likelihood** and the best per-series win-rate against every baseline — AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot foundation models, **and GARCH-t** (68% / 65% family-weighted). 
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
 
 **Not for price/return series:** 
-We recomment GARCH-t there instead. 
+We recommend GARCH-t there instead. 
 
 **Not really for CRPS targets**
 On CRPS Laplace still beats most of the competition. However if you really like CRPS you should pick a method like
@@ -50,12 +50,13 @@ for y in observations:
 
 Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
-## `laplace` — the one forecaster
+## `laplace` — the general forecaster
 
 `skaters` exposes **exactly one forecaster**, `laplace`. Everything else is a
 building block (transforms, leaves, ensembles) you can compose. ("skater" is the
 *concept* — any `(y, state) -> ([Dist], state)` function, borrowed from the old
-timemachines package.)
+timemachines package.) At multi-step horizons (`k>1`) it is **multi-scale by
+default** (below).
 
 ```python
 from skaters import laplace
@@ -97,9 +98,28 @@ f = laplace(k=1, leaf=garch_leaf)         # GARCH(1,1) conditional variance + St
 
 **Not for price/returns, though** — there a fitted GARCH-t still wins
 
+### Multi-step horizons are multi-scale by default
+
+Natively, `laplace(k)` reaches horizon `h` by fanning its one-step model out,
+and on long horizons the fan-out can inflate the predictive variance. A model on
+a *decimated* clock (every s-th observation) reaches the same horizon in
+`round(h/s)` of its own steps and stays tight — but is blind to the skipped
+points. At `k>1`, `laplace` runs a full instance per scale (default strides
+`{1, ceil(sqrt(k)), k}`) and mixes their predictive `Dist`s per horizon with
+likelihood softmax weights, so each horizon selects its effective granularity
+online. At `k=1` it *is* `laplace(1)`; on a 150-series multi-step pilot it is
+the only variant to win the likelihood race against AutoARIMA, AutoETS, GARCH-t
+*and* Prophet at every horizon in {1, 5, 20}.
+
+```python
+f = laplace(k=20)                      # scales {1, 5, 20}, mixed by likelihood
+f = laplace(k=20, scales=[1, 4, 20])   # or pick the clock grid yourself
+f = laplace(k=20, scales=[1])          # opt out: single-scale native fan-out
+```
+
 ### Specialist behaviour by composition
 
-There's only one forecaster, but the building blocks compose into specialists when
+The named forecasters are thin wrappers; the building blocks compose into specialists when
 you have a strong prior. **Mean reversion** (e.g. pairs-trading spreads): the
 `ou_transform` reverts to a running mean and its edge grows with the horizon, so
 feed it `k>1` —
@@ -177,6 +197,9 @@ Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inve
 | `garch(`$\omega, \alpha, \beta$`)` | $y'_t = y_t / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D$ | Volatility clustering |
 | `seasonal_difference(`$s$`)` | $y'_t = y_t - y_{t-s}$ | Shift by lagged value | Periodicity |
 | `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method | Tail compression |
+| `theta(`$\alpha$`)` | $y'_t = y_t - \text{SES}_t$ | Shift by smoothed level + drift | Theta method (M3 winner) |
+| `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Component-wise delta method | Coordinate learning (log/root/linear) |
+| `ou_transform(`$\kappa$`)` | Deviation from running mean, OU speed $\kappa$ | Exact OU moments (scale + shift) | Mean reversion |
 
 ## Conjugation
 
@@ -322,8 +345,8 @@ def my_transform():
 
 The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
 transform, ensemble, and named policy. It is verified against the Python reference by a parity
-suite that checks 76,000+ values to 1e-6 (`parity/`, run in the test suite via
-`tests/test_js_parity.py`).
+suite that checks roughly 100,000 values to 1e-6 (`parity/`, run in the test
+suite via `tests/test_js_parity.py`).
 
 ```html
 <script type="module">
