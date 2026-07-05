@@ -1,5 +1,5 @@
 ---
-title: "Model First, Conform Last: A Composition-Based Automatic Online Distributional Forecaster"
+title: "Transforms All the Way Down: Automatic Online Distributional Forecasting by Conjugation"
 author:
   - Peter Cotton (Microprediction)
 date: 2026
