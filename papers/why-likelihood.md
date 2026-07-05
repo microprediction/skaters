@@ -32,7 +32,7 @@ The log score is the only proper score whose regret is a divergence you can read
 
 CRPS is a proper score, and it has two genuine virtues. Neither of them is "you don't have a density."
 
-**Robustness.** The log score is unbounded below: a forecast that assigns near-zero density to a value that then occurs is punished by a near-infinite loss. When the truth has tails you cannot or will not model — raw financial returns are the standard case — that sensitivity becomes noise, and a single deep-tail draw can dominate a whole evaluation. CRPS is finite and lives in the units of the outcome, so it degrades gracefully under tail misspecification. On price and returns the CRPS-shaped GARCH-t wins, and you should use it. That is the one place `skaters` cedes.
+**Robustness.** The log score is unbounded below: a forecast that assigns near-zero density to a value that then occurs takes a near-infinite loss. That sensitivity is usually a signal, not a defect — it tells you the tails are wrong, and the fix is to model them, not to change the ruler. `skaters` does exactly this with its scale-mixture leaf: heavier tails *lift* the log-likelihood rather than being papered over. On price and returns a proper tail-and-volatility model like GARCH-t wins, and it wins under the log score too — because it is the right model there, not because CRPS is the right metric. Where CRPS earns its keep is when you genuinely cannot model the tails and still need a bounded score: monitoring, or an adversarial or unknown source, where a single deep-tail draw must not blow up the evaluation. CRPS is finite and lives in the units of the outcome, so it degrades gracefully when the model is wrong and you know it.
 
 **Interpretability.** CRPS reports a distance in the outcome's own units — dollars, degrees, people — which a decision-maker can read directly. Log-likelihood is in nats.
 
@@ -40,4 +40,4 @@ What is *not* a reason to reach for CRPS is "I only have samples." A cloud of sa
 
 ## The verdict
 
-Rank by held-out log-likelihood. It is local, it is the wealth a market pays, it composes, and it is information. Keep CRPS in the drawer for two jobs: a robustness check when you fear the tails, and a unit-interpretable summary for a reader who asks for one. That is exactly what `skaters` does — everything is judged by log-likelihood, and `Dist.crps(y)` is there as a secondary proper score for when you want it.
+Rank by held-out log-likelihood. It is local, it is the wealth a market pays, it composes, and it is information. Keep CRPS in the drawer for two jobs: a bounded score for when you cannot model the tails, and a unit-interpretable summary for a reader who asks for one. That is exactly what `skaters` does — everything is judged by log-likelihood, and `Dist.crps(y)` is there as a secondary proper score for when you want it.
