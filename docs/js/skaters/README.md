@@ -1,5 +1,9 @@
 # skaters
 
+[![npm version](https://img.shields.io/npm/v/skaters)](https://www.npmjs.com/package/skaters)
+[![npm downloads](https://img.shields.io/npm/dm/skaters)](https://www.npmjs.com/package/skaters)
+[![license: MIT](https://img.shields.io/npm/l/skaters)](https://github.com/microprediction/skaters/blob/main/LICENSE)
+
 Fast univariate **online distributional** time-series forecasting. Zero
 dependencies, runs in Node or the browser. This is the JavaScript port of the
 Python [`skaters`](https://pypi.org/project/skaters/) package, numerically
