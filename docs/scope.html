@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — scope</title>
+  <meta name="description" content="What autonomous univariate distributional time-series forecasting is for, and the objections it is not refuted by." />
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Scope</h1>
+    <p class="subtitle">What autonomous univariate distributional forecasting is
+      for, and the objections it is not refuted by.</p>
+
+    <h2>What it is</h2>
+    <p>
+      A skater turns a single numeric stream into a full predictive
+      <em>distribution</em>, online, automatically, in Python or the browser. Not
+      a point and an error bar bolted on afterwards. A distribution: a mean for an
+      estimate, a spread for risk, tails for sizing, and a density for scoring and
+      combination. No human tends any one series, and nothing is configured per
+      series.
+    </p>
+
+    <h2>What it is good for</h2>
+    <p>
+      A distribution, not a point, is what downstream decisions actually consume.
+      Risk limits read the spread, threshold alarms read the tail probability,
+      position sizing reads the whole shape, simulation reads draws, and a
+      likelihood-based evaluation reads the density at what happened. A skater
+      supplies all of these for any stream it is pointed at.
+    </p>
+    <p>
+      It is built to run unattended and at scale: thousands of streams, updated on
+      every observation, on a server or in a browser tab, with no fitting job to
+      babysit. That makes it a good <em>baseline</em>, a good <em>prior</em>, and
+      a good <em>monitor</em> — the always-on distributional layer under a system
+      that has better things to spend attention on.
+    </p>
+
+    <h2>The objections it is not refuted by</h2>
+    <p>
+      <strong>&ldquo;But you need more data, or exogenous features.&rdquo;</strong>
+      Yes, and univariate forecasting never claimed otherwise. Real series are
+      driven by outside data, and a serious model brings it in. Univariate
+      distributional prediction is a <em>component</em>, not a pipeline. It is
+      what you run on the series you have, and it plugs in before, during, or
+      after the rest of the modeling. A skater is a transformation by
+      construction, so it composes into a larger system rather than standing
+      alone; exogenous structure enters as another stage that conditions on it and
+      refines the residual.
+    </p>
+    <p>
+      <strong>&ldquo;You should just hire an analyst, or build a bespoke
+      model.&rdquo;</strong> For one series, sure. The point is autonomy and
+      scale. A hand-built model per stream does not survive thousands of streams
+      updated online, and a point forecast from it is not the object most
+      decisions need. A skater is cheap, fast, dependency-free, and runs anywhere,
+      which is exactly what you want for the long tail of series nobody will ever
+      staff.
+    </p>
+
+    <h2>Chaining into larger systems</h2>
+    <p>
+      This is the point the
+      <a href="https://book.microprediction.org/">Microprediction book</a> is
+      built around. Forecasting can be organized as a supply chain: one stream's
+      distributional output becomes the input, the residual, or the settled
+      outcome of the next, each stage contributed by whoever is best at it. A
+      univariate distributional forecaster is the base layer of that chain, the
+      reusable density that residual markets, dependence models, and conditioning
+      forecasters build on.
+    </p>
+    <p>
+      That is also why a skater is scored by held-out log-likelihood rather than
+      by a threshold or interval metric. Likelihood is the score under which such
+      refinements compose: the log-likelihood of a chained forecast is the base
+      score plus the contribution of each stage. The reasoning is laid out in
+      <a href="/metrics.html">why skaters ranks by likelihood</a>.
+    </p>
+
+    <h2>The short version</h2>
+    <p>
+      Univariate distributional forecasting is not the whole system. It is the
+      honest, autonomous, composable base of one: a full distribution for every
+      stream, at scale, ready to be chained.
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="https://github.com/microprediction/precise">precise</a>,
+    <a href="https://github.com/microprediction/allocation">allocation</a>,
+    <a href="https://github.com/microprediction/humpday">humpday</a>).
+  </footer>
+</body>
+</html>
