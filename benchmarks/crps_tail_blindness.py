@@ -45,11 +45,13 @@ mean_nll = lambda s: gauss_nll(y, 0.0, s).mean()
 sC = minimize_scalar(mean_crps, bounds=(0.3, 6), method="bounded").x
 sL = minimize_scalar(mean_nll, bounds=(0.3, 6), method="bounded").x
 
-# true-t3 baseline (wins both, by propriety) via the energy form for CRPS
-xs = stats.t.rvs(DF, size=1_000_000, random_state=rng)
-xs2 = stats.t.rvs(DF, size=1_000_000, random_state=rng)
-t3_crps = np.abs(xs - y[:len(xs)]).mean() - 0.5 * np.abs(xs - xs2).mean()
-t3_nll = (-stats.t.logpdf(y[:1_000_000], DF)).mean()
+# true-t3 baseline (wins both, by propriety), computed exactly by integration:
+# expected CRPS of the true law = int F(t)(1-F(t)) dt; t3 NLL = differential entropy.
+from scipy import integrate  # noqa: E402
+_Ft = lambda t: stats.t.cdf(t, DF)
+_ft = lambda t: stats.t.pdf(t, DF)
+t3_crps, _ = integrate.quad(lambda t: _Ft(t) * (1 - _Ft(t)), -np.inf, np.inf, limit=300)
+t3_nll, _ = integrate.quad(lambda t: -np.log(_ft(t)) * _ft(t), -np.inf, np.inf, limit=300)
 
 # conformal-style bounded support: t3 truncated to an observed calibration range
 cal = stats.t.rvs(DF, size=2000, random_state=rng)
