@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — live forecasting race</title>
+  <meta name="description" content="Race skaters against classical baselines on real FRED series, live in your browser. No key, no server." />
+  <link rel="stylesheet" href="../academic.css" />
+  <style>
+    .race-intro { color: var(--muted); }
+    .panel { border: 1px solid var(--border, #e6e6ef); border-radius: 10px; padding: 18px 20px; margin: 22px 0; }
+    .panel h2 { margin-top: 0; }
+    .bigstat { font-size: 2.4rem; font-weight: 700; line-height: 1.1; }
+    .bigstat small { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+    .row { display: grid; grid-template-columns: 130px 1fr 78px 78px 84px; gap: 10px; align-items: center; margin: 8px 0; font-size: 0.92rem; }
+    .row .who { font-weight: 600; white-space: nowrap; }
+    .row .who .tag { font-weight: 400; color: var(--muted); font-size: 0.78rem; display: block; }
+    .bar { background: #ececf3; border-radius: 5px; height: 14px; overflow: hidden; }
+    .bar > span { display: block; height: 100%; width: 0; background: #4a3aff; transition: width 0.08s linear; }
+    .row.laplace .bar > span { background: #1a8c4a; }
+    .num { font-variant-numeric: tabular-nums; text-align: right; }
+    .muted { color: var(--muted); }
+    button.btn { cursor: pointer; }
+    select, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border, #ccd); background: #fff; }
+    .btn.primary { background: #4a3aff; color: #fff; border-color: #4a3aff; }
+    .headline { margin: 10px 0 2px; }
+    .legend { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+    code.k { font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+        <a href="https://www.npmjs.com/package/skaters">npm</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <p class="pagenav"><a href="/demos/">&larr; Demos</a></p>
+    <h1>Live forecasting race</h1>
+    <p class="race-intro">
+      The whole thing runs in your browser — the actual <code>skaters</code>
+      JavaScript port against classical baselines, on 150 real FRED daily
+      change-series (from the benchmark's popularity-ranked universe). No API key,
+      no server. Every method is turned into the same predictive distribution and
+      scored on held-out <strong>log-likelihood</strong> and CRPS, rolling
+      one-step-ahead — the paper's harness, live.
+    </p>
+
+    <div class="panel">
+      <h2>1. Race the whole universe</h2>
+      <p class="muted">The online methods (<code class="k">laplace</code> and a
+        naive Gaussian) sweep all 150 series. Watch the win-rate settle.</p>
+      <p><button id="run-agg" class="btn primary">Run the benchmark</button>
+        <span id="agg-status" class="muted"></span></p>
+      <p class="headline"><span id="agg-winrate" class="bigstat">—</span>
+        <small id="agg-winrate-label"></small></p>
+      <div class="row laplace"><div class="who">laplace <span class="tag">online, native density</span></div>
+        <div class="bar"><span id="bar-lap"></span></div>
+        <div class="num" id="ll-lap">—</div><div class="num muted">mean LL</div><div></div></div>
+      <div class="row"><div class="who">naive <span class="tag">EWMA mean ± rolling σ</span></div>
+        <div class="bar"><span id="bar-naive"></span></div>
+        <div class="num" id="ll-naive">—</div><div class="num muted">mean LL</div><div></div></div>
+      <p class="legend">Bars show mean held-out log-likelihood (nats; longer is better). A win is a higher per-series log-likelihood.</p>
+    </div>
+
+    <div class="panel">
+      <h2>2. Watch one series — with the heavyweights</h2>
+      <p class="muted">Add the refit-every-step baselines. <code class="k">laplace</code>
+        finishes in a blink; Holt-Winters and ARIMA grind through a fresh fit at
+        every step. The slowness is the point.</p>
+      <p>
+        <select id="series-sel"><option>Loading series…</option></select>
+        <button id="run-drill" class="btn primary">Race</button>
+        <span id="drill-status" class="muted"></span>
+      </p>
+      <div id="drill-rows"></div>
+      <p class="legend">ARIMA is the npm <code class="k">arima</code> package (WebAssembly), loaded from a CDN on demand; if it can't load it's skipped. Holt-Winters and the naive method are wrapped as Gaussians, since a point/interval forecast is all they emit.</p>
+    </div>
+
+    <p class="muted">Reproduce at scale (all 894 non-price series, more baselines):
+      <a href="/papers.html">the benchmarks</a>. Why log-likelihood is the score:
+      <a href="/metrics.html">metrics</a>.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="https://github.com/microprediction/precise">precise</a>,
+    <a href="https://github.com/microprediction/allocation">allocation</a>,
+    <a href="https://github.com/microprediction/humpday">humpday</a>).
+  </footer>
+
+  <script type="module">
+    import { makeLaplace, makeNaive, makeHoltWinters, runSeries } from "./race-engine.mjs";
+    import { Dist } from "../js/skaters/index.mjs";
+
+    const $ = (id) => document.getElementById(id);
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const BURN = 100;
+
+    let SERIES = null;
+    async function loadData() {
+      if (!SERIES) {
+        $("agg-status").textContent = "loading data…";
+        ({ SERIES } = await import("./data/fred-changes.mjs"));
+        populateSelect();
+      }
+      return SERIES;
+    }
+    function populateSelect() {
+      const sel = $("series-sel");
+      sel.innerHTML = "";
+      SERIES.forEach((s, i) => {
+        const o = document.createElement("option");
+        o.value = String(i);
+        o.textContent = s.id + " — " + (s.title || "").slice(0, 48);
+        sel.appendChild(o);
+      });
+    }
+
+    // ---- Panel 1: aggregate sweep (online methods only) ----
+    async function runAggregate() {
+      const btn = $("run-agg"); btn.disabled = true;
+      const series = await loadData();
+      let wins = 0, tot = 0, sumLap = 0, sumNaive = 0;
+      const t0 = performance.now();
+      for (let i = 0; i < series.length; i++) {
+        const r = runSeries(series[i].changes, [makeLaplace(), makeNaive()], BURN);
+        if (isFinite(r[0].meanLL) && isFinite(r[1].meanLL)) {
+          tot++; if (r[0].meanLL > r[1].meanLL) wins++;
+          sumLap += r[0].meanLL; sumNaive += r[1].meanLL;
+        }
+        if (i % 4 === 0 || i === series.length - 1) {
+          drawAgg(i + 1, series.length, wins, tot, sumLap, sumNaive);
+          await frame();
+        }
+      }
+      $("agg-status").textContent = `${tot} series · ${((performance.now() - t0) / 1000).toFixed(1)}s`;
+      btn.disabled = false;
+    }
+    function drawAgg(done, total, wins, tot, sumLap, sumNaive) {
+      $("agg-status").textContent = `${done}/${total} series`;
+      if (!tot) return;
+      const wr = 100 * wins / tot;
+      $("agg-winrate").textContent = wr.toFixed(0) + "%";
+      $("agg-winrate-label").textContent = `of ${tot} series won by laplace`;
+      const mLap = sumLap / tot, mNaive = sumNaive / tot;
+      const scale = Math.max(mLap, mNaive, 0.001);
+      $("bar-lap").style.width = (100 * mLap / scale) + "%";
+      $("bar-naive").style.width = (100 * Math.max(mNaive, 0) / scale) + "%";
+      $("ll-lap").textContent = mLap.toFixed(3);
+      $("ll-naive").textContent = mNaive.toFixed(3);
+    }
+
+    // ---- Panel 2: single-series drill-down (each competitor races on its own) ----
+    let ARIMA;
+    async function ensureArima() {
+      if (ARIMA === false) return null;
+      if (ARIMA) return ARIMA;
+      try {
+        const mod = await import("https://esm.sh/arima@0.2.5");
+        ARIMA = mod.default || mod;
+        return ARIMA;
+      } catch (e) { ARIMA = false; return null; }
+    }
+    function makeArima(A) {
+      const hist = []; let residVar = 1e-4, pending = Dist.gaussian(0, 1); const aVar = 0.05, WIN = 150;
+      return {
+        name: "arima", kind: "refit",
+        get pending() { return pending; },
+        step(y) {
+          if (hist.length) { const r = y - pending.mean; residVar = (1 - aVar) * residVar + aVar * r * r; }
+          hist.push(y);
+          try {
+            const m = new A({ p: 2, d: 0, q: 1, verbose: false }).train(hist.slice(-WIN));
+            const [pred, err] = m.predict(1);
+            pending = Dist.gaussian(pred[0], Math.sqrt(Math.max(err[0] || residVar, 1e-9)));
+          } catch (e) {
+            pending = Dist.gaussian(hist[hist.length - 1], Math.sqrt(Math.max(residVar, 1e-9)));
+          }
+        },
+      };
+    }
+
+    // Run one competitor over a series, a few steps per frame, updating its row.
+    async function raceOne(changes, comp, row) {
+      const t0 = performance.now();
+      let ll = 0, crps = 0, n = 0;
+      const N = changes.length, chunk = comp.kind === "refit" ? 3 : 400;
+      for (let i = 0; i < N; i++) {
+        const y = changes[i];
+        if (i >= BURN && comp.pending) { ll += comp.pending.logpdf(y); crps += comp.pending.crps(y); n++; }
+        comp.step(y);
+        if (i % chunk === 0) {
+          row.bar.style.width = (100 * (i + 1) / N) + "%";
+          if (n) { row.ll.textContent = (ll / n).toFixed(3); row.crps.textContent = (crps / n).toFixed(4); }
+          await frame();
+        }
+      }
+      row.bar.style.width = "100%";
+      row.ll.textContent = n ? (ll / n).toFixed(3) : "—";
+      row.crps.textContent = n ? (crps / n).toFixed(4) : "—";
+      row.time.textContent = ((performance.now() - t0)).toFixed(0) + " ms";
+      return n ? ll / n : NaN;
+    }
+
+    function competitorRow(name, tag, isLap) {
+      const wrap = document.createElement("div");
+      wrap.className = "row" + (isLap ? " laplace" : "");
+      wrap.innerHTML = `<div class="who">${name} <span class="tag">${tag}</span></div>
+        <div class="bar"><span></span></div>
+        <div class="num">—</div><div class="num">—</div><div class="num muted">—</div>`;
+      const [barWrap, ll, crps, time] = [wrap.querySelector(".bar span"), ...wrap.querySelectorAll(".num")];
+      return { el: wrap, bar: barWrap, ll, crps, time };
+    }
+
+    async function runDrill() {
+      const btn = $("run-drill"); btn.disabled = true;
+      const series = await loadData();
+      const s = series[Number($("series-sel").value) || 0];
+      const host = $("drill-rows"); host.innerHTML = "";
+      $("drill-status").textContent = "loading ARIMA…";
+      const A = await ensureArima();
+      $("drill-status").textContent = s.id;
+
+      const specs = [
+        ["laplace", "online, native density", makeLaplace(), true],
+        ["naive", "EWMA mean ± rolling σ", makeNaive(), false],
+        ["holt-winters", "refit every step", makeHoltWinters(), false],
+      ];
+      if (A) specs.push(["arima", "WASM, refit every step", makeArima(A), false]);
+      else host.insertAdjacentHTML("beforeend", `<p class="muted">(ARIMA unavailable — CDN blocked; racing the rest.)</p>`);
+
+      const rows = specs.map(([name, tag, comp, isLap]) => {
+        const row = competitorRow(name, tag, isLap);
+        host.appendChild(row.el);
+        return { comp, row };
+      });
+      // race them concurrently — laplace finishes instantly, arima grinds
+      await Promise.all(rows.map((r) => raceOne(s.changes, r.comp, r.row)));
+      btn.disabled = false;
+    }
+
+    $("run-agg").addEventListener("click", runAggregate);
+    $("run-drill").addEventListener("click", runDrill);
+    // warm the series list without blocking
+    loadData();
+  </script>
+</body>
+</html>
