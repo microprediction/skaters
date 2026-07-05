@@ -1,6 +1,6 @@
 # Why likelihood is the metric that matters
 
-*Why `skaters` ranks forecasters by held-out log-likelihood, why CRPS is the wrong goal-post for most of what you will do with a forecast, and where CRPS is nonetheless the right tool.*
+*Why `skaters` ranks forecasters by held-out log-likelihood, why CRPS is the wrong goal-post for most of what you will do with a forecast.*
 
 ## The claim
 
