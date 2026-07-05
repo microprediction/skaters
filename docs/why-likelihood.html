@@ -96,7 +96,7 @@
       The chain's log score is the sum of the stages' log scores. That
       additivity is what makes a chain of residual markets a decentralized
       gradient-boosting machine, and what lets you attribute skill stage by stage
-      (<a href="https://mechanisms.microprediction.org">Multi-Stage Solicitation</a>).
+      (<a href="https://mechanisms.microprediction.org/papers/multi-stage-solicitation.html">Multi-Stage Solicitation</a>).
       CRPS does not factor this way; a CRPS pipeline cannot be split into
       per-stage credit.
     </p>
@@ -108,7 +108,7 @@
       divergence, and the value a <em>conditioning</em> forecaster extracts from a
       covariate the crowd ignored is exactly the mutual information $I(R;X)$
       between residual and input
-      (<a href="https://conformalprediction.net">conformalprediction.net</a>).
+      (<a href="https://conformalprediction.net/papers/parimutuel/">Betting Against a Conformal Predictor</a>).
       This is why conformal prediction — which prices the residual flat across
       the input space — leaves $I(R;X)$ on the table: a log-scored (Kelly) market
       prices that gap and pays whoever closes it. There is no CRPS analogue; the
@@ -126,7 +126,7 @@
       score that will not expose the fact. What such a forecaster forfeits is
       exactly the conditional information a sharper, conditioning rival collects
       against it — the mutual information $I(R;X)$ between residual and input
-      (<a href="https://conformalprediction.net">conformalprediction.net</a>). So
+      (<a href="https://conformalprediction.net/papers/parimutuel/">Betting Against a Conformal Predictor</a>). So
       neither of CRPS's real virtues, below, is "you don't have a density"; that
       is a modeling failure wearing a metric's clothes.
     </p>
@@ -155,7 +155,7 @@
       And samples are not the exception they seem: a cloud of samples is a
       density waiting for a kernel. Smooth it — with the jitter that keeps the
       smoothing honest
-      (<a href="https://mechanisms.microprediction.org">the point-cloud paper</a>)
+      (<a href="https://mechanisms.microprediction.org/papers/scoring-point-cloud-distributional-submissions.html">the point-cloud paper</a>)
       — and score the log-likelihood. If you cannot form a density even then, you
       have no probabilistic model, and no score repairs that.
     </p>
@@ -163,12 +163,12 @@
     <h2>The verdict</h2>
     <p>
       Rank by held-out log-likelihood. It is local, it is the wealth a market
-      pays, it composes, and it is information. Keep CRPS in the drawer for two
-      jobs: a bounded score for when you cannot model the tails, and a unit-interpretable
-      summary for a reader who asks for one. That is exactly what
-      <code>skaters</code> does — everything is judged by log-likelihood, and
-      <code>Dist.crps(y)</code> is there as a secondary proper score for when you
-      want it.
+      pays, it composes, and it is information. The short version on CRPS: it is
+      for when you know the model is wrong and can't fix it — a bounded score
+      under a misspecification you are stuck with, and a unit-interpretable
+      summary when a reader wants one. That is exactly what <code>skaters</code>
+      does: everything is judged by log-likelihood, with <code>Dist.crps(y)</code>
+      in the drawer for those two jobs.
     </p>
   </main>
 
