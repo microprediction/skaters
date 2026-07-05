@@ -1,6 +1,6 @@
 # Why skaters ranks by likelihood, by default
 
-*A minor contribution to an age-old debate, with chaining of solicitation in mind.*
+*A minor but novel contribution to an age-old debate, emphasizing chained elicitation of probabilities.*
 
 ## Choosing the target
 
@@ -14,9 +14,9 @@ None of this pretends a univariate density is the whole job. Real time-series ar
 
 ## Why likelihood is the default density target
 
-The log-versus-CRPS debate is an old one, usually settled on the grounds already rehearsed here: locality, propriety, robustness, interpretability. `skaters` presses a different consideration, and for it the decisive one, because chaining has been integral to the microprediction vision from the start. That program never pictured a single model emitting a forecast. It pictured a stream of participants, each refining the residual the last one left behind, a supermind assembled from small contributions ([Cotton, *Microprediction: Building an Open AI Network*, MIT Press, 2022](https://book.microprediction.org/)). A score fit for that has to make refinements *compose*, and, over and above the usual considerations, that is what separates the two.
+The log-versus-CRPS debate is an old one, usually settled on the grounds already rehearsed here: locality, propriety, robustness, interpretability. `skaters` presses a different consideration, one this debate rarely weighs, because chaining has been integral to the microprediction vision from the start. That program never pictured a single model emitting a forecast. It pictured a stream of participants, each refining the residual the last one left behind, a supermind assembled from small contributions ([Cotton, *Microprediction: Building an Open AI Network*, MIT Press, 2022](https://book.microprediction.org/)). A score fit for that has to make refinements *compose*. That consideration seldom enters the log-versus-CRPS discussion, and it is the one `skaters` turns on.
 
-That the log score is proper is not the distinguishing fact. CRPS is proper too. The distinguishing fact is that *likelihood is the score under which density refinements compose*.
+The usual case rests on propriety, and propriety is shared: CRPS is proper too. The reason that gets less attention is that *likelihood is the score under which density refinements compose*.
 
 Suppose a base forecast has density $p_1(y)$ and CDF $F_1$. A second-stage forecaster can forecast the residualized variable $z = \Phi^{-1}(F_1(y))$. If the residual density is $g(z)$, the composed density is $p(y) = p_1(y)\,g(z)/\varphi(z)$, so
 
