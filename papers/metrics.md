@@ -1,4 +1,6 @@
-# Why skaters ranks by likelihood
+# Why skaters ranks by likelihood, by default
+
+*Some minor contributions to an age-old debate.*
 
 *A scoring rule is a settlement rule: match it to the object you want. For `skaters`' default — a reusable density for unknown later use — that is held-out log-likelihood.*
 
