@@ -114,10 +114,21 @@ export function crpsLeaf(k = 1, eta = 1.0, scaleAlpha = 0.01, scales = FINE) {
       g[c] = absNormal(-z, C[c]) - dot;
     }
     const gm = fsum(g) / K;
+    // Exponentiated-gradient step, stabilized by subtracting the max exponent so
+    // exp() cannot overflow to Inf (which would normalize to NaN weights and
+    // crash Dist). Subtracting a constant from every exponent leaves the
+    // normalized weights unchanged.
+    const e = new Array(K);
+    for (let c = 0; c < K; c++) e[c] = -eta * (g[c] - gm);
+    let emax = -Infinity;
+    for (let c = 0; c < K; c++) if (e[c] > emax) emax = e[c];
     const nw = new Array(K);
-    let Z = 0.0;
-    for (let c = 0; c < K; c++) nw[c] = w[c] * Math.exp(-eta * (g[c] - gm));
-    Z = fsum(nw);
+    for (let c = 0; c < K; c++) nw[c] = w[c] * Math.exp(e[c] - emax);
+    let Z = fsum(nw);
+    if (!(Z > 0.0) || !Number.isFinite(Z)) {
+      for (let c = 0; c < K; c++) nw[c] = w[c];  // degenerate update: keep weights
+      Z = fsum(nw);
+    }
     state.w = nw.map((x) => x / Z);
     const comps = C.map((c, i) => [state.w[i], 0.0, c * sig]);
     return [new Array(k).fill(new Dist(comps)), state];

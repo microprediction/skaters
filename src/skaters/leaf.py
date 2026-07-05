@@ -179,8 +179,17 @@ def crps_leaf(k: int = 1, eta: float = 1.0, scale_alpha: float = 0.01, scales: t
         w = state["w"]
         g = [_abs_normal(-z, C[c]) - sum(w[j] * B[c][j] for j in range(K)) for c in range(K)]
         gm = sum(g) / K
-        nw = [w[c] * math.exp(-eta * (g[c] - gm)) for c in range(K)]
+        # Exponentiated-gradient step, stabilized by subtracting the max exponent
+        # so exp() cannot overflow to inf (which would normalize to nan weights
+        # and crash Dist). Subtracting a constant from every exponent leaves the
+        # normalized weights unchanged.
+        e = [-eta * (g[c] - gm) for c in range(K)]
+        emax = max(e)
+        nw = [w[c] * math.exp(e[c] - emax) for c in range(K)]
         Z = sum(nw)
+        if not (Z > 0.0 and math.isfinite(Z)):
+            nw = list(w)  # degenerate update: keep the current weights
+            Z = sum(nw)
         state["w"] = [x / Z for x in nw]
         d = Dist([(state["w"][c], 0.0, C[c] * sig) for c in range(K)])
         return [d] * k, state
