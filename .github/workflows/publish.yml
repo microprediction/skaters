@@ -1,0 +1,47 @@
+name: Publish JS port to npm
+
+# Publishes docs/js/skaters (the JavaScript port) to npm when a GitHub Release
+# is published, after re-checking Python<->JS numeric parity. Bump the version
+# in docs/js/skaters/package.json before tagging the release.
+#
+# Requires a repo secret NPM_TOKEN (an npm "Automation" access token).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write        # npm provenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python (parity reference)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the Python package
+        run: pip install -e .
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Parity gate (regenerate vectors from Python, check the JS port)
+        env:
+          PYTHONPATH: src
+        run: |
+          python parity/gen_vectors.py
+          node parity/check.mjs
+
+      - name: Publish to npm
+        working-directory: docs/js/skaters
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
