@@ -61,6 +61,6 @@ There is one honest caveat about *why* CRPS often gets reached for. It is freque
 
 As a secondary metric CRPS earns its keep as a warning light: a density can win the log score by pathological sharpness, and CRPS asks whether its CDF shape is also usable for ordinary threshold decisions. It is finite and unit-interpretable, so it also degrades gracefully when the model is wrong and you know it.
 
-## The verdict
+## Summary, for now
 
 The user chooses the target. If the target is a threshold, quantile, interval, action, or custom payoff, score that target directly. But when the target is a reusable density and the future use is unknown, `skaters` defaults to held-out log-likelihood: it is local, information-theoretic, and, most importantly, compositional, the natural accounting system for residual forecasting and multi-stage solicitation. CRPS remains useful as a secondary diagnostic for CDF shape, threshold behavior, robustness, and unit-scale interpretability. It is not wrong; it is a different contract. That is what `skaters` does: rank by log-likelihood, and report `Dist.crps(y)` as the warning light.
