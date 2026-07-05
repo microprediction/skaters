@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — FAQ</title>
-  <meta name="description" content="Frequently asked questions about skaters: why likelihood is the default score, and what univariate distributional forecasting is for." />
+  <meta name="description" content="Frequently asked questions about skaters: why likelihood is the default score, whether the benchmark win holds up, and what univariate distributional forecasting is for." />
   <link rel="stylesheet" href="./academic.css" />
 </head>
 <body>
@@ -30,37 +30,41 @@
 
     <h2>Why is likelihood the default, not CRPS?</h2>
     <p>
-      Because a skater's target is a reusable predictive <em>density</em>, and
-      densities are meant to be chained: each stage refines the residual of the
-      last. Held-out log-likelihood is the score under which those refinements
-      compose, the log-likelihood of a chained forecast being the base score plus
-      the contribution of each stage. CRPS is a perfectly good score for a
-      different target, coverage or threshold behaviour, and it is reported
-      alongside as a diagnostic. It is a different contract, not a worse one.
-    </p>
-    <p>
-      The full argument, with the worked example and where CRPS is the right
-      choice, is in
+      A skater's target is a reusable predictive <em>density</em>, and densities
+      are meant to be chained: each stage refines the residual of the last.
+      Held-out log-likelihood is the score under which those refinements compose,
+      the log-likelihood of a chained forecast being the base score plus the
+      contribution of each stage. CRPS is a good score for a different target,
+      coverage or threshold behaviour, and it is reported alongside as a
+      diagnostic. It is a different contract, not a worse one. The full argument,
+      with the worked example and where CRPS is the right choice, is in
       <a href="/metrics.html">why skaters ranks by likelihood, by default</a>.
     </p>
 
-    <h2>The basics</h2>
+    <h2>Isn't the benchmark win just p-hacked?</h2>
     <p>
-      <strong>Isn't univariate forecasting useless without more data or
-      features?</strong> No. It is a composable <em>component</em>, not a whole
-      pipeline, and it plugs in before, during, or after the rest of a model.
-      See <a href="/scope.html">Scope</a>.
+      Reasonable thing to ask of any leaderboard. Rather than take one slice on
+      faith, the <a href="/robustness.html">robustness explorer</a> lets you cut
+      the non-price benchmark any way you like — at random, by category,
+      frequency, stickiness, martingality — and watch the per-series win-rate
+      recompute live with a bootstrap band. A cherry-picked edge falls apart under
+      reslicing; a real one stays high and tight. The price caveat is stated
+      plainly too: on equity/fx/commodity returns GARCH-t wins, and we say so.
     </p>
+
+    <h2>Do I need exogenous data or features for this to be useful?</h2>
     <p>
-      <strong>Why not just hire an analyst or build a bespoke model?</strong> For
-      one series you could. The point is autonomy and scale: thousands of streams,
-      online, unattended, each returning a full distribution.
-      See <a href="/scope.html">Scope</a>.
+      Not to use it. Univariate distributional prediction is a composable
+      <em>component</em>, not a whole pipeline: it runs on the series you have and
+      plugs in before, during, or after the rest of a model. Exogenous structure
+      enters as another stage. See <a href="/scope.html">Scope</a>.
     </p>
+
+    <h2>Why not just build a bespoke model?</h2>
     <p>
-      <strong>What is this actually for?</strong> Distributions for decisions,
-      at scale, and as the base layer that larger systems chain onto.
-      See <a href="/scope.html">Scope</a>.
+      For a single important series, do. The value here is autonomy and scale:
+      thousands of streams, online, unattended, each returning a full
+      distribution rather than a point. See <a href="/scope.html">Scope</a>.
     </p>
   </main>
 
