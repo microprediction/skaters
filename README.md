@@ -21,9 +21,11 @@ Laplace is fast, dependency-free, **online** univariate *distributional* forecas
 **Not for price/return series:** 
 We recommend GARCH-t there instead. 
 
-**Not really for CRPS targets**
-On CRPS Laplace still beats most of the competition. However if you really like CRPS you should pick a method like
-conformal prediction. This comes with the warning that the CRPS goalpost is not suited for things like growing your wealth.
+**When CRPS is the target:**
+A scoring rule is a settlement rule — match it to what you actually want. `skaters` defaults to held-out
+log-likelihood because it ranks reusable densities, and on CRPS `laplace` still beats most of the competition. But if
+your target really is CDF shape or threshold behaviour, CRPS is a reasonable contract and a method like conformal
+prediction may suit — just know it is a different contract, not a better density.
 ([Why likelihood is the metric that matters →](https://skaters.microprediction.org/why-likelihood.html))
 
 

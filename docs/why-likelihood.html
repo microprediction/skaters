@@ -28,147 +28,160 @@
 
   <main>
     <h1>Why likelihood is the metric that matters</h1>
-    <p class="subtitle">Why <code>skaters</code> ranks forecasters by held-out
-      log-likelihood, why CRPS is the wrong goal-post for most of what you will
-      do with a forecast.</p>
+    <p class="subtitle">A scoring rule is a settlement rule, not a definition of
+      good forecasting. Choose it to match the object the user asks for. For
+      <code>skaters</code>' default — a reusable density under unknown future
+      use — that object is best judged by held-out log-likelihood.</p>
 
-    <h2>The claim</h2>
+    <h2>Choosing the target</h2>
     <p>
-      A distributional forecast is a density — or a mixture, or a cloud of
-      samples that stands in for one. To rank two of them you need a number that
-      says which put more probability where the outcome actually landed.
-      <code>skaters</code> uses one number for that: the held-out log-likelihood
-      $\log q(y)$, averaged over out-of-sample points. Leaf selection, the
-      terminal-leaf ensemble, and every benchmark in this repo are judged by it.
-      This note is why.
-    </p>
-
-    <h2>Locality: it scores the density where the outcome is</h2>
-    <p>
-      The log score reads exactly one thing off your forecast: the density it
-      placed at the realized $y$. Nothing else about the distribution enters.
-      That is its defining property — up to an affine change, the log score is
-      the <em>only</em> smooth strictly proper <strong>local</strong> score
-      (Bernardo, 1979). CRPS is not local: it integrates
-      $\big(F(t) - \mathbf{1}\{t \ge y\}\big)^2$ over the whole line, so a
-      forecaster is graded on probability placed far from the outcome, in regions
-      no realized value ever visited.
+      A scoring rule is not a metaphysical definition of "good forecasting." It
+      is a settlement rule: it says what the forecaster is being paid to
+      produce. So the first question is not "likelihood or CRPS?" It is:
+      <strong>what object is the user asking for?</strong>
     </p>
     <p>
-      Locality is not an aesthetic preference. The density at $y$ is the number
-      your decisions actually consume. A Kelly bet, a likelihood ratio, a
-      posterior update, an option price — each reads $q(y)$, not the shape of $q$
-      a mile away. A score that grades the whole curve is grading things you will
-      never spend.
+      If the user wants a threshold probability, score threshold probabilities.
+      Quantiles, score quantiles. Intervals, score intervals. A trading action,
+      score the action or the P&amp;L it induces. A full density for later
+      reuse, score the density.
+    </p>
+    <p>
+      That last case is the <code>skaters</code> default, and it is a deliberate
+      choice. A density forecast is a portable object: it can be used later for
+      pricing, simulation, Bayesian updating, risk limits, threshold alarms,
+      portfolio sizing, tail estimation, or further refinement by another
+      forecaster. When the future use is not known in advance, the right default
+      is to reward the object that preserves the most reusable probabilistic
+      information. That is why <code>skaters</code> ranks density forecasts by
+      held-out log-likelihood $\log q(y)$.
+    </p>
+
+    <h2>Why likelihood is the default density target</h2>
+    <p>
+      The strongest reason is not merely that the log score is proper — CRPS is
+      proper too. It is that <strong>likelihood is the score under which density
+      refinements compose</strong>.
+    </p>
+    <p>
+      Suppose a base forecast has density $p_1(y)$ and CDF $F_1$. A second-stage
+      forecaster can forecast the residualized variable $z = \Phi^{-1}(F_1(y))$.
+      If the residual density is $g(z)$, the composed density is
+      $p(y) = p_1(y)\,g(z)/\varphi(z)$, so
+    </p>
+    $$\log p(y) = \log p_1(y) + \big(\log g(z) - \log\varphi(z)\big).$$
+    <p>
+      The log score of the composed forecast is the base score plus the
+      incremental score of the refinement. Skill can be attributed stage by
+      stage. A residual market can pay the forecaster who finds structure the
+      base market left behind, and a sequence of such markets is a decentralized
+      boosting machine
+      (<a href="https://mechanisms.microprediction.org/papers/multi-stage-solicitation.html">Multi-Stage Solicitation</a>).
+      CRPS does not factor through this residual-density multiplication in the
+      same way; it is a valuable CDF and threshold diagnostic, but not the same
+      accounting system for chained density improvement.
+    </p>
+    <p>
+      Two properties support the default. The log score is <strong>local</strong>
+      — it reads only the density at the realized $y$, the number a likelihood
+      ratio, a Bayesian update, or a Kelly bet actually consumes; up to an affine
+      change it is the <em>only</em> smooth strictly proper local score
+      (Bernardo, 1979). And it is <strong>information-theoretic</strong> — its
+      regret against the truth is the Kullback–Leibler divergence, so the value a
+      conditioning forecaster extracts from a covariate the crowd ignored is
+      exactly the mutual information $I(R;X)$
+      (<a href="https://conformalprediction.net/papers/parimutuel/">Betting Against a Conformal Predictor</a>).
+      Both are properties a reusable density ought to be rewarded for.
     </p>
 
     <h2>It is what a market pays</h2>
     <p>
-      Here is the sharper reason, and it is a foundational fact of quantitative
-      finance rather than a metaphor: every financial market is the same object
-      in disguise — a bet on an uncertain outcome, settled when the outcome is
-      revealed, whose prices <em>are</em> a distribution. Arrow–Debreu state
-      prices, normalized, are a density; the fundamental theorem of asset pricing
-      says any price is an expectation under the market's implied law; and the
-      investor who compounds — the growth-optimal, log-utility Kelly investor —
-      maximizes $\mathbb{E}[\log q(Y)]$ by staking her true probabilities. A
-      parimutuel that splits its pot in proportion to the density each
-      participant placed on the outcome is only the bare version: per unit of
-      staked wealth it pays exactly $q(y)$ relative to the field, so the
-      log-wealth maximizer's best move is her honest density. An options book, a
-      prediction market, and the nearest-the-pin pool are the same machine in
-      different clothes
-      (<a href="https://mechanisms.microprediction.org">mechanisms.microprediction.org</a>),
-      and the machine pays the log score. CRPS has no such reading: no natural
-      market pays it, and optimizing it compounds nobody's bankroll. A CRPS
-      specialist is winning a goal-post that will not grow your wealth.
+      There is a market reading of the same fact, and it is foundational
+      quantitative finance rather than metaphor. Every financial market is a bet
+      on an uncertain outcome whose prices <em>are</em> a distribution:
+      Arrow–Debreu state prices, normalized, are a density, and the
+      growth-optimal (Kelly) investor stakes her true probabilities, maximizing
+      $\mathbb{E}[\log q(Y)]$. A parimutuel that splits its pot in proportion to
+      the density each participant placed on the outcome is the bare version —
+      per unit of staked wealth it pays $q(y)$ relative to the field — and an
+      options book, a prediction market, and the nearest-the-pin pool are the
+      same machine in different clothes
+      (<a href="https://mechanisms.microprediction.org">mechanisms.microprediction.org</a>).
+      So log-likelihood is the settlement rule of a density-ratio market. CRPS
+      has useful threshold and CDF readings, but it is not that settlement rule:
+      it does not give the same multiplicative refinement and additive credit
+      accounting that likelihood gives.
     </p>
 
-    <h2>It composes</h2>
+    <h2>Two geometries of error</h2>
     <p>
-      Chained and boosted forecasts factor under the log score, and only under
-      it. If a base forecast $p_1$ is refined by a residual stage with density
-      $g$ for the residual z-score $z = \Phi^{-1}(F_1(y))$, the composed density
-      is $p_1(y)\,g(z)/\varphi(z)$, so
+      The cleanest way to see when each score is right is to look at what its
+      regret measures:
     </p>
-    $$\log p(y) = \log p_1(y) + \big(\log g(z) - \log\varphi(z)\big).$$
+    $$\text{log-score regret} = D_{\mathrm{KL}}(p \,\|\, q), \qquad \text{CRPS regret} = \int_{-\infty}^{\infty}\big(F_q(t) - F_p(t)\big)^2\,dt.$$
     <p>
-      The chain's log score is the sum of the stages' log scores. That
-      additivity is what makes a chain of residual markets a decentralized
-      gradient-boosting machine, and what lets you attribute skill stage by stage
-      (<a href="https://mechanisms.microprediction.org/papers/multi-stage-solicitation.html">Multi-Stage Solicitation</a>).
-      CRPS does not factor this way; a CRPS pipeline cannot be split into
-      per-stage credit.
+      Log score penalizes relative density error where the truth puts its mass —
+      it asks, "did you assign enough density to the state that actually
+      occurred?" CRPS penalizes integrated CDF error across thresholds. These
+      correspond to different future-use assumptions. If the downstream use may
+      involve likelihood ratios, Bayesian updating, sequential composition, Kelly
+      sizing, or sharp conditional bets, log score is the more faithful
+      general-purpose density score. If the use is coarse — a threshold, a
+      quantile, an inventory or risk limit, a smooth payoff integral — CRPS can
+      be more decision-relevant, because a forecast can have a slightly ugly
+      density but very good threshold probabilities, and CRPS will rank it
+      accordingly.
     </p>
 
-    <h2>It is information</h2>
+    <h2>Where CRPS belongs</h2>
     <p>
-      The log score is the only proper score whose regret is a divergence you can
-      read as information. Its regret against the truth is the Kullback–Leibler
-      divergence, and the value a <em>conditioning</em> forecaster extracts from a
-      covariate the crowd ignored is exactly the mutual information $I(R;X)$
-      between residual and input
+      CRPS is not a bad score; it answers a different question, and it is well
+      aligned with broad CDF accuracy, threshold and quantile behavior,
+      robustness under tails you cannot model, and interpretability in the
+      outcome's own units — dollars, degrees, people. If the target is
+      $P(Y>K)$, or the 5th percentile of $Y$, or a buy/sell rule triggered by a
+      threshold, then a threshold score, a quantile score, Brier, or a
+      task-specific utility may be more relevant than pure log-likelihood, and
+      CRPS is a reasonable choice among them. On price and returns, for instance,
+      a proper tail-and-volatility model like GARCH-t is the right tool — and it
+      happens to win under the log score too, because it is the right model
+      there.
+    </p>
+    <p>
+      There is one honest caveat about <em>why</em> CRPS often gets reached for.
+      It is frequently chosen because the forecaster does not have a density —
+      and that is usually a tell. It commonly means leaning on a procedure that
+      cannot produce one, conformal prediction being the standard example: it
+      delivers marginal intervals, flat in the covariates, and forfeits the
+      conditional information $I(R;X)$ a sharper, conditioning rival would collect
       (<a href="https://conformalprediction.net/papers/parimutuel/">Betting Against a Conformal Predictor</a>).
-      This is why conformal prediction — which prices the residual flat across
-      the input space — leaves $I(R;X)$ on the table: a log-scored (Kelly) market
-      prices that gap and pays whoever closes it. There is no CRPS analogue; the
-      mutual-information identity is a log-score identity.
-    </p>
-
-    <h2>Where CRPS is the right tool</h2>
-    <p>
-      CRPS is a proper score with two genuine virtues, but the pragmatic truth
-      comes first. CRPS is often chosen because you <em>don't</em> have a
-      density — and that, frankly, is a tell. It usually means you are leaning
-      too heavily on a procedure that cannot produce one, conformal prediction
-      being the standard example: it delivers marginal intervals, flat in the
-      covariates, never a sharp conditional distribution, and it is glad of a
-      score that will not expose the fact. What such a forecaster forfeits is
-      exactly the conditional information a sharper, conditioning rival collects
-      against it — the mutual information $I(R;X)$ between residual and input
-      (<a href="https://conformalprediction.net/papers/parimutuel/">Betting Against a Conformal Predictor</a>). So
-      neither of CRPS's real virtues, below, is "you don't have a density"; that
-      is a modeling failure wearing a metric's clothes.
-    </p>
-    <p>
-      <strong>Robustness.</strong> The log score is unbounded below: a forecast
-      that assigns near-zero density to a value that then occurs takes a
-      near-infinite loss. That sensitivity is usually a signal, not a defect — it
-      tells you the tails are wrong, and the fix is to model them, not to change
-      the ruler. <code>skaters</code> does exactly this with its scale-mixture
-      leaf: heavier tails <em>lift</em> the log-likelihood rather than being
-      papered over. On price and returns a proper tail-and-volatility model like
-      GARCH-t wins, and it wins under the log score too — because it is the right
-      model there, not because CRPS is the right metric. Where CRPS earns its
-      keep is when you genuinely cannot model the tails and still need a bounded
-      score: monitoring, or an adversarial or unknown source, where a single
-      deep-tail draw must not blow up the evaluation. CRPS is finite and lives in
-      the units of the outcome, so it degrades gracefully when the model is wrong
-      and you know it.
-    </p>
-    <p>
-      <strong>Interpretability.</strong> CRPS reports a distance in the outcome's
-      own units — dollars, degrees, people — which a decision-maker can read
-      directly. Log-likelihood is in nats.
-    </p>
-    <p>
-      And samples are not the exception they seem: a cloud of samples is a
-      density waiting for a kernel. Smooth it — with the jitter that keeps the
+      "No density" is a modeling gap, not a metric choice; a cloud of samples is
+      a density waiting for a kernel — smooth it, with the jitter that keeps the
       smoothing honest
       (<a href="https://mechanisms.microprediction.org/papers/scoring-point-cloud-distributional-submissions.html">the point-cloud paper</a>)
-      — and score the log-likelihood. If you cannot form a density even then, you
-      have no probabilistic model, and no score repairs that.
+      — and score the likelihood. But that is a caveat about misuse, not a
+      verdict on the score.
+    </p>
+    <p>
+      As a secondary metric CRPS earns its keep as a warning light: a density can
+      win the log score by pathological sharpness, and CRPS asks whether its CDF
+      shape is also usable for ordinary threshold decisions. It is finite and
+      unit-interpretable, so it also degrades gracefully when the model is wrong
+      and you know it.
     </p>
 
     <h2>The verdict</h2>
     <p>
-      Rank by held-out log-likelihood. It is local, it is the wealth a market
-      pays, it composes, and it is information. The short version on CRPS: it is
-      for when you know the model is wrong and can't fix it — a bounded score
-      under a misspecification you are stuck with, and a unit-interpretable
-      summary when a reader wants one. That is exactly what <code>skaters</code>
-      does: everything is judged by log-likelihood, with <code>Dist.crps(y)</code>
-      in the drawer for those two jobs.
+      The user chooses the target. If the target is a threshold, quantile,
+      interval, action, or custom payoff, score that target directly. But when
+      the target is a reusable density and the future use is unknown,
+      <code>skaters</code> defaults to held-out log-likelihood: it is local,
+      information-theoretic, and — most importantly — compositional, the natural
+      accounting system for residual forecasting and multi-stage solicitation.
+      CRPS remains useful as a secondary diagnostic for CDF shape, threshold
+      behavior, robustness, and unit-scale interpretability. It is not wrong; it
+      is a different contract. That is what <code>skaters</code> does: rank by
+      log-likelihood, and report <code>Dist.crps(y)</code> as the warning light.
     </p>
   </main>
 
