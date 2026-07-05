@@ -1,4 +1,4 @@
-# Why likelihood is the metric that matters
+# Why skaters ranks by likelihood
 
 *A scoring rule is a settlement rule, not a definition of good forecasting. Choose it to match the object the user asks for. For `skaters`' default — a reusable density under unknown future use — that object is best judged by held-out log-likelihood, with CRPS reported alongside as a diagnostic.*
 

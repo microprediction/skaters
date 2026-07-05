@@ -26,7 +26,7 @@ A scoring rule is a settlement rule — match it to what you actually want. `ska
 log-likelihood because it ranks reusable densities, and on CRPS `laplace` still beats most of the competition. But if
 your target really is CDF shape or threshold behaviour, CRPS is a reasonable contract and a method like conformal
 prediction may suit — just know it is a different contract, not a better density.
-([Why likelihood is the metric that matters →](https://skaters.microprediction.org/why-likelihood.html))
+([Why skaters ranks by likelihood →](https://skaters.microprediction.org/why-likelihood.html))
 
 
 ## Install
