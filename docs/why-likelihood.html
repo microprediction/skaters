@@ -132,6 +132,58 @@
       accordingly.
     </p>
 
+    <h2>A worked example: CRPS picks the thinner tail</h2>
+    <p>
+      That difference of integrand changes which forecast wins. Take heavy-tailed
+      truth — Student-$t$ with three degrees of freedom — and fit a single
+      Gaussian $N(0,\sigma^2)$ to it under each score. Likelihood insists on
+      covering the tail: its optimum is variance-matching, $\sigma=\sqrt{3}\approx
+      1.73$, because a rare large outcome costs the log score about
+      $y^2/2\sigma^2$ and a too-narrow forecast is punished hard for it. CRPS
+      charges only about $|y|$ for the same outcome, so it prefers a sharper
+      central fit and shrugs off the occasional outlier — its optimum is
+      $\sigma\approx1.25$, a <strong>28% narrower</strong> Gaussian with the tail
+      squished in.
+    </p>
+    <figure>
+      <img src="./assets/crps-tail-blindness.svg" alt="Fitting a Gaussian to
+        Student-t(3) data: mean CRPS is minimized at sigma about 1.25 (narrow
+        tail) while mean negative log-likelihood is minimized at sigma about 1.73
+        (covers the tail). CRPS prefers the thinner tail." style="max-width:100%;height:auto;" />
+      <figcaption>Two proper scores, two different forecasts. Fitting a Gaussian
+        to heavy-tailed $t_3$ data, CRPS is minimized by a narrow forecast that
+        squishes the tail in; log-likelihood is minimized by the wider,
+        tail-covering one.</figcaption>
+    </figure>
+    <table>
+      <thead><tr><th>Gaussian fit to $t_3$</th><th>mean CRPS</th><th>mean NLL</th></tr></thead>
+      <tbody>
+        <tr><td>$\sigma=1.73$ — likelihood-optimal (covers the tail)</td><td>0.848</td><td><strong>1.968</strong></td></tr>
+        <tr><td>$\sigma=1.25$ — CRPS-optimal (narrow)</td><td><strong>0.829</strong></td><td>2.101</td></tr>
+      </tbody>
+    </table>
+    <p>
+      The narrower forecast wins CRPS and loses log-likelihood. That is the whole
+      phenomenon in one line: squeeze the tail in, and CRPS pays you while
+      likelihood charges you. Two honest qualifications. This is not a way to beat
+      a <em>correct</em> model — CRPS is proper, so the true $t_3$ still scores
+      best on both (CRPS 0.823, NLL 1.772); the trade-off exists only among
+      <em>imperfect</em> forecasts, which is to say, in practice. And the trade
+      runs the other way when the tail is genuinely unmodelable: there the
+      narrower, robust forecast is the sensible one, and CRPS is right to prefer
+      it.
+    </p>
+    <p>
+      Conformal prediction is this taken to its limit. A split-conformal
+      predictive law has <em>bounded support</em> — the observed range of
+      calibration residuals — so it assigns zero density, and $-\infty$
+      log-likelihood, to any outcome beyond that range (about 0.1% of them in the
+      run above), while its CRPS stays finite and competitive. A method that
+      cannot be log-scored at all, yet scores well on CRPS: the metric's
+      tail-insensitivity turned into a feature of the method.
+      (Reproduce: <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/crps_tail_blindness.py"><code>benchmarks/crps_tail_blindness.py</code></a>.)
+    </p>
+
     <h2>Where CRPS belongs</h2>
     <p>
       CRPS is not a bad score; it answers a different question, and it is well
