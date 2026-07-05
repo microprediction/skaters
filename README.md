@@ -24,7 +24,7 @@ We recommend GARCH-t there instead.
 **Not really for CRPS targets**
 On CRPS Laplace still beats most of the competition. However if you really like CRPS you should pick a method like
 conformal prediction. This comes with the warning that the CRPS goalpost is not suited for things like growing your wealth.
-([Why likelihood is the metric that matters →](papers/why-likelihood.md))
+([Why likelihood is the metric that matters →](https://skaters.microprediction.org/why-likelihood.html))
 
 
 ## Install
