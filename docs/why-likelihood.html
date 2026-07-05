@@ -117,8 +117,18 @@
 
     <h2>Where CRPS is the right tool</h2>
     <p>
-      CRPS is a proper score, and it has two genuine virtues. Neither of them is
-      "you don't have a density."
+      CRPS is a proper score with two genuine virtues, but the pragmatic truth
+      comes first. CRPS is often chosen because you <em>don't</em> have a
+      density — and that, frankly, is a tell. It usually means you are leaning
+      too heavily on a procedure that cannot produce one, conformal prediction
+      being the standard example: it delivers marginal intervals, flat in the
+      covariates, never a sharp conditional distribution, and it is glad of a
+      score that will not expose the fact. What such a forecaster forfeits is
+      exactly the conditional information a sharper, conditioning rival collects
+      against it — the mutual information $I(R;X)$ between residual and input
+      (<a href="https://conformalprediction.net">conformalprediction.net</a>). So
+      neither of CRPS's real virtues, below, is "you don't have a density"; that
+      is a modeling failure wearing a metric's clothes.
     </p>
     <p>
       <strong>Robustness.</strong> The log score is unbounded below: a forecast
@@ -142,14 +152,12 @@
       directly. Log-likelihood is in nats.
     </p>
     <p>
-      What is <em>not</em> a reason to reach for CRPS is "I only have samples." A
-      cloud of samples is a density waiting for a kernel. If you have no density
-      at all then you do not have a probabilistic model, and no score repairs
-      that. The move is to smooth the samples — with the jitter that keeps the
+      And samples are not the exception they seem: a cloud of samples is a
+      density waiting for a kernel. Smooth it — with the jitter that keeps the
       smoothing honest
       (<a href="https://mechanisms.microprediction.org">the point-cloud paper</a>)
-      — and score the log-likelihood, not to retreat to a metric that pretends
-      the question away.
+      — and score the log-likelihood. If you cannot form a density even then, you
+      have no probabilistic model, and no score repairs that.
     </p>
 
     <h2>The verdict</h2>

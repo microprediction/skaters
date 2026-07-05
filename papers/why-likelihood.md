@@ -30,13 +30,13 @@ The log score is the only proper score whose regret is a divergence you can read
 
 ## Where CRPS is the right tool
 
-CRPS is a proper score, and it has two genuine virtues. Neither of them is "you don't have a density."
+CRPS is a proper score with two genuine virtues, but the pragmatic truth comes first. CRPS is often chosen because you *don't* have a density — and that, frankly, is a tell. It usually means you are leaning too heavily on a procedure that cannot produce one, conformal prediction being the standard example: it delivers marginal intervals, flat in the covariates, never a sharp conditional distribution, and it is glad of a score that will not expose the fact. What such a forecaster forfeits is exactly the conditional information a sharper, conditioning rival collects against it — the mutual information $I(R;X)$ between residual and input ([conformalprediction.net](https://conformalprediction.net)). So neither of CRPS's real virtues, below, is "you don't have a density"; that is a modeling failure wearing a metric's clothes.
 
 **Robustness.** The log score is unbounded below: a forecast that assigns near-zero density to a value that then occurs takes a near-infinite loss. That sensitivity is usually a signal, not a defect — it tells you the tails are wrong, and the fix is to model them, not to change the ruler. `skaters` does exactly this with its scale-mixture leaf: heavier tails *lift* the log-likelihood rather than being papered over. On price and returns a proper tail-and-volatility model like GARCH-t wins, and it wins under the log score too — because it is the right model there, not because CRPS is the right metric. Where CRPS earns its keep is when you genuinely cannot model the tails and still need a bounded score: monitoring, or an adversarial or unknown source, where a single deep-tail draw must not blow up the evaluation. CRPS is finite and lives in the units of the outcome, so it degrades gracefully when the model is wrong and you know it.
 
 **Interpretability.** CRPS reports a distance in the outcome's own units — dollars, degrees, people — which a decision-maker can read directly. Log-likelihood is in nats.
 
-What is *not* a reason to reach for CRPS is "I only have samples." A cloud of samples is a density waiting for a kernel. If you have no density at all then you do not have a probabilistic model, and no score repairs that. The move is to smooth the samples — with the jitter that keeps the smoothing honest ([the point-cloud paper](https://mechanisms.microprediction.org)) — and score the log-likelihood, not to retreat to a metric that pretends the question away.
+And samples are not the exception they seem: a cloud of samples is a density waiting for a kernel. Smooth it — with the jitter that keeps the smoothing honest ([the point-cloud paper](https://mechanisms.microprediction.org)) — and score the log-likelihood. If you cannot form a density even then, you have no probabilistic model, and no score repairs that.
 
 ## The verdict
 
