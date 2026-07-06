@@ -4,6 +4,15 @@
 [![npm downloads](https://img.shields.io/npm/dm/skaters)](https://www.npmjs.com/package/skaters)
 [![license: MIT](https://img.shields.io/npm/l/skaters)](https://github.com/microprediction/skaters/blob/main/LICENSE)
 
+### ▶ [Watch it race live in your browser](https://skaters.microprediction.org/demos/race.html)
+
+The actual JavaScript port racing `arima`, `@bsull/augurs` (ETS and MSTL), and
+Prophet (Stan compiled to WASM) on 150 real FRED series — every method scored on
+held-out log-likelihood, rolling one-step-ahead, no server. `laplace` keeps up
+with a moving average while the refit baselines grind. **[Start here →](https://skaters.microprediction.org/demos/race.html)**
+
+---
+
 Fast univariate **online distributional** time-series forecasting. Zero
 dependencies, runs in Node or the browser. This is the JavaScript port of the
 Python [`skaters`](https://pypi.org/project/skaters/) package, numerically

@@ -5,6 +5,13 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## 0.11.4
+
+Docs: lead the README with the live in-browser race demo
+(<https://skaters.microprediction.org/demos/race.html>) — the JS port racing
+`arima`, `@bsull/augurs` (ETS and MSTL), and Prophet (Stan compiled to WASM) on
+real FRED series, scored on held-out log-likelihood. No code changes.
+
 ## 0.11.3
 
 Fix: `Dist.logpdf` returned `-Infinity` for finite inputs when the scale had
