@@ -113,9 +113,10 @@
       <div id="tour-table" class="tour-table"></div>
       <figure class="scatter-fig">
         <div id="tour-scatter"></div>
-        <figcaption class="legend">Accuracy (mean held-out log-likelihood, up is
-          better) against speed (total compute relative to <code class="k">laplace</code>,
-          log scale, right is slower). Top-left is the corner you want.</figcaption>
+        <figcaption class="legend">Win rate (share of rounds with the best
+          log-likelihood, up is better) against speed (total compute relative to
+          <code class="k">laplace</code>, log scale, right is slower). Top-left is the
+          corner you want.</figcaption>
       </figure>
     </div>
 
@@ -416,26 +417,18 @@
           `<td>${isFinite(r.ll) ? r.ll.toFixed(3) : "—"}</td>` +
           `<td>${fmtRatio(r.ratio)}</td></tr>`).join("") +
         `</tbody></table>`;
-      drawScatter(rows.filter((r) => isFinite(r.ll)));
+      drawScatter(rows, done);
     }
 
-    function drawScatter(pts) {
-      if (!pts.length) { $("tour-scatter").innerHTML = ""; return; }
-      const W = 520, H = 300, L = 46, R = 14, T = 14, B = 36;
+    function drawScatter(pts, done) {
+      const host = $("tour-scatter");
+      if (!pts.length || !done) { host.innerHTML = ""; return; }
+      const W = 520, H = 300, L = 40, R = 14, T = 14, B = 36;
       const xmax = Math.max(0.4, ...pts.map((p) => Math.log10(Math.max(p.ratio, 1))));
-      // Robust y-window: a single blown-up competitor (mean LL in the thousands
-      // below) must not crush the axis. Scale to the readable cluster near the
-      // leader; anything far below is pinned to the floor as "off-scale".
-      const lls = pts.map((p) => p.ll);
-      const top = Math.max(...lls);
-      const near = lls.filter((v) => v >= top - 12);
-      let ymin = Math.min(...near), ymax = top;
-      if (ymax - ymin < 1e-6) { ymin -= 0.5; ymax += 0.5; }
-      const pad = (ymax - ymin) * 0.18; ymin -= pad; ymax += pad;
       const px = (x) => L + (x / xmax) * (W - L - R);
-      const py = (y) => (H - B) - ((Math.max(ymin, Math.min(ymax, y)) - ymin) / (ymax - ymin)) * (H - B - T);
+      const py = (w) => (H - B) - (Math.max(0, Math.min(100, w)) / 100) * (H - B - T);  // fixed 0..100
       const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="accuracy vs speed">`;
+      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="win rate vs speed">`;
       svg += `<line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="#ccc"/>`;
       svg += `<line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="#ccc"/>`;
       for (let k = 0; k <= Math.ceil(xmax); k++) {                       // x ticks: 1×,10×,100×…
@@ -443,29 +436,22 @@
         svg += `<line x1="${x}" y1="${H - B}" x2="${x}" y2="${H - B + 4}" stroke="#ccc"/>`;
         svg += `<text x="${x}" y="${H - B + 16}" font-size="10" fill="#888" text-anchor="middle">${Math.pow(10, k)}×</text>`;
       }
-      for (let t = 0; t <= 3; t++) {                                     // y ticks
-        const y = ymin + (t / 3) * (ymax - ymin);
-        svg += `<text x="${L - 6}" y="${py(y) + 3}" font-size="10" fill="#888" text-anchor="end">${y.toFixed(2)}</text>`;
+      for (let w = 0; w <= 100; w += 25) {                              // y ticks: win %
+        const y = py(w);
+        svg += `<line x1="${L - 3}" y1="${y}" x2="${L}" y2="${y}" stroke="#ccc"/>`;
+        svg += `<text x="${L - 6}" y="${y + 3}" font-size="10" fill="#888" text-anchor="end">${w}</text>`;
       }
       svg += `<text x="${(L + W - R) / 2}" y="${H - 4}" font-size="10.5" fill="#666" text-anchor="middle">total compute vs laplace (log)</text>`;
-      svg += `<text transform="translate(12 ${(T + H - B) / 2}) rotate(-90)" font-size="10.5" fill="#666" text-anchor="middle">mean log-likelihood</text>`;
+      svg += `<text transform="translate(11 ${(T + H - B) / 2}) rotate(-90)" font-size="10.5" fill="#666" text-anchor="middle">win rate (%)</text>`;
       for (const p of pts) {
-        const x = px(Math.log10(Math.max(p.ratio, 1)));
+        const x = px(Math.log10(Math.max(p.ratio, 1))), y = py(p.win);
         const c = p.isLap ? "#1a8c4a" : "#4a3aff";
-        const off = p.ll < ymin;                                        // off the bottom of the readable window
+        svg += `<circle cx="${x}" cy="${y}" r="${p.isLap ? 6 : 5}" fill="${c}"/>`;
         const anchor = x > W - 90 ? "end" : "start", dx = anchor === "end" ? -9 : 9;
-        if (off) {                                                      // pin to floor with a down-triangle
-          const yf = H - B - 1;
-          svg += `<path d="M ${x - 5} ${yf - 9} L ${x + 5} ${yf - 9} L ${x} ${yf} Z" fill="${c}"/>`;
-          svg += `<text x="${x + dx}" y="${yf - 12}" font-size="11" fill="${c}" text-anchor="${anchor}">${esc(p.nm)} (${Math.round(p.ll)})</text>`;
-        } else {
-          const y = py(p.ll);
-          svg += `<circle cx="${x}" cy="${y}" r="${p.isLap ? 6 : 5}" fill="${c}"/>`;
-          svg += `<text x="${x + dx}" y="${y + 3.5}" font-size="11" fill="${c}" text-anchor="${anchor}" font-weight="${p.isLap ? 700 : 400}">${esc(p.nm)}</text>`;
-        }
+        svg += `<text x="${x + dx}" y="${y + 3.5}" font-size="11" fill="${c}" text-anchor="${anchor}" font-weight="${p.isLap ? 700 : 400}">${esc(p.nm)}</text>`;
       }
       svg += `</svg>`;
-      $("tour-scatter").innerHTML = svg;
+      host.innerHTML = svg;
     }
 
     $("run-tour").addEventListener("click", runTournament);
