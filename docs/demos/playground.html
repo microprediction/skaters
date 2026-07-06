@@ -250,8 +250,9 @@
         // each decimation stride is scored by its trailing one-step logpdf on
         // its own clock; the horizon then mixes eligible scales by these weights.
         let scaleW = null;
-        if (st && st.score) {
-          const entries = Object.entries(st.score);
+        const msState = st && st.base && st.base.score ? st.base : st;   // parade wraps multiscale
+        if (msState && msState.score) {
+          const entries = Object.entries(msState.score);
           const vals = entries.map(([, m]) => m).filter((m) => m !== null);
           if (vals.length) {
             const top = Math.max(...vals);

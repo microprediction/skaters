@@ -22,6 +22,7 @@ export {
   buildCandidates, laplace,
 } from "./api.mjs";
 export { multiscale } from "./multiscale.mjs";
+export { parade } from "./parade.mjs";
 export { sticky } from "./sticky.mjs";
 export {
   build, name as specName, toJson, fromJson,

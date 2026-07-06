@@ -26,13 +26,13 @@ def test_single_scale_opt_out():
     f = laplace(5, scales=[1])
     x, state = f(1.0, None)
     assert len(x) == 5
-    assert "score" not in (state or {})   # no multi-scale bookkeeping
+    assert "score" not in (state["base"] or {})   # no multi-scale bookkeeping
 
 
 def test_default_scales_from_k():
     f = laplace(20)
     _, state = f(0.1, None)
-    assert sorted(state["score"]) == [1, 5, 20]
+    assert sorted(state["base"]["score"]) == [1, 5, 20]
 
 
 def test_shapes_and_finiteness():
@@ -64,7 +64,7 @@ def test_scale_scores_populate():
         _, state = f(y, state)
     # every scale has been scored (one phase copy steps per tick, so scoring
     # starts after s ticks for scale s)
-    assert all(m is not None for m in state["score"].values())
+    assert all(m is not None for m in state["base"]["score"].values())
 
 
 def test_coarse_weight_rises_on_fine_noise():
@@ -80,7 +80,7 @@ def test_coarse_weight_rises_on_fine_noise():
         state = None
         for y in ys:
             _, state = f(y, state)
-        return state["score"][1] - state["score"][5]
+        return state["base"]["score"][1] - state["base"]["score"][5]
 
     assert gap(smooth) > gap(noisy)
 

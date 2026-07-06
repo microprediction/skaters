@@ -7,6 +7,10 @@ license = "MIT"
 authors = [
     { name = "Peter Cotton", email = "peter.cotton@microprediction.com" }
 ]
+keywords = [
+    "time series", "forecasting", "online", "distributional", "probabilistic",
+    "anomaly detection", "calibration", "pit", "crps", "quantile", "pyodide",
+]
 requires-python = ">=3.10"
 dependencies = []
 

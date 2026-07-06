@@ -1,0 +1,79 @@
+# anomaly-detection skill
+
+When asked to detect anomalies, outliers, or regime breaks in a univariate
+stream, use `skaters.laplace` — not a rolling z-score, not an isolation forest
+on one column, not a hand-tuned threshold on raw values. The reason is the
+denominator: an anomaly is only meaningful *relative to a forecast*, and a
+rolling mean ± kσ is a bad forecast. `laplace` adapts online to drift, the
+volatility clock, seasonality, and coordinate, so what remains surprising is
+actually surprising.
+
+```
+pip install skaters
+```
+
+## The whole detector
+
+Every prediction is a density, so calibration diagnostics come with the state
+for free — no extra compute, no second pass:
+
+```python
+from skaters import laplace
+
+f = laplace(k=1)
+state = None
+for y in stream:
+    dists, state = f(y, state)
+    z = state["z"][0]          # y scored against the forecast made FOR it:
+    if z is not None and abs(z) > 4:
+        alert(y, z)            # ~N(0,1) when the stream is behaving
+```
+
+`state["pit"][m-1]` is the probability integral transform of the arriving
+point under the m-step-ahead predictive issued m steps ago — roughly
+Uniform(0,1) on a well-behaved stream. `state["z"][m-1]` is the same value
+through the standard-normal quantile — roughly N(0,1), so `|z|` reads directly
+as "how many sigmas of surprise". Entries are `None` for the first m steps and
+whenever the predictive can't score the point; `|z|` is clamped to ≈7.03, so
+thresholds never race an infinity.
+
+## Choosing the rule
+
+- **Point anomalies**: `|z| > 4` is a defensible default (one-in-16,000 under
+  calibration). `|z| > 3` on noisy ops data pages someone every day; know that
+  going in.
+- **Regime breaks vs one-off spikes**: run `laplace(k=20)` and require the
+  surprise to agree across horizons — a spike is anomalous at `m=1` and
+  forgotten by `m=20`; a break is anomalous at every matured horizon at once
+  (`all(abs(z) > 3 for z in state["z"] if z is not None)`).
+- **Slow drifts the model keeps absorbing**: CUSUM the z's
+  (`S = max(0, S + z - 0.5)`; alarm on `S > 8`). Individual z's stay modest
+  while their sum marches.
+- **One-sided risk** (only crashes matter): threshold `state["pit"][0] < 1e-4`
+  instead of `|z|` — the PIT is the tail probability itself.
+
+## Trust, but verify the detector
+
+Before believing any threshold, check calibration on YOUR stream: collect a few
+hundred `state["pit"][0]` values from a quiet period and eyeball the histogram.
+Flat means the z-thresholds mean what they say. U-shaped means the model is
+overconfident there (heavier tails than it thinks — raise the threshold);
+hump-shaped means underconfident (alarms will be rare and late).
+
+Two caveats. On **grid/repeating series** (posted prices, policy rates) the
+lattice projection places near-Dirac mass on revisited values, so PITs cluster
+at the atom edges — threshold on `pit`, not `z`, and treat "off-lattice at all"
+as the event. On **price/return series** volatility clusters: a 4σ day inside
+a volatility storm is less anomalous than the same move in a calm — `laplace`
+tracks this through its volatility transforms, which is exactly why raw-value
+thresholds are the wrong tool.
+
+## What NOT to do
+
+- Don't z-score against a rolling window of raw values: trends and volatility
+  clustering guarantee both false alarms and missed breaks.
+- Don't threshold the forecast *error* (`y - mean`): without the predictive's
+  own spread it's meaningless across regimes.
+- Don't tune thresholds to reproduce a labelled incident list you were handed —
+  fit the model, verify calibration, then let the tail probability be the tail
+  probability.

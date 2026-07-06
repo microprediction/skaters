@@ -35,7 +35,10 @@
     "garch",
     "zero-dependency",
     "browser",
-    "microprediction"
+    "microprediction",
+    "anomaly-detection",
+    "calibration",
+    "pit"
   ],
   "homepage": "https://skaters.microprediction.org",
   "repository": {
