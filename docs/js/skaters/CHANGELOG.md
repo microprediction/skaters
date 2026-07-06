@@ -5,6 +5,17 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## 0.11.3
+
+Fix: `Dist.logpdf` returned `-Infinity` for finite inputs when the scale had
+collapsed near a Dirac (e.g. on a near-constant stream), because `log(sum(w *
+pdf))` underflowed each `exp(-z**2/2)` to `0`. A Gaussian mixture is strictly
+positive everywhere, so this is now computed as a log-sum-exp over the
+per-component log densities and is always finite for finite `x`. Numerically
+identical to the old path wherever it did not underflow (parity vectors
+unchanged); only the former `-Infinity` cases now return the correct large
+finite value.
+
 ## 0.11.2
 
 Fix: RLS covariance windup in the `ar` and `grouped_ar` transforms. Under

@@ -71,9 +71,32 @@ class Dist:
         return total
 
     def logpdf(self, x: float) -> float:
-        """Log probability density at x."""
-        p = self.pdf(x)
-        return math.log(p) if p > 0 else -math.inf
+        """Log density at x, accumulated in log-space (log-sum-exp).
+
+        A Gaussian mixture is strictly positive everywhere, so for finite x the
+        log density is always finite. Computing ``log(sum(w * pdf))`` directly
+        underflows to ``-inf`` once x sits many standard deviations from every
+        component (e.g. after the scale collapses on a near-constant stream),
+        because each ``exp(-z**2 / 2)`` rounds to 0.0. Summing the per-component
+        log densities instead keeps the result finite and correct.
+        """
+        best = -math.inf
+        terms = []
+        for w, m, s in self.components:
+            if w <= 0.0:
+                continue
+            if s <= 0.0:
+                if x == m:
+                    return math.inf
+                continue
+            z = (x - m) / s
+            t = math.log(w) - 0.5 * z * z - math.log(s) - _LOG_SQRT2PI
+            terms.append(t)
+            if t > best:
+                best = t
+        if best == -math.inf:
+            return -math.inf
+        return best + math.log(sum(math.exp(t - best) for t in terms))
 
     def cdf(self, x: float) -> float:
         """Cumulative distribution function at x."""

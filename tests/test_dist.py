@@ -335,3 +335,30 @@ class TestLogLikelihood:
         ll_bi = sum(d_bimodal.logpdf(x) for x in data)
         ll_uni = sum(d_unimodal.logpdf(x) for x in data)
         assert ll_bi > ll_uni
+
+
+# --- logpdf numerical robustness (log-sum-exp) ---
+
+class TestLogpdfRobustness:
+    """A Gaussian mixture is strictly positive everywhere, so logpdf must be
+    finite for any finite x -- even when the scale has collapsed and a naive
+    log(sum(w * pdf)) would underflow to -inf."""
+
+    def test_collapsed_scale_far_outcome_is_finite(self):
+        d = Dist.gaussian(0.0, 1e-6)          # near-Dirac
+        lp = d.logpdf(0.25)                    # ~250000 sigma away
+        assert math.isfinite(lp) and lp < 0
+
+    def test_mixture_far_outcome_is_finite(self):
+        d = Dist([(0.999, 0.0, 1e-6), (0.001, 0.0, 1e-5)])
+        assert math.isfinite(d.logpdf(0.3))
+
+    def test_matches_log_pdf_when_not_underflowing(self):
+        d = Dist([(0.6, -1.0, 0.7), (0.4, 2.0, 1.3)])
+        for x in (-3.0, -0.5, 0.0, 1.1, 4.0):
+            assert math.isclose(d.logpdf(x), math.log(d.pdf(x)), rel_tol=1e-12)
+
+    def test_degenerate_spike_at_x(self):
+        d = Dist([(1.0, 5.0, 0.0)])
+        assert d.logpdf(5.0) == math.inf
+        assert d.logpdf(6.0) == -math.inf

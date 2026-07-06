@@ -8,6 +8,7 @@
 
 const SQRT2 = Math.SQRT2;
 const SQRT2PI = Math.sqrt(2.0 * Math.PI);
+const LOG_SQRT2PI = 0.5 * Math.log(2.0 * Math.PI);
 const LGAMMA_HALF = 0.5723649429247001; // ln(Gamma(1/2)) = ln(sqrt(pi))
 
 // --- erf via the regularized lower incomplete gamma P(1/2, x^2) ---
@@ -134,8 +135,28 @@ export class Dist {
   }
 
   logpdf(x) {
-    const p = this.pdf(x);
-    return p > 0 ? Math.log(p) : -Infinity;
+    // Log density accumulated in log-space (log-sum-exp). A Gaussian mixture is
+    // strictly positive everywhere, so for finite x this is always finite;
+    // log(sum(w * pdf)) would underflow to -Infinity once x sits many standard
+    // deviations from every component (e.g. after the scale collapses on a
+    // near-constant stream), because each exp(-z*z/2) rounds to 0.
+    let best = -Infinity;
+    const terms = [];
+    for (const [w, m, s] of this.components) {
+      if (w <= 0.0) continue;
+      if (s <= 0.0) {
+        if (x === m) return Infinity;
+        continue;
+      }
+      const z = (x - m) / s;
+      const t = Math.log(w) - 0.5 * z * z - Math.log(s) - LOG_SQRT2PI;
+      terms.push(t);
+      if (t > best) best = t;
+    }
+    if (best === -Infinity) return -Infinity;
+    let acc = 0.0;
+    for (const t of terms) acc += Math.exp(t - best);
+    return best + Math.log(acc);
   }
 
   cdf(x) {
