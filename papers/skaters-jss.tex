@@ -164,7 +164,8 @@ itself (Section~\ref{sec:martingality}): prices are merely its random-walk-heavy
 extreme, and the \pkg{GARCH}-$t$ contest is governed by where a series falls along
 it. The library's
 conditional-variance building blocks (Section~\ref{sec:doob}) narrow but do not
-close that gap; matching \pkg{GARCH}-$t$ on price series with an online,
+close that gap (Table~\ref{tab:price}: the \pkg{GARCH}-$t$ leaf halves the
+paired log-score deficit on $2{,}500$ price series); matching \pkg{GARCH}-$t$ on price series with an online,
 dependency-free recursion is future work, not a present claim.
 
 %% -------------------------------------------------------------------------
@@ -384,9 +385,16 @@ score grows like $\log(1/\text{width})$, so the projection is a bandwidth-%
 dependent log-score machine on grid series. That is precisely why
 Table~\ref{tab:sota} restricts to \emph{continuous} series (under $5\%$
 repeating changes), where the projection fires rarely and its contribution to
-the reported win-rates is immaterial; on grid-heavy series we report the wins
-separately and read them as qualitative (the ordering is insensitive to the
-atom width, the magnitudes are not).
+the reported win-rates is immaterial. On grid-heavy series we measured the
+sensitivity directly: sweeping the atom width over two orders of magnitude
+($0.0005$--$0.05$ of the predictive std, $400$ grid-heavy series) moves the
+median held-out log-likelihood from $+7.8$ to $+5.1$ (off: $+3.2$) --- the
+magnitudes are bandwidth artefacts, as the scaling predicts --- while the
+per-series \emph{winner} against \pkg{AutoETS} agrees on $91\%$ of series
+between the extreme widths (win-rate $66\%$ vs $57\%$), and CRPS, being
+bounded, barely moves ($0.0035$ vs $0.0053$). Grid-series log-likelihood
+magnitudes should be read as qualitative; the orderings survive the bandwidth
+choice.
 
 %% -------------------------------------------------------------------------
 \section{Coordinate learning} \label{sec:coord}
@@ -651,7 +659,8 @@ non-price continuous            & $1{,}742$ & $51\%$ & $+0.003$ & $46\%$ \\
 \quad low-martingality tercile  & $580$     & $78\%$ & $+0.182$ & $78\%$ \\
 \quad mid tercile               & $580$     & $44\%$ & $-0.014$ & $42\%$ \\
 \quad high-martingality tercile & $582$     & $31\%$ & $-0.030$ & $17\%$ \\
-asset price/returns             & $40$      & $2\%$  & $-0.042$ & $0\%$  \\
+asset price/returns             & $2{,}500$ & $10\%$ & $-0.034$ & $7\%$  \\
+\quad with \code{garch\_leaf}   & $2{,}500$ & $18\%$ & $-0.031$ & $5\%$  \\
 \bottomrule
 \end{tabular}
 \caption{\code{laplace} vs the \pkg{arch} \pkg{GARCH}$(1,1)$-$t$, by regime.
@@ -659,9 +668,14 @@ asset price/returns             & $40$      & $2\%$  & $-0.042$ & $0\%$  \\
 held-out log-likelihood; $\Delta$LL is the paired per-series log-score
 difference. Terciles split the continuous non-price universe by the
 martingality score $m$ of Section~\ref{sec:martingality} (low $m$ = mean
-structure). The price sample is small ($40$ return series, one correlated
-family) but unambiguous, and consistent with the high-martingality tercile it
-extends.}
+structure). The price rows are a $2{,}500$-series stratified sample of the
+equity/FX/commodity classes ($34$ correlated families) under the identical
+one-step protocol: \pkg{GARCH}-$t$ wins the per-series likelihood race $9$
+to $1$, the martingale-heavy extreme of the same axis. Swapping in the
+library's \pkg{GARCH}$(1,1)$-$t$ terminal leaf (\code{laplace(leaf=garch\_leaf)})
+roughly halves the paired deficit (mean $\Delta$LL $-0.027 \to -0.015$) without
+closing it --- and both \code{laplace} variants still beat \pkg{AutoARIMA} and
+\pkg{AutoETS} on $68\%$ of the same price series.}
 \label{tab:price}
 \end{table}
 
@@ -807,9 +821,8 @@ length, stickiness, or martingality --- at
 \subsection{Multi-step horizons and the granularity mixture} \label{sec:multistep}
 
 %% MULTISTEP-NUMBERS: full non-price universe (benchmarks/multistep_study.py);
-%% single-scale rows = method "laplace" (scales=[1]); multi-scale rows currently
-%% from the decimation-ensemble prototype ("laplace-ms"); swap to "laplace-msw"
-%% (the shipped default, extend mode) when that run completes.
+%% single-scale rows = method "laplace" (scales=[1]); multi-scale rows =
+%% method "laplace-msw" (the shipped default, evaluated online).
 Multi-step is where the granularity axis of Section~\ref{sec:granularity}
 earns its place. The target is stated exactly: at origin $t$ and horizon $h \in
 \{1, 5, 20\}$, every forecaster emits a predictive for $\Delta_{t+h}$ --- the
@@ -834,8 +847,8 @@ single-scale       & $1$  & \textbf{75\,\%} / \textbf{58\,\%} & \textbf{81\,\%} 
                    & $5$  & \textbf{72\,\%} / \textbf{55\,\%} & \textbf{77\,\%} / \textbf{68\,\%} & \textbf{59\,\%} / 45\,\% & \textbf{76\,\%} / \textbf{58\,\%} \\
                    & $20$ & \textbf{60\,\%} / 46\,\%          & \textbf{66\,\%} / \textbf{59\,\%} & 50\,\% / 36\,\%          & \textbf{63\,\%} / 43\,\% \\
 \midrule
-multi-scale        & $5$  & \textbf{72\,\%} / \textbf{51\,\%} & \textbf{79\,\%} / \textbf{63\,\%} & \textbf{55\,\%} / 39\,\% & \textbf{74\,\%} / \textbf{55\,\%} \\
-(the default)      & $20$ & \textbf{69\,\%} / 49\,\% & \textbf{76\,\%} / \textbf{60\,\%} & \textbf{58\,\%} / 35\,\% & \textbf{69\,\%} / 47\,\% \\
+multi-scale        & $5$  & \textbf{80\,\%} / \textbf{62\,\%} & \textbf{85\,\%} / \textbf{74\,\%} & \textbf{62\,\%} / 49\,\% & \textbf{81\,\%} / \textbf{65\,\%} \\
+(the default)      & $20$ & \textbf{73\,\%} / \textbf{53\,\%} & \textbf{79\,\%} / \textbf{64\,\%} & \textbf{60\,\%} / 38\,\% & \textbf{72\,\%} / 50\,\% \\
 \bottomrule
 \end{tabular}
 \caption{Multi-step per-series win-rates (LL / CRPS) of \code{laplace} on
@@ -845,10 +858,10 @@ the multi-scale mixture that is the default at $k>1$
 (Section~\ref{sec:granularity}); at $h=1$ the two coincide by construction and
 the multi-scale row is omitted. Bold marks a win ($>50\%$). The single-scale
 fan-out decays with horizon --- mean held-out log-likelihood $+2.65$, $+2.44$,
-$+1.10$ at $h = 1, 5, 20$ --- while the granularity mixture holds it ($+2.98$,
-$+2.81$ at $h = 5, 20$), lifts every $h=20$ log-likelihood contest by
-$6$--$10$ points, and beats the single-scale variant head-to-head on $64\%$ of
-series at $h=20$ ($53\%$ at $h=5$).}
+$+1.10$ at $h = 1, 5, 20$ --- while the granularity mixture holds it ($+2.70$,
+$+2.53$ at $h = 5, 20$), lifts every $h\ge 5$ log-likelihood contest by
+$3$--$13$ points, and beats the single-scale variant head-to-head on $68\%$ of
+series at $h=20$ ($59\%$ at $h=5$; exact ties at $h=1$).}
 \label{tab:multistep}
 \end{table}
 
@@ -860,10 +873,10 @@ inflates --- severely so on a small set of series that dominate the (therefore
 unreported) mean CRPS. Second, a \emph{fixed} coarse clock is not the answer:
 decimating to stride $h$ and forecasting one step rescues the $h=20$ density
 (mean $+2.43$) but throws away the intermediate points and loses to the mixture
-on $72\%$ of series at $h=20$. Third, the likelihood-weighted mixture of scales
-recovers both ends: it beats the native fan-out on $64\%$ of series at $h=20$,
-leaves $h=1$ untouched by construction, and wins every $h=20$ log-likelihood
-contest. The gain is flat across autocorrelation terciles ($63/59/63\%$ vs
+on $72\%$ of series at $h=20$ ($75\%$ at $h=5$). Third, the likelihood-weighted
+mixture of scales recovers both ends: it beats the native fan-out on $68\%$ of
+series at $h=20$, leaves $h=1$ untouched by construction (the wrapper passes
+scale one through), and wins every $h\ge5$ log-likelihood contest. The gain is flat across autocorrelation terciles ($63/59/63\%$ vs
 native), consistent with its mechanism: it repairs the variance fan-out rather
 than exploiting mean structure. Granularity behaves like the other candidate
 axes --- mixed under likelihood weights, the wrong scale costs only its softmax
