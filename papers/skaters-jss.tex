@@ -1037,7 +1037,11 @@ reproduces Table~\ref{tab:sota} end to end, and
 \code{study.py sota summarize} regenerates the reported win-rates from the
 committed result file. The multi-step results of Section~\ref{sec:multistep} have
 their own harness (\code{benchmarks/multistep\_study.py}) under the same
-\code{Dist} protocol.
+\code{Dist} protocol. All results in this paper were produced with the
+v0.11 defaults; from v0.12 the terminal leaf's scale-tracking rate default
+changed (\code{scale\_alpha}: $0.01 \to 0.03$, a small out-of-sample
+improvement on both metrics), so pass \code{scale\_alpha=0.01} to reproduce
+the reported numbers exactly.
 
 %% -------------------------------------------------------------------------
 \bibliographystyle{plainnat}
