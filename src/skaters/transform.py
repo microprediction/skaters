@@ -779,6 +779,13 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
                 for i in range(p):
                     for j in range(p):
                         P[i * p + j] = (P[i * p + j] - K[i] * Px[j]) / lam
+                # Guard against RLS covariance windup: under low-excitation input
+                # P inflates by 1/lam each step and eventually overflows to inf,
+                # yielding nan coefficients. Reset the covariance (keeping phi) if
+                # it grows implausibly large or turns non-finite. It never triggers
+                # on well-excited data, so results there are unchanged.
+                if not all(math.isfinite(v) for v in P) or max(abs(v) for v in P) > 1e10:
+                    P[:] = _init_P()
         else:
             residual = y
 
@@ -895,6 +902,11 @@ def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
                         P[i * n_groups + j] = (
                             P[i * n_groups + j] - K[i] * Px[j]
                         ) / lam
+                # RLS covariance windup guard (see ar()): reset P if it inflates
+                # implausibly or turns non-finite; keeps theta. No effect on
+                # well-excited data.
+                if not all(math.isfinite(v) for v in P) or max(abs(v) for v in P) > 1e10:
+                    P[:] = _eye(n_groups, ridge)
         else:
             residual = y
 

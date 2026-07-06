@@ -461,6 +461,18 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
             P[i * p + j] = (P[i * p + j] - K[i] * Px[j]) / lam;
           }
         }
+        // Guard against RLS covariance windup (see the Python note): under
+        // low-excitation input P inflates by 1/lam each step and overflows to
+        // Inf, giving nan coefficients. Reset the covariance (keeping phi) if it
+        // grows implausibly large or non-finite. No effect on well-excited data.
+        let bad = false, pmax = 0.0;
+        for (let m = 0; m < P.length; m++) {
+          const v = P[m];
+          if (!Number.isFinite(v)) { bad = true; break; }
+          const av = Math.abs(v);
+          if (av > pmax) pmax = av;
+        }
+        if (bad || pmax > 1e10) { const np = initP(); for (let m = 0; m < P.length; m++) P[m] = np[m]; }
       }
     } else {
       residual = y;
@@ -555,6 +567,16 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
             P[i * nGroups + j] = (P[i * nGroups + j] - K[i] * Px[j]) / lam;
           }
         }
+        // RLS covariance windup guard (see ar()): reset P if it inflates
+        // implausibly or turns non-finite; keeps theta. No effect on well-excited data.
+        let bad = false, pmax = 0.0;
+        for (let m = 0; m < P.length; m++) {
+          const v = P[m];
+          if (!Number.isFinite(v)) { bad = true; break; }
+          const av = Math.abs(v);
+          if (av > pmax) pmax = av;
+        }
+        if (bad || pmax > 1e10) { const np = eye(nGroups, ridge); for (let m = 0; m < P.length; m++) P[m] = np[m]; }
       }
     } else {
       residual = y;

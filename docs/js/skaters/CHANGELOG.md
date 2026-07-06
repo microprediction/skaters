@@ -5,6 +5,15 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## 0.11.2
+
+Fix: RLS covariance windup in the `ar` and `grouped_ar` transforms. Under
+low-excitation input the RLS `P` matrix inflated by `1/lam` each step and
+eventually overflowed to `Inf` (~74k steps), giving `NaN` coefficients and a
+non-finite forecast. `P` is now reset if it grows implausibly large or turns
+non-finite (keeping the coefficients); it never triggers on well-excited data, so
+results and Python↔JS parity are unchanged.
+
 ## 0.11.1
 
 Fix: the CRPS leaf's exponentiated-gradient weight update could overflow `exp()`

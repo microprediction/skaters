@@ -25,22 +25,21 @@ def _assert_valid(d):
     assert math.isfinite(d.mean) and math.isfinite(d.std) and d.std >= 0.0
 
 
-def test_laplace_periodic_stream_does_not_crash():
-    """The full pipeline runs to completion without raising.
+def test_laplace_periodic_stream_stays_finite():
+    """The full pipeline emits a finite forecast throughout a long run.
 
-    The unfixed CRPS-leaf overflow raised ``AssertionError`` around step ~74k on
-    this periodic stream; with the stabilized update it no longer crashes. In the
-    normal regime the output stays well-formed. (A separate, deeper degeneracy in
-    the transform/ensemble layer can still emit a non-finite forecast far into a
-    *perfectly* periodic synthetic stream — never on real data — and is tracked
-    separately; this test asserts only that the leaf-overflow crash is gone.)
+    Two bugs used to bite this stream far into a run: the CRPS-leaf exp() overflow
+    (AssertionError, ~74k) and RLS covariance windup in the AR transforms (P
+    inflating by 1/lam each step until it overflowed to inf around ~74k, giving
+    nan coefficients). Both are fixed; the forecast now stays well-formed.
     """
     f = laplace(1)
     state = None
-    for i in range(90_000):
+    for i in range(120_000):
         dists, state = f(PERIODIC[i % len(PERIODIC)], state)
-        if i <= 60_000 and i % 10_000 == 0:
+        if i % 20_000 == 0:
             _assert_valid(dists[0])
+    _assert_valid(dists[0])
 
 
 @pytest.mark.parametrize("make", [crps_leaf, scale_mixture_leaf, garch_leaf])
