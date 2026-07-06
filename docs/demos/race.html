@@ -19,13 +19,15 @@
     .bar > span { display: block; height: 100%; width: 0; background: #4a3aff; transition: width 0.08s linear; }
     .row.laplace .bar > span { background: #1a8c4a; }
     .num { font-variant-numeric: tabular-nums; text-align: right; }
+    .row.head { margin: 4px 0 2px; }
+    .row.head .num { color: var(--muted); font-size: 0.76rem; font-weight: 500; }
     .muted { color: var(--muted); }
     button.btn { cursor: pointer; }
     select, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border, #ccd); background: #fff; color: #24243a; }
     .btn.primary { background: #4a3aff; color: #fff; border-color: #4a3aff; }
     .headline { margin: 10px 0 2px; }
     .legend { font-size: 0.85rem; color: var(--muted); margin-top: 12px; line-height: 1.6; max-width: 62ch; }
-    .legend code, code.k { background: none; border: 0; padding: 0; font-size: 0.9em; color: inherit; }
+    .legend code, code.k { background: none; border: 0; padding: 0; font-size: 0.9em; color: inherit; white-space: nowrap; }
     .tour-table { overflow-x: auto; margin: 10px 0 4px; }
     .tour-table table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
     .tour-table th, .tour-table td { padding: 5px 12px; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.08); font-variant-numeric: tabular-nums; }
@@ -78,8 +80,17 @@
         <button id="run-drill" class="btn primary">Race</button>
         <span id="drill-status" class="muted"></span>
       </p>
+      <div class="row head" aria-hidden="true">
+        <div></div><div></div>
+        <div class="num">log-lik</div><div class="num">CRPS</div><div class="num">time</div>
+      </div>
       <div id="drill-rows"></div>
-      <p class="legend">ARIMA (npm <code class="k">arima</code>), augurs ETS and MSTL (npm <code class="k">@bsull/augurs</code>), and Prophet (npm <code class="k">@bsull/augurs</code> + <code class="k">@bsull/augurs-prophet-wasmstan</code>, its Stan optimizer compiled to WASM and vendored into this site) are WebAssembly, loaded on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit. Their predictive σ is floored at a small fraction of the series' rolling scale, so one overconfident step can't produce a spurious −10⁴.</p>
+      <p class="legend">The refit baselines are real npm packages —
+        <code class="k">arima</code>, <code class="k">@bsull/augurs</code> (ETS and MSTL),
+        and Prophet (its Stan model compiled to WebAssembly) — loaded on demand, skipped if
+        they can't load. Each is wrapped as one Gaussian <code class="k">Dist</code> and scored
+        identically, with its σ floored at a fraction of the rolling scale so a single
+        overconfident step can't manufacture a spurious −10⁴ log-likelihood.</p>
     </div>
 
     <div class="panel">
