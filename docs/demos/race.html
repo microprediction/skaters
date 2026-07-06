@@ -274,9 +274,19 @@
         ]);
         if (pm.default) await pm.default();   // initialize the Prophet WebAssembly
         if (!opt.optimizer) throw new Error("no optimizer export");
+        // Smoke test: a real fit+predict must succeed here, or Prophet is not usable
+        // (the Stan/WASI optimizer can load yet fail to run). If it throws we skip
+        // Prophet rather than silently show its cheap fallback as a fast competitor.
+        const DAY = 86400, BASE = 946684800;
+        const sds = Array.from({ length: 24 }, (_, i) => BASE + i * DAY);
+        const sy = Float64Array.from(Array.from({ length: 24 }, (_, i) => Math.sin(i / 3) + i * 0.01));
+        const sm = new pm.Prophet({ optimizer: opt.optimizer, uncertaintySamples: 0 });
+        sm.fit({ ds: sds, y: sy });
+        const sp = sm.predict(sm.makeFutureDataframe(1, { includeHistory: false }));
+        if (!(sp && sp.yhat && Number.isFinite(sp.yhat.point[0]))) throw new Error("Prophet predict returned no finite point");
         PROPHET = { Prophet: pm.Prophet, optimizer: opt.optimizer };
         return PROPHET;
-      } catch (e) { PROPHET = false; return null; }
+      } catch (e) { console.warn("[race] Prophet unavailable:", e); PROPHET = false; return null; }
     }
     function makeProphet(Prophet, optimizer) {
       const hist = []; let residVar = 1e-4, pending = Dist.gaussian(0, 1);
@@ -309,23 +319,31 @@
 
     // Run one competitor over a series, a few steps per frame, updating its row.
     async function raceOne(changes, comp, row) {
-      const t0 = performance.now();
-      let ll = 0, crps = 0, n = 0;
+      // Competitors race concurrently (so laplace visibly finishes first), so wall-clock
+      // is useless -- they all end on the same shared frame. Sum this competitor's own
+      // synchronous compute instead, excluding the rAF waits; single-threaded JS means
+      // one method's compute never overlaps another's, so this attributes real cost.
+      let ll = 0, crps = 0, n = 0, compute = 0;
       const N = changes.length, chunk = comp.kind === "refit" ? 3 : 400;
+      let seg = performance.now();
       for (let i = 0; i < N; i++) {
         const y = changes[i];
         if (i >= BURN && comp.pending) { ll += comp.pending.logpdf(y); crps += comp.pending.crps(y); n++; }
         comp.step(y);
         if (i % chunk === 0) {
+          compute += performance.now() - seg;
           row.bar.style.width = (100 * (i + 1) / N) + "%";
           if (n) { row.ll.textContent = (ll / n).toFixed(3); row.crps.textContent = (crps / n).toFixed(4); }
+          row.time.textContent = compute.toFixed(0) + " ms";
           await frame();
+          seg = performance.now();
         }
       }
+      compute += performance.now() - seg;
       row.bar.style.width = "100%";
       row.ll.textContent = n ? (ll / n).toFixed(3) : "—";
       row.crps.textContent = n ? (crps / n).toFixed(4) : "—";
-      row.time.textContent = ((performance.now() - t0)).toFixed(0) + " ms";
+      row.time.textContent = compute.toFixed(0) + " ms";
       return n ? ll / n : NaN;
     }
 
