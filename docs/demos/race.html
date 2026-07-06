@@ -96,7 +96,7 @@
         <span id="drill-status" class="muted"></span>
       </p>
       <div id="drill-rows"></div>
-      <p class="legend">ARIMA (npm <code class="k">arima</code>) and augurs ETS (npm <code class="k">@bsull/augurs</code>) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit. Their predictive σ is floored at a small fraction of the series' rolling scale, so one overconfident step can't produce a spurious −10⁴.</p>
+      <p class="legend">ARIMA (npm <code class="k">arima</code>) and augurs ETS and MSTL (npm <code class="k">@bsull/augurs</code>) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit. Their predictive σ is floored at a small fraction of the series' rolling scale, so one overconfident step can't produce a spurious −10⁴.</p>
     </div>
 
     <div class="panel">
@@ -269,6 +269,45 @@
       };
     }
 
+    let MSTLM;
+    async function ensureMstl() {
+      if (MSTLM === false) return null;
+      if (MSTLM) return MSTLM;
+      try {
+        const mod = await import("https://esm.sh/@bsull/augurs@0.10.2/mstl");
+        if (mod.default) await mod.default();   // initialize the WebAssembly
+        MSTLM = { MSTL: mod.MSTL };
+        return MSTLM;
+      } catch (e) { MSTLM = false; return null; }
+    }
+    function makeMstl(MSTL) {
+      const hist = []; let residVar = 1e-4, pending = Dist.gaussian(0, 1);
+      const aVar = 0.05, WIN = 200, Z = 1.959964, PERIOD = 7;   // weekly seasonal + AutoETS trend
+      return {
+        name: "augurs-mstl", kind: "refit",
+        get pending() { return pending; },
+        step(y) {
+          if (hist.length) { const r = y - pending.mean; residVar = (1 - aVar) * residVar + aVar * r * r; }
+          hist.push(y);
+          try {
+            const win = hist.slice(-WIN);
+            if (win.length < PERIOD * 2 + 1) throw new Error("too short for MSTL");  // needs >=2 cycles
+            const m = MSTL.ets([PERIOD]);
+            m.fit(Float64Array.from(win));
+            const fc = m.predict(1, 0.95);
+            let std = Math.sqrt(Math.max(residVar, 1e-9));
+            if (fc.intervals && fc.intervals.lower && fc.intervals.upper) {
+              std = Math.max((fc.intervals.upper[0] - fc.intervals.lower[0]) / (2 * Z), 1e-9);
+            }
+            std = Math.max(std, SIGMA_FLOOR * Math.sqrt(Math.max(residVar, 1e-12)));  // clamp overconfidence
+            pending = Dist.gaussian(fc.point[0], std);
+          } catch (e) {
+            pending = Dist.gaussian(hist[hist.length - 1], Math.sqrt(Math.max(residVar, 1e-9)));
+          }
+        },
+      };
+    }
+
     // Run one competitor over a series, a few steps per frame, updating its row.
     async function raceOne(changes, comp, row) {
       const t0 = performance.now();
@@ -307,7 +346,7 @@
       const s = series[Number($("series-sel").value) || 0];
       const host = $("drill-rows"); host.innerHTML = "";
       $("drill-status").textContent = "loading ARIMA & augurs…";
-      const [A, AU] = await Promise.all([ensureArima(), ensureAugurs()]);
+      const [A, AU, MS] = await Promise.all([ensureArima(), ensureAugurs(), ensureMstl()]);
       $("drill-status").textContent = s.id;
 
       const specs = [
@@ -317,7 +356,8 @@
       ];
       if (A) specs.push(["arima", "npm arima (WASM), refit every step", makeArima(A), false]);
       if (AU) specs.push(["augurs-ets", "npm @bsull/augurs (WASM), refit every step", makeAugurs(AU.AutoETS), false]);
-      const missing = [!A && "arima", !AU && "augurs"].filter(Boolean);
+      if (MS) specs.push(["augurs-mstl", "npm @bsull/augurs MSTL (WASM), refit every step", makeMstl(MS.MSTL), false]);
+      const missing = [!A && "arima", !AU && "augurs-ets", !MS && "augurs-mstl"].filter(Boolean);
       if (missing.length) host.insertAdjacentHTML("beforeend",
         `<p class="muted">(${missing.join(" and ")} unavailable — CDN blocked; racing the rest.)</p>`);
 
@@ -364,7 +404,7 @@
       btn.textContent = "Stop"; btn.classList.remove("primary");
       const series = await loadData();
       $("tour-status").textContent = "loading ARIMA & augurs…";
-      const [A, AU] = await Promise.all([ensureArima(), ensureAugurs()]);
+      const [A, AU, MS] = await Promise.all([ensureArima(), ensureAugurs(), ensureMstl()]);
       const defs = [
         ["laplace", () => makeLaplace(), true],
         ["naive", () => makeNaive(), false],
@@ -372,6 +412,7 @@
       ];
       if (A) defs.push(["arima", () => makeArima(A), false]);
       if (AU) defs.push(["augurs-ets", () => makeAugurs(AU.AutoETS), false]);
+      if (MS) defs.push(["augurs-mstl", () => makeMstl(MS.MSTL), false]);
       for (const [name, , isLap] of defs)
         if (!TOUR.has(name)) TOUR.set(name, { wins: 0, sumLL: 0, sumMs: 0, count: 0, isLap });
       const names = defs.map((d) => d[0]);
