@@ -275,8 +275,7 @@
         const sds = Array.from({ length: sn }, (_, i) => BASE + i * DAY);
         const sy = Float64Array.from(Array.from({ length: sn }, (_, i) =>
           0.02 * i + 0.3 * Math.sin(2 * Math.PI * i / 7) + 0.05 * Math.sin(i * 1.7)));
-        const sm = new pm.Prophet({ optimizer: opt.optimizer, uncertaintySamples: 0,
-          nChangepoints: 10, yearlySeasonality: false, dailySeasonality: false });
+        const sm = new pm.Prophet({ optimizer: opt.optimizer, uncertaintySamples: 0, nChangepoints: 10 });
         sm.fit({ ds: sds, y: sy });
         const sp = sm.predict(sm.makeFutureDataframe(1, { includeHistory: false }));
         if (!(sp && sp.yhat && Number.isFinite(sp.yhat.point[0]))) throw new Error("Prophet predict returned no finite point");
@@ -297,8 +296,7 @@
             const win = hist.slice(-WIN);
             if (win.length < 14) throw new Error("too short for Prophet");
             const ds = win.map((_, i) => BASE + i * DAY);   // daily index -> auto weekly seasonality
-            const m = new Prophet({ optimizer, uncertaintySamples: 0, nChangepoints: 10,
-              yearlySeasonality: false, dailySeasonality: false });
+            const m = new Prophet({ optimizer, uncertaintySamples: 0, nChangepoints: 10 });
             m.fit({ ds, y: Float64Array.from(win) });
             const pred = m.predict(m.makeFutureDataframe(1, { includeHistory: false }));
             const pt = pred.yhat.point[0];
