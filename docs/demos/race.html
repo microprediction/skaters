@@ -78,15 +78,15 @@
     <div class="panel">
       <h2>2. Watch one series — with the heavyweights</h2>
       <p class="muted">Add the refit-every-step baselines. <code class="k">laplace</code>
-        finishes in a blink; Holt-Winters and ARIMA grind through a fresh fit at
-        every step. The slowness is the point.</p>
+        finishes in a blink; Holt-Winters, ARIMA, and augurs (ETS) grind through a
+        fresh fit at every step. The slowness is the point.</p>
       <p>
         <select id="series-sel"><option>Loading series…</option></select>
         <button id="run-drill" class="btn primary">Race</button>
         <span id="drill-status" class="muted"></span>
       </p>
       <div id="drill-rows"></div>
-      <p class="legend">ARIMA is the npm <code class="k">arima</code> package (WebAssembly), loaded from a CDN on demand; if it can't load it's skipped. Holt-Winters and the naive method are wrapped as Gaussians, since a point/interval forecast is all they emit.</p>
+      <p class="legend">ARIMA (npm <code class="k">arima</code>) and augurs ETS (npm <code class="k">@bsull/augurs</code>) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit.</p>
     </div>
 
     <p class="muted">Reproduce at scale (all 894 non-price series, more baselines):
@@ -194,6 +194,42 @@
       };
     }
 
+    let AUGURS;
+    async function ensureAugurs() {
+      if (AUGURS === false) return null;
+      if (AUGURS) return AUGURS;
+      try {
+        const mod = await import("https://esm.sh/@bsull/augurs@0.10.2/ets");
+        if (mod.default) await mod.default();   // initialize the WebAssembly
+        AUGURS = { AutoETS: mod.AutoETS };
+        return AUGURS;
+      } catch (e) { AUGURS = false; return null; }
+    }
+    function makeAugurs(AutoETS) {
+      const hist = []; let residVar = 1e-4, pending = Dist.gaussian(0, 1);
+      const aVar = 0.05, WIN = 200, Z = 1.959964;   // 95% -> 1.96 sigma
+      return {
+        name: "augurs-ets", kind: "refit",
+        get pending() { return pending; },
+        step(y) {
+          if (hist.length) { const r = y - pending.mean; residVar = (1 - aVar) * residVar + aVar * r * r; }
+          hist.push(y);
+          try {
+            const m = new AutoETS(1, "ZZN");          // non-seasonal auto ETS search
+            m.fit(Float64Array.from(hist.slice(-WIN)));
+            const fc = m.predict(1, 0.95);
+            let std = Math.sqrt(Math.max(residVar, 1e-9));
+            if (fc.intervals && fc.intervals.lower && fc.intervals.upper) {
+              std = Math.max((fc.intervals.upper[0] - fc.intervals.lower[0]) / (2 * Z), 1e-9);
+            }
+            pending = Dist.gaussian(fc.point[0], std);
+          } catch (e) {
+            pending = Dist.gaussian(hist[hist.length - 1], Math.sqrt(Math.max(residVar, 1e-9)));
+          }
+        },
+      };
+    }
+
     // Run one competitor over a series, a few steps per frame, updating its row.
     async function raceOne(changes, comp, row) {
       const t0 = performance.now();
@@ -231,8 +267,8 @@
       const series = await loadData();
       const s = series[Number($("series-sel").value) || 0];
       const host = $("drill-rows"); host.innerHTML = "";
-      $("drill-status").textContent = "loading ARIMA…";
-      const A = await ensureArima();
+      $("drill-status").textContent = "loading ARIMA & augurs…";
+      const [A, AU] = await Promise.all([ensureArima(), ensureAugurs()]);
       $("drill-status").textContent = s.id;
 
       const specs = [
@@ -240,8 +276,11 @@
         ["naive", "EWMA mean ± rolling σ", makeNaive(), false],
         ["holt-winters", "refit every step", makeHoltWinters(), false],
       ];
-      if (A) specs.push(["arima", "WASM, refit every step", makeArima(A), false]);
-      else host.insertAdjacentHTML("beforeend", `<p class="muted">(ARIMA unavailable — CDN blocked; racing the rest.)</p>`);
+      if (A) specs.push(["arima", "npm arima (WASM), refit every step", makeArima(A), false]);
+      if (AU) specs.push(["augurs-ets", "npm @bsull/augurs (WASM), refit every step", makeAugurs(AU.AutoETS), false]);
+      const missing = [!A && "arima", !AU && "augurs"].filter(Boolean);
+      if (missing.length) host.insertAdjacentHTML("beforeend",
+        `<p class="muted">(${missing.join(" and ")} unavailable — CDN blocked; racing the rest.)</p>`);
 
       const rows = specs.map(([name, tag, comp, isLap]) => {
         const row = competitorRow(name, tag, isLap);
