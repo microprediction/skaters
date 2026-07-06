@@ -96,7 +96,7 @@
         <span id="drill-status" class="muted"></span>
       </p>
       <div id="drill-rows"></div>
-      <p class="legend">ARIMA (npm <code class="k">arima</code>) and augurs ETS (npm <code class="k">@bsull/augurs</code>) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit.</p>
+      <p class="legend">ARIMA (npm <code class="k">arima</code>) and augurs ETS (npm <code class="k">@bsull/augurs</code>) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit. Their predictive σ is floored at a small fraction of the series' rolling scale, so one overconfident step can't produce a spurious −10⁴.</p>
     </div>
 
     <div class="panel">
@@ -140,6 +140,11 @@
     const $ = (id) => document.getElementById(id);
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
     const BURN = 100;
+    // Floor each point-forecast baseline's predictive sigma at this fraction of the
+    // series' own rolling residual scale, so one overconfident step can't produce a
+    // spurious -10^4 log-likelihood. Only clamps pathological overconfidence; laplace
+    // needs no floor (its mixture can't collapse that way).
+    const SIGMA_FLOOR = 0.15;
 
     let SERIES = null;
     async function loadData() {
@@ -217,7 +222,9 @@
           try {
             const m = new A({ p: 2, d: 0, q: 1, verbose: false }).train(hist.slice(-WIN));
             const [pred, err] = m.predict(1);
-            pending = Dist.gaussian(pred[0], Math.sqrt(Math.max(err[0] || residVar, 1e-9)));
+            let std = Math.sqrt(Math.max(err[0] || residVar, 1e-9));
+            std = Math.max(std, SIGMA_FLOOR * Math.sqrt(Math.max(residVar, 1e-12)));  // clamp overconfidence
+            pending = Dist.gaussian(pred[0], std);
           } catch (e) {
             pending = Dist.gaussian(hist[hist.length - 1], Math.sqrt(Math.max(residVar, 1e-9)));
           }
@@ -253,6 +260,7 @@
             if (fc.intervals && fc.intervals.lower && fc.intervals.upper) {
               std = Math.max((fc.intervals.upper[0] - fc.intervals.lower[0]) / (2 * Z), 1e-9);
             }
+            std = Math.max(std, SIGMA_FLOOR * Math.sqrt(Math.max(residVar, 1e-12)));  // clamp overconfidence
             pending = Dist.gaussian(fc.point[0], std);
           } catch (e) {
             pending = Dist.gaussian(hist[hist.length - 1], Math.sqrt(Math.max(residVar, 1e-9)));
