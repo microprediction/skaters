@@ -6,13 +6,6 @@
   <title>skaters — live forecasting race</title>
   <meta name="description" content="Race skaters against classical baselines on real FRED series, live in your browser. No key, no server." />
   <link rel="stylesheet" href="../academic.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "@bytecodealliance/preview2-shim/": "https://esm.sh/@bytecodealliance/preview2-shim@0.17.0/"
-    }
-  }
-  </script>
   <style>
     .race-intro { color: var(--muted); }
     .panel { border: 1px solid var(--border, #e6e6ef); border-radius: 10px; padding: 18px 20px; margin: 22px 0; }
@@ -270,7 +263,7 @@
       try {
         const [pm, opt] = await Promise.all([                    // model wasm (CDN) + vendored Stan optimizer
           import("https://esm.sh/@bsull/augurs@0.10.2/prophet"),
-          import("/vendor/prophet-wasmstan/prophet-wasmstan.js"),  // jco WASI component; .wasm served locally
+          import("/vendor/prophet-wasmstan/prophet-wasmstan.bundle.js"),  // jco WASI component + preview2-shim, bundled
         ]);
         if (pm.default) await pm.default();   // initialize the Prophet WebAssembly
         if (!opt.optimizer) throw new Error("no optimizer export");
