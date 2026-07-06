@@ -268,12 +268,15 @@
         if (pm.default) await pm.default();   // initialize the Prophet WebAssembly
         if (!opt.optimizer) throw new Error("no optimizer export");
         // Smoke test: a real fit+predict must succeed here, or Prophet is not usable
-        // (the Stan/WASI optimizer can load yet fail to run). If it throws we skip
-        // Prophet rather than silently show its cheap fallback as a fast competitor.
-        const DAY = 86400, BASE = 946684800;
-        const sds = Array.from({ length: 24 }, (_, i) => BASE + i * DAY);
-        const sy = Float64Array.from(Array.from({ length: 24 }, (_, i) => Math.sin(i / 3) + i * 0.01));
-        const sm = new pm.Prophet({ optimizer: opt.optimizer, uncertaintySamples: 0 });
+        // (the Stan/WASI optimizer can load yet fail to run). Use the same conservative
+        // config and enough data as the real wrapper -- too few points vs the default
+        // 25 changepoints over-parameterizes and Stan's line search diverges.
+        const DAY = 86400, BASE = 946684800, sn = 80;
+        const sds = Array.from({ length: sn }, (_, i) => BASE + i * DAY);
+        const sy = Float64Array.from(Array.from({ length: sn }, (_, i) =>
+          0.02 * i + 0.3 * Math.sin(2 * Math.PI * i / 7) + 0.05 * Math.sin(i * 1.7)));
+        const sm = new pm.Prophet({ optimizer: opt.optimizer, uncertaintySamples: 0,
+          nChangepoints: 10, yearlySeasonality: false, dailySeasonality: false });
         sm.fit({ ds: sds, y: sy });
         const sp = sm.predict(sm.makeFutureDataframe(1, { includeHistory: false }));
         if (!(sp && sp.yhat && Number.isFinite(sp.yhat.point[0]))) throw new Error("Prophet predict returned no finite point");
