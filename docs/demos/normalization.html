@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — running normalization</title>
+  <meta name="description" content="The same ugly stream, two normalizers: a rolling z-score stays ugly; laplace's calibration state turns it into the same N(0,1) bell every time." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — running normalization" />
+  <meta property="og:description" content="The same ugly stream, two normalizers: a rolling z-score stays ugly; laplace's calibration state turns it into the same N(0,1) bell every time." />
+  <meta property="og:url" content="https://skaters.microprediction.org/demos/normalization.html" />
+  <meta property="og:image" content="https://skaters.microprediction.org/assets/frontier.png" />
+  <meta property="og:image:alt" content="Accuracy vs speed: laplace has the best held-out likelihood at a fraction of the baselines' runtime." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="stylesheet" href="../academic.css" />
+  <style>
+    .histo-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; }
+    .histo-cell { flex: 1 1 300px; min-width: 300px; }
+    .histo-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; }
+    .histo-sub { font-weight: 400; color: #888; font-size: 0.8rem; }
+    .stats { font-size: 0.82rem; color: #666; font-variant-numeric: tabular-nums; margin-top: 4px; }
+    .stats b { color: #1a1a1a; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+        <a href="https://www.npmjs.com/package/skaters">npm</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Running normalization</h1>
+    <p class="subtitle">
+      One ugly stream, two normalizers. The joke: whatever you feed it, the same
+      bell comes out.
+    </p>
+
+    <div class="panel">
+      <div class="controls">
+        <div class="control">
+          <label for="regime">Data</label>
+          <select id="regime">
+            <option value="multiplicative">multiplicative (level-dependent noise)</option>
+            <option value="jumps">level jumps</option>
+            <option value="hetero">slowly-varying noise</option>
+            <option value="trend">trend + noise</option>
+            <option value="seasonal">seasonal (period 7)</option>
+            <option value="rw">random walk</option>
+            <option value="meanrevert">weak mean reversion</option>
+            <option value="sqrtvar">variance ∝ level (√ coord)</option>
+            <option value="longmem">long memory (fractional)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="speed">Speed <span class="val" id="speedVal">4</span></label>
+          <input type="range" id="speed" min="1" max="20" value="4" />
+        </div>
+        <button class="btn" id="run">Regenerate</button>
+        <button class="btn secondary" id="pause">Pause</button>
+      </div>
+
+      <canvas class="plot" id="strip" width="940" height="120"></canvas>
+      <p class="status" id="status">—</p>
+
+      <div class="histo-row">
+        <div class="histo-cell">
+          <div class="histo-title">What goes in
+            <span class="histo-sub">— rolling z-score of the raw stream (window 30): what naive standardisation gives you</span></div>
+          <canvas class="plot" id="histNaive" width="450" height="240"></canvas>
+          <div class="stats" id="statNaive">—</div>
+        </div>
+        <div class="histo-cell">
+          <div class="histo-title">What comes out
+            <span class="histo-sub">— <code>state["z"]</code>: the PIT of each point under the forecast made for it, through Φ⁻¹</span></div>
+          <canvas class="plot" id="histZ" width="450" height="240"></canvas>
+          <div class="stats" id="statZ">—</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:#9a9aa6"></span>rolling z-score</span>
+        <span><span class="swatch" style="background:#4a3aff"></span>laplace z</span>
+        <span><span class="swatch" style="background:#1a1a1a; height:2px; margin-bottom:5px"></span>N(0,1)</span>
+      </div>
+    </div>
+
+    <p>
+      Both panels normalize the <em>same</em> observations onto the same axis.
+      The left panel divides by a trailing standard deviation — so trends smear
+      it sideways, volatility bursts fatten its tails, and jumps leave scars for
+      thirty steps. The right panel is <code>laplace</code>'s calibration state:
+      each arriving point's probability integral transform under the predictive
+      distribution issued <em>for</em> it, mapped through the standard-normal
+      quantile. Because the model has already absorbed the trend, the
+      volatility clock, the seasonality, and the coordinate, what remains is
+      (roughly) pure N(0,1) innovation — <em>running normalization</em>. That
+      residue is also an anomaly detector: anything with |z| &gt; 4 earned it.
+    </p>
+    <p>
+      Pick the multiplicative or jumps regime for the full effect. The bars are
+      recomputed live as the stream reveals; the black curve never changes.
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+
+  <script type="module">
+    import { laplace } from "../js/skaters/index.mjs";
+
+    // Reproducible-but-varied RNG (mulberry32). Seed bumps each regenerate.
+    function rng(seed) {
+      return function () {
+        seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function gauss(r) {
+      let u = 0, v = 0;
+      while (u === 0) u = r();
+      while (v === 0) v = r();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    }
+
+    function makeSeries(regime, seed, n = 600) {
+      const r = rng(seed);
+      if (regime === "longmem") {
+        const d = 0.42, Wn = 140;
+        const wt = [1]; for (let k = 1; k < Wn; k++) wt.push(wt[k - 1] * (d + k - 1) / k);
+        const eps = []; for (let i = 0; i < n + Wn; i++) eps.push(gauss(r));
+        const out = [];
+        for (let t = 0; t < n; t++) { let acc = 0; for (let j = 0; j < Wn; j++) acc += wt[j] * eps[t + Wn - 1 - j]; out.push(acc); }
+        return out;
+      }
+      const s = [];
+      let lvl = 0, logv = Math.log(40), sq = 200;
+      for (let t = 0; t < n; t++) {
+        if (regime === "trend") s.push(0.06 * t + 2 * gauss(r));
+        else if (regime === "seasonal") s.push(5 * Math.sin((2 * Math.PI * t) / 7) + gauss(r));
+        else if (regime === "rw") { lvl += gauss(r); s.push(lvl); }
+        else if (regime === "meanrevert") { lvl += 0.04 * (0 - lvl) + 1.2 * gauss(r); s.push(lvl); }
+        else if (regime === "multiplicative") { logv += 0.06 * gauss(r); s.push(Math.exp(logv)); }
+        else if (regime === "sqrtvar") { sq = Math.max(sq + 1.2 * Math.sqrt(Math.max(sq, 1)) * gauss(r), 1); s.push(sq); }
+        else if (regime === "hetero") {
+          const sigma = Math.exp(Math.log(0.3) + (Math.log(3) - Math.log(0.3)) * (0.5 + 0.5 * Math.sin((2 * Math.PI * t) / 120)));
+          s.push(gauss(r) * sigma);
+        } else if (regime === "jumps") {
+          if (t % 60 === 0) lvl += 12 * (r() - 0.5);
+          s.push(lvl + gauss(r));
+        }
+      }
+      return s;
+    }
+
+    let rows = [], cursor = 0, timer = null, seed = 1, paused = false;
+
+    function compute() {
+      const regime = document.getElementById("regime").value;
+      const series = makeSeries(regime, seed);
+      const f = laplace(1);
+      let state = null;
+      const W = 30;                       // naive rolling window
+      rows = [];
+      for (let t = 0; t < series.length; t++) {
+        const y = series[t];
+        // naive rolling z-score BEFORE absorbing y (same information set as laplace)
+        let naive = null;
+        if (t >= W) {
+          const win = series.slice(t - W, t);
+          const mu = win.reduce((a, b) => a + b, 0) / W;
+          const sd = Math.sqrt(win.reduce((a, b) => a + (b - mu) * (b - mu), 0) / W);
+          if (sd > 1e-12) naive = Math.max(-8, Math.min(8, (y - mu) / sd));
+        }
+        const [, st] = f(y, state);
+        state = st;
+        rows.push({ y, naive, z: st.z[0] });
+      }
+      cursor = 1;
+    }
+
+    // --- drawing -----------------------------------------------------------
+    const stripC = document.getElementById("strip"), stripX = stripC.getContext("2d");
+    const nC = document.getElementById("histNaive"), nX = nC.getContext("2d");
+    const zC = document.getElementById("histZ"), zX = zC.getContext("2d");
+    const LO = -5, HI = 5, BINS = 40;
+
+    function drawStrip(upto) {
+      const W = stripC.width, H = stripC.height, PAD = 10;
+      stripX.clearRect(0, 0, W, H);
+      const view = rows.slice(0, upto);
+      let mn = Infinity, mx = -Infinity;
+      for (const r of view) { mn = Math.min(mn, r.y); mx = Math.max(mx, r.y); }
+      if (!isFinite(mn) || mx === mn) { mn -= 1; mx += 1; }
+      const X = (i) => PAD + (i / (rows.length - 1)) * (W - 2 * PAD);
+      const Y = (v) => H - PAD - ((v - mn) / (mx - mn)) * (H - 2 * PAD);
+      stripX.fillStyle = "#1a1a1a";
+      for (let i = 0; i < view.length; i++) {
+        stripX.beginPath(); stripX.arc(X(i), Y(view[i].y), 1.2, 0, 2 * Math.PI); stripX.fill();
+      }
+    }
+
+    function drawHist(ctx, canvas, values, color, statsEl) {
+      const W = canvas.width, H = canvas.height, PAD = 26;
+      ctx.clearRect(0, 0, W, H);
+      const bins = new Array(BINS).fill(0);
+      let n = 0, sum = 0, sum2 = 0, big = 0;
+      for (const v of values) {
+        if (v === null) continue;
+        const b = Math.max(0, Math.min(BINS - 1, Math.floor(((v - LO) / (HI - LO)) * BINS)));
+        bins[b] += 1; n += 1; sum += v; sum2 += v * v;
+        if (Math.abs(v) > 3) big += 1;
+      }
+      const X = (v) => PAD + ((v - LO) / (HI - LO)) * (W - 2 * PAD);
+      // N(0,1) reference: convert density to expected bin share
+      const binw = (HI - LO) / BINS;
+      const phi = (x) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+      let ymax = phi(0) * binw * 1.35;
+      if (n) for (const b of bins) ymax = Math.max(ymax, (b / n) * 1.08);
+      const Y = (share) => H - PAD - (share / ymax) * (H - 2 * PAD);
+      // baseline
+      ctx.strokeStyle = "#e2e2e2"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(PAD, H - PAD); ctx.lineTo(W - PAD, H - PAD); ctx.stroke();
+      // bars
+      if (n) {
+        ctx.fillStyle = color;
+        for (let b = 0; b < BINS; b++) {
+          if (!bins[b]) continue;
+          const x0 = X(LO + b * binw), x1 = X(LO + (b + 1) * binw);
+          const y = Y(bins[b] / n);
+          ctx.fillRect(x0 + 0.5, y, (x1 - x0) - 1, H - PAD - y);
+        }
+      }
+      // N(0,1) overlay
+      ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 1.6; ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      for (let i = 0; i <= 160; i++) {
+        const v = LO + (i / 160) * (HI - LO);
+        const y = Y(phi(v) * binw);
+        if (i === 0) ctx.moveTo(X(v), y); else ctx.lineTo(X(v), y);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      // tick labels
+      ctx.fillStyle = "#888"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+      for (const v of [-4, -2, 0, 2, 4]) ctx.fillText(String(v), X(v), H - PAD + 14);
+      // stats
+      if (n) {
+        const mean = sum / n, sd = Math.sqrt(Math.max(sum2 / n - mean * mean, 0));
+        statsEl.innerHTML = `n <b>${n}</b> &nbsp; mean <b>${mean.toFixed(2)}</b> &nbsp; std <b>${sd.toFixed(2)}</b> &nbsp; |z|&gt;3 <b>${(100 * big / n).toFixed(1)}%</b> <span style="color:#aaa">(N(0,1): 0.3%)</span>`;
+      } else statsEl.textContent = "—";
+    }
+
+    function frame() {
+      const view = rows.slice(0, cursor);
+      drawStrip(cursor);
+      drawHist(nX, nC, view.map((r) => r.naive), "#9a9aa6", document.getElementById("statNaive"));
+      drawHist(zX, zC, view.map((r) => r.z), "#4a3aff", document.getElementById("statZ"));
+      document.getElementById("status").textContent = `step ${cursor} / ${rows.length}`;
+    }
+
+    function tick() {
+      if (paused) return;
+      const step = parseInt(document.getElementById("speed").value, 10);
+      cursor = Math.min(rows.length, cursor + step);
+      frame();
+      if (cursor < rows.length) timer = requestAnimationFrame(tick);
+    }
+
+    function start() {
+      if (timer) cancelAnimationFrame(timer);
+      compute();
+      paused = false;
+      document.getElementById("pause").textContent = "Pause";
+      timer = requestAnimationFrame(tick);
+    }
+
+    document.getElementById("run").addEventListener("click", () => { seed++; start(); });
+    document.getElementById("regime").addEventListener("change", start);
+    document.getElementById("speed").addEventListener("input", (e) => {
+      document.getElementById("speedVal").textContent = e.target.value;
+    });
+    document.getElementById("pause").addEventListener("click", (e) => {
+      paused = !paused;
+      e.target.textContent = paused ? "Resume" : "Pause";
+      if (!paused) timer = requestAnimationFrame(tick);
+    });
+
+    start();
+  </script>
+</body>
+</html>

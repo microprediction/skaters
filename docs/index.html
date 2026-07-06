@@ -95,6 +95,17 @@
       <a href="/papers.html">The foundation study →</a>
     </div>
 
+    <div class="callout">
+      <strong>Anomaly detection falls out for free.</strong> Every arriving point is scored
+      against the forecast that was made <em>for it</em>: the state carries its probability
+      integral transform (<code>state["pit"]</code>, ~Uniform when the stream behaves) and its
+      normalized surprise (<code>state["z"]</code>, ~N(0,1)) at every horizon — running
+      normalization with no extra compute, and a threshold on |z| is an anomaly detector
+      calibrated by construction.
+      <a href="/demos/normalization.html">See it live →</a> ·
+      <a href="/skills.html#anomaly-detection">the skill →</a>
+    </div>
+
     <p>
       <code>pip install skaters</code>. Every prediction is a <code>Dist</code> — a weighted
       Gaussian mixture carrying the mean, the spread, quantiles, and a density at once. You build
