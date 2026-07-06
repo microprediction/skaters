@@ -423,12 +423,17 @@
       if (!pts.length) { $("tour-scatter").innerHTML = ""; return; }
       const W = 520, H = 300, L = 46, R = 14, T = 14, B = 36;
       const xmax = Math.max(0.4, ...pts.map((p) => Math.log10(Math.max(p.ratio, 1))));
+      // Robust y-window: a single blown-up competitor (mean LL in the thousands
+      // below) must not crush the axis. Scale to the readable cluster near the
+      // leader; anything far below is pinned to the floor as "off-scale".
       const lls = pts.map((p) => p.ll);
-      let ymin = Math.min(...lls), ymax = Math.max(...lls);
+      const top = Math.max(...lls);
+      const near = lls.filter((v) => v >= top - 12);
+      let ymin = Math.min(...near), ymax = top;
       if (ymax - ymin < 1e-6) { ymin -= 0.5; ymax += 0.5; }
-      const pad = (ymax - ymin) * 0.15; ymin -= pad; ymax += pad;
+      const pad = (ymax - ymin) * 0.18; ymin -= pad; ymax += pad;
       const px = (x) => L + (x / xmax) * (W - L - R);
-      const py = (y) => (H - B) - ((y - ymin) / (ymax - ymin)) * (H - B - T);
+      const py = (y) => (H - B) - ((Math.max(ymin, Math.min(ymax, y)) - ymin) / (ymax - ymin)) * (H - B - T);
       const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
       let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="accuracy vs speed">`;
       svg += `<line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="#ccc"/>`;
@@ -445,11 +450,19 @@
       svg += `<text x="${(L + W - R) / 2}" y="${H - 4}" font-size="10.5" fill="#666" text-anchor="middle">total compute vs laplace (log)</text>`;
       svg += `<text transform="translate(12 ${(T + H - B) / 2}) rotate(-90)" font-size="10.5" fill="#666" text-anchor="middle">mean log-likelihood</text>`;
       for (const p of pts) {
-        const x = px(Math.log10(Math.max(p.ratio, 1))), y = py(p.ll);
+        const x = px(Math.log10(Math.max(p.ratio, 1)));
         const c = p.isLap ? "#1a8c4a" : "#4a3aff";
-        svg += `<circle cx="${x}" cy="${y}" r="${p.isLap ? 6 : 5}" fill="${c}"/>`;
+        const off = p.ll < ymin;                                        // off the bottom of the readable window
         const anchor = x > W - 90 ? "end" : "start", dx = anchor === "end" ? -9 : 9;
-        svg += `<text x="${x + dx}" y="${y + 3.5}" font-size="11" fill="${c}" text-anchor="${anchor}" font-weight="${p.isLap ? 700 : 400}">${esc(p.nm)}</text>`;
+        if (off) {                                                      // pin to floor with a down-triangle
+          const yf = H - B - 1;
+          svg += `<path d="M ${x - 5} ${yf - 9} L ${x + 5} ${yf - 9} L ${x} ${yf} Z" fill="${c}"/>`;
+          svg += `<text x="${x + dx}" y="${yf - 12}" font-size="11" fill="${c}" text-anchor="${anchor}">${esc(p.nm)} (${Math.round(p.ll)})</text>`;
+        } else {
+          const y = py(p.ll);
+          svg += `<circle cx="${x}" cy="${y}" r="${p.isLap ? 6 : 5}" fill="${c}"/>`;
+          svg += `<text x="${x + dx}" y="${y + 3.5}" font-size="11" fill="${c}" text-anchor="${anchor}" font-weight="${p.isLap ? 700 : 400}">${esc(p.nm)}</text>`;
+        }
       }
       svg += `</svg>`;
       $("tour-scatter").innerHTML = svg;
