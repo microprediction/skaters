@@ -8,6 +8,7 @@ import { terminalLeafEnsemble } from "./terminal.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
 import { sticky as project } from "./sticky.mjs";
 import { multiscale } from "./multiscale.mjs";
+import { parade } from "./parade.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, drift,
   holtLinear, ar, theta, seasonalDifference, garch, powerTransform, yeoJohnson,
@@ -162,7 +163,8 @@ function laplaceSingleScale(k, objective, sticky) {
 // (default {1, ceil(sqrt(k)), k}), horizons mix eligible scales by likelihood.
 // Pass scales = [1] for the single-scale (native fan-out) variant.
 export function laplace(k = 1, objective = "crps", sticky = true, scales = null) {
-  const f = multiscale((kk) => laplaceSingleScale(kk, objective, sticky), k, { scales });
+  // parade adds state.pit / state.z calibration diagnostics (see parade.mjs)
+  const f = parade(multiscale((kk) => laplaceSingleScale(kk, objective, sticky), k, { scales }), k);
   f.skaterName = `laplace(k=${k})`;
   return f;
 }

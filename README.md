@@ -89,6 +89,14 @@ f = laplace(k=1, objective="likelihood")  # pure-likelihood leaf
 f = laplace(k=1, sticky=False)            # no lattice projection
 ```
 
+**Calibration state, free.** Every arriving point is resolved against the
+forecasts previously made *for it*: `state["pit"][m-1]` is its probability
+integral transform under the m-step-ahead predictive issued m steps ago
+(roughly Uniform(0,1) when calibrated) and `state["z"][m-1]` the same through
+the standard-normal quantile (roughly N(0,1) — so `abs(z) > 4` is an anomaly
+detector with no extra compute; z is clamped to ±7.03, never infinite). See
+the [anomaly-detection skill](https://skaters.microprediction.org/skills.html#anomaly-detection).
+
 **Price/return series** (`garch_leaf`). The default terminal leaf tracks its scale
 with an EWMA (RiskMetrics/IGARCH — no variance mean-reversion). For series with
 volatility *clustering and reversion* (equity/fx/commodity returns), swap in a

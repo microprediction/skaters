@@ -29,6 +29,7 @@ from skaters.transform import (
 )
 from skaters.terminal import terminal_leaf_ensemble
 from skaters.multiscale import multiscale
+from skaters.parade import parade as _parade   # PIT/z calibration state
 from skaters.sticky import sticky as _project  # lattice projection (handles repeats)
 
 
@@ -296,8 +297,16 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
         scales: decimation strides for the multi-scale mixture (stride s serves
             horizons h >= s). Default ``{1, ceil(sqrt(k)), k}``; ``[1]`` opts
             out of multi-scale.
+
+    The returned state also carries calibration diagnostics, resolved online
+    against the predictions previously made for each arriving point:
+    ``state["pit"][m-1]`` is the PIT of y under the m-step-ahead predictive
+    issued m steps ago (roughly Uniform(0,1) when calibrated) and
+    ``state["z"][m-1]`` the same through the standard-normal quantile (roughly
+    N(0,1)); ``None`` until horizon m has matured. See :mod:`skaters.parade`.
     """
     f = multiscale(lambda kk: _laplace_single_scale(kk, objective, sticky, leaf),
                    k=k, scales=scales)
+    f = _parade(f, k=k)
     f.__name__ = f"laplace(k={k})"
     return f
