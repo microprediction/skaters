@@ -21,7 +21,7 @@
     .num { font-variant-numeric: tabular-nums; text-align: right; }
     .muted { color: var(--muted); }
     button.btn { cursor: pointer; }
-    select, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border, #ccd); background: #fff; }
+    select, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border, #ccd); background: #fff; color: #24243a; }
     .btn.primary { background: #4a3aff; color: #fff; border-color: #4a3aff; }
     .headline { margin: 10px 0 2px; }
     .legend { font-size: 0.85rem; color: var(--muted); margin-top: 12px; line-height: 1.6; max-width: 62ch; }
@@ -69,27 +69,10 @@
     </p>
 
     <div class="panel">
-      <h2>1. Race the whole universe</h2>
-      <p class="muted">The online methods (<code class="k">laplace</code> and a
-        naive Gaussian) sweep all 150 series. Watch the win-rate settle.</p>
-      <p><button id="run-agg" class="btn primary">Run the benchmark</button>
-        <span id="agg-status" class="muted"></span></p>
-      <p class="headline"><span id="agg-winrate" class="bigstat">—</span>
-        <small id="agg-winrate-label"></small></p>
-      <div class="row laplace"><div class="who">laplace <span class="tag">online, native density</span></div>
-        <div class="bar"><span id="bar-lap"></span></div>
-        <div class="num" id="ll-lap">—</div><div class="num muted">mean LL</div><div></div></div>
-      <div class="row"><div class="who">naive <span class="tag">EWMA mean ± rolling σ</span></div>
-        <div class="bar"><span id="bar-naive"></span></div>
-        <div class="num" id="ll-naive">—</div><div class="num muted">mean LL</div><div></div></div>
-      <p class="legend">Bars show mean held-out log-likelihood (nats; longer is better). A win is a higher per-series log-likelihood.</p>
-    </div>
-
-    <div class="panel">
-      <h2>2. Watch one series — with the heavyweights</h2>
-      <p class="muted">Add the refit-every-step baselines. <code class="k">laplace</code>
-        finishes in a blink; Holt-Winters, ARIMA, and augurs (ETS) grind through a
-        fresh fit at every step. The slowness is the point.</p>
+      <h2>1. Watch one series — every method at once</h2>
+      <p class="muted"><code class="k">laplace</code> finishes in a blink; Holt-Winters,
+        ARIMA, augurs (ETS and MSTL), and Prophet grind through a fresh fit at every
+        step. The slowness is the point.</p>
       <p>
         <select id="series-sel"><option>Loading series…</option></select>
         <button id="run-drill" class="btn primary">Race</button>
@@ -100,7 +83,7 @@
     </div>
 
     <div class="panel">
-      <h2>3. Run the whole tournament — one random series at a time</h2>
+      <h2>2. Run the whole tournament — one random series at a time</h2>
       <p class="muted">Every method, including the refit-every-step heavyweights,
         on a fresh random series each round. It is slow on purpose: each round is a
         few seconds of ARIMA and ETS grinding. Leave it running as long as you like —
@@ -134,7 +117,7 @@
   </footer>
 
   <script type="module">
-    import { makeLaplace, makeNaive, makeHoltWinters, runSeries } from "./race-engine.mjs";
+    import { makeLaplace, makeNaive, makeHoltWinters } from "./race-engine.mjs";
     import { Dist } from "../js/skaters/index.mjs";
 
     const $ = (id) => document.getElementById(id);
@@ -149,7 +132,6 @@
     let SERIES = null;
     async function loadData() {
       if (!SERIES) {
-        $("agg-status").textContent = "loading data…";
         ({ SERIES } = await import("./data/fred-changes.mjs"));
         populateSelect();
       }
@@ -166,41 +148,7 @@
       });
     }
 
-    // ---- Panel 1: aggregate sweep (online methods only) ----
-    async function runAggregate() {
-      const btn = $("run-agg"); btn.disabled = true;
-      const series = await loadData();
-      let wins = 0, tot = 0, sumLap = 0, sumNaive = 0;
-      const t0 = performance.now();
-      for (let i = 0; i < series.length; i++) {
-        const r = runSeries(series[i].changes, [makeLaplace(), makeNaive()], BURN);
-        if (isFinite(r[0].meanLL) && isFinite(r[1].meanLL)) {
-          tot++; if (r[0].meanLL > r[1].meanLL) wins++;
-          sumLap += r[0].meanLL; sumNaive += r[1].meanLL;
-        }
-        if (i % 4 === 0 || i === series.length - 1) {
-          drawAgg(i + 1, series.length, wins, tot, sumLap, sumNaive);
-          await frame();
-        }
-      }
-      $("agg-status").textContent = `${tot} series · ${((performance.now() - t0) / 1000).toFixed(1)}s`;
-      btn.disabled = false;
-    }
-    function drawAgg(done, total, wins, tot, sumLap, sumNaive) {
-      $("agg-status").textContent = `${done}/${total} series`;
-      if (!tot) return;
-      const wr = 100 * wins / tot;
-      $("agg-winrate").textContent = wr.toFixed(0) + "%";
-      $("agg-winrate-label").textContent = `of ${tot} series won by laplace`;
-      const mLap = sumLap / tot, mNaive = sumNaive / tot;
-      const scale = Math.max(mLap, mNaive, 0.001);
-      $("bar-lap").style.width = (100 * mLap / scale) + "%";
-      $("bar-naive").style.width = (100 * Math.max(mNaive, 0) / scale) + "%";
-      $("ll-lap").textContent = mLap.toFixed(3);
-      $("ll-naive").textContent = mNaive.toFixed(3);
-    }
-
-    // ---- Panel 2: single-series drill-down (each competitor races on its own) ----
+    // ---- Panel 1: single-series drill-down (each competitor races on its own) ----
     let ARIMA;
     async function ensureArima() {
       if (ARIMA === false) return null;
@@ -416,7 +364,7 @@
       btn.disabled = false;
     }
 
-    // ---- Panel 3: continuous tournament (every method, random series) ----
+    // ---- Panel 2: continuous tournament (every method, random series) ----
     // Score one competitor over a whole series, yielding to keep the tab alive.
     async function scoreOne(changes, comp) {
       let ll = 0, crps = 0, n = 0, compute = 0;
@@ -503,6 +451,7 @@
           ratio: a.sumMs > 0 ? a.sumMs / lapMs : 1,
         };
       });
+      rows.sort((a, b) => (b.win - a.win) || (b.ll - a.ll));   // leaderboard: best win-rate first
       const fmtRatio = (r) => r < 1.5 ? "1×" : "×" + (r < 10 ? r.toFixed(1) : Math.round(r));
       $("tour-table").innerHTML =
         `<table><thead><tr><th>method</th><th>win&nbsp;%</th><th>mean&nbsp;LL</th><th>speed</th></tr></thead><tbody>` +
@@ -550,7 +499,6 @@
     }
 
     $("run-tour").addEventListener("click", runTournament);
-    $("run-agg").addEventListener("click", runAggregate);
     $("run-drill").addEventListener("click", runDrill);
     // warm the series list without blocking
     loadData();
