@@ -96,7 +96,7 @@
         <span id="drill-status" class="muted"></span>
       </p>
       <div id="drill-rows"></div>
-      <p class="legend">ARIMA (npm <code class="k">arima</code>) and augurs ETS and MSTL (npm <code class="k">@bsull/augurs</code>) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit. Their predictive σ is floored at a small fraction of the series' rolling scale, so one overconfident step can't produce a spurious −10⁴.</p>
+      <p class="legend">ARIMA (npm <code class="k">arima</code>), augurs ETS and MSTL (npm <code class="k">@bsull/augurs</code>), and Prophet (npm <code class="k">@bsull/augurs</code> + <code class="k">@bsull/augurs-prophet-wasmstan</code>, its Stan optimizer compiled to WASM) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit. Their predictive σ is floored at a small fraction of the series' rolling scale, so one overconfident step can't produce a spurious −10⁴.</p>
     </div>
 
     <div class="panel">
@@ -308,6 +308,50 @@
       };
     }
 
+    let PROPHET;
+    async function ensureProphet() {
+      if (PROPHET === false) return null;
+      if (PROPHET) return PROPHET;
+      try {
+        const [pm, opt] = await Promise.all([                    // model wasm + Stan optimizer wasm
+          import("https://esm.sh/@bsull/augurs@0.10.2/prophet"),
+          import("https://esm.sh/@bsull/augurs-prophet-wasmstan@0.2.0"),
+        ]);
+        if (pm.default) await pm.default();   // initialize the Prophet WebAssembly
+        if (!opt.optimizer) throw new Error("no optimizer export");
+        PROPHET = { Prophet: pm.Prophet, optimizer: opt.optimizer };
+        return PROPHET;
+      } catch (e) { PROPHET = false; return null; }
+    }
+    function makeProphet(Prophet, optimizer) {
+      const hist = []; let residVar = 1e-4, pending = Dist.gaussian(0, 1);
+      const aVar = 0.05, WIN = 160, DAY = 86400, BASE = 946684800;   // synthesised daily timestamps
+      return {
+        name: "prophet", kind: "refit",
+        get pending() { return pending; },
+        step(y) {
+          if (hist.length) { const r = y - pending.mean; residVar = (1 - aVar) * residVar + aVar * r * r; }
+          hist.push(y);
+          try {
+            const win = hist.slice(-WIN);
+            if (win.length < 14) throw new Error("too short for Prophet");
+            const ds = win.map((_, i) => BASE + i * DAY);   // daily index -> auto weekly seasonality
+            const m = new Prophet({ optimizer, uncertaintySamples: 0, nChangepoints: 10,
+              yearlySeasonality: false, dailySeasonality: false });
+            m.fit({ ds, y: Float64Array.from(win) });
+            const pred = m.predict(m.makeFutureDataframe(1, { includeHistory: false }));
+            const pt = pred.yhat.point[0];
+            // uncertaintySamples:0 -> no intervals; use the rolling residual scale (floored).
+            const std = Math.max(Math.sqrt(Math.max(residVar, 1e-9)),
+              SIGMA_FLOOR * Math.sqrt(Math.max(residVar, 1e-12)));
+            pending = Dist.gaussian(pt, std);
+          } catch (e) {
+            pending = Dist.gaussian(hist[hist.length - 1], Math.sqrt(Math.max(residVar, 1e-9)));
+          }
+        },
+      };
+    }
+
     // Run one competitor over a series, a few steps per frame, updating its row.
     async function raceOne(changes, comp, row) {
       const t0 = performance.now();
@@ -345,8 +389,8 @@
       const series = await loadData();
       const s = series[Number($("series-sel").value) || 0];
       const host = $("drill-rows"); host.innerHTML = "";
-      $("drill-status").textContent = "loading ARIMA & augurs…";
-      const [A, AU, MS] = await Promise.all([ensureArima(), ensureAugurs(), ensureMstl()]);
+      $("drill-status").textContent = "loading ARIMA, augurs & Prophet…";
+      const [A, AU, MS, PR] = await Promise.all([ensureArima(), ensureAugurs(), ensureMstl(), ensureProphet()]);
       $("drill-status").textContent = s.id;
 
       const specs = [
@@ -357,7 +401,8 @@
       if (A) specs.push(["arima", "npm arima (WASM), refit every step", makeArima(A), false]);
       if (AU) specs.push(["augurs-ets", "npm @bsull/augurs (WASM), refit every step", makeAugurs(AU.AutoETS), false]);
       if (MS) specs.push(["augurs-mstl", "npm @bsull/augurs MSTL (WASM), refit every step", makeMstl(MS.MSTL), false]);
-      const missing = [!A && "arima", !AU && "augurs-ets", !MS && "augurs-mstl"].filter(Boolean);
+      if (PR) specs.push(["prophet", "npm @bsull/augurs Prophet + Stan (WASM), refit every step", makeProphet(PR.Prophet, PR.optimizer), false]);
+      const missing = [!A && "arima", !AU && "augurs-ets", !MS && "augurs-mstl", !PR && "prophet"].filter(Boolean);
       if (missing.length) host.insertAdjacentHTML("beforeend",
         `<p class="muted">(${missing.join(" and ")} unavailable — CDN blocked; racing the rest.)</p>`);
 
@@ -403,8 +448,8 @@
       tourRunning = true;
       btn.textContent = "Stop"; btn.classList.remove("primary");
       const series = await loadData();
-      $("tour-status").textContent = "loading ARIMA & augurs…";
-      const [A, AU, MS] = await Promise.all([ensureArima(), ensureAugurs(), ensureMstl()]);
+      $("tour-status").textContent = "loading ARIMA, augurs & Prophet…";
+      const [A, AU, MS, PR] = await Promise.all([ensureArima(), ensureAugurs(), ensureMstl(), ensureProphet()]);
       const defs = [
         ["laplace", () => makeLaplace(), true],
         ["naive", () => makeNaive(), false],
@@ -413,6 +458,7 @@
       if (A) defs.push(["arima", () => makeArima(A), false]);
       if (AU) defs.push(["augurs-ets", () => makeAugurs(AU.AutoETS), false]);
       if (MS) defs.push(["augurs-mstl", () => makeMstl(MS.MSTL), false]);
+      if (PR) defs.push(["prophet", () => makeProphet(PR.Prophet, PR.optimizer), false]);
       for (const [name, , isLap] of defs)
         if (!TOUR.has(name)) TOUR.set(name, { wins: 0, sumLL: 0, sumMs: 0, count: 0, isLap });
       const names = defs.map((d) => d[0]);
