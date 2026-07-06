@@ -134,6 +134,14 @@
     const $ = (id) => document.getElementById(id);
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
     const BURN = 100;
+    // The npm arima package (and some WASM fits) print Emscripten warnings straight to
+    // the console on every step; silence them around the synchronous fit so the demo
+    // doesn't flood DevTools. Single-threaded, so nothing else logs meanwhile.
+    const quiet = (fn) => {
+      const s = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+      console.log = console.warn = console.error = console.info = () => {};
+      try { return fn(); } finally { Object.assign(console, s); }
+    };
     // Floor each point-forecast baseline's predictive sigma at this fraction of the
     // series' own rolling residual scale, so one overconfident step can't produce a
     // spurious -10^4 log-likelihood. Only clamps pathological overconfidence; laplace
@@ -179,8 +187,10 @@
           if (hist.length) { const r = y - pending.mean; residVar = (1 - aVar) * residVar + aVar * r * r; }
           hist.push(y);
           try {
-            const m = new A({ p: 2, d: 0, q: 1, verbose: false }).train(hist.slice(-WIN));
-            const [pred, err] = m.predict(1);
+            const [pred, err] = quiet(() => {
+              const m = new A({ p: 2, d: 0, q: 1, verbose: false }).train(hist.slice(-WIN));
+              return m.predict(1);
+            });
             let std = Math.sqrt(Math.max(err[0] || residVar, 1e-9));
             std = Math.max(std, SIGMA_FLOOR * Math.sqrt(Math.max(residVar, 1e-12)));  // clamp overconfidence
             pending = Dist.gaussian(pred[0], std);
@@ -307,9 +317,11 @@
             const win = hist.slice(-WIN);
             if (win.length < 14) throw new Error("too short for Prophet");
             const ds = win.map((_, i) => BASE + i * DAY);   // daily index -> auto weekly seasonality
-            const m = new Prophet({ optimizer, uncertaintySamples: 0, nChangepoints: 10 });
-            m.fit({ ds, y: Float64Array.from(win) });
-            const pred = m.predict(m.makeFutureDataframe(1, { includeHistory: false }));
+            const pred = quiet(() => {
+              const m = new Prophet({ optimizer, uncertaintySamples: 0, nChangepoints: 10 });
+              m.fit({ ds, y: Float64Array.from(win) });
+              return m.predict(m.makeFutureDataframe(1, { includeHistory: false }));
+            });
             const pt = pred.yhat.point[0];
             // uncertaintySamples:0 -> no intervals; use the rolling residual scale (floored).
             const std = Math.max(Math.sqrt(Math.max(residVar, 1e-9)),
