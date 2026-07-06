@@ -5,6 +5,17 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## 0.12.0
+
+Better default forecaster. `laplace`'s terminal-leaf `scaleAlpha` (the residual-variance
+EWMA rate — how fast the predictive scale tracks changing volatility) now defaults to
+**0.03** instead of 0.01. On the continuous FRED universe this beats the old default on
+held-out **log-likelihood** (~+0.02 nats, ~79% of series) **and CRPS** (~80% of series), on
+both non-price and price series — validated out-of-sample (see
+`benchmarks/leaf_experiments/`). New optional `scaleAlpha` argument on `laplace`; pass
+`scaleAlpha: 0.01` to reproduce the previous default. Minor bump because default predictions
+change; Python/JS parity re-verified to 1e-6.
+
 ## 0.11.4
 
 Docs: lead the README with the live in-browser race demo

@@ -143,16 +143,16 @@ export function buildCandidates(k) {
 // Policies
 // ---------------------------------------------------------------------------
 
-function objectiveLeaf(objective) {
-  if (objective === "crps") return crpsLeaf;
-  if (objective === "likelihood") return scaleMixtureLeaf;
+function objectiveLeaf(objective, scaleAlpha) {
+  if (objective === "crps") return (k) => crpsLeaf(k, undefined, scaleAlpha);
+  if (objective === "likelihood") return (k) => scaleMixtureLeaf(k, undefined, scaleAlpha);
   throw new Error(`objective must be 'crps' or 'likelihood', got ${objective}`);
 }
 
-function laplaceSingleScale(k, objective, sticky) {
+function laplaceSingleScale(k, objective, sticky, scaleAlpha) {
   const [candidates, depths] = buildCandidates(k);
   let f = terminalLeafEnsemble(candidates, {
-    k, leafFn: objectiveLeaf(objective), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
+    k, leafFn: objectiveLeaf(objective, scaleAlpha), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
     forget: 0.99,
   });
   if (sticky) f = project(f, k);
@@ -162,9 +162,14 @@ function laplaceSingleScale(k, objective, sticky) {
 // Multi-scale by default at k > 1: one instance per decimation stride
 // (default {1, ceil(sqrt(k)), k}), horizons mix eligible scales by likelihood.
 // Pass scales = [1] for the single-scale (native fan-out) variant.
-export function laplace(k = 1, objective = "crps", sticky = true, scales = null) {
+//
+// scaleAlpha is the terminal leaf's residual-variance EWMA rate (how fast the
+// predictive scale tracks volatility). Default 0.03 beats the older 0.01 on
+// held-out log-likelihood AND CRPS across the continuous FRED universe; pass
+// scaleAlpha = 0.01 to reproduce the earlier default.
+export function laplace(k = 1, objective = "crps", sticky = true, scales = null, scaleAlpha = 0.03) {
   // parade adds state.pit / state.z calibration diagnostics (see parade.mjs)
-  const f = parade(multiscale((kk) => laplaceSingleScale(kk, objective, sticky), k, { scales }), k);
+  const f = parade(multiscale((kk) => laplaceSingleScale(kk, objective, sticky, scaleAlpha), k, { scales }), k);
   f.skaterName = `laplace(k=${k})`;
   return f;
 }

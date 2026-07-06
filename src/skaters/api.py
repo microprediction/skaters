@@ -19,6 +19,7 @@ Ornstein--Uhlenbeck group.
 
 from __future__ import annotations
 import math
+from functools import partial
 from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.conjugate import conjugate
 from skaters.bayesian import bayesian_ensemble
@@ -33,14 +34,15 @@ from skaters.parade import parade as _parade   # PIT/z calibration state
 from skaters.sticky import sticky as _project  # lattice projection (handles repeats)
 
 
-def _objective_leaf(objective: str):
+def _objective_leaf(objective: str, scale_alpha: float = 0.03):
     """Terminal-leaf factory for a policy's objective. ``crps`` is the default:
     *model first* (likelihood-weighted trunk) then *conform last* (CRPS-fit leaf).
-    Pass ``"likelihood"`` for the scale-mixture leaf instead."""
+    Pass ``"likelihood"`` for the scale-mixture leaf instead. ``scale_alpha`` is the
+    terminal leaf's residual-variance EWMA rate (see :func:`laplace`)."""
     if objective == "crps":
-        return crps_leaf
+        return partial(crps_leaf, scale_alpha=scale_alpha)
     if objective == "likelihood":
-        return scale_mixture_leaf
+        return partial(scale_mixture_leaf, scale_alpha=scale_alpha)
     raise ValueError(f"objective must be 'crps' or 'likelihood', got {objective!r}")
 
 
@@ -247,13 +249,13 @@ def _build_candidates(k: int, leaf_fn=leaf):
 # The named forecaster
 # ---------------------------------------------------------------------------
 
-def _laplace_single_scale(k, objective, sticky, leaf):
+def _laplace_single_scale(k, objective, sticky, leaf, scale_alpha):
     """One laplace instance on one clock: the likelihood-weighted trunk with a
     terminal leaf, plus the lattice projection."""
     candidates, depths, _ = _build_candidates(k)
     f = terminal_leaf_ensemble(
         candidates, k=k,
-        leaf_fn=leaf if leaf is not None else _objective_leaf(objective),
+        leaf_fn=leaf if leaf is not None else _objective_leaf(objective, scale_alpha),
         learning_rate=0.8,
         complexity_penalty=0.005,
         depths=depths,
@@ -269,7 +271,7 @@ def _laplace_single_scale(k, objective, sticky, leaf):
 
 
 def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
-            scales: list[int] | None = None):
+            scales: list[int] | None = None, scale_alpha: float = 0.03):
     """The general forecaster.
 
     A likelihood-weighted Bayesian ensemble over the full candidate population
@@ -297,6 +299,13 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
         scales: decimation strides for the multi-scale mixture (stride s serves
             horizons h >= s). Default ``{1, ceil(sqrt(k)), k}``; ``[1]`` opts
             out of multi-scale.
+        scale_alpha: residual-variance EWMA rate of the terminal leaf — how fast
+            the predictive scale tracks changing volatility (effective memory
+            ~``1/scale_alpha`` steps). Default ``0.03``; on the continuous FRED
+            universe this beats the older ``0.01`` on held-out log-likelihood
+            (~+0.02 nats, ~79% of series) *and* CRPS (~80% of series), on both
+            non-price and price series. Pass ``scale_alpha=0.01`` to reproduce
+            the earlier default. Ignored when a custom ``leaf`` is given.
 
     The returned state also carries calibration diagnostics, resolved online
     against the predictions previously made for each arriving point:
@@ -305,7 +314,7 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
     ``state["z"][m-1]`` the same through the standard-normal quantile (roughly
     N(0,1)); ``None`` until horizon m has matured. See :mod:`skaters.parade`.
     """
-    f = multiscale(lambda kk: _laplace_single_scale(kk, objective, sticky, leaf),
+    f = multiscale(lambda kk: _laplace_single_scale(kk, objective, sticky, leaf, scale_alpha),
                    k=k, scales=scales)
     f = _parade(f, k=k)
     f.__name__ = f"laplace(k={k})"
