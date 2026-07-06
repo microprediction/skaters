@@ -24,8 +24,18 @@
     select, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border, #ccd); background: #fff; }
     .btn.primary { background: #4a3aff; color: #fff; border-color: #4a3aff; }
     .headline { margin: 10px 0 2px; }
-    .legend { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
-    code.k { font-size: 0.85em; }
+    .legend { font-size: 0.85rem; color: var(--muted); margin-top: 12px; line-height: 1.6; max-width: 62ch; }
+    .legend code, code.k { background: none; border: 0; padding: 0; font-size: 0.9em; color: inherit; }
+    .tour-table { overflow-x: auto; margin: 10px 0 4px; }
+    .tour-table table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+    .tour-table th, .tour-table td { padding: 5px 12px; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.08); font-variant-numeric: tabular-nums; }
+    .tour-table th:first-child, .tour-table td:first-child { text-align: left; }
+    .tour-table th { color: var(--muted); font-weight: 500; font-size: 0.82rem; }
+    .tour-table tr.lap td { font-weight: 700; color: #1a8c4a; }
+    .tour-table .winbar { display: inline-block; height: 9px; border-radius: 4px; background: #4a3aff; vertical-align: middle; margin-left: 8px; }
+    .tour-table tr.lap .winbar { background: #1a8c4a; }
+    .scatter-fig { margin: 16px 0 0; }
+    #tour-scatter svg { max-width: 100%; height: auto; display: block; }
   </style>
 </head>
 <body>
@@ -48,14 +58,14 @@
 
   <main>
     <p class="pagenav"><a href="/demos/">&larr; Demos</a></p>
-    <h1>Live forecasting race</h1>
+    <h1>Live JavaScript forecasting race</h1>
     <p class="race-intro">
-      The whole thing runs in your browser — the actual <code>skaters</code>
-      JavaScript port against classical baselines, on 150 real FRED daily
-      change-series (from the benchmark's popularity-ranked universe). No API key,
-      no server. Every method is turned into the same predictive distribution and
-      scored on held-out <strong>log-likelihood</strong> and CRPS, rolling
-      one-step-ahead — the paper's harness, live.
+      How does the <code>skaters</code> JavaScript port stack up against what the
+      npm ecosystem actually offers? This races it, in your browser, against the
+      forecasting packages you'd reach for there — <code class="k">arima</code> and
+      <code class="k">@bsull/augurs</code> (ETS), plus classical baselines — on 150
+      real FRED daily change-series. Every method is scored identically: held-out
+      <strong>log-likelihood</strong> and CRPS, rolling one-step-ahead.
     </p>
 
     <div class="panel">
@@ -87,6 +97,26 @@
       </p>
       <div id="drill-rows"></div>
       <p class="legend">ARIMA (npm <code class="k">arima</code>) and augurs ETS (npm <code class="k">@bsull/augurs</code>) are WebAssembly, loaded from a CDN on demand; if they can't load they're skipped. Every method is wrapped as the same <code class="k">Dist</code> and scored identically — a point/interval forecast becomes a Gaussian, since that's all these emit.</p>
+    </div>
+
+    <div class="panel">
+      <h2>3. Run the whole tournament — one random series at a time</h2>
+      <p class="muted">Every method, including the refit-every-step heavyweights,
+        on a fresh random series each round. It is slow on purpose: each round is a
+        few seconds of ARIMA and ETS grinding. Leave it running as long as you like —
+        the win-rates and the speed gap to <code class="k">laplace</code> keep
+        sharpening.</p>
+      <p>
+        <button id="run-tour" class="btn primary">Run the tournament</button>
+        <span id="tour-status" class="muted"></span>
+      </p>
+      <div id="tour-table" class="tour-table"></div>
+      <figure class="scatter-fig">
+        <div id="tour-scatter"></div>
+        <figcaption class="legend">Accuracy (mean held-out log-likelihood, up is
+          better) against speed (total compute relative to <code class="k">laplace</code>,
+          log scale, right is slower). Top-left is the corner you want.</figcaption>
+      </figure>
     </div>
 
     <p class="muted">Reproduce at scale (all 894 non-price series, more baselines):
@@ -292,6 +322,140 @@
       btn.disabled = false;
     }
 
+    // ---- Panel 3: continuous tournament (every method, random series) ----
+    // Score one competitor over a whole series, yielding to keep the tab alive.
+    async function scoreOne(changes, comp) {
+      let ll = 0, crps = 0, n = 0, compute = 0;
+      const N = changes.length, chunk = comp.kind === "refit" ? 4 : 2000;
+      let seg = performance.now();
+      for (let i = 0; i < N; i++) {
+        const y = changes[i];
+        if (i >= BURN && comp.pending) { ll += comp.pending.logpdf(y); crps += comp.pending.crps(y); n++; }
+        comp.step(y);
+        if (i % chunk === 0) {                 // accumulate compute time, excluding the rAF wait
+          compute += performance.now() - seg;
+          await frame();
+          seg = performance.now();
+        }
+      }
+      compute += performance.now() - seg;
+      return { meanLL: n ? ll / n : NaN, meanCRPS: n ? crps / n : NaN, ms: compute, n };
+    }
+
+    let tourRunning = false;
+    const TOUR = new Map();   // name -> {wins, sumLL, sumMs, count, isLap}
+    async function runTournament() {
+      const btn = $("run-tour");
+      if (tourRunning) {                       // toggle off
+        tourRunning = false;
+        btn.textContent = "Run the tournament"; btn.classList.add("primary");
+        return;
+      }
+      tourRunning = true;
+      btn.textContent = "Stop"; btn.classList.remove("primary");
+      const series = await loadData();
+      $("tour-status").textContent = "loading ARIMA & augurs…";
+      const [A, AU] = await Promise.all([ensureArima(), ensureAugurs()]);
+      const defs = [
+        ["laplace", () => makeLaplace(), true],
+        ["naive", () => makeNaive(), false],
+        ["holt-winters", () => makeHoltWinters(), false],
+      ];
+      if (A) defs.push(["arima", () => makeArima(A), false]);
+      if (AU) defs.push(["augurs-ets", () => makeAugurs(AU.AutoETS), false]);
+      for (const [name, , isLap] of defs)
+        if (!TOUR.has(name)) TOUR.set(name, { wins: 0, sumLL: 0, sumMs: 0, count: 0, isLap });
+      const names = defs.map((d) => d[0]);
+
+      let round = 0;
+      while (tourRunning) {
+        round++;
+        const s = series[Math.floor(Math.random() * series.length)];
+        const res = {};
+        for (const [name, mk] of defs) {
+          if (!tourRunning) break;
+          $("tour-status").textContent = `round ${round} · ${s.id} · ${name}…`;
+          res[name] = await scoreOne(s.changes, mk());
+        }
+        if (!tourRunning) break;
+        if (names.every((nm) => isFinite(res[nm].meanLL))) {   // count clean rounds only
+          let best = null, bestLL = -Infinity;
+          for (const nm of names) if (res[nm].meanLL > bestLL) { bestLL = res[nm].meanLL; best = nm; }
+          for (const nm of names) {
+            const a = TOUR.get(nm);
+            a.count++; a.sumLL += res[nm].meanLL; a.sumMs += res[nm].ms;
+            if (nm === best) a.wins++;
+          }
+        }
+        drawTournament(names, round);
+        await frame();
+      }
+      $("tour-status").textContent = `stopped · ${round - 1} rounds`;
+    }
+
+    function drawTournament(names, round) {
+      const lap = TOUR.get("laplace");
+      const lapMs = lap && lap.sumMs > 0 ? lap.sumMs : 1;
+      const done = lap ? lap.count : 0;
+      $("tour-status").textContent = `round ${round} · ${done} scored`;
+      const rows = names.map((nm) => {
+        const a = TOUR.get(nm);
+        return {
+          nm, isLap: a.isLap,
+          win: a.count ? 100 * a.wins / a.count : 0,
+          ll: a.count ? a.sumLL / a.count : NaN,
+          ratio: a.sumMs > 0 ? a.sumMs / lapMs : 1,
+        };
+      });
+      const fmtRatio = (r) => r < 1.5 ? "1×" : "×" + (r < 10 ? r.toFixed(1) : Math.round(r));
+      $("tour-table").innerHTML =
+        `<table><thead><tr><th>method</th><th>win&nbsp;%</th><th>mean&nbsp;LL</th><th>speed</th></tr></thead><tbody>` +
+        rows.map((r) =>
+          `<tr class="${r.isLap ? "lap" : ""}"><td>${r.nm}</td>` +
+          `<td>${done ? r.win.toFixed(0) + "%" : "—"}<span class="winbar" style="width:${Math.max(0, r.win) * 0.6}px"></span></td>` +
+          `<td>${isFinite(r.ll) ? r.ll.toFixed(3) : "—"}</td>` +
+          `<td>${fmtRatio(r.ratio)}</td></tr>`).join("") +
+        `</tbody></table>`;
+      drawScatter(rows.filter((r) => isFinite(r.ll)));
+    }
+
+    function drawScatter(pts) {
+      if (!pts.length) { $("tour-scatter").innerHTML = ""; return; }
+      const W = 520, H = 300, L = 46, R = 14, T = 14, B = 36;
+      const xmax = Math.max(0.4, ...pts.map((p) => Math.log10(Math.max(p.ratio, 1))));
+      const lls = pts.map((p) => p.ll);
+      let ymin = Math.min(...lls), ymax = Math.max(...lls);
+      if (ymax - ymin < 1e-6) { ymin -= 0.5; ymax += 0.5; }
+      const pad = (ymax - ymin) * 0.15; ymin -= pad; ymax += pad;
+      const px = (x) => L + (x / xmax) * (W - L - R);
+      const py = (y) => (H - B) - ((y - ymin) / (ymax - ymin)) * (H - B - T);
+      const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="accuracy vs speed">`;
+      svg += `<line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="#ccc"/>`;
+      svg += `<line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="#ccc"/>`;
+      for (let k = 0; k <= Math.ceil(xmax); k++) {                       // x ticks: 1×,10×,100×…
+        const x = px(k);
+        svg += `<line x1="${x}" y1="${H - B}" x2="${x}" y2="${H - B + 4}" stroke="#ccc"/>`;
+        svg += `<text x="${x}" y="${H - B + 16}" font-size="10" fill="#888" text-anchor="middle">${Math.pow(10, k)}×</text>`;
+      }
+      for (let t = 0; t <= 3; t++) {                                     // y ticks
+        const y = ymin + (t / 3) * (ymax - ymin);
+        svg += `<text x="${L - 6}" y="${py(y) + 3}" font-size="10" fill="#888" text-anchor="end">${y.toFixed(2)}</text>`;
+      }
+      svg += `<text x="${(L + W - R) / 2}" y="${H - 4}" font-size="10.5" fill="#666" text-anchor="middle">total compute vs laplace (log)</text>`;
+      svg += `<text transform="translate(12 ${(T + H - B) / 2}) rotate(-90)" font-size="10.5" fill="#666" text-anchor="middle">mean log-likelihood</text>`;
+      for (const p of pts) {
+        const x = px(Math.log10(Math.max(p.ratio, 1))), y = py(p.ll);
+        const c = p.isLap ? "#1a8c4a" : "#4a3aff";
+        svg += `<circle cx="${x}" cy="${y}" r="${p.isLap ? 6 : 5}" fill="${c}"/>`;
+        const anchor = x > W - 90 ? "end" : "start", dx = anchor === "end" ? -9 : 9;
+        svg += `<text x="${x + dx}" y="${y + 3.5}" font-size="11" fill="${c}" text-anchor="${anchor}" font-weight="${p.isLap ? 700 : 400}">${esc(p.nm)}</text>`;
+      }
+      svg += `</svg>`;
+      $("tour-scatter").innerHTML = svg;
+    }
+
+    $("run-tour").addEventListener("click", runTournament);
     $("run-agg").addEventListener("click", runAggregate);
     $("run-drill").addEventListener("click", runDrill);
     // warm the series list without blocking
