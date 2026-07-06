@@ -319,27 +319,28 @@
 
     // Run one competitor over a series, a few steps per frame, updating its row.
     async function raceOne(changes, comp, row) {
-      // Competitors race concurrently (so laplace visibly finishes first), so wall-clock
-      // is useless -- they all end on the same shared frame. Sum this competitor's own
-      // synchronous compute instead, excluding the rAF waits; single-threaded JS means
-      // one method's compute never overlaps another's, so this attributes real cost.
-      let ll = 0, crps = 0, n = 0, compute = 0;
-      const N = changes.length, chunk = comp.kind === "refit" ? 3 : 400;
-      let seg = performance.now();
-      for (let i = 0; i < N; i++) {
-        const y = changes[i];
-        if (i >= BURN && comp.pending) { ll += comp.pending.logpdf(y); crps += comp.pending.crps(y); n++; }
-        comp.step(y);
-        if (i % chunk === 0) {
-          compute += performance.now() - seg;
-          row.bar.style.width = (100 * (i + 1) / N) + "%";
-          if (n) { row.ll.textContent = (ll / n).toFixed(3); row.crps.textContent = (crps / n).toFixed(4); }
-          row.time.textContent = compute.toFixed(0) + " ms";
-          await frame();
-          seg = performance.now();
-        }
+      // A real race: advance each competitor by a fixed COMPUTE BUDGET per frame, not a
+      // fixed step count. A cheap method burns through its steps and finishes first; an
+      // expensive one (an ARIMA refit) manages only a step or two per frame and visibly
+      // lags, so the bar (steps done / N) tracks real speed. Timing sums this
+      // competitor's own compute only, excluding the rAF waits -- single-threaded JS
+      // means one method's compute never overlaps another's, so the ms stays honest.
+      let ll = 0, crps = 0, n = 0, compute = 0, i = 0;
+      const N = changes.length, BUDGET = 8;   // ms of this competitor's compute per frame
+      while (i < N) {
+        const seg = performance.now();
+        do {
+          const y = changes[i];
+          if (i >= BURN && comp.pending) { ll += comp.pending.logpdf(y); crps += comp.pending.crps(y); n++; }
+          comp.step(y);
+          i++;
+        } while (i < N && performance.now() - seg < BUDGET);
+        compute += performance.now() - seg;
+        row.bar.style.width = (100 * i / N) + "%";
+        if (n) { row.ll.textContent = (ll / n).toFixed(3); row.crps.textContent = (crps / n).toFixed(4); }
+        row.time.textContent = compute.toFixed(0) + " ms";
+        await frame();
       }
-      compute += performance.now() - seg;
       row.bar.style.width = "100%";
       row.ll.textContent = n ? (ll / n).toFixed(3) : "—";
       row.crps.textContent = n ? (crps / n).toFixed(4) : "—";
@@ -377,7 +378,7 @@
       if (PR) specs.push(["prophet", "npm @bsull/augurs Prophet + Stan (WASM), refit every step", makeProphet(PR.Prophet, PR.optimizer), false]);
       const missing = [!A && "arima", !AU && "augurs-ets", !MS && "augurs-mstl", !PR && "prophet"].filter(Boolean);
       if (missing.length) host.insertAdjacentHTML("beforeend",
-        `<p class="muted">(${missing.join(" and ")} unavailable — CDN blocked; racing the rest.)</p>`);
+        `<p class="muted">(${missing.join(" and ")} unavailable — couldn't load or run here; racing the rest.)</p>`);
 
       const rows = specs.map(([name, tag, comp, isLap]) => {
         const row = competitorRow(name, tag, isLap);
