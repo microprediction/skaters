@@ -75,7 +75,8 @@ def run_one(args):
     wsum = {w: 0.0 for w in WINDOWS}
 
     best = {"mah": (-1.0, -1.0, -1), "mahS": (-1.0, -1.0, -1),
-            "z1": (-1.0, -1.0, -1), "mz": (-1.0, -1.0, -1)}
+            "z1": (-1.0, -1.0, -1), "zU": (-1.0, -1.0, -1),
+            "mz": (-1.0, -1.0, -1)}
     t0 = time.time()
     for t, y in enumerate(ys):
         _, state = f(y, state)
@@ -105,10 +106,22 @@ def run_one(args):
                     sc = wsum[w] / w
                     if sc > best["mahS"][0]:
                         best["mahS"] = (sc, 0.0, t - w // 2)
-        z = state["base"]["z"][0] if isinstance(state["base"], dict) else None
+        zvec = state["base"]["z"] if isinstance(state["base"], dict) else None
+        z = zvec[0] if zvec else None
         if z is not None:
             if abs(z) > best["z1"][0]:
                 best["z1"] = (abs(z), 0.0, t)
+        # Union detector: min-p over the Mahalanobis channel and the k margin
+        # channels (margins are N(0,1) by parade construction). Max of
+        # -log10 p is argmax-equivalent to min-p; a Sidak fold would be
+        # needed only for calibrated deployment, not for ranking.
+        if p is not None and zvec is not None and all(v is not None for v in zvec):
+            su = -math.log10(max(p, 1e-300))
+            for zm in zvec:
+                pm = math.erfc(abs(zm) / math.sqrt(2.0))
+                su = max(su, -math.log10(max(pm, 1e-300)))
+            if su > best["zU"][0]:
+                best["zU"] = (su, 0.0, t)
         if mz_score > best["mz"][0]:
             best["mz"] = (mz_score, 0.0, t)
 
@@ -146,15 +159,17 @@ def main():
         for i, res in enumerate(pool.imap_unordered(
                 run_one, [(f, args.k) for f in files])):
             results.append(res)
-            hits = {m: sum(r[m]["hit"] for r in results) for m in ("mah", "mahS", "z1", "mz")}
+            hits = {m: sum(r[m]["hit"] for r in results) for m in ("mah", "mahS", "z1", "zU", "mz")}
             print(f"[{i+1}/{len(files)}] {res['sid']:03d} {res['name'][:30]:30s} "
                   f"n={res['n']:7d} {res['seconds']:6.1f}s  "
                   f"mah={'HIT ' if res['mah']['hit'] else 'miss'} "
                   f"mahS={'HIT ' if res['mahS']['hit'] else 'miss'} "
                   f"z1={'HIT ' if res['z1']['hit'] else 'miss'} "
+                  f"zU={'HIT ' if res['zU']['hit'] else 'miss'} "
                   f"mz={'HIT ' if res['mz']['hit'] else 'miss'}  "
                   f"running: mah {hits['mah']} mahS {hits['mahS']} "
-                  f"z1 {hits['z1']} mz {hits['mz']} of {i+1}", flush=True)
+                  f"z1 {hits['z1']} zU {hits['zU']} mz {hits['mz']} "
+                  f"of {i+1}", flush=True)
 
     with open(out_path, "w") as fh:
         for r in sorted(results, key=lambda r: r["sid"]):
@@ -165,6 +180,7 @@ def main():
     for m, label in (("mah", "parade Mahalanobis (single tick)"),
                      ("mahS", "parade Mahalanobis (scan w=8/64)"),
                      ("z1", "per-horizon |z1| (same forecaster)"),
+                     ("zU", "union min-p (Mahalanobis + margins)"),
                      ("mz", "EWMA z-score (trivial baseline)")):
         h = sum(r[m]["hit"] for r in results)
         print(f"{label:38s} {h}/{n} = {h/n:.3f}")
