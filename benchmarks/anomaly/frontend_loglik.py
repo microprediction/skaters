@@ -50,6 +50,13 @@ WINDOW = 1000         # fit window (trailing)
 _L2PI = math.log(2.0 * math.pi)
 
 
+def _clamp(lp):
+    """Bounded per-tick loss, the package's own convention: one degenerate
+    predictive (e.g. a sticky near-Dirac missed by 8 sigma, logpdf ~ -1e6)
+    must not dominate a series mean. Applied to EVERY method symmetrically."""
+    return 20.0 if lp > 20.0 else (-20.0 if not (lp >= -20.0) else lp)
+
+
 def _gll(y, mu, var):
     var = max(var, 1e-12)
     return -0.5 * (_L2PI + math.log(var) + (y - mu) ** 2 / var)
@@ -80,7 +87,7 @@ def laplace_pass(ys):
 
 # --- rolling opponents: mean one-step Gaussian log-lik on a series ---
 
-def roll_gauss(xs):
+def roll_gauss(xs, dates=None):
     """EWMA mean/var control head."""
     m, v, n = 0.0, 0.0, 0
     out = [0.0] * len(xs)
@@ -93,7 +100,7 @@ def roll_gauss(xs):
         v = (1 - a) * v + a * d * (x - m)
     return out
 
-def roll_ets(xs):
+def roll_ets(xs, dates=None):
     from statsmodels.tsa.holtwinters import Holt
     import numpy as np
     out = [0.0] * len(xs)
@@ -112,7 +119,7 @@ def roll_ets(xs):
         out[t] = _gll(xs[t], mu, var)
     return out
 
-def roll_arima(xs):
+def roll_arima(xs, dates=None):
     from statsforecast.models import AutoARIMA
     import numpy as np
     out = [0.0] * len(xs)
@@ -131,7 +138,7 @@ def roll_arima(xs):
         out[t] = _gll(xs[t], float(mus[i]), float(sds[i]) ** 2)
     return out
 
-def roll_garch(xs):
+def roll_garch(xs, dates=None):
     from arch import arch_model
     import numpy as np
     out = [0.0] * len(xs)
@@ -154,8 +161,40 @@ def roll_garch(xs):
     return out
 
 
+def roll_prophet(xs, dates=None):
+    """Prophet, rolling refit. Prophet models CALENDAR structure (weekday,
+    yearly, holidays) from real dates — structure laplace's integer-lag
+    seasonal block cannot represent. If prophet_z beats laplace alone, the
+    front-end + calendar head genuinely compose."""
+    import logging
+    logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
+    logging.getLogger("prophet").setLevel(logging.ERROR)
+    import pandas as pd
+    from prophet import Prophet
+    out = [0.0] * len(xs)
+    for t in range(BURN, len(xs)):
+        if (t - BURN) % REFIT == 0:
+            j0 = max(0, t - WINDOW)
+            df = pd.DataFrame({"ds": pd.to_datetime(dates[j0:t]),
+                               "y": xs[j0:t]})
+            h = min(REFIT, len(xs) - t)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                m = Prophet(interval_width=0.6827,
+                            uncertainty_samples=100)
+                m.fit(df)
+                fut = pd.DataFrame({"ds": pd.to_datetime(dates[t:t + h])})
+                fc = m.predict(fut)
+            mus = fc["yhat"].values
+            sds = ((fc["yhat_upper"] - fc["yhat_lower"]) / 2.0).values
+        i = (t - BURN) % REFIT
+        out[t] = _gll(xs[t], float(mus[i]), max(float(sds[i]), 1e-8) ** 2)
+    return out
+
+
 OPPONENTS = {"gauss": roll_gauss, "ets": roll_ets,
-             "arima": roll_arima, "garch": roll_garch}
+             "arima": roll_arima, "garch": roll_garch,
+             "prophet": roll_prophet}
 
 
 def run_one(args):
@@ -164,18 +203,19 @@ def run_one(args):
     ys = _to_changes(levels) if levels else []
     if len(ys) < MIN_LEN:
         return None
-    ys = ys[-N_MAX:]
+    dates = [d for d, _ in levels][1:]        # aligned with changes
+    ys, dates = ys[-N_MAX:], dates[-N_MAX:]
     n = len(ys)
     t0 = time.time()
     zs, jac, lap_ll = laplace_pass(ys)
     res = {"sid": sid, "n": n,
-           "laplace": sum(lap_ll[BURN:]) / (n - BURN)}
+           "laplace": sum(_clamp(v) for v in lap_ll[BURN:]) / (n - BURN)}
     for name, roll in OPPONENTS.items():
         try:
-            raw = roll(ys)
-            res[f"{name}_raw"] = sum(raw[BURN:]) / (n - BURN)
-            onz = roll(zs)
-            res[f"{name}_z"] = sum(onz[t] + jac[t]
+            raw = roll(ys, dates)
+            res[f"{name}_raw"] = sum(_clamp(v) for v in raw[BURN:]) / (n - BURN)
+            onz = roll(zs, dates)
+            res[f"{name}_z"] = sum(_clamp(onz[t] + jac[t])
                                    for t in range(BURN, n)) / (n - BURN)
         except Exception as e:      # a failed fit shouldn't kill the series
             res[f"{name}_err"] = str(e)[:80]
@@ -216,7 +256,8 @@ def main():
 
     n = len(results)
     print(f"\n=== mean one-step log-lik per point, y-space (n={n} series) ===")
-    print(f"{'opponent':8s} {'raw':>8s} {'laplace-fronted':>16s} {'lift':>8s} {'wins':>6s}")
+    print(f"{'opponent':8s} {'raw':>8s} {'laplace-fronted':>16s} "
+          f"{'lift':>8s} {'median':>8s} {'wins':>6s}")
     for name in OPPONENTS:
         rows = [r for r in results
                 if f"{name}_raw" in r and f"{name}_z" in r]
@@ -224,9 +265,11 @@ def main():
             continue
         m_raw = sum(r[f"{name}_raw"] for r in rows) / len(rows)
         m_z = sum(r[f"{name}_z"] for r in rows) / len(rows)
-        wins = sum(r[f"{name}_z"] > r[f"{name}_raw"] for r in rows)
+        lifts = sorted(r[f"{name}_z"] - r[f"{name}_raw"] for r in rows)
+        med = lifts[len(lifts) // 2]
+        wins = sum(l > 0 for l in lifts)
         print(f"{name:8s} {m_raw:8.3f} {m_z:16.3f} {m_z - m_raw:+8.3f} "
-              f"{wins}/{len(rows)}")
+              f"{med:+8.3f} {wins}/{len(rows)}")
     lap = sum(r["laplace"] for r in results) / n
     print(f"{'laplace':8s} {'':8s} {lap:16.3f}   (reference, alone)")
     print(f"\nwrote {out}")
