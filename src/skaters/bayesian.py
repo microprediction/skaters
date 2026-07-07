@@ -85,27 +85,31 @@ def bayesian_ensemble(
             dists_i, state["sub"][i] = f(y, state["sub"][i])
             all_dists.append(dists_i)
 
-        # Resolve pending predictions: score each model's past Dist against y
+        # Enqueue current predictions, then resolve the ones that have matured.
+        # Horizon h (0-based) is (h+1)-step-ahead, so the Dist issued h+1 steps
+        # ago is the one that targeted the current y: buffer h+1 predictions
+        # before scoring. (At h=0 this is the ordinary one-step lag.)
         for i in range(n):
             for h in range(k):
                 q = state["queues"][i][h]
-                if q:
+                q.append(all_dists[i][h])
+                if len(q) > h + 1:
                     past_dist = q.popleft()
                     lp = past_dist.logpdf(y)
-                    # Clamp logpdf to prevent a single bad prediction from
-                    # permanently killing a model. This is the "mixability"
-                    # trick from online learning — bounded losses.
-                    lp = max(lp, -20.0)
+                    # Bounded loss (the "mixability" trick from online learning):
+                    # clamp to a finite band so neither a -inf (y far from every
+                    # component) nor a +inf (an exact hit on a Dirac atom, e.g. the
+                    # sticky lattice path) can dominate or NaN-poison the running
+                    # log-weight. The `not (lp >= -20.0)` arm also catches NaN.
+                    if lp > 20.0:
+                        lp = 20.0
+                    elif not (lp >= -20.0):
+                        lp = -20.0
                     # XGBoost-inspired: shrunk log-likelihood minus complexity penalty
                     state["log_w"][i][h] += (
                         learning_rate * lp
                         - complexity_penalty * depths[i]
                     )
-
-        # Enqueue current predictions for future scoring
-        for i in range(n):
-            for h in range(k):
-                state["queues"][i][h].append(all_dists[i][h])
 
         # Compute softmax weights per horizon, then combine
         combined = []

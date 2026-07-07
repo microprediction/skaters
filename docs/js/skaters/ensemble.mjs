@@ -25,15 +25,18 @@ export function precisionWeightedEnsemble(skaters, k = 1, floor = 1e-6) {
       allDists.push(distsI);
     }
 
+    // Horizon h (0-based) is (h+1)-step-ahead, so the mean issued h+1 steps ago
+    // is the one that targeted the current y: buffer h+1 predictions, then
+    // resolve. (At h=0 this is the ordinary one-step lag.)
     for (let i = 0; i < n; i++) {
       for (let h = 0; h < k; h++) {
         const q = state.queues[i][h];
-        if (q.length) {
+        q.push(allDists[i][h].mean);
+        if (q.length > h + 1) {
           const predMean = q.shift();
           const error = y - predMean;
           state.stats[i][h] = runningVarUpdate(state.stats[i][h], error);
         }
-        state.queues[i][h].push(allDists[i][h].mean);
       }
     }
 

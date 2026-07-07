@@ -209,19 +209,6 @@ _GARCH_AB_GRID = [(a, b) for a in (0.02, 0.04, 0.06, 0.09, 0.12, 0.16, 0.20)
 _GARCH_OMEGA_MULT = (0.5, 0.7, 1.0, 1.4, 2.0)
 
 
-def _garch_nll(resid, alpha, beta, s2):
-    """Gaussian QMLE neg-log-lik of a variance-targeted GARCH(1,1) over ``resid``."""
-    omega = (1.0 - alpha - beta) * s2
-    h = s2
-    nll = 0.0
-    for r in resid:
-        h = omega + alpha * (r * r) + beta * h
-        if h <= 1e-300:
-            h = 1e-300
-        nll += math.log(h) + (r * r) / h
-    return 0.5 * nll
-
-
 def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
                min_obs: int = 80, window: int = 400, scales: tuple = _SCALE_BASIS):
     """Terminal leaf with a GARCH(1,1) conditional variance and Student-t tails.

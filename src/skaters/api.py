@@ -18,11 +18,9 @@ Ornstein--Uhlenbeck group.
 """
 
 from __future__ import annotations
-import math
 from functools import partial
 from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.conjugate import conjugate
-from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, ou_transform,
     garch, power_transform, drift, holt_linear, ar, theta,

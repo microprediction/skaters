@@ -37,6 +37,10 @@ def conjugate(skater, transform, k: int = 1):
 
         # Predict in transformed space (returns list[Dist])
         dists_prime, state["s_state"] = skater(y_prime, state["s_state"])
+        assert len(dists_prime) == k, (
+            f"conjugate(k={k}) wraps a skater emitting {len(dists_prime)} horizons; "
+            "k must match the wrapped skater's k"
+        )
 
         # Invert predictions back to original space
         dists = inverse_k(dists_prime, state["t_state"])

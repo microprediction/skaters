@@ -43,7 +43,13 @@ export function terminalLeafEnsemble(skaters, {
     for (let i = 0; i < n; i++) {
       const q = state.qdist[i];
       if (q.length) {
-        const lp = Math.max(q.shift().logpdf(y), -20.0);
+        // Bounded loss (mixability): clamp to a finite band so neither a -inf
+        // (y far from every component) nor a +inf (an exact hit on a Dirac atom,
+        // e.g. the sticky lattice path) can dominate or NaN-poison log_w. The
+        // `!(lp >= -20)` arm also catches NaN.
+        let lp = q.shift().logpdf(y);
+        if (lp > 20.0) lp = 20.0;
+        else if (!(lp >= -20.0)) lp = -20.0;
         state.log_w[i] = forget * state.log_w[i] + learningRate * lp - complexityPenalty * d[i];
       }
       q.push(allDists[i][0]);

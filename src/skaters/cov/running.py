@@ -4,7 +4,6 @@ Processes one observation vector at a time. Numerically stable.
 """
 
 from __future__ import annotations
-import math
 
 
 def running_cov(y: list[float], state: dict | None) -> tuple[list[float], list[float], dict]:
