@@ -166,11 +166,34 @@ def _mahal2(L: list, v: list, n: int) -> float:
     return d2
 
 
+def _top_eig(S: list, n: int, iters: int = 60) -> tuple:
+    """Leading eigenpair of a symmetric flat matrix by power iteration.
+
+    Deterministic start (uniform with a small index tilt to break ties) so the
+    whole detector stays reproducible and portable to the JS twin.
+    """
+    v = [1.0 + 1e-3 * i for i in range(n)]
+    norm = math.sqrt(sum(x * x for x in v))
+    v = [x / norm for x in v]
+    lam = 0.0
+    for _ in range(iters):
+        w = [sum(S[i * n + j] * v[j] for j in range(n)) for i in range(n)]
+        norm = math.sqrt(sum(x * x for x in w))
+        if norm <= 0.0:
+            return 0.0, v
+        w = [x / norm for x in w]
+        lam = sum(w[i] * sum(S[i * n + j] * w[j] for j in range(n))
+                  for i in range(n))
+        v = w
+    return max(lam, 0.0), v
+
+
 # ---------------------------------------------------------------------------
 # The wrapper skater.
 # ---------------------------------------------------------------------------
 
-def mahalanobis(base, k: int, alpha: float = 0.02, shrink: float = 0.05,
+def mahalanobis(base, k: int, alpha: float = 0.02, scatter: str = "factor",
+                shrink: float = 0.05, dfloor: float = 1e-3,
                 guard_p: float = 0.99, adapt_after: int = 10):
     """Wrap a parade-wrapped skater with a streaming Mahalanobis anomaly score.
 
@@ -179,10 +202,22 @@ def mahalanobis(base, k: int, alpha: float = 0.02, shrink: float = 0.05,
             wrapped by :func:`skaters.parade` (as :func:`skaters.laplace` is).
         k: forecast horizon (must match base).
         alpha: EWMA rate for the location/scatter of z (memory ~ 1/alpha).
-        shrink: shrinkage of the scatter toward the identity at scoring time.
-            The identity is the *calibrated* target here — the parade
-            standardises each margin — so this is a principled Ledoit-Wolf-%
-            style target, not just conditioning.
+        scatter: how the near-singular scatter is tamed at scoring time.
+            ``"factor"`` (default) fits one factor plus a diagonal,
+            ``Sigma ~ lam * vv' + D`` (leading eigenpair by power iteration,
+            residual per-horizon variances on the diagonal, exact inverse by
+            Sherman--Morrison). The z-vector's structure is *known* — one
+            dominant "all horizons surprised together" direction — so this
+            models the degeneracy instead of flooring it, preserving
+            sensitivity along the small "the forecasts disagreed" directions
+            that identity shrinkage suppresses. ``"shrink"`` uses plain
+            shrinkage toward the identity (the calibrated Ledoit--Wolf-style
+            target, since the parade standardises each margin).
+        shrink: identity-shrinkage weight (``scatter="shrink"`` only).
+        dfloor: floor on the factor model's residual variances, relative to
+            the mean diagonal of the scatter (``scatter="factor"`` only).
+            Bounds the false-alarm amplification from underestimated
+            idiosyncratic variances.
         guard_p: chi-square level above which a tick's update is Huberised
             (downweighted by q/d2). Robustness against masking.
         adapt_after: consecutive guarded ticks after which the run is treated
@@ -199,6 +234,8 @@ def mahalanobis(base, k: int, alpha: float = 0.02, shrink: float = 0.05,
     assert k >= 1
     assert 0.0 < alpha < 1.0
     assert 0.0 <= shrink < 1.0
+    assert scatter in ("factor", "shrink")
+    assert dfloor > 0.0
 
     def _skater(y: float, state: dict | None):
         if state is None:
@@ -227,9 +264,23 @@ def mahalanobis(base, k: int, alpha: float = 0.02, shrink: float = 0.05,
 
         # Score under the CURRENT estimates — the point must not defend itself.
         v = [z[i] - mu[i] for i in range(k)]
-        Ssh = [(1.0 - shrink) * S[i * k + j] + (shrink if i == j else 0.0)
-               for i in range(k) for j in range(k)]
-        d2 = _mahal2(_cholesky(Ssh, k), v, k)
+        if scatter == "factor":
+            # One factor + diagonal: Sigma ~ lam*ww' + D, inverted exactly by
+            # Sherman--Morrison. D keeps the *estimated* residual variances,
+            # so disagreement directions retain their true (small) scale.
+            lam, w_vec = _top_eig(S, k)
+            mean_diag = sum(S[i * k + i] for i in range(k)) / k
+            floor = max(dfloor * mean_diag, 1e-12)
+            D = [max(S[i * k + i] - lam * w_vec[i] * w_vec[i], floor)
+                 for i in range(k)]
+            q1 = sum(v[i] * v[i] / D[i] for i in range(k))
+            q2 = sum(w_vec[i] * v[i] / D[i] for i in range(k))
+            q3 = sum(w_vec[i] * w_vec[i] / D[i] for i in range(k))
+            d2 = q1 - lam * q2 * q2 / (1.0 + lam * q3)
+        else:
+            Ssh = [(1.0 - shrink) * S[i * k + j] + (shrink if i == j else 0.0)
+                   for i in range(k) for j in range(k)]
+            d2 = _mahal2(_cholesky(Ssh, k), v, k)
 
         # Empirical null (two-moment Satterthwaite): d2 ~ c * chi2_nu with
         # c = v/2m, nu = 2m^2/v; seeded at the exact chi2_k moments.

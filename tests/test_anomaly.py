@@ -2,8 +2,11 @@
 
 import math
 import random
+import pytest
 from skaters import laplace
 from skaters.anomaly import mahalanobis, chi2_sf, chi2_ppf
+
+SCATTERS = ("factor", "shrink")
 
 
 # --- chi-square math ---
@@ -50,14 +53,15 @@ def test_pass_through_and_warmup():
     assert 0.0 <= state["pvalue"] <= 1.0
 
 
-def test_calibrated_null():
+@pytest.mark.parametrize('scatter', SCATTERS)
+def test_calibrated_null(scatter):
     """On a well-specified stream the p-values are roughly Uniform(0,1) —
     the empirical null absorbs the cross-horizon correlation of z (near
     rank-1 on smooth streams), so this is the calibration claim, not the raw
     d2 scale."""
     random.seed(5)
     k = 3
-    f = mahalanobis(laplace(k), k=k)
+    f = mahalanobis(laplace(k), k=k, scatter=scatter)
     out, _ = _run(f, [random.gauss(0, 1) for _ in range(900)])
     ps = [p for d2, p, _ in out[200:] if d2 is not None]
     n = len(ps)
@@ -69,12 +73,13 @@ def test_calibrated_null():
     assert 0.30 < sum(ps) / n < 0.70          # mean ~ 1/2
 
 
-def test_point_outlier_fires_once():
+@pytest.mark.parametrize('scatter', SCATTERS)
+def test_point_outlier_fires_once(scatter):
     """An isolated outlier must yield a tiny p-value and read as a spike
     (small run), with the detector recovering afterwards."""
     random.seed(11)
     k = 3
-    f = mahalanobis(laplace(k), k=k)
+    f = mahalanobis(laplace(k), k=k, scatter=scatter)
     state = None
     for _ in range(300):
         _, state = f(random.gauss(0, 0.1), state)
@@ -112,12 +117,13 @@ def test_level_shift_reads_as_run_and_readapts():
     assert max(ps_late) > 0.01                # ...then re-adapted
 
 
-def test_masking_resistance():
+@pytest.mark.parametrize('scatter', SCATTERS)
+def test_masking_resistance(scatter):
     """Repeated outliers must not inflate the scatter enough to hide later
     ones: the last injected outlier still fires as hard as the first."""
     random.seed(7)
     k = 2
-    f = mahalanobis(laplace(k), k=k)
+    f = mahalanobis(laplace(k), k=k, scatter=scatter)
     state = None
     pvals = []
     t = 0
@@ -129,6 +135,48 @@ def test_masking_resistance():
         t += 1
     assert len(pvals) >= 10
     assert all(p < 1e-3 for p in pvals)       # every outlier still fires
+
+
+def _scripted_z(z_seq, k):
+    """A mock parade-wrapped skater emitting a scripted z-vector each tick."""
+    from skaters.dist import Dist
+    def f(y, state):
+        t = 0 if state is None else state["t"] + 1
+        return [Dist.gaussian(0.0, 1.0)] * k, {"t": t, "z": list(z_seq[t])}
+    return f
+
+
+def test_factor_scatter_detects_disagreement_anomalies():
+    """The z-vector is near rank-1 ('all horizons surprised together'); the
+    diagnostic directions are the small ones ('the forecasts disagreed').
+    Identity shrinkage floors those variances and suppresses exactly that
+    signal; the factor model keeps their estimated scale. An anomaly pattern
+    orthogonal to the common factor, with every |z| component modest, must
+    fire under the factor scatter — and this is precisely where it should
+    dominate the shrink scatter."""
+    random.seed(3)
+    k = 3
+    n = 900
+    zs = []
+    for t in range(n):
+        g = random.gauss(0, 1)                        # common factor
+        zs.append([g + random.gauss(0, 0.05) for _ in range(k)])
+    anomaly_at = 700
+    # Disagreement pattern: +-0.6, orthogonal-ish to (1,1,1); every |z| < 1,
+    # so no per-horizon rule (and no common-mode detector) can see it.
+    zs[anomaly_at] = [0.6, -0.6, 0.0]
+
+    pv = {}
+    for scatter in SCATTERS:
+        f = mahalanobis(_scripted_z(zs, k), k=k, scatter=scatter)
+        state = None
+        for t in range(n):
+            _, state = f(0.0, state)
+            if t == anomaly_at:
+                pv[scatter] = state["pvalue"]
+
+    assert pv["factor"] < 1e-4                 # screams under the factor model
+    assert pv["factor"] < pv["shrink"] * 1e-2  # and beats shrinkage by orders
 
 
 def test_k1_and_constant_stream_no_crash():
