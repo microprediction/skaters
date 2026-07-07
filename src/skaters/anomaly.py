@@ -1,0 +1,275 @@
+"""Streaming anomaly detection on the prediction parade.
+
+The parade reduces an arbitrary stream to — under calibration — a stationary
+vector ``z_t ~ N(0, Sigma)``: the standard-normal surprises of the arriving
+point under the predictions issued 1..k steps ago. That is exactly the
+homogeneous input classical multivariate-Gaussian outlier detection assumes.
+The forecaster is the normaliser; detection reduces to the textbook robust
+Mahalanobis case, applied to *trailing predictions* instead of raw features.
+
+``mahalanobis`` wraps a parade-wrapped skater (e.g. :func:`skaters.laplace`)
+and maintains a streaming robust estimate of the location ``mu`` and scatter
+``Sigma`` of z. Each tick it scores
+
+    d2 = (z - mu)' Sigma^{-1} (z - mu),
+
+and converts d2 to a p-value through an *empirical null* (in the spirit of
+Efron 2004): under the theoretical null d2 ~ chi^2_k, but in practice the
+z-components are often strongly correlated across horizons (on smooth streams
+the forecasts issued at t-1..t-k are nearly identical, so Sigma is
+near-singular) and the shrinkage floor then collapses the effective degrees
+of freedom below k. Rather than pretend, the wrapper tracks the running mean
+``m`` and variance ``v`` of d2 and matches the null to a scaled chi-square
+``c * chi^2_nu`` by two-moment (Welch--Satterthwaite) matching, ``c = v/2m``,
+``nu = 2m^2/v``, seeded at the theoretical moments ``(m, v) = (k, 2k)``. The
+p-value in ``state["pvalue"]`` is therefore approximately Uniform(0,1) on
+well-specified data by construction, whatever the effective rank.
+
+Scoring happens *before* any update — a point must not defend itself — and
+every update (mu, Sigma, and the null moments alike) is Huberised: ticks whose
+d2 exceeds the ``guard_p`` empirical-null quantile are downweighted by
+``q_guard / d2``, the online cousin of reweighted MCD. Without this, anomalies
+contaminate the estimates and inflate them (masking), hiding later anomalies.
+Pure self-exclusion has its own failure mode — after a structural break every
+tick looks anomalous forever — so a run of more than ``adapt_after``
+consecutive guarded ticks is treated as a changepoint and updates resume at
+full weight. In practice an adaptive base forecaster absorbs level shifts
+itself within a few ticks, so ``state["run"]`` scales with the *forecaster's
+adaptation time*: isolated spikes read as point outliers (run 1-2, the echo
+tick coming from the outlier polluting the next forecast), structural breaks
+as longer runs.
+
+Two structural facts make the scores meaningful from the very first matured
+tick: the parade standardises each margin, so the identity matrix is not an
+arbitrary initialisation of Sigma but the *calibrated prior* (and the
+``shrink`` toward it a principled Ledoit--Wolf-style target); and the null
+moments are seeded at their exact theoretical values.
+
+Entries of ``state["d2"]``/``state["pvalue"]`` are ``None`` until every
+horizon of the parade has matured (the first k observations) and on any tick
+where a horizon's z is unavailable. The wrapper is pass-through for the
+forecasts themselves.
+"""
+
+from __future__ import annotations
+import math
+
+_EPS = 3e-12
+_ITMAX = 300
+
+
+# ---------------------------------------------------------------------------
+# Chi-square tail probability via the regularized incomplete gamma function.
+# Standard series / continued-fraction split (Abramowitz & Stegun 6.5).
+# ---------------------------------------------------------------------------
+
+def _gser(a: float, x: float) -> float:
+    """Series for the regularized lower incomplete gamma P(a, x), x < a+1."""
+    if x <= 0.0:
+        return 0.0
+    ap = a
+    total = 1.0 / a
+    term = total
+    for _ in range(_ITMAX):
+        ap += 1.0
+        term *= x / ap
+        total += term
+        if abs(term) < abs(total) * _EPS:
+            break
+    return total * math.exp(-x + a * math.log(x) - math.lgamma(a))
+
+
+def _gcf(a: float, x: float) -> float:
+    """Continued fraction (modified Lentz) for the regularized upper
+    incomplete gamma Q(a, x), x >= a+1."""
+    tiny = 1e-300
+    b = x + 1.0 - a
+    c = 1.0 / tiny
+    d = 1.0 / b
+    h = d
+    for i in range(1, _ITMAX + 1):
+        an = -i * (i - a)
+        b += 2.0
+        d = an * d + b
+        if abs(d) < tiny:
+            d = tiny
+        c = b + an / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        de = d * c
+        h *= de
+        if abs(de - 1.0) < _EPS:
+            break
+    return h * math.exp(-x + a * math.log(x) - math.lgamma(a))
+
+
+def chi2_sf(x: float, dof: float) -> float:
+    """Survival function P(X > x) of a chi-square with ``dof`` degrees of
+    freedom (fractional dof allowed): Q(dof/2, x/2)."""
+    assert dof > 0
+    if x <= 0.0:
+        return 1.0
+    a = 0.5 * dof
+    xx = 0.5 * x
+    if xx < a + 1.0:
+        return 1.0 - _gser(a, xx)
+    return _gcf(a, xx)
+
+
+def chi2_ppf(p: float, dof: float, tol: float = 1e-10) -> float:
+    """Quantile of the chi-square via bisection on the survival function."""
+    assert 0.0 < p < 1.0
+    lo = 0.0
+    hi = dof + 40.0 * math.sqrt(2.0 * dof) + 100.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if 1.0 - chi2_sf(mid, dof) < p:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < tol:
+            break
+    return 0.5 * (lo + hi)
+
+
+# ---------------------------------------------------------------------------
+# Small dense linear algebra on flat row-major k x k matrices (k is small).
+# ---------------------------------------------------------------------------
+
+def _cholesky(A: list, n: int, jitter: float = 1e-12) -> list:
+    """Lower Cholesky factor of a (near-)PD flat row-major matrix."""
+    L = [0.0] * (n * n)
+    for i in range(n):
+        for j in range(i + 1):
+            s = A[i * n + j]
+            for t in range(j):
+                s -= L[i * n + t] * L[j * n + t]
+            if i == j:
+                L[i * n + i] = math.sqrt(s) if s > jitter else math.sqrt(jitter)
+            else:
+                L[i * n + j] = s / L[j * n + j]
+    return L
+
+
+def _mahal2(L: list, v: list, n: int) -> float:
+    """||L^{-1} v||^2 by forward substitution: v' (L L')^{-1} v."""
+    w = [0.0] * n
+    d2 = 0.0
+    for i in range(n):
+        s = v[i]
+        for t in range(i):
+            s -= L[i * n + t] * w[t]
+        wi = s / L[i * n + i]
+        w[i] = wi
+        d2 += wi * wi
+    return d2
+
+
+# ---------------------------------------------------------------------------
+# The wrapper skater.
+# ---------------------------------------------------------------------------
+
+def mahalanobis(base, k: int, alpha: float = 0.02, shrink: float = 0.05,
+                guard_p: float = 0.99, adapt_after: int = 10):
+    """Wrap a parade-wrapped skater with a streaming Mahalanobis anomaly score.
+
+    Args:
+        base: a skater whose state exposes ``state["z"]`` — i.e. already
+            wrapped by :func:`skaters.parade` (as :func:`skaters.laplace` is).
+        k: forecast horizon (must match base).
+        alpha: EWMA rate for the location/scatter of z (memory ~ 1/alpha).
+        shrink: shrinkage of the scatter toward the identity at scoring time.
+            The identity is the *calibrated* target here — the parade
+            standardises each margin — so this is a principled Ledoit-Wolf-%
+            style target, not just conditioning.
+        guard_p: chi-square level above which a tick's update is Huberised
+            (downweighted by q/d2). Robustness against masking.
+        adapt_after: consecutive guarded ticks after which the run is treated
+            as a changepoint and updates resume at full weight.
+
+    After ``dists, state = f(y, state)``:
+        state["d2"]     Mahalanobis distance of this tick's parade z-vector
+                        (None until all k horizons have matured);
+        state["pvalue"] its chi^2_k tail probability — calibrated, so under a
+                        well-specified forecaster ~Uniform(0,1);
+        state["run"]    consecutive ticks above the guard level (1 = isolated
+                        spike ~ point outlier; growing ~ changepoint).
+    """
+    assert k >= 1
+    assert 0.0 < alpha < 1.0
+    assert 0.0 <= shrink < 1.0
+
+    def _skater(y: float, state: dict | None):
+        if state is None:
+            state = {
+                "base": None,
+                "mu": [0.0] * k,                     # calibrated prior mean
+                "S": [1.0 if i == j else 0.0         # calibrated prior scatter
+                      for i in range(k) for j in range(k)],
+                "m2": float(k),                      # empirical-null mean of d2
+                "v2": float(2 * k),                  # ...and variance (chi2_k prior)
+                "run": 0, "d2": None, "pvalue": None,
+            }
+        dists, state["base"] = base(y, state["base"])
+        bs = state["base"]
+        z = bs.get("z") if isinstance(bs, dict) else None
+        assert z is not None and len(z) == k, (
+            "mahalanobis requires a parade-wrapped skater exposing "
+            "state['z'] of length k (e.g. skaters.laplace)")
+
+        if any(v is None for v in z):                # warmup / degenerate tick
+            state["d2"] = None
+            state["pvalue"] = None
+            return dists, state
+
+        mu, S = state["mu"], state["S"]
+
+        # Score under the CURRENT estimates — the point must not defend itself.
+        v = [z[i] - mu[i] for i in range(k)]
+        Ssh = [(1.0 - shrink) * S[i * k + j] + (shrink if i == j else 0.0)
+               for i in range(k) for j in range(k)]
+        d2 = _mahal2(_cholesky(Ssh, k), v, k)
+
+        # Empirical null (two-moment Satterthwaite): d2 ~ c * chi2_nu with
+        # c = v/2m, nu = 2m^2/v; seeded at the exact chi2_k moments.
+        m2 = max(state["m2"], 1e-9)
+        v2 = max(state["v2"], 1e-9)
+        c = max(v2 / (2.0 * m2), 1e-9)
+        nu = min(max(2.0 * m2 * m2 / v2, 0.5), 1000.0)
+        state["d2"] = d2
+        state["pvalue"] = chi2_sf(d2 / c, nu)
+
+        # Huberised update with a changepoint escape hatch. The guard level is
+        # the empirical null's quantile, so it tracks the learned calibration.
+        q_guard = c * chi2_ppf(guard_p, nu)
+        if d2 > q_guard:
+            state["run"] += 1
+            w = 1.0 if state["run"] > adapt_after else q_guard / d2
+        else:
+            state["run"] = 0
+            w = 1.0
+        a = alpha * w
+        # Null moments update by WINSORIZATION, not downweighting: the Huber
+        # weight bounds a linear update but the variance update is quadratic
+        # in d2 (a * dm^2 ~ alpha * q * d2 still grows with the outlier), so a
+        # downweighted outlier would widen its own null through v2. Clipping
+        # at the guard bounds the influence outright; on the changepoint
+        # escape (w == 1 with run exhausted) the raw d2 passes through so a
+        # genuinely new regime can widen the null.
+        d2n = d2 if w == 1.0 else min(d2, q_guard)
+        dm = d2n - state["m2"]
+        state["m2"] += alpha * dm
+        state["v2"] = (1.0 - alpha) * state["v2"] + alpha * dm * (d2n - state["m2"])
+        delta = v                                     # z - mu (pre-update)
+        for i in range(k):
+            mu[i] += a * delta[i]
+        delta2 = [z[i] - mu[i] for i in range(k)]     # z - mu (post-update)
+        for i in range(k):
+            for j in range(k):
+                S[i * k + j] = (1.0 - a) * S[i * k + j] + a * delta[i] * delta2[j]
+
+        return dists, state
+
+    _skater.__name__ = f"mahalanobis({getattr(base, '__name__', '?')}, k={k})"
+    return _skater
