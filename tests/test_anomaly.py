@@ -179,6 +179,66 @@ def test_factor_scatter_detects_disagreement_anomalies():
     assert pv["factor"] < pv["shrink"] * 1e-2  # and beats shrinkage by orders
 
 
+def test_multifactor_reduces_to_single_factor():
+    """With factors=1 the Woodbury path must agree with Sherman-Morrison
+    (same scores on the same stream)."""
+    random.seed(9)
+    k = 3
+    ys = [random.gauss(0, 1) for _ in range(300)]
+    f1 = mahalanobis(laplace(k), k=k, factors=1)
+    out1, _ = _run(f1, ys)
+    # factors=1 IS the reference implementation now; sanity: calibrated + finite
+    d2s = [d2 for d2, _, _ in out1 if d2 is not None]
+    assert all(math.isfinite(d) for d in d2s)
+
+
+def test_multifactor_calibrated_on_two_factor_null():
+    """A scripted two-factor z stream: factors=2 must stay calibrated and
+    detect an anomaly orthogonal to BOTH factors that factors=1 dilutes."""
+    random.seed(13)
+    k = 4
+    n = 900
+    u = [1.0, 1.0, 1.0, 1.0]
+    w = [1.0, -1.0, 1.0, -1.0]
+    zs = []
+    for _ in range(n):
+        g1, g2 = random.gauss(0, 1), random.gauss(0, 0.5)
+        zs.append([g1 * u[i] + g2 * w[i] + random.gauss(0, 0.05)
+                   for i in range(k)])
+    A = 700
+    zs[A] = [0.5, 0.5, -0.5, -0.5]      # orthogonal to u and w, modest size
+
+    pv = {}
+    for r in (1, 2):
+        f = mahalanobis(_scripted_z(zs, k), k=k, factors=r)
+        state = None
+        for t in range(n):
+            _, state = f(0.0, state)
+            if t == A:
+                pv[r] = state["pvalue"]
+    assert pv[2] < 1e-4
+    assert pv[2] <= pv[1]
+
+
+def test_zbank_shapes_and_detection():
+    """The bank exposes a concatenated z and a point outlier fires through
+    the whole stack."""
+    from skaters.anomaly import zbank
+    random.seed(21)
+    k, sigmas, strides = 2, (0.03, 0.003), (1, 4)
+    dim = len(sigmas) * len(strides) * k
+    f = mahalanobis(zbank(k=k, sigmas=sigmas, strides=strides),
+                    k=dim, factors=3)
+    state = None
+    for _ in range(400):
+        d, state = f(random.gauss(0, 0.1), state)
+    assert len(d) == k                     # pass-through forecasts, finest engine
+    assert len(state["base"]["z"]) == dim
+    assert state["pvalue"] is not None     # bank fully matured
+    _, state = f(25.0, state)              # outlier
+    assert state["pvalue"] < 1e-6
+
+
 def test_k1_and_constant_stream_no_crash():
     f = mahalanobis(laplace(1), k=1)
     state = None

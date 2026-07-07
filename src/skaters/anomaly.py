@@ -188,12 +188,50 @@ def _top_eig(S: list, n: int, iters: int = 60) -> tuple:
     return max(lam, 0.0), v
 
 
+def _top_factors(S: list, n: int, r: int) -> list:
+    """Up to ``r`` leading eigenpairs by power iteration with deflation.
+
+    Stops early once an eigenvalue drops below 1% of the mean diagonal —
+    factors below that carry no usable structure.
+    """
+    work = list(S)
+    mean_diag = sum(S[i * n + i] for i in range(n)) / n
+    out = []
+    for _ in range(r):
+        lam, v = _top_eig(work, n)
+        if lam <= 0.01 * mean_diag:
+            break
+        out.append((lam, v))
+        for i in range(n):                      # deflate: S -= lam * v v'
+            for j in range(n):
+                work[i * n + j] -= lam * v[i] * v[j]
+    return out
+
+
+def _solve_sym(A: list, b: list, n: int) -> list:
+    """Solve A x = b for small symmetric positive-definite A (flat, n<=r)."""
+    L = _cholesky(A, n)
+    y = [0.0] * n
+    for i in range(n):                          # forward: L y = b
+        s = b[i]
+        for t in range(i):
+            s -= L[i * n + t] * y[t]
+        y[i] = s / L[i * n + i]
+    x = [0.0] * n
+    for i in range(n - 1, -1, -1):              # back: L' x = y
+        s = y[i]
+        for t in range(i + 1, n):
+            s -= L[t * n + i] * x[t]
+        x[i] = s / L[i * n + i]
+    return x
+
+
 # ---------------------------------------------------------------------------
 # The wrapper skater.
 # ---------------------------------------------------------------------------
 
 def mahalanobis(base, k: int, alpha: float = 0.02, scatter: str = "factor",
-                shrink: float = 0.05, dfloor: float = 1e-3,
+                factors: int = 1, shrink: float = 0.05, dfloor: float = 1e-3,
                 guard_p: float = 0.99, adapt_after: int = 10):
     """Wrap a parade-wrapped skater with a streaming Mahalanobis anomaly score.
 
@@ -213,6 +251,12 @@ def mahalanobis(base, k: int, alpha: float = 0.02, scatter: str = "factor",
             that identity shrinkage suppresses. ``"shrink"`` uses plain
             shrinkage toward the identity (the calibrated Ledoit--Wolf-style
             target, since the parade standardises each margin).
+        factors: number of factors in the factor model (``scatter="factor"``).
+            1 suffices for a single parade z-vector; a feature bank
+            (:func:`zbank`) concatenating several engines' surprises has a
+            few shared modes — use 2-4. Extraction deflates (power-iterate,
+            subtract, repeat) and stops early below 1% of the mean diagonal;
+            the inverse is exact Woodbury with an r x r solve.
         shrink: identity-shrinkage weight (``scatter="shrink"`` only).
         dfloor: floor on the factor model's residual variances, relative to
             the mean diagonal of the scatter (``scatter="factor"`` only).
@@ -235,6 +279,7 @@ def mahalanobis(base, k: int, alpha: float = 0.02, scatter: str = "factor",
     assert 0.0 < alpha < 1.0
     assert 0.0 <= shrink < 1.0
     assert scatter in ("factor", "shrink")
+    assert factors >= 1
     assert dfloor > 0.0
 
     def _skater(y: float, state: dict | None):
@@ -265,18 +310,35 @@ def mahalanobis(base, k: int, alpha: float = 0.02, scatter: str = "factor",
         # Score under the CURRENT estimates — the point must not defend itself.
         v = [z[i] - mu[i] for i in range(k)]
         if scatter == "factor":
-            # One factor + diagonal: Sigma ~ lam*ww' + D, inverted exactly by
-            # Sherman--Morrison. D keeps the *estimated* residual variances,
-            # so disagreement directions retain their true (small) scale.
-            lam, w_vec = _top_eig(S, k)
+            # r factors + diagonal: Sigma ~ sum_j lam_j w_j w_j' + D, inverted
+            # exactly by Woodbury (r x r solve). D keeps the *estimated*
+            # residual variances, so disagreement directions retain their
+            # true (small) scale.
+            fac = _top_factors(S, k, factors)
             mean_diag = sum(S[i * k + i] for i in range(k)) / k
             floor = max(dfloor * mean_diag, 1e-12)
-            D = [max(S[i * k + i] - lam * w_vec[i] * w_vec[i], floor)
+            D = [max(S[i * k + i]
+                     - sum(lam * w[i] * w[i] for lam, w in fac), floor)
                  for i in range(k)]
             q1 = sum(v[i] * v[i] / D[i] for i in range(k))
-            q2 = sum(w_vec[i] * v[i] / D[i] for i in range(k))
-            q3 = sum(w_vec[i] * w_vec[i] / D[i] for i in range(k))
-            d2 = q1 - lam * q2 * q2 / (1.0 + lam * q3)
+            if not fac:
+                d2 = q1
+            else:
+                r = len(fac)
+                # b_j = w_j' D^{-1} v ;  B = diag(1/lam) + W' D^{-1} W
+                b = [sum(w[i] * v[i] / D[i] for i in range(k))
+                     for _, w in fac]
+                B = [0.0] * (r * r)
+                for a_ in range(r):
+                    B[a_ * r + a_] = 1.0 / fac[a_][0]
+                    for c_ in range(a_, r):
+                        g = sum(fac[a_][1][i] * fac[c_][1][i] / D[i]
+                                for i in range(k))
+                        B[a_ * r + c_] += g
+                        if c_ != a_:
+                            B[c_ * r + a_] += g
+                x = _solve_sym(B, b, r)
+                d2 = q1 - sum(b[j] * x[j] for j in range(r))
         else:
             Ssh = [(1.0 - shrink) * S[i * k + j] + (shrink if i == j else 0.0)
                    for i in range(k) for j in range(k)]
@@ -323,4 +385,68 @@ def mahalanobis(base, k: int, alpha: float = 0.02, scatter: str = "factor",
         return dists, state
 
     _skater.__name__ = f"mahalanobis({getattr(base, '__name__', '?')}, k={k})"
+    return _skater
+
+
+def zbank(k: int = 3, sigmas: tuple = (0.03, 0.003),
+          strides: tuple = (1, 4, 16), engine=None):
+    """A bank of forecasters whose concatenated parade surprises form one z.
+
+    The package's recurring move — a geometric grid over an unknown scale,
+    mixed online — applied to detection: engines at every (residual-memory
+    sigma) x (clock stride) gridpoint each maintain their own parade, and the
+    bank exposes ``state["z"]`` as the concatenation (dimension
+    ``len(sigmas) * len(strides) * k``). Feed it to :func:`mahalanobis` with
+    ``k`` equal to that dimension and ``factors=2..4``: the bank's engines are
+    highly correlated views of one stream, which is exactly the factor
+    structure the scatter models.
+
+    Strides reuse the :func:`skaters.multiscale` phase trick: stride s keeps s
+    phase-shifted engine copies and each tick advances exactly the copy whose
+    clock ends now, so every stride contributes a *fresh* surprise at every
+    tick (no staleness, no detection delay) at an amortised cost of one engine
+    step per (sigma, stride) per tick. A slow-memory engine spots anomalies
+    against a long-held notion of normal; a coarse-clock engine spots drifts
+    a fine clock absorbs.
+
+    Forecasts pass through from the (first sigma, stride 1) engine.
+
+    Args:
+        k: per-engine horizon (also the finest engine's output length).
+        sigmas: ``scale_alpha`` grid for the default laplace engine.
+        strides: decimation grid; must include 1 (the pass-through engine).
+        engine: optional factory ``engine(sigma) -> skater`` overriding the
+            default ``laplace(k, scale_alpha=sigma)``. The returned skater
+            must expose parade state (``state["z"]``), as laplace does.
+    """
+    assert 1 in strides, "strides must include 1 (the pass-through engine)"
+    from skaters.api import laplace as _laplace
+    make = engine if engine is not None else (
+        lambda sig: _laplace(k, scale_alpha=sig))
+    fs = {sig: make(sig) for sig in sigmas}      # skaters are pure: one per sigma
+
+    def _skater(y: float, state: dict | None):
+        if state is None:
+            state = {"t": 0,
+                     "sub": {(sig, s): [None] * s
+                             for sig in sigmas for s in strides},
+                     "z": None}
+        t = state["t"]
+        z = []
+        dists_out = None
+        for sig in sigmas:
+            for s in strides:
+                copies = state["sub"][(sig, s)]
+                ph = t % s
+                dists, copies[ph] = fs[sig](y, copies[ph])
+                if sig == sigmas[0] and s == 1:
+                    dists_out = dists              # pass-through forecasts
+                cz = copies[ph].get("z") if isinstance(copies[ph], dict) else None
+                z.extend(cz if cz is not None else [None] * k)
+        state["z"] = z
+        state["t"] = t + 1
+        return dists_out, state
+
+    _skater.__name__ = (f"zbank(k={k}, sigmas={list(sigmas)}, "
+                        f"strides={list(strides)})")
     return _skater
