@@ -317,3 +317,29 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
     f = _parade(f, k=k)
     f.__name__ = f"laplace(k={k})"
     return f
+
+
+def dantzig(k: int = 1, **kwargs):
+    """Adaptive-search skater: grow the model space online instead of fixing it.
+
+    Where :func:`laplace` weights a *fixed* candidate population, ``dantzig``
+    explores a growing one: beam search over the transform grammar — expand
+    the top performers with new transforms (including seasonal differences at
+    periods its online detector actually finds), replay recent history so new
+    candidates join warm, prune the losers. Use it when the structure is
+    unknown and possibly drifting, or under a compute budget
+    (``cost_budget``); on the benchmarked FRED and UCR regimes the fixed
+    population of ``laplace`` remains the stronger default.
+
+    This restores the policy's original roster name (the generic ``search``
+    remains exported as the underlying machinery): Dantzig 1947 — the simplex
+    method explores a combinatorial space by walking from vertex to better
+    neighbouring vertex, never enumerating the polytope, which is precisely
+    the expand-and-prune walk this skater takes through the model grammar.
+
+    Accepts :func:`skaters.search.search`'s keyword arguments.
+    """
+    from skaters.search import search as _search
+    f = _search(k=k, **kwargs)
+    f.__name__ = f"dantzig(k={k})"
+    return f

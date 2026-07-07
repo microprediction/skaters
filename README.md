@@ -270,14 +270,20 @@ f = bayesian_ensemble(
 )
 ```
 
-### Adaptive search (beam search over transform grammar)
+### `dantzig` — adaptive search (beam search over transform grammar)
 
-Grows the candidate population online: expand top performers with new transforms, replay recent history to warm-start, prune losers.
+Where `laplace` weights a fixed candidate population, `dantzig` explores a
+growing one: expand top performers with new transforms (including seasonal
+differences at periods its online detector finds), replay recent history to
+warm-start, prune losers. Named for Dantzig 1947 — the simplex method walks
+from vertex to better neighbouring vertex without enumerating the polytope,
+which is exactly this expand-and-prune walk through the model grammar.
+(`search` remains exported as the underlying machinery.)
 
 ```python
-from skaters import search
+from skaters import dantzig
 
-f = search(
+f = dantzig(
     k=1,
     expand_interval=100,  # expand top performers every 100 obs
     max_depth=3,          # maximum transform chain depth

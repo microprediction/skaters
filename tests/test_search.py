@@ -227,3 +227,18 @@ def test_long_run_stable():
         x, state = f(random.gauss(0, 1), state)
     assert math.isfinite(x[0].mean)
     assert x[0].std > 0
+
+
+def test_dantzig_is_the_roster_name_for_search():
+    """dantzig is the named policy over the search machinery: same behaviour,
+    roster name."""
+    import random
+    from skaters import dantzig
+    f = dantzig(k=2)
+    assert f.__name__ == "dantzig(k=2)"
+    random.seed(4)
+    state = None
+    for _ in range(120):
+        dists, state = f(random.gauss(0, 1), state)
+    assert len(dists) == 2
+    assert all(d.std > 0 for d in dists)
