@@ -1021,7 +1021,31 @@ lattice projection is active} --- neither of which is a prior over the trunk. Th
 granularity mixture of Section~\ref{sec:granularity} is the same argument applied
 to the sampling clock: which time scale a forecaster commits to is one more
 implicit prior, and the multi-step results show it too is better weighted online
-than chosen. The
+than chosen.
+
+\paragraph{Anomaly detection as future work.}
+A calibrated online density makes anomaly detection nearly a by-product. The
+state exposes, at every horizon $m \le k$, the probability integral transform
+of each arriving point under the predictive issued $m$ steps earlier
+(\code{state["pit"]}, approximately Uniform when the stream behaves) and its
+standard-normal image (\code{state["z"]}), so a threshold on $|z|$ is an alarm
+whose false-positive rate means what it says --- the coverage results above are
+precisely the license --- and the multi-horizon structure separates one-off
+spikes (surprising at $m=1$, forgotten by $m=20$) from genuine breaks
+(surprising at every matured horizon at once). Because the model has already
+absorbed drift, the volatility clock, seasonality, and coordinate, what remains
+surprising is surprising relative to an adapted forecast rather than to a
+rolling window. We deliberately stop short of a benchmark claim: the empirical
+evaluation of time-series anomaly detection is notoriously fraught ---
+\citet{wu2023current} argue that the prevailing benchmark suites are flawed to
+the point of ``creating the illusion of progress,'' and \citet{kim2022rigorous}
+show that a common scoring adjustment lets even random scores appear
+state-of-the-art --- and our own preliminary experiments on the Numenta
+benchmark \citep{lavin2015nab} indicate that leaderboard position there is
+dominated by detector-layer machinery (per-stream score normalisation and
+thresholding economics) rather than by the quality of the underlying
+predictive. Turning a calibrated surprise stream into a benchmark-competitive
+detector, and finding an evaluation worth competing on, is future research. The
 empirical headline supports the design: against the strongest distributional
 opponents available on CPU, including the heavy-tail and neural state of the art,
 the general forecaster wins the likelihood race, and where it does not lead ---
