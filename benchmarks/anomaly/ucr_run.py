@@ -65,9 +65,17 @@ def run_one(args):
     start = max(0, train_len - warmup_tail) if warmup_tail else 0
 
     from skaters import laplace, search, parade
-    from skaters.anomaly import mahalanobis
+    from skaters.anomaly import mahalanobis, zbank
 
-    if base == "search":
+    if base == "zbank":
+        # Feature bank: (memory sigma) x (clock stride) grid of engines,
+        # concatenated parade surprises, r-factor scatter. z[0] remains the
+        # finest engine's 1-step surprise, so the z1 ablation stays valid.
+        sigmas, strides = (0.03, 0.003), (1, 4, 16)
+        dim = len(sigmas) * len(strides) * k
+        f = mahalanobis(zbank(k=k, sigmas=sigmas, strides=strides),
+                        k=dim, factors=3, alpha=det_alpha)
+    elif base == "search":
         # search() self-discovers periodicity online and injects seas(p)
         # candidates -- essential on UCR's waveform-periodic series, whose
         # periods (~50-400 samples) are invisible to laplace's fixed
@@ -158,7 +166,8 @@ def main():
                     help="run only the N shortest series (0 = all 250)")
     ap.add_argument("--k", type=int, default=3)
     ap.add_argument("--workers", type=int, default=8)
-    ap.add_argument("--base", default="laplace", choices=("laplace", "search"))
+    ap.add_argument("--base", default="laplace",
+                    choices=("laplace", "search", "zbank"))
     ap.add_argument("--scale-alpha", type=float, default=0.03,
                     help="laplace residual-scale EWMA rate (memory ~1/value)")
     ap.add_argument("--det-alpha", type=float, default=0.02,
