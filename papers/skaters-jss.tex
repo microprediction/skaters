@@ -1035,12 +1035,17 @@ spikes (surprising at $m=1$, forgotten by $m=20$) from genuine breaks
 (surprising at every matured horizon at once). Because the model has already
 absorbed drift, the volatility clock, seasonality, and coordinate, what remains
 surprising is surprising relative to an adapted forecast rather than to a
-rolling window. We deliberately stop short of a benchmark claim: the empirical
-evaluation of time-series anomaly detection is notoriously fraught ---
-\citet{wu2023current} argue that the prevailing benchmark suites are flawed to
-the point of ``creating the illusion of progress,'' and \citet{kim2022rigorous}
-show that a common scoring adjustment lets even random scores appear
-state-of-the-art --- and our own preliminary experiments on the Numenta
+rolling window. We deliberately stop short of a benchmark claim, for two reasons.
+First, the definition itself is unsettled: an anomaly is only ever ``a pattern
+that does not conform to expected behaviour'' \citep{chandola2009anomaly},
+which makes the concept relative to a model of expectation and a purpose ---
+our $|z|$ is precise about \emph{whose} expectation (the adapted predictive's),
+but whether that coincides with what a benchmark's human labeller meant is
+exactly the unresolved part. Second, the empirical evaluation is notoriously
+fraught --- \citet{wu2023current} argue that the prevailing benchmark suites
+are flawed to the point of ``creating the illusion of progress,'' and
+\citet{kim2022rigorous} show that a common scoring adjustment lets even random
+scores appear state-of-the-art --- and our own preliminary experiments on the Numenta
 benchmark \citep{lavin2015nab} indicate that leaderboard position there is
 dominated by detector-layer machinery (per-stream score normalisation and
 thresholding economics) rather than by the quality of the underlying
