@@ -54,15 +54,22 @@ def load_series(path: str) -> list:
 
 
 def run_one(args):
-    fname, k = args
+    fname, k, base = args
     sid, name, train_len, a_start, a_end = parse_name(fname)
     ys = load_series(os.path.join(DATA, fname))
     n = len(ys)
 
-    from skaters import laplace
+    from skaters import laplace, search, parade
     from skaters.anomaly import mahalanobis
 
-    f = mahalanobis(laplace(k), k=k)
+    if base == "search":
+        # search() self-discovers periodicity online and injects seas(p)
+        # candidates -- essential on UCR's waveform-periodic series, whose
+        # periods (~50-400 samples) are invisible to laplace's fixed
+        # calendar grid {7,12,24}. parade-wrap to expose z for the detector.
+        f = mahalanobis(parade(search(k=k), k=k), k=k)
+    else:
+        f = mahalanobis(laplace(k), k=k)
     state = None
     # trivial baseline state: EWMA mean/var of raw y
     mz_m, mz_v, mz_n = 0.0, 0.0, 0
@@ -141,6 +148,7 @@ def main():
                     help="run only the N shortest series (0 = all 250)")
     ap.add_argument("--k", type=int, default=3)
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--base", default="laplace", choices=("laplace", "search"))
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -152,12 +160,12 @@ def main():
 
     out_path = args.out or os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        f"ucr_results_k{args.k}_n{len(files)}.jsonl")
+        f"ucr_results_{args.base}_k{args.k}_n{len(files)}.jsonl")
 
     results = []
     with Pool(args.workers) as pool:
         for i, res in enumerate(pool.imap_unordered(
-                run_one, [(f, args.k) for f in files])):
+                run_one, [(f, args.k, args.base) for f in files])):
             results.append(res)
             hits = {m: sum(r[m]["hit"] for r in results) for m in ("mah", "mahS", "z1", "zU", "mz")}
             print(f"[{i+1}/{len(files)}] {res['sid']:03d} {res['name'][:30]:30s} "
