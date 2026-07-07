@@ -54,10 +54,15 @@ def load_series(path: str) -> list:
 
 
 def run_one(args):
-    fname, k, base, scale_alpha, det_alpha = args
+    fname, k, base, scale_alpha, det_alpha, warmup_tail = args
     sid, name, train_len, a_start, a_end = parse_name(fname)
     ys = load_series(os.path.join(DATA, fname))
     n = len(ys)
+    # Skip most of the anomaly-free prefix: every estimator in the stack has
+    # effective memory <= ~1/min(alpha) ticks, so only the prefix TAIL warms
+    # state. Statistically inert (the scored region is unchanged), large
+    # compute saving on UCR's long prefixes. warmup_tail=0 => full prefix.
+    start = max(0, train_len - warmup_tail) if warmup_tail else 0
 
     from skaters import laplace, search, parade
     from skaters.anomaly import mahalanobis
@@ -90,7 +95,7 @@ def run_one(args):
             "z1": (-1.0, -1.0, -1), "zU": (-1.0, -1.0, -1),
             "mz": (-1.0, -1.0, -1)}
     t0 = time.time()
-    for t, y in enumerate(ys):
+    for t, y in enumerate(ys[start:], start=start):
         _, state = f(y, state)
         # trivial baseline (causal: score with current estimate, then update)
         mz_n += 1
@@ -158,6 +163,9 @@ def main():
                     help="laplace residual-scale EWMA rate (memory ~1/value)")
     ap.add_argument("--det-alpha", type=float, default=0.02,
                     help="detector location/scatter/null EWMA rate")
+    ap.add_argument("--warmup-tail", type=int, default=4000,
+                    help="feed only the last N points of the anomaly-free "
+                         "prefix (0 = full prefix)")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -176,7 +184,8 @@ def main():
     with Pool(args.workers) as pool:
         for i, res in enumerate(pool.imap_unordered(
                 run_one, [(f, args.k, args.base, args.scale_alpha,
-                           args.det_alpha) for f in files])):
+                           args.det_alpha, args.warmup_tail)
+                          for f in files])):
             results.append(res)
             hits = {m: sum(r[m]["hit"] for r in results) for m in ("mah", "mahS", "z1", "zU", "mz")}
             print(f"[{i+1}/{len(files)}] {res['sid']:03d} {res['name'][:30]:30s} "
