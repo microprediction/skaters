@@ -269,7 +269,15 @@ means exactly and propagate variances under the library's recursive
 independent-innovation convention --- the differenced inverse, for example, adds
 the marginal innovation variances, $\sum_{h}\sigma_h^2$, which is exact when
 future transformed innovations are conditionally uncorrelated and an
-approximation otherwise. The inner skater is unconstrained: it may
+approximation otherwise. The convention is audited rather than merely stated:
+the returned state carries per-horizon calibration diagnostics --- the
+probability integral transform of each arriving observation under the
+prediction issued $m$ steps earlier \emph{for it}, and its standard-normal
+quantile $z$ --- and the empirical standard deviation of the horizon-$m$ $z$
+sequence estimates precisely the factor by which the independent-innovation
+convention mis-states the $m$-step scale. (Even under perfect calibration the
+horizon-$m$ $z$ values are $(m{-}1)$-dependent, from overlapping forecast
+windows, so consecutive values are not independent evidence.) The inner skater is unconstrained: it may
 itself be a conjugation, or an ensemble of conjugations, so a model is
 \emph{transforms all the way down}, bottoming out at a single distributional leaf
 --- the one non-transform in the stack.
@@ -305,7 +313,14 @@ of the candidate \emph{means} (and by component pruning), so a carefully shaped
 heavy-tailed leaf inside the pool has little influence on the output tail. We therefore use the candidate models
 only as mean forecasters, weight them online by predictive likelihood
 (with a learning-rate shrinkage and a per-depth complexity penalty, in the
-spirit of gradient boosting), combine their means, and model the distribution of
+spirit of gradient boosting),\footnote{The penalty is charged per step ---
+rent, not a prior. Under geometric forgetting of the accumulated log-evidence
+(the shipped policy discounts at $\lambda=0.99$) the discounted rent
+telescopes to a bounded handicap proportional to $\text{depth}/(1-\lambda)$,
+i.e.\ an MDL-style prior on model complexity; at $\lambda=1$ it grows linearly
+and would eventually evict any deep candidate regardless of skill. The
+forgetting factor is what makes the complexity penalty a prior rather than a
+bias.} combine their means, and model the distribution of
 the combined residual with a single terminal leaf:
 \[
  y \;\to\; \hat\mu = \sum_i w_i\,\hat\mu_i, \qquad
@@ -353,6 +368,16 @@ improving on a pure-likelihood policy on CRPS and on likelihood alike: a CRPS-fi
 leaf is more outlier-robust, so it even generalises slightly better in
 log-likelihood.
 
+There is also a well-posedness asymmetry between the two objectives.
+Minimising expected log-score projects the truth onto the leaf family in
+Kullback--Leibler divergence, which for a location--scale family amounts to
+moment matching and requires a finite second moment. Minimising expected CRPS
+projects in the Cram\'er distance $\int (F-G)^2$, and $\mathrm{CRPS}(F,y)$ is
+finite whenever $F$ has a first moment \citep{gneiting2007strictly}. On
+fat-tailed streams the CRPS leaf therefore remains well-defined in regimes
+where variance matching does not --- a theoretical companion to the robustness
+observed empirically.
+
 %% -------------------------------------------------------------------------
 \section{The lattice projection} \label{sec:lattice}
 
@@ -394,7 +419,12 @@ per-series \emph{winner} against \pkg{AutoETS} agrees on $91\%$ of series
 between the extreme widths (win-rate $66\%$ vs $57\%$), and CRPS, being
 bounded, barely moves ($0.0035$ vs $0.0053$). Grid-series log-likelihood
 magnitudes should be read as qualitative; the orderings survive the bandwidth
-choice.
+choice. The convention has one further consequence, this time favourable:
+evaluating the mixture cdf at a revisited value $v$ carrying atom mass $p$
+yields, as the atom width shrinks, $F(v^-)+p/2$ --- the nonrandomised
+\emph{mid-PIT} recommended for discrete data \citep{czado2009predictive} ---
+so probability-integral-transform diagnostics remain centred on lattice series
+without any explicit discrete-data correction.
 
 %% -------------------------------------------------------------------------
 \section{Coordinate learning} \label{sec:coord}
@@ -537,7 +567,15 @@ many \proglang{FRED} families are panels (a yield curve, an index family) that a
 far from independent, we report each win-rate both \emph{raw} and
 \emph{family-weighted} (one vote per leading-letter family). Table~\ref{tab:sota}
 reports the result (the unified \code{study.py sota} run with
-\code{STUDY\_EXCLUDE\_PRICE}).
+\code{STUDY\_EXCLUDE\_PRICE}).\footnote{The tables in this paper use the default at
+submission, \code{scale\_alpha}${=}0.01$ (the terminal leaf's residual-variance
+smoothing rate). The shipped default was subsequently raised to $0.03$, which tracks
+changing volatility faster; validated out-of-sample on the continuous non-price
+universe this improves \code{laplace}'s held-out log-likelihood (${\sim}{+}0.01$ to
+${+}0.02$ nats, ${\sim}79\%$ of series) \emph{and} its CRPS (${\sim}80\%$ of series)
+uniformly, on both non-price and price series, nudging every win-rate up by roughly a
+point or two --- it strengthens the reported figures rather than altering the picture.
+Every table reproduces exactly with \code{laplace(scale\_alpha=0.01)}.}
 
 \begin{table}[t!]
 \centering
