@@ -182,21 +182,27 @@ export function search({
       entry.age += 1;
     }
 
+    // Queue current predictions, then resolve the ones that have matured.
+    // Horizon h (0-based) is (h+1)-step-ahead, so the Dist issued h+1 steps
+    // ago is the one that targeted the current y: buffer h+1 predictions
+    // before scoring. (At h=0 this is the ordinary one-step lag.)
     for (const entry of pool) {
       for (let h = 0; h < k; h++) {
         const q = entry.queues[h];
-        if (q.length) {
+        q.push(entry.dists[h]);
+        if (q.length > h + 1) {
           const pastDist = q.shift();
           if (entry.warmed) {
-            const lp = Math.max(pastDist.logpdf(y), -20.0);
+            // Bounded loss: clamp both tails so neither -inf nor a +inf
+            // (exact hit on a Dirac atom) can dominate or NaN-poison the
+            // log-weight; `!(lp >= -20)` also catches NaN.
+            let lp = pastDist.logpdf(y);
+            if (lp > 20.0) lp = 20.0;
+            else if (!(lp >= -20.0)) lp = -20.0;
             entry.log_w[h] += learningRate * lp - complexityPenalty * entry.depth;
           }
         }
       }
-    }
-
-    for (const entry of pool) {
-      for (let h = 0; h < k; h++) entry.queues[h].push(entry.dists[h]);
     }
 
     const [scores, pdState] = pdFunc(y, state.pd_state);
