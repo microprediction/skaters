@@ -51,7 +51,27 @@ def parade(base, k: int):
                 u = min(max(u, _EPS), 1.0 - _EPS)
                 pit[m - 1] = u
                 z[m - 1] = _STD_NORMAL.quantile(u)
-        dists, state["base"] = base(y, state["base"])
+        # State sanity, part two: no *finite* input can crash the tree.
+        # Double arithmetic inside the transforms dies long before the float
+        # range ends (the AR inverse raises OverflowError on a 1e300 tick;
+        # predictive moments go NaN by 1e100), so gate the observation before
+        # the tree consumes it. The window is magnitude-relative, NOT
+        # sigma-relative — after a degenerate-variance stretch (missing-data
+        # zeros, say) a legitimate value sits billions of sigmas out and must
+        # pass — and twelve orders above the current level is unreachable by
+        # data yet far below the ~1e77 jump ratio where doubles actually die.
+        # The PIT/z diagnostics above are computed on the raw y; the gate is
+        # exact identity on any stream doubles can represent comfortably.
+        y_fed = y
+        if isinstance(y_fed, (int, float)) and math.isfinite(y_fed):
+            y_fed = min(max(y_fed, -1e60), 1e60)
+            if n:
+                d1 = pend[-1][0]              # the 1-step predictive for y
+                mp, sp = d1.mean, d1.std
+                if math.isfinite(mp) and math.isfinite(sp):
+                    w = 1e12 * (1.0 + abs(mp) + sp)
+                    y_fed = min(max(y_fed, mp - w), mp + w)
+        dists, state["base"] = base(y_fed, state["base"])
         pend.append(list(dists))
         state["pit"] = pit
         state["z"] = z
