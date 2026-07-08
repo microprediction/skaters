@@ -65,10 +65,23 @@ ablation), zU (union min-p), mz (trivial EWMA z-score control).
 | defaults (sa 0.03 / da 0.02) | n=40 shortest | z1 | 0.650 |
 | slow memory (sa 0.01 / da 0.005) | n=40 shortest | **mahS** | **0.675** |
 | slow memory | n=60 shortest | mahS | 0.583 |
-| slow memory | full 250 | mahS | RUNNING (~0.41 at 158/250) |
+| defaults | full 250 | z1 | 0.276 |
+| slow memory | full 250 | mahS | 0.304 — FINAL |
 | search() engine (adaptive periods) | n=100 | z1 | 0.390 — worse; dropped |
-| zbank sigma-grid | n=60 | | RUNNING |
-| trivial control (mz) | n=60 | | 0.28-0.30 (matches its published band) |
+| zbank sigma-grid | n=60 | z1 / mahS | 0.550 / 0.533 — no lift over slow laplace |
+| trivial control (mz) | n=60 / full 250 | | 0.283 / 0.216 |
+
+FINAL full-250 read (2026-07-08): the n=60 story does not survive scale.
+By length bucket, slow-mem mahS hits 32/53 (<10k), 32/97 (10-50k), 12/100
+(>=50k); defaults z1 collapses the same way (14/100 on >=50k). The bleed is
+concentrated in the long high-frequency waveform families (ECG, gait,
+power demand), whose periods the fixed calendar grid cannot represent —
+consistent with the search() finding that periodicity discovery, not
+memory, is the missing ingredient there. Union of the two configs' best
+scorers reaches 95/250 = 0.38 (oracle ceiling on this axis: parameter
+diversity buys real coverage). Own head sits at the top of the trivial
+band, well under good classical (0.50-0.60); the UCR credibility row
+should quote the n<=50k subset (64/150 = 0.43) alongside the honest 0.304.
 
 Context bands (full 250, published): trivial 0.30-0.40; good single classical
 methods 0.50-0.60; DAMP/matrix-profile 0.65-0.75; 2021 contest ensembles
