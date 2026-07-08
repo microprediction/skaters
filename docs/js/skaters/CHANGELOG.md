@@ -5,6 +5,13 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## 0.12.1
+
+- Skater state is now pure data (picklable/serialisable for checkpoint-restore
+  deployments): the terminal ensemble's per-horizon leaf closures moved out of
+  the state dict into the wrapper, mirroring how multiscale holds its
+  sub-skaters. No numerical change (parity: 104,678 values, 53 scenarios).
+
 ## 0.12.0
 
 Better default forecaster. `laplace`'s terminal-leaf `scaleAlpha` (the residual-variance
