@@ -39,6 +39,7 @@ series, rolling refit every 200 on trailing 1000.
 | ETS (statsmodels Holt, damped) | 1.642 | 3.680 | **+2.04** | +0.79 | **30/30** |
 | AutoARIMA (statsforecast) | 1.646 | 3.719 | **+2.07** | +0.76 | **30/30** |
 | GARCH(1,1) (arch) | 1.732 | 3.703 | **+1.97** | +0.77 | **30/30** |
+| Prophet (real calendar dates) | 1.636 | 3.702 | **+2.07** | **+0.85** | **30/30** |
 | EWMA-Gauss (control head) | 2.243 | 3.795 | +1.55 | +0.51 | 29/30 |
 | *laplace alone (reference)* | | *3.674* | | | |
 
@@ -47,9 +48,11 @@ Bijection prediction verified: fronted opponents converge to laplace + eps
 extracted ~98% of the structure ARIMA can model). The control head on z
 reproduces laplace's own score, confirming the Jacobian accounting.
 
-Pending: 5-opponent rerun including Prophet (real calendar dates — structure
-laplace's integer-lag seasonal block cannot represent; single-series smoke:
-raw 2.105 -> fronted 2.546).
+Prophet is the sharpest row: its calendar machinery (weekday/yearly from
+real dates — structure laplace's integer-lag seasonal block cannot
+represent) earns the largest median lift when fronted, yet adds only
++0.03 nats over laplace alone: even the calendar model finds almost
+nothing left in the residuals. FINAL: five opponents, 149/150 wins.
 
 ## 3. Own head on UCR (argmax, their home turf)
 
@@ -94,8 +97,8 @@ crisis windows. Keep argmax row for reference.
 
 ## 5. Still to come
 
-- Prophet column (running); slow-alpha full-250 (running); zbank-60 and
-  default-250 (running, detached).
+- slow-alpha full-250 (running); zbank-60 and default-250 (running,
+  detached).
 - FRED v2 with rank-percentile scoring.
 - The calibration panel — empirical false-alarm rate vs nominal alpha,
   prequential protocol, detection delay; the verified literature gap
