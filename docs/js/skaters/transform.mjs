@@ -329,18 +329,35 @@ export function seasonalDifference(period = 12) {
   function inverseK(dists, state) {
     const buf = state.buffer.slice();
     const recoveredMeans = [];
+    const recoveredVars = [];
     const result = [];
     for (let h = 0; h < dists.length; h++) {
       const lagIdx = h - period;
-      let anchor;
+      let anchorMean, anchorVar;
       if (lagIdx < 0) {
+        // Observed buffer value: deterministic, only shifts the location.
         const bufIdx = buf.length - period + h;
-        anchor = bufIdx >= 0 && bufIdx < buf.length ? buf[bufIdx] : 0.0;
+        anchorMean = bufIdx >= 0 && bufIdx < buf.length ? buf[bufIdx] : 0.0;
+        anchorVar = 0.0;
       } else {
-        anchor = recoveredMeans[lagIdx];
+        // Value recovered earlier in this call: it carries its own variance,
+        // which must be added along the seasonal integration chain (mirrors the
+        // difference / grouped_ar inverses). Dropping it understates uncertainty
+        // at every horizon h >= period.
+        anchorMean = recoveredMeans[lagIdx];
+        anchorVar = recoveredVars[lagIdx];
       }
-      recoveredMeans.push(dists[h].mean + anchor);
-      result.push(dists[h].shift(anchor));
+      recoveredMeans.push(dists[h].mean + anchorMean);
+      recoveredVars.push(dists[h].var + anchorVar);
+      if (anchorVar > 0.0) {
+        // Convolve the mixture with N(0, anchorVar): shift means, inflate stds.
+        const comps = dists[h].components.map(
+          ([w, m, s]) => [w, m + anchorMean, Math.sqrt(s * s + anchorVar)]
+        );
+        result.push(new Dist(comps));
+      } else {
+        result.push(dists[h].shift(anchorMean));
+      }
     }
     return result;
   }

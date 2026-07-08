@@ -91,7 +91,15 @@ def terminal_leaf_ensemble(
         for i in range(n):
             q = state["qdist"][i]
             if q:
-                lp = max(q.popleft().logpdf(y), -20.0)
+                # Bounded loss (mixability): clamp to a finite band so neither a
+                # -inf (y far from every component) nor a +inf (an exact hit on a
+                # Dirac atom, e.g. the sticky lattice path) can dominate or
+                # NaN-poison log_w. The `not (lp >= -20.0)` arm also catches NaN.
+                lp = q.popleft().logpdf(y)
+                if lp > 20.0:
+                    lp = 20.0
+                elif not (lp >= -20.0):
+                    lp = -20.0
                 state["log_w"][i] = (forget * state["log_w"][i]
                                      + learning_rate * lp - complexity_penalty * depths[i])
             q.append(all_dists[i][0])

@@ -153,6 +153,34 @@ def test_multihorizon():
     assert all(math.isfinite(v.mean) for v in x)
 
 
+def test_horizon_alignment():
+    """Each horizon's error must be scored against the forecast that actually
+    targeted the current point: the (h+1)-step forecast issued h+1 steps ago.
+
+    A model that is *perfect at every horizon* on a deterministic ramp must
+    therefore accumulate ~zero error at every horizon. Before the fix the queue
+    resolved at lag 1 for all horizons, so horizon h>0 saw a constant error of
+    -h and its precision weight was wrongly penalised.
+    """
+    k = 4
+
+    def perfect(y, state):
+        t = 0 if state is None else state + 1
+        # horizon index h is (h+1)-step-ahead; on y_t = t the value at t+(h+1)
+        # is exactly t+h+1, so a perfect forecaster emits that mean now.
+        return [Dist.gaussian(t + h + 1, 1.0) for h in range(k)], t
+
+    f = precision_weighted_ensemble([perfect], k=k)
+    state = None
+    for t in range(40):
+        _, state = f(float(t), state)  # y_t = t
+
+    from skaters.runstats import running_mse_get
+    for h in range(k):
+        mse = running_mse_get(state["stats"][0][h])
+        assert mse < 1e-9, f"horizon {h} not aligned: mse={mse}"
+
+
 def test_empty_skaters_raises():
     with pytest.raises(AssertionError):
         precision_weighted_ensemble([], k=1)

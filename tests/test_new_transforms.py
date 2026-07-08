@@ -123,6 +123,29 @@ class TestSeasonalDifference:
             if i < 5:
                 assert y_p == 0.0
 
+    def test_inverse_accumulates_variance_past_period(self):
+        """For h >= period the anchor is a previously recovered forecast, so its
+        uncertainty must be added: recovered_var[h] = leaf_var + recovered_var[h-s].
+        Before the fix the inverse shifted by the anchor mean only and dropped
+        this variance, understating uncertainty at long horizons.
+        """
+        period = 2
+        fwd, inv = seasonal_difference(period=period)
+        state = None
+        for y in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]:
+            _, state = fwd(y, state)
+        # Constant unit-variance differenced predictive at every horizon.
+        k = 4
+        dists_in = [Dist.gaussian(0.0, 1.0) for _ in range(k)]
+        out = inv(dists_in, state)
+        vars_out = [d.var for d in out]
+        # h < period: buffer anchor (deterministic) -> var == leaf var == 1.
+        assert abs(vars_out[0] - 1.0) < 1e-9
+        assert abs(vars_out[1] - 1.0) < 1e-9
+        # h >= period: += recovered_var[h-period] == 1 -> var == 2.
+        assert abs(vars_out[2] - 2.0) < 1e-9
+        assert abs(vars_out[3] - 2.0) < 1e-9
+
     def test_inverse_shifts_by_lag(self):
         fwd, inv = seasonal_difference(period=4)
         state = None

@@ -9,7 +9,6 @@ All O(n_lags) per observation. No batch computation.
 """
 
 from __future__ import annotations
-import math
 
 
 # Common periods to scan

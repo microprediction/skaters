@@ -10,6 +10,27 @@ from skaters.leaf import leaf
 from skaters.dist import Dist
 
 
+def _dirac_skater(value: float, k: int):
+    """A skater that emits a zero-width (Dirac) predictive at a fixed value."""
+    def f(y, state):
+        return [Dist([(1.0, value, 0.0)]) for _ in range(k)], {}
+    f.__name__ = f"dirac({value})"
+    return f
+
+
+def test_dirac_hit_does_not_nan_poison_weights():
+    """logpdf is +inf on an exact hit of a Dirac atom (e.g. the sticky lattice
+    path). Unclamped, that +inf makes log_w +inf and the softmax exp(inf-inf)=NaN,
+    poisoning every horizon. The bounded-loss clamp must keep outputs finite.
+    """
+    k = 2
+    f = bayesian_ensemble([_dirac_skater(3.0, k), ema(alpha=0.2, k=k)], k=k)
+    state = None
+    for _ in range(30):
+        x, state = f(3.0, state)     # land exactly on the Dirac every step
+        assert all(math.isfinite(d.mean) and math.isfinite(d.std) for d in x)
+
+
 # --- Basic mechanics ---
 
 def test_returns_list_of_dist():

@@ -43,22 +43,25 @@ export function bayesianEnsemble(
       allDists.push(distsI);
     }
 
-    // Resolve pending predictions: score each model's past Dist against y.
+    // Enqueue current predictions, then resolve the ones that have matured.
+    // Horizon h (0-based) is (h+1)-step-ahead, so the Dist issued h+1 steps ago
+    // is the one that targeted the current y: buffer h+1 predictions before
+    // scoring. (At h=0 this is the ordinary one-step lag.)
     for (let i = 0; i < n; i++) {
       for (let h = 0; h < k; h++) {
         const q = state.queues[i][h];
-        if (q.length) {
+        q.push(allDists[i][h]);
+        if (q.length > h + 1) {
           const pastDist = q.shift();
+          // Bounded loss (mixability): clamp to a finite band so neither a -inf
+          // nor a +inf (exact hit on a Dirac atom) can dominate or NaN-poison
+          // log_w. The `!(lp >= -20)` arm also catches NaN.
           let lp = pastDist.logpdf(y);
-          lp = Math.max(lp, -20.0); // bounded loss (mixability)
+          if (lp > 20.0) lp = 20.0;
+          else if (!(lp >= -20.0)) lp = -20.0;
           state.log_w[i][h] += learningRate * lp - complexityPenalty * d[i];
         }
       }
-    }
-
-    // Enqueue current predictions for future scoring.
-    for (let i = 0; i < n; i++) {
-      for (let h = 0; h < k; h++) state.queues[i][h].push(allDists[i][h]);
     }
 
     // Softmax weights per horizon, then combine.

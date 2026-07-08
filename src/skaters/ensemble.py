@@ -45,15 +45,18 @@ def precision_weighted_ensemble(skaters: list, k: int = 1, floor: float = 1e-6):
             dists_i, state["sub"][i] = f(y, state["sub"][i])
             all_dists.append(dists_i)
 
-        # Resolve pending predictions (using Dist mean) and update error stats
+        # Resolve pending predictions (using Dist mean) and update error stats.
+        # Horizon h (0-based) is (h+1)-step-ahead, so the mean issued h+1 steps
+        # ago is the one that targeted the current y: buffer h+1 predictions,
+        # then resolve. (At h=0 this is the ordinary one-step lag.)
         for i in range(n):
             for h in range(k):
                 q = state["queues"][i][h]
-                if q:
+                q.append(all_dists[i][h].mean)
+                if len(q) > h + 1:
                     pred_mean = q.popleft()
                     error = y - pred_mean
                     state["stats"][i][h] = running_var_update(state["stats"][i][h], error)
-                state["queues"][i][h].append(all_dists[i][h].mean)
 
         # Compute precision weights from MSE, then combine Dists per horizon
         combined = []

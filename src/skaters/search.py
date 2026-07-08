@@ -259,9 +259,6 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int,
     if transforms is None:
         transforms = TRANSFORMS
 
-    # Build cost lookup
-    cost_lookup = {name: cost for name, _, cost in transforms}
-
     scored = [(sum(e["log_w"]) / k, i, e) for i, e in enumerate(pool)]
     scored.sort(reverse=True)
 

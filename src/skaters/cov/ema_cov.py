@@ -4,7 +4,6 @@ Recent observations count more. Adapts to non-stationarity.
 """
 
 from __future__ import annotations
-import math
 
 
 def ema_cov(y: list[float], state: dict | None, alpha: float = 0.05) -> tuple[list[float], list[float], dict]:
