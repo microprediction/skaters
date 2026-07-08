@@ -61,13 +61,18 @@ def terminal_leaf_ensemble(
     depths = depths if depths is not None else [0] * n
     prior = prior_log_weights if prior_log_weights is not None else [0.0] * n
 
+    # One terminal leaf per horizon. These are closures, so they live HERE, in
+    # the wrapper — never in the state dict. Skater state must stay pure data
+    # (picklable for checkpoint/restore); functions are reconstructed with the
+    # wrapper, exactly as multiscale keeps its sub-skaters outside state.
+    tleafs = [leaf_fn(k=1) for _ in range(k)]
+
     def _skater(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
             state = {
                 "sub": [None] * n,
                 "qdist": [deque() for _ in range(n)],          # h=1 Dist queue for weighting
                 "log_w": [prior[i] for i in range(n)],
-                "tleaf": [leaf_fn(k=1) for _ in range(k)],      # one terminal leaf per horizon
                 "leaf_state": [None] * k,
                 "leaf_pred": [None] * k,
                 "mean_q": [deque() for _ in range(k)],          # pending combined means per horizon
@@ -113,7 +118,7 @@ def terminal_leaf_ensemble(
             mq = state["mean_q"][h]
             if len(mq) >= h + 1:
                 r = y - mq.popleft()
-                ld, state["leaf_state"][h] = state["tleaf"][h](r, state["leaf_state"][h])
+                ld, state["leaf_state"][h] = tleafs[h](r, state["leaf_state"][h])
                 state["leaf_pred"][h] = ld[0]
 
             if state["leaf_pred"][h] is not None:
