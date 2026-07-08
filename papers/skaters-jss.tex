@@ -733,6 +733,23 @@ can repoint the leaf (Section~\ref{sec:ablations}); a practitioner who cares abo
 the density --- for risk, sizing, or combination --- should prefer the
 log-likelihood column.
 
+\paragraph{Coverage.}
+Proper scores reward calibration only implicitly; we also measured it directly.
+On $1{,}000$ continuous non-price series (same rolling protocol), the empirical
+coverage of each method's \emph{nominal central $90\%$} interval over the
+$300$ held-out points: \code{laplace} covers a median $89.3\%$ (mean $88.4\%$)
+and is within $\pm2$ points of nominal on $65\%$ of series --- its aggregate
+PIT histogram is nearly flat (bin shares $0.046$--$0.059$ against an ideal
+$0.050$). The baselines are systematically overdispersed: \pkg{AutoARIMA},
+\pkg{AutoETS}, and \pkg{GARCH}-$t$ deliver $93.7$--$95.0\%$ median coverage
+from their $90\%$ bands and land within $\pm2$ points on only $12$--$17\%$ of
+series. An interval that quietly covers $95\%$ is not conservative comfort; it
+is a miscalibrated risk limit. Calibration is also what makes the
+probability-integral-transform diagnostics that \pkg{skaters} exposes in its
+state (\code{state["pit"]}, \code{state["z"]}) usable as an anomaly monitor:
+the thresholds mean what they say
+(harness: \code{benchmarks/coverage\_study.py}).
+
 \paragraph{Conformal prediction, specifically.}
 The conformal opponents deserve a separate word; two kinds appear here. Conformal
 seasonal pools (CSP) sample a seasonal residual pool and KDE-smooth it into a
@@ -1042,7 +1059,36 @@ lattice projection is active} --- neither of which is a prior over the trunk. Th
 granularity mixture of Section~\ref{sec:granularity} is the same argument applied
 to the sampling clock: which time scale a forecaster commits to is one more
 implicit prior, and the multi-step results show it too is better weighted online
-than chosen. The
+than chosen.
+
+\paragraph{Anomaly detection as future work.}
+A calibrated online density makes anomaly detection nearly a by-product. The
+state exposes, at every horizon $m \le k$, the probability integral transform
+of each arriving point under the predictive issued $m$ steps earlier
+(\code{state["pit"]}, approximately Uniform when the stream behaves) and its
+standard-normal image (\code{state["z"]}), so a threshold on $|z|$ is an alarm
+whose false-positive rate means what it says --- the coverage results above are
+precisely the license --- and the multi-horizon structure separates one-off
+spikes (surprising at $m=1$, forgotten by $m=20$) from genuine breaks
+(surprising at every matured horizon at once). Because the model has already
+absorbed drift, the volatility clock, seasonality, and coordinate, what remains
+surprising is surprising relative to an adapted forecast rather than to a
+rolling window. We deliberately stop short of a benchmark claim, for two reasons.
+First, the definition itself is unsettled: an anomaly is only ever ``a pattern
+that does not conform to expected behaviour'' \citep{chandola2009anomaly},
+which makes the concept relative to a model of expectation and a purpose ---
+our $|z|$ is precise about \emph{whose} expectation (the adapted predictive's),
+but whether that coincides with what a benchmark's human labeller meant is
+exactly the unresolved part. Second, the empirical evaluation is notoriously
+fraught --- \citet{wu2023current} argue that the prevailing benchmark suites
+are flawed to the point of ``creating the illusion of progress,'' and
+\citet{kim2022rigorous} show that a common scoring adjustment lets even random
+scores appear state-of-the-art --- and our own preliminary experiments on the Numenta
+benchmark \citep{lavin2015nab} indicate that leaderboard position there is
+dominated by detector-layer machinery (per-stream score normalisation and
+thresholding economics) rather than by the quality of the underlying
+predictive. Turning a calibrated surprise stream into a benchmark-competitive
+detector, and finding an evaluation worth competing on, is future research. The
 empirical headline supports the design: against the strongest distributional
 opponents available on CPU, including the heavy-tail and neural state of the art,
 the general forecaster wins the likelihood race, and where it does not lead ---
@@ -1075,7 +1121,11 @@ reproduces Table~\ref{tab:sota} end to end, and
 \code{study.py sota summarize} regenerates the reported win-rates from the
 committed result file. The multi-step results of Section~\ref{sec:multistep} have
 their own harness (\code{benchmarks/multistep\_study.py}) under the same
-\code{Dist} protocol.
+\code{Dist} protocol. All results in this paper were produced with the
+v0.11 defaults; from v0.12 the terminal leaf's scale-tracking rate default
+changed (\code{scale\_alpha}: $0.01 \to 0.03$, a small out-of-sample
+improvement on both metrics), so pass \code{scale\_alpha=0.01} to reproduce
+the reported numbers exactly.
 
 %% -------------------------------------------------------------------------
 \bibliographystyle{plainnat}

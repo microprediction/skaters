@@ -177,6 +177,19 @@ f = laplace(k=1)</code></pre>
       </a>
     </div>
 
+    <h2>A bijection, not just a forecaster</h2>
+    <p><code>laplace</code>'s calibration state maps each arriving point through its own
+      predictive cdf, <em>z<sub>t</sub></em> = &Phi;<sup>&minus;1</sup>(<em>F<sub>t</sub></em>(<em>y<sub>t</sub></em>))
+      — a causal bijection on paths (Rosenblatt, 1952) whose image is, under calibration,
+      iid N(0,1). Run <em>any</em> forecaster in those coordinates and score it back in the
+      original ones by exact change of variables: on 30 FRED series, ETS, AutoARIMA,
+      GARCH(1,1) and Prophet each gain <strong>&asymp;+2 nats/point</strong> and lose to their
+      fronted selves on <strong>30/30 series</strong> — converging to laplace plus a few
+      hundredths of a nat. <a href="./demos/rosenblatt.html">See the diagram computed live</a>,
+      or the anomaly-detection consequences at
+      <a href="https://timemachines.microprediction.org/">timemachines</a> (DSPOT 5.2&times;,
+      RRCF 1.8&times; in the same coordinates).</p>
+
     <h2 id="heritage">Heritage</h2>
     <p>
       <code>skaters</code> is a from-scratch rewrite that distils ideas from

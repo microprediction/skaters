@@ -72,7 +72,7 @@ Represent parametric Student-t / sample / quantile outputs as a finite Gaussian
 everyone identically. Verify the representation matches the analytic density to
 ~1e-3 before trusting it.
 
-## Step 6 — Aggregate honestly
+## Step 6 — Aggregate fairly
 
 - Report **per-series win-rate** (fraction of series where the method wins), not
   family-clustered rates — clustering can inflate a number by spreading wins

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Rosenblatt bijection — skaters demo</title>
+  <meta name="description" content="laplace is a causal bijection: upstairs the raw series trends, cycles and bursts; downstairs its image is boring N(0,1) noise. Forecast where it's easy, answer where it matters — live in your browser." />
+  <link rel="stylesheet" href="../academic.css" />
+  <style>
+    .demo-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 18px 10px; margin: 24px 0; }
+    .panel-label { color: var(--muted); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; margin: 6px 0 2px; }
+    .demo-controls { display: flex; gap: 10px; align-items: center; margin: 10px 0 2px; flex-wrap: wrap; }
+    .demo-controls button { background: var(--accent); color: #fff; border: 0; border-radius: 7px; padding: 7px 14px; font-size: 15px; cursor: pointer; }
+    .demo-controls button:hover { background: var(--accent-dark); }
+    .demo-controls button.on { background: var(--accent-dark); box-shadow: inset 0 0 0 2px #fff3; }
+    .demo-controls button.secondary { background: var(--code-bg); color: var(--text); border: 1px solid var(--border); }
+    .demo-note { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+    canvas { width: 100%; display: block; }
+    .diagram { display: block; margin: 18px auto 6px; max-width: 560px; width: 100%; }
+    .diagram text { font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: var(--text); }
+    .diagram .lbl { font-size: 13px; fill: var(--muted); }
+    .diagram .node { font-weight: 600; }
+    .diagram line, .diagram path { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+    .diagram .accent { stroke: var(--accent); }
+    .diagram .hot { stroke: var(--warn); }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>The Rosenblatt bijection</h1>
+    <p class="subtitle">One diagram, computed live: <code>laplace</code> is a change of
+      coordinates, and the coordinates it changes to are <strong>boring</strong>.</p>
+
+    <p class="lead">Every tick, <code>laplace</code> maps the arriving point through its own
+      predictive cdf: <em>z<sub>t</sub></em> = &Phi;<sup>&minus;1</sup>(<em>F<sub>t</sub></em>(<em>y<sub>t</sub></em>)).
+      That map is causal and invertible — a bijection on paths (Rosenblatt, 1952). Under a
+      calibrated forecaster its image is iid N(0,1): whatever trends, cycles and volatility
+      bursts live upstairs, downstairs is white noise in a fixed band. Forecasting downstairs
+      is trivial — and the <em>inverse</em> map carries that trivial forecast back up into the
+      rich, widening, correctly-shaped band upstairs. The diagram commutes:</p>
+
+    <svg class="diagram" viewBox="0 0 560 190" role="img" aria-label="Commutative diagram: y maps to z by the forecast cdf; a trivial N(0,1) forecast in z maps back to the full predictive in y.">
+      <text class="node" x="60" y="40">y<tspan baseline-shift="sub" font-size="11">t</tspan> (raw series)</text>
+      <text class="node" x="380" y="40">z<tspan baseline-shift="sub" font-size="11">t</tspan> ~ N(0,1)</text>
+      <text class="node" x="30" y="160">predictive band in y</text>
+      <text class="node" x="360" y="160">flat band: N(0,1)</text>
+      <path class="accent" d="M 200 35 L 360 35" marker-end="url(#a)"/>
+      <text class="lbl" x="222" y="26">z = &Phi;&#8315;&#185;(F<tspan baseline-shift="sub" font-size="10">t</tspan>(y))</text>
+      <path d="M 430 55 L 430 140" marker-end="url(#a)"/>
+      <text class="lbl" x="440" y="102">forecast (trivial)</text>
+      <path class="hot" d="M 350 155 L 190 155" marker-end="url(#a)"/>
+      <text class="lbl" x="215" y="147">y&#770; = F<tspan baseline-shift="sub" font-size="10">t</tspan>&#8315;&#185;(&Phi;(z&#770;))</text>
+      <path d="M 90 55 L 90 140" marker-end="url(#a)"/>
+      <text class="lbl" x="100" y="102">forecast (hard)</text>
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#5a5a5a" stroke="none"/></marker></defs>
+    </svg>
+
+    <div class="demo-wrap">
+      <p class="panel-label">upstairs: raw series y, with laplace's band and 8-step fan</p>
+      <canvas id="ypanel" data-h="260"></canvas>
+      <p class="panel-label">downstairs: the same points through the bijection — z = &Phi;<sup>&minus;1</sup>(F<sub>t</sub>(y<sub>t</sub>))</p>
+      <canvas id="zpanel" data-h="150"></canvas>
+      <div class="demo-controls">
+        <button id="trend">Trend</button>
+        <button id="season">Seasonality</button>
+        <button id="burst" class="secondary">Volatility burst</button>
+        <button id="spike" class="secondary">Outlier</button>
+      </div>
+      <p class="demo-note">Toggle regimes upstairs and watch downstairs not care: the dots stay
+        in the same &plusmn;1.96 band, because the forecaster absorbs the structure into the map.
+        The orange fan upstairs is the <em>image</em> of the flat fan downstairs under
+        F<sub>t</sub><sup>&minus;1</sup> — one trivial forecast, correctly reshaped. This is the
+        JavaScript twin of the Python package running live, not a recording.</p>
+    </div>
+
+    <h2>Why this matters: the map does the work</h2>
+    <p>Because the bijection is exact, log-likelihoods convert between coordinate systems by an
+      exact change of variables — so any external forecaster can be run <em>downstairs</em> and
+      scored fairly <em>upstairs</em>. Measured on 30 FRED series (one-step, held out, rolling
+      refits): every opponent improves on essentially every series, and each converges to
+      laplace-plus-a-few-hundredths-of-a-nat — the map had already extracted nearly everything
+      they know how to model.</p>
+
+    <table>
+      <thead><tr><th>opponent</th><th>raw</th><th>laplace-fronted</th><th>mean lift (nats/pt)</th><th>series won</th></tr></thead>
+      <tbody>
+        <tr><td>ETS</td><td>1.64</td><td>3.68</td><td><strong>+2.04</strong></td><td><strong>30/30</strong></td></tr>
+        <tr><td>AutoARIMA</td><td>1.65</td><td>3.72</td><td><strong>+2.07</strong></td><td><strong>30/30</strong></td></tr>
+        <tr><td>GARCH(1,1)</td><td>1.73</td><td>3.70</td><td><strong>+1.97</strong></td><td><strong>30/30</strong></td></tr>
+        <tr><td>Prophet</td><td>1.64</td><td>3.70</td><td><strong>+2.07</strong></td><td><strong>30/30</strong></td></tr>
+        <tr><td><em>laplace alone</em></td><td></td><td><em>3.67</em></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <p>The same coordinates lift anomaly <em>detectors</em> even harder (DSPOT 5.2&times;,
+      RRCF 1.8&times; on the UCR archive) — that story lives at
+      <a href="https://timemachines.microprediction.org/">timemachines</a>, the decision layer
+      built on these surprise streams.</p>
+  </main>
+
+  <script type="module">
+    import { laplace } from "../js/skaters/api.mjs";
+    import { Dist } from "../js/skaters/dist.mjs";
+
+    const INK = "#1a1a1a", ACCENT = "#4a3aff", BAND = "rgba(74,58,255,0.16)",
+          HOT = "#ff8a3a", HOTBAND = "rgba(255,138,58,0.18)", BASE = "#e2e2e2",
+          MUTED = "#5a5a5a";
+    const K = 8, N = 220;
+    const stdNormal = Dist.gaussian(0, 1);
+
+    let seed = 7;
+    const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const gauss = () => {
+      const u = Math.max(rand(), 1e-12), v = rand();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    };
+
+    // regime switches
+    let trendOn = false, seasonOn = false, burstLeft = 0, pendingSpike = false;
+    let level = 0.0;
+    function nextY(t) {
+      if (trendOn) level += 0.06;
+      const vol = burstLeft > 0 ? (burstLeft--, 1.2) : 0.28;
+      let y = level + vol * gauss();
+      if (seasonOn) y += 1.1 * Math.sin(t / 9);
+      if (pendingSpike) { pendingSpike = false; y += 5.0; }
+      return y;
+    }
+
+    let f = laplace(K), state = null, t = 0, lastDists = null;
+    const ys = [], means = [], los = [], his = [], zs = [];
+
+    function step() {
+      const y = nextY(t);
+      const [dists, s] = f(y, state);
+      state = s;
+      ys.push(y);
+      zs.push(state.z && state.z[0] !== null && state.z[0] !== undefined ? state.z[0] : 0.0);
+      means.push(dists[0].mean);
+      los.push(dists[0].quantile(0.025));
+      his.push(dists[0].quantile(0.975));
+      lastDists = dists;
+      if (ys.length > N) { ys.shift(); means.shift(); los.shift(); his.shift(); zs.shift(); }
+      t += 1;
+    }
+
+    function fit(cv) {
+      const dpr = window.devicePixelRatio || 1;
+      const w = cv.clientWidth || 900, h = +cv.dataset.h;
+      const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+      if (cv.width !== bw || cv.height !== bh) {
+        cv.width = bw; cv.height = bh; cv.style.height = h + "px";
+      }
+      const ctx = cv.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return [ctx, w, h];
+    }
+
+    const PAD = 36;
+    let yLoS = null, yHiS = null;
+    // x-domain reserves room for the fan (skill: never run the fan off the edge)
+    const xOf = (W) => (i) => PAD + (W - 2 * PAD) * i / (N - 1 + K);
+
+    function drawY() {
+      const cv = document.getElementById("ypanel");
+      const [ctx, W, H] = fit(cv);
+      ctx.clearRect(0, 0, W, H);
+      const n = ys.length; if (n < 3 || !lastDists) return;
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < n; i++) { lo = Math.min(lo, ys[i], los[i]); hi = Math.max(hi, ys[i], his[i]); }
+      for (let h = 0; h < K; h++) {
+        lo = Math.min(lo, lastDists[h].quantile(0.025));
+        hi = Math.max(hi, lastDists[h].quantile(0.975));
+      }
+      const span = (hi - lo) || 1; lo -= 0.08 * span; hi += 0.08 * span;
+      if (yLoS === null) { yLoS = lo; yHiS = hi; }
+      yLoS += 0.15 * (lo - yLoS); yHiS += 0.15 * (hi - yHiS);
+      yLoS = Math.min(yLoS, lo); yHiS = Math.max(yHiS, hi);
+      lo = yLoS; hi = yHiS;
+      const x = xOf(W), yy = (v) => H - PAD + 10 - (H - 2 * PAD) * (v - lo) / (hi - lo);
+      ctx.strokeStyle = BASE; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(PAD, yy(lo)); ctx.lineTo(W - PAD, yy(lo)); ctx.stroke();
+      // history band + mean (model's present: accent)
+      ctx.fillStyle = BAND; ctx.beginPath();
+      ctx.moveTo(x(1), yy(his[0]));
+      for (let i = 1; i < n; i++) ctx.lineTo(x(i), yy(his[i - 1]));
+      for (let i = n - 1; i >= 1; i--) ctx.lineTo(x(i), yy(los[i - 1]));
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.8; ctx.beginPath();
+      ctx.moveTo(x(1), yy(means[0]));
+      for (let i = 1; i < n; i++) ctx.lineTo(x(i), yy(means[i - 1]));
+      ctx.stroke();
+      // the fan (model's future: hot accent), anchored at the last observation
+      const x0 = x(n - 1), y0 = yy(ys[n - 1]);
+      ctx.fillStyle = HOTBAND; ctx.beginPath(); ctx.moveTo(x0, y0);
+      for (let h = 0; h < K; h++) ctx.lineTo(x(n + h), yy(lastDists[h].quantile(0.975)));
+      for (let h = K - 1; h >= 0; h--) ctx.lineTo(x(n + h), yy(lastDists[h].quantile(0.025)));
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = HOT; ctx.lineWidth = 1.8; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(x0, y0);
+      for (let h = 0; h < K; h++) ctx.lineTo(x(n + h), yy(lastDists[h].mean));
+      ctx.stroke(); ctx.setLineDash([]);
+      // observations last: ink dots
+      ctx.fillStyle = INK;
+      for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x(i), yy(ys[i]), 1.7, 0, 2 * Math.PI); ctx.fill(); }
+    }
+
+    function drawZ() {
+      const cv = document.getElementById("zpanel");
+      const [ctx, W, H] = fit(cv);
+      ctx.clearRect(0, 0, W, H);
+      const n = zs.length; if (n < 3) return;
+      const lo = -4.2, hi = 4.2;
+      const x = xOf(W), yy = (v) => H - 18 - (H - 34) * (v - lo) / (hi - lo);
+      // the whole point: a STATIC band. ±1.96 forever, whatever happens upstairs.
+      ctx.fillStyle = BAND;
+      ctx.fillRect(PAD, yy(1.96), W - 2 * PAD, yy(-1.96) - yy(1.96));
+      ctx.strokeStyle = BASE; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(PAD, yy(0)); ctx.lineTo(W - PAD, yy(0)); ctx.stroke();
+      // flat fan downstairs: the trivial forecast whose image is the fan upstairs
+      const xf0 = x(n - 1);
+      ctx.fillStyle = HOTBAND;
+      ctx.fillRect(xf0, yy(1.96), x(n - 1 + K) - xf0, yy(-1.96) - yy(1.96));
+      ctx.strokeStyle = HOT; ctx.lineWidth = 1.8; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(xf0, yy(0)); ctx.lineTo(x(n - 1 + K), yy(0)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = MUTED; ctx.font = "11px sans-serif";
+      ctx.fillText("+1.96", W - PAD - 34, yy(1.96) - 4);
+      ctx.fillText("−1.96", W - PAD - 37, yy(-1.96) + 12);
+      ctx.fillStyle = INK;
+      for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x(i), yy(Math.max(lo, Math.min(hi, zs[i]))), 1.7, 0, 2 * Math.PI); ctx.fill(); }
+    }
+
+    const toggle = (id, fn) => {
+      const b = document.getElementById(id);
+      b.onclick = () => { fn(); b.classList.toggle("on"); };
+    };
+    toggle("trend", () => { trendOn = !trendOn; });
+    toggle("season", () => { seasonOn = !seasonOn; });
+    document.getElementById("burst").onclick = () => { burstLeft = 45; };
+    document.getElementById("spike").onclick = () => { pendingSpike = true; };
+
+    for (let i = 0; i < 60; i++) step();
+    setInterval(() => { step(); drawY(); drawZ(); }, 90);
+    addEventListener("resize", () => { drawY(); drawZ(); });
+  </script>
+</body>
+</html>

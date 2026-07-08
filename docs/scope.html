@@ -111,10 +111,20 @@
       <a href="/metrics.html">why skaters ranks by likelihood</a>.
     </p>
 
+    <h2>Replacing running standardization</h2>
+    <p>
+      A common first use is narrower and immediate: wherever a codebase whitens a
+      stream with a rolling z-score or a running mean and standard deviation, the
+      calibrated online transform is a drop-in that fixes the leakage, the
+      symmetric-Gaussian assumption, and the lack of calibration those approaches
+      carry. The <a href="/skills.html">standardization-review skill</a> scans for
+      that pattern and suggests the replacement.
+    </p>
+
     <h2>The short version</h2>
     <p>
       Univariate distributional forecasting is not the whole system. It is the
-      honest, autonomous, composable base of one: a full distribution for every
+      calibrated, autonomous, composable base of one: a full distribution for every
       stream, at scale, ready to be chained.
     </p>
   </main>
