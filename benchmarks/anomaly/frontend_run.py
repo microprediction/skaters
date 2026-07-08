@@ -184,25 +184,45 @@ def main():
     if args.limit:
         files = files[:args.limit]
 
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       f"frontend_results_n{len(files)}.jsonl")
+
+    # Crash safety: every result is appended and fsynced as it arrives, so a
+    # dead run loses at most the in-flight series. Rerunning with the same
+    # limit resumes: finished sids are skipped.
     keys = ["dspot_raw", "dspot_z", "rrcf_raw", "rrcf_z"]
     results = []
+    if os.path.exists(out):
+        with open(out) as fh:
+            results = [json.loads(line) for line in fh if line.strip()]
+        done = {r["sid"] for r in results}
+        files = [f for f in files if parse_name(f)[0] not in done]
+        print(f"resuming {out}: {len(results)} done, {len(files)} to go",
+              flush=True)
+    total = len(results) + len(files)
+
+    ofh = open(out, "a")
     with Pool(args.workers) as pool:
-        for i, res in enumerate(pool.imap_unordered(
-                run_one, [(f,) for f in files])):
+        for res in pool.imap_unordered(run_one, [(f,) for f in files]):
             results.append(res)
+            ofh.write(json.dumps(res) + "\n")
+            ofh.flush()
+            os.fsync(ofh.fileno())
             hits = {m: sum(r[m]["hit"] for r in results) for m in keys}
-            print(f"[{i+1}/{len(files)}] {res['sid']:03d} "
+            print(f"[{len(results)}/{total}] {res['sid']:03d} "
                   f"{res['name'][:26]:26s} {res['seconds']:6.1f}s  "
                   + "  ".join(f"{m}={'HIT' if res[m]['hit'] else '.'}"
                               for m in keys)
                   + f"   running: " + " ".join(f"{m}:{hits[m]}" for m in keys),
                   flush=True)
+    ofh.close()
 
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       f"frontend_results_n{len(results)}.jsonl")
-    with open(out, "w") as fh:
+    # atomic sorted rewrite (cosmetic; the data is already on disk)
+    tmp = out + ".tmp"
+    with open(tmp, "w") as fh:
         for r in sorted(results, key=lambda r: r["sid"]):
             fh.write(json.dumps(r) + "\n")
+    os.replace(tmp, out)
 
     n = len(results)
     print("\n=== UCR accuracy: raw vs laplace-transformed (z) ===")

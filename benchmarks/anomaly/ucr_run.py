@@ -189,15 +189,31 @@ def main():
         f"ucr_results_{args.base}_k{args.k}_sa{args.scale_alpha}"
         f"_da{args.det_alpha}_n{len(files)}.jsonl")
 
+    # Crash safety: every result is appended and fsynced as it arrives, so a
+    # dead run loses at most the in-flight series. Rerunning with the same
+    # out_path resumes: finished sids are skipped.
     results = []
+    if os.path.exists(out_path):
+        with open(out_path) as fh:
+            results = [json.loads(line) for line in fh if line.strip()]
+        done = {r["sid"] for r in results}
+        files = [f for f in files if parse_name(f)[0] not in done]
+        print(f"resuming {out_path}: {len(results)} done, {len(files)} to go",
+              flush=True)
+    total = len(results) + len(files)
+
+    out = open(out_path, "a")
     with Pool(args.workers) as pool:
-        for i, res in enumerate(pool.imap_unordered(
+        for res in pool.imap_unordered(
                 run_one, [(f, args.k, args.base, args.scale_alpha,
                            args.det_alpha, args.warmup_tail)
-                          for f in files])):
+                          for f in files]):
             results.append(res)
+            out.write(json.dumps(res) + "\n")
+            out.flush()
+            os.fsync(out.fileno())
             hits = {m: sum(r[m]["hit"] for r in results) for m in ("mah", "mahS", "z1", "zU", "mz")}
-            print(f"[{i+1}/{len(files)}] {res['sid']:03d} {res['name'][:30]:30s} "
+            print(f"[{len(results)}/{total}] {res['sid']:03d} {res['name'][:30]:30s} "
                   f"n={res['n']:7d} {res['seconds']:6.1f}s  "
                   f"mah={'HIT ' if res['mah']['hit'] else 'miss'} "
                   f"mahS={'HIT ' if res['mahS']['hit'] else 'miss'} "
@@ -206,11 +222,15 @@ def main():
                   f"mz={'HIT ' if res['mz']['hit'] else 'miss'}  "
                   f"running: mah {hits['mah']} mahS {hits['mahS']} "
                   f"z1 {hits['z1']} zU {hits['zU']} mz {hits['mz']} "
-                  f"of {i+1}", flush=True)
+                  f"of {len(results)}", flush=True)
+    out.close()
 
-    with open(out_path, "w") as fh:
+    # atomic sorted rewrite (cosmetic; the data is already on disk)
+    tmp = out_path + ".tmp"
+    with open(tmp, "w") as fh:
         for r in sorted(results, key=lambda r: r["sid"]):
             fh.write(json.dumps(r) + "\n")
+    os.replace(tmp, out_path)
 
     n = len(results)
     print("\n=== UCR accuracy ===")
