@@ -103,7 +103,7 @@ schedules change; re-check before believing this paragraph.)
   mean won't pull — believe them. Cointegration that broke is a trend you're
   fading.
 - **Size from the quantiles, not the mean**: `d.quantile(0.05)` on your P&L
-  payoff is the honest stop-sizing number; mixtures carry the fat tails that
+  payoff is the right stop-sizing number; mixtures carry the fat tails that
   Gaussian half-life math throws away.
 - **Costs are part of the hypothesis.** A mean-reversion signal that dies when
   you subtract `c` was never a signal; it was a market-making fee you proposed

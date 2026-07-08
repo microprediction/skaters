@@ -54,4 +54,4 @@ Quantiles/samples? Reconstruct a density and flag it as tail-limited. CDF-only
 - Hold the mean model constant across any wrapped comparison.
 
 If `laplace` wins, your method isn't earning its dependencies. If it loses, you
-have a real result — through one honest harness.
+have a real result — through one leak-free harness.

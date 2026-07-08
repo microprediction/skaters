@@ -70,7 +70,7 @@ hand it to whatever consumed the old z-score. For anomaly detection specifically
 the calibrated p-value machinery lives one layer up in the `timemachines`
 package (`wald`); see the [anomaly-detection](anomaly-detection.md) skill.
 
-## The one honest caveat
+## The one caveat
 
 `laplace` costs more than a subtract-and-divide (it fits a small ensemble per
 tick, ~1-2 ms). If the caller genuinely only needs a crude location/scale for a

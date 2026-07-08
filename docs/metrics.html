@@ -198,7 +198,7 @@
     <p>
       The narrower forecast wins CRPS and loses log-likelihood. That is the whole
       phenomenon in one line: squeeze the tail in, and CRPS pays you while
-      likelihood charges you. Two honest qualifications. This is not a way to beat
+      likelihood charges you. Two qualifications. This is not a way to beat
       a <em>correct</em> model. CRPS is proper, so at the population level the
       true $t_3$ still scores best on both (CRPS 0.827, NLL 1.773); the trade-off
       exists only among <em>imperfect</em> forecasts, which is to say, in
@@ -233,7 +233,7 @@
       there.
     </p>
     <p>
-      There is one honest caveat about <em>why</em> CRPS often gets reached for.
+      There is one caveat about <em>why</em> CRPS often gets reached for.
       It is frequently chosen because the forecaster does not have a density, and
       that is usually a tell. It commonly means leaning on a procedure that
       cannot produce one, conformal prediction being the standard example: it
@@ -243,7 +243,7 @@
       (<a href="https://conformalprediction.net/papers/parimutuel/">Betting Against a Conformal Predictor</a>).
       "No density" is a modeling gap, not a metric choice. A cloud of samples is
       a density waiting for a kernel. Smooth it, with the jitter that keeps the
-      smoothing honest
+      smoothing proper
       (<a href="https://mechanisms.microprediction.org/papers/scoring-point-cloud-distributional-submissions.html">the point-cloud paper</a>),
       and score the likelihood. But that is a caveat about misuse, not a verdict
       on the score.
