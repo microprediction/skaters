@@ -274,7 +274,54 @@ one-step. CRPS — the default leaf objective — is untouched to within
 noise, disclosed as a tiny negative median. Downside benefit lives beyond
 the ~2% boundary; pinball at 1% or 0.5% is where to look for it.
 
-## 8. Still to come
+## 8. Post-ship panel recheck (87 series, new default, 2026-07-09)
+
+With the splice in the forecaster, the panel harness confirms the product
+claim end-to-end: **plain erfc on state["z"] is now the honest alarm rule**
+— median 1.0e-2 at nominal 1e-2 (89% of series in the 2x band), 1.3e-3 at
+1e-3 (59% in band). Two negative findings with design consequences:
+
+* **mah did NOT heal** (median 9.2e-3 at 1e-3, unchanged ~9x): the
+  Mahalanobis layer's overconfidence is its own defect — the
+  Satterthwaite empirical null / EWMA scatter machinery — not inherited
+  from the thin z tails. Its repair is a separate ticket in anomaly.py;
+  until then the multivariate geometry is for RANKING (argmax), not for
+  calibrated alarming.
+* **Do not stack gpdtail on the new laplace** (double splice): median is
+  fine but a few series blow up (thin exceedances of already-honest z fit
+  near-degenerate GPDs), dragging pooled rates above nominal. With
+  tails="gpd" (the default), threshold erfc(|z|/sqrt2) directly; the
+  gpdtail head remains useful only over gaussian-tail bodies.
+
+## 9. Price series and the downside (2026-07-09, autonomous session)
+
+Price acceptance (109 equity/fx/commodity change series): the splice
+carries over — dLL +0.0176 (107/109), z@1e-3 7.4e-3 -> 1.33e-3. The
+four-cell stack study answers "does the vol-dynamics leaf stack with the
+tail-shape fix":
+
+| cell | median LL |
+|---|---|
+| plain, gaussian tails | +3.0242 |
+| **plain, gpd tails (the default)** | **+3.0537** |
+| garch leaf, gaussian | +3.0327 |
+| garch leaf, gpd | +3.0308 |
+
+They do NOT stack: garch_gpd - garch_gauss = -0.0006, and garch_gpd loses
+to plain_gpd on 85/109 (median -0.0130). The leaf's conditional variance
+and the splice compete for the same signal (vol clustering explains much
+of what reads as tail mass), and the splice wins. The new DEFAULT is the
+best within-library configuration measured on price series — the garch
+leaf advice should be retired pending a rematch vs a true GARCH-t
+opponent (arch), which this does not replace.
+
+Downside quantiles (59 non-price series): pinball@1% is a wash (-0.10%
+median, 28/59), pinball@0.5% modestly better (+1.01%, 38/59). The
+splice's value is density height at extreme ticks (log-lik) and alarm
+calibration — tail QUANTILE location moves only slightly. Report it that
+way; do not oversell the VaR angle.
+
+## 10. Still to come
 
 - slow-alpha full-250 (running); zbank-60 and default-250 (running,
   detached).

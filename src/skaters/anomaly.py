@@ -456,6 +456,15 @@ def gpdtail(base, k: int = 1, level: float = 0.98, nexc: int = 1000,
             warmup: int = 500):
     """Wrap a parade-wrapped skater with a POT/GPD tail on the 1-step z.
 
+    NOTE (0.13.0): ``laplace`` now splices GPD tails into the predictive
+    itself (``skaters.tails``), so its ``state["z"]`` is already honest —
+    threshold ``erfc(|z|/sqrt(2))`` directly and do NOT stack this head on
+    top (a second splice fits near-degenerate GPDs to the thin exceedances
+    of already-corrected z and over-alarms on some series; measured in
+    benchmarks/anomaly/RESULTS.md section 8). This head remains useful for
+    bodies with gaussian-read tails: third-party forecasters, or
+    ``laplace(tails="gaussian")``.
+
     The FRED calibration panel (benchmarks/anomaly/RESULTS.md section 5)
     measured the failure this repairs: the parade z is honest in the bulk
     (the coverage study's 90% interval) but its Gaussian tail is too thin
