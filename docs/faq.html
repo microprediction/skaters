@@ -204,6 +204,23 @@
       The <a href="/demos/playground.html">playground demo</a> lets you
       switch regimes mid-stream and watch.
     </p>
+    <h2>Is there a multivariate version?</h2>
+    <p>
+      Not in skaters itself. One stream, one forecaster, one distribution.
+      That is the whole contract.
+    </p>
+    <p>
+      Cross-stream work happens one layer up. Each stream is reduced to its
+      forecaster's expectation and surprise. Downstream models consume those
+      instead of raw values. The first packaged version is
+      <a href="https://ice-skaters.microprediction.org">ice-skaters</a>,
+      which feeds streaming regressions in river.
+    </p>
+    <p>
+      It is highly preliminary. The benchmarks there report the losing
+      configurations next to the winning ones. Read the boundaries before
+      relying on it.
+    </p>
   </main>
 
   <footer>
