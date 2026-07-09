@@ -46,6 +46,29 @@ the periodic template structure RRCF's shingles exploit on raw data.
 The forecaster's periodicity gap is the single root cause across both
 studies — fix that and both the own head and the front-end move together.
 
+### Matrix-profile head (DAMP-style left discord) — the strong head says no
+
+`frontend_damp.py` (stumpy.stumpi left profile = DAMP scores without the
+pruning; m=100 fixed for both conditions), n = 150 shortest, 2026-07-09:
+
+| head | raw | laplace-fronted |
+|---|---|---|
+| left-discord matrix profile | **88/150 = 0.587** | 64/150 = 0.427 |
+
+Prediction confirmed: the front-end HURTS a structural similarity-search
+head. Matrix profile z-normalizes every subsequence internally (it has its
+own local normalizer) and feeds on repeated templates — z whitens exactly
+that structure. Raw DAMP at 0.587 with one fixed window also confirms the
+harness: it lands in the published good-classical band on this subset.
+
+Sweet-spot synthesis across the three heads: the front-end lifts
+DISTRIBUTIONAL heads (DSPOT: assumes stationarity, gets it, 2-5x), is a
+wash for a WEAK-STRUCTURAL head (RRCF), and hurts a STRONG-STRUCTURAL head
+(DAMP). We add value where the alarm decision needs a calibrated,
+stationarised stream — not where detection is subsequence similarity
+search. Position accordingly: the differentiator is job 2 (when to alarm),
+not job 1 (where is the anomaly).
+
 ## 2. Forecaster front-end — FINAL (FRED-30, exact change of variables)
 
 One-step log-likelihood in y-space; z-space scores mapped back through the
