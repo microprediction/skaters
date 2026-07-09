@@ -67,6 +67,61 @@
       thousands of streams, online, unattended, each returning a full
       distribution rather than a point. See <a href="/scope.html">Scope</a>.
     </p>
+    <h2>Doesn't the transform leave the hard part, the time-dependence,
+      exactly as hard? (the copula objection)</h2>
+    <p>
+      Yes, and that is the design rather than a defect. The forecaster
+      <em>is</em> the time-dependence model: the conditional law it emits each
+      tick is its running account of the serial structure, and z is what is
+      left over after that account. So the claim is never that z is
+      independent. The claim is that whatever dependence remains in z is
+      precisely the improvement still available, priced in nats by exact
+      change of variables, a measurement rather than an assumption. Run
+      ARIMA, ETS, GARCH or Prophet on the transformed stream and they add a
+      few hundredths of a nat on the series benchmarked so far (<a
+      href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">the
+      front-end results log</a>), which says the forecaster had left little
+      serial structure behind on those streams, not that none could ever
+      remain. The copula reading is exactly the architecture: margins and
+      conditional dynamics from the forecaster, any dependence a second stage
+      can still find modelled in z, with the log-likelihood accounting
+      additive across the two stages.
+    </p>
+
+    <h2>"Don't do nonlinear things with your estimates, kids." Isn't this
+      exactly that?</h2>
+    <p>
+      The rule is right, and it is a rule about points. Nothing here pushes a
+      point estimate through a nonlinearity: the object moved through every
+      transform is the whole predictive distribution, and for densities the
+      change of variables is exact, with no Jensen gap to fall into. When a
+      point is finally wanted back in the original coordinates it is computed
+      as a functional of the pulled-back distribution, the mean by
+      quadrature, never the image of a mean. We have even measured the
+      failure the rule predicts when this is shortcut: a plug-in point pushed
+      back through a contaminated forecaster misbehaves exactly as the old
+      advice warns, and the results log reports that pathology in its own
+      footnote rather than hiding it.
+    </p>
+
+    <h2>Online methods struggle to adjust parameters without a restart. How
+      is that handled?</h2>
+    <p>
+      By never having a fit-then-freeze stage to restart. Every estimator in
+      the tree is recursive with forgetting: exponentially weighted scales,
+      recursive least squares with a forgetting factor, and a
+      likelihood-weighted ensemble that reweights its candidate models on
+      every tick, so a regime change demotes candidates instead of forcing a
+      refit, and windup guards reset degenerate estimators locally. The cost
+      of adaptation is monitored rather than hidden: the prediction parade
+      computes prequential calibration diagnostics each tick, so parameter
+      lag shows up as measurable miscalibration, and memory speed is an
+      exposed knob rather than a buried constant. After a genuine structural
+      break the forecaster does pay a re-adaptation cost, measured in the
+      benchmarks, and that is the price the whole design accepts for running
+      unattended at scale. State purity keeps the escape hatch cheap: any
+      body can be checkpointed, forked, or restarted from its state dict.
+    </p>
   </main>
 
   <footer>
