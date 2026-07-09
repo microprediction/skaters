@@ -70,65 +70,70 @@
     <h2>Doesn't the transform leave the hard part, the time-dependence,
       exactly as hard? (the copula objection)</h2>
     <p>
-      Yes, and that is the design rather than a defect. The forecaster
-      <em>is</em> the time-dependence model: the conditional law it emits each
-      tick is its running account of the serial structure, and z is what is
-      left over after that account. So the claim is never that z is
-      independent. The claim is that whatever dependence remains in z is
-      precisely the improvement still available, priced in nats by exact
-      change of variables, a measurement rather than an assumption. Run
-      ARIMA, ETS, GARCH or Prophet on the transformed stream and they add a
-      few hundredths of a nat on the series benchmarked so far (<a
-      href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">the
-      front-end results log</a>), which says the forecaster had left little
-      serial structure behind on those streams, not that none could ever
-      remain. The copula reading is exactly the architecture: margins and
-      conditional dynamics from the forecaster, any dependence a second stage
-      can still find modelled in z, with the log-likelihood accounting
-      additive across the two stages. Watch the division of labour live in
-      the <a href="/demos/rosenblatt.html">Rosenblatt demo</a>, or read the
-      twenty lines that do the bookkeeping in
-      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/parade.py">parade.py</a>.
+      Yes. That is the design.
+    </p>
+    <p>
+      The forecaster is the time-dependence model. Its conditional law each
+      tick is its account of the serial structure. z is the leftover.
+    </p>
+    <p>
+      The claim is not that z is independent. The claim is that any
+      dependence left in z equals the improvement still available. Change of
+      variables makes the accounting exact, in nats.
+    </p>
+    <p>
+      This is measured, not assumed. ARIMA, ETS, GARCH and Prophet were run
+      on transformed streams. They added a few hundredths of a nat
+      (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
+      log</a>). On those series the forecaster had left little behind.
+    </p>
+    <p>
+      The copula reading is the architecture. Margins and dynamics come from
+      the forecaster. Any remaining dependence goes to a second stage in z.
+      Log-likelihood adds across the stages. Watch it in the
+      <a href="/demos/rosenblatt.html">Rosenblatt demo</a>, or read
+      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/parade.py">parade.py</a>;
+      the bookkeeping is about twenty lines.
     </p>
 
     <h2>"A nonlinear transform of an optimal estimate is usually not the
       optimal estimate of the nonlinear transform." Isn't this exactly
       that mistake?</h2>
     <p>
-      The rule is E[g(X)] &ne; g(E[X]), and it bites whenever a point summary
-      is pushed through a nonlinearity. Three exact facts put this machinery
-      inside the rule's own exception rather than in its blast radius.
-      First, distributions transform exactly where expectations do not: if Y
-      has conditional law F, then F(Y) is uniform and the pullback of any
-      density on z is exactly a density on y. Change of variables is an
-      isomorphism of measures, so there is no Jensen gap in the transform
-      itself; the only estimated object is F, same as in any model. Second,
-      and this is the direct answer: the rule's stated exception is maximum
-      likelihood, because likelihood is invariant under smooth invertible
-      reparametrisation, and that exception is used here as the design
-      principle. The whole apparatus is scored by log-likelihood, and the
+      The rule is E[g(X)] &ne; g(E[X]). It bites when a point is pushed
+      through a nonlinearity.
+    </p>
+    <p>
+      Distributions do not have this problem. If Y has law F then F(Y) is
+      uniform. The pullback of a density is exactly a density. There is no
+      Jensen gap in the map itself. The only estimated object is F, as in
+      any model.
+    </p>
+    <p>
+      The stated exception to the rule is maximum likelihood. Likelihood is
+      invariant under smooth invertible maps. That exception is the design
+      principle here. Everything is scored by log-likelihood, and the
       identity log p(y) = log f&#770;(y) + log q(z) &minus; log &phi;(z)
-      holds pathwise for the actual estimated f&#770;, however wrong it is.
-      Estimation error in F therefore never becomes a silent bias inside a
-      nonlinearity; it appears as its own explicit, measured term, the
-      prequential miscalibration the parade tracks every tick. Third, when a
-      point is finally wanted back in the original coordinates, it is
-      computed as the expectation of the pulled-back distribution by
-      quadrature, which is the optimal estimate <em>of</em> the transform,
-      not the transform of an optimal estimate: the rule applied, not
-      violated. The codebase in fact contains both the obedient and the
-      disobedient version of the rule: the obedient
-      <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/regression_frontend.py">quadrature
-      map-back</a> (the quantile-trick mean of the pulled-back
-      distribution), and a deliberately disobedient
-      <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/river_data_frontend.py">plug-in
-      point</a> pushed through the inverse map, and the disobedient one lost,
-      measurably, exactly as the old advice predicts; the
+      holds for the actual estimated f&#770;. Estimation error in F cannot
+      hide inside the nonlinearity. It shows up as measured miscalibration
+      in the parade.
+    </p>
+    <p>
+      When a point is needed it is the mean of the pulled-back distribution,
+      computed by quadrature. That is the optimal estimate of the transform.
+    </p>
+    <p>
+      The codebase contains both versions of the rule. The obedient one uses
+      <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/regression_frontend.py">quadrature</a>.
+      The disobedient one plugs a point through the
+      <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/river_data_frontend.py">inverse
+      map</a>. The disobedient one lost. The
       <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
-      log</a> reports that pathology in its own footnote. Move the slider
-      below to watch the rule at work: a standard normal z pulled back
-      through an increasingly skewed inverse cdf, with the transform of the
-      mean staying put while the mean of the transform walks away.
+      log</a> reports it in a footnote.
+    </p>
+    <p>
+      Move the slider. The transform of the mean stays at 1. The mean of the
+      transform does not.
     </p>
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin:10px 0 22px;">
       <div style="font-size:0.9em;color:var(--muted);margin-bottom:6px;">
@@ -174,25 +179,30 @@
     <h2>Online methods struggle to adjust parameters without a restart. How
       is that handled?</h2>
     <p>
-      By never having a fit-then-freeze stage to restart. Every estimator in
-      the tree is recursive with forgetting: exponentially weighted scales,
-      recursive least squares with a forgetting factor, and a
-      likelihood-weighted ensemble that reweights its candidate models on
-      every tick, so a regime change demotes candidates instead of forcing a
-      refit, and windup guards reset degenerate estimators locally. The cost
-      of adaptation is monitored rather than hidden: the prediction parade
-      computes prequential calibration diagnostics each tick, so parameter
-      lag shows up as measurable miscalibration, and memory speed is an
-      exposed knob rather than a buried constant. After a genuine structural
-      break the forecaster does pay a re-adaptation cost, measured in the
-      benchmarks, and that is the price the whole design accepts for running
-      unattended at scale. State purity keeps the escape hatch cheap: any
-      body can be checkpointed, forked, or restarted from its state dict.
-      The recursion is inspectable: the ensemble reweighting lives in
-      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/terminal.py">terminal.py</a>,
-      and the <a href="/demos/playground.html">playground demo</a> lets you
-      switch data regimes mid-stream and watch the adaptation, calibration
-      included, in the browser.
+      There is no fit-then-freeze stage. So there is nothing to restart.
+    </p>
+    <p>
+      Every estimator is recursive with forgetting. Scales are exponentially
+      weighted. The regressions are recursive least squares with a
+      forgetting factor. The ensemble reweights its candidate models every
+      tick. A regime change demotes candidates instead of forcing a refit.
+      Windup guards reset degenerate estimators locally.
+    </p>
+    <p>
+      Adaptation is monitored, not hidden. The parade computes prequential
+      calibration each tick. Parameter lag shows up as miscalibration.
+      Memory speed is a knob, not a buried constant.
+    </p>
+    <p>
+      A structural break still costs something. The benchmarks measure that
+      cost. It is the price of running unattended at scale.
+    </p>
+    <p>
+      Any body can be checkpointed, forked or restarted from its state dict.
+      The reweighting is in
+      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/terminal.py">terminal.py</a>.
+      The <a href="/demos/playground.html">playground demo</a> lets you
+      switch regimes mid-stream and watch.
     </p>
   </main>
 
