@@ -44,7 +44,10 @@ from frontend_run import DSpot  # noqa: E402
 
 ALPHAS = (1e-2, 1e-3, 1e-4)
 DELAY_ALPHA = 1e-3
-METHODS = ("mah", "z1", "dspot", "mz")
+# *_z variants are the same heads fed the parade 1-step z instead of raw y:
+# the front-end question for job 2 — does the transform make THEIR alarm
+# rates honest?
+METHODS = ("mah", "z1", "dspot", "mz", "dspot_z", "mz_z")
 
 
 def run_one(args):
@@ -63,7 +66,9 @@ def run_one(args):
     f = mahalanobis(laplace(k, scale_alpha=scale_alpha), k=k, alpha=det_alpha)
     state = None
     d = DSpot(list(ys[:burn])) if burn >= 10 else None
+    d_z, zcal = None, []                 # fronted DSPOT, calibrated on burn z
     mz_m, mz_v, mz_n = 0.0, 0.0, 0
+    mzz_m, mzz_v, mzz_n = 0.0, 0.0, 0    # fronted trivial head
     MZ_ALPHA = 0.02
 
     clean = {m: {a: 0 for a in ALPHAS} for m in METHODS}
@@ -92,6 +97,24 @@ def run_one(args):
         zvec = state["base"]["z"] if isinstance(state["base"], dict) else None
         z = zvec[0] if zvec else None
         ps["z1"] = math.erfc(abs(z) / math.sqrt(2.0)) if z is not None else 1.0
+
+        # fronted heads: same detectors, parade z as the input stream
+        zv = z if z is not None else 0.0
+        if t < burn:
+            zcal.append(zv)
+        else:
+            if d_z is None and len(zcal) >= 10:
+                d_z = DSpot(zcal)
+            if d_z is not None:
+                ps["dspot_z"] = math.exp(-min(d_z.score(zv), 700.0))
+        mzz_n += 1
+        a = max(MZ_ALPHA, 1.0 / mzz_n)
+        sd = math.sqrt(mzz_v) if mzz_v > 0 else 1e-8
+        ps["mz_z"] = math.erfc((abs(zv - mzz_m) / sd) / math.sqrt(2.0)) \
+            if mzz_n > 3 else 1.0
+        dz = zv - mzz_m
+        mzz_m += a * dz
+        mzz_v = (1 - a) * mzz_v + a * dz * (zv - mzz_m)
 
         if burn <= t < train_len:                # certified-clean prefix
             clean_ticks += 1
@@ -136,7 +159,7 @@ def main():
 
     out = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        f"calibration_panel_sa{args.scale_alpha}_da{args.det_alpha}"
+        f"calibration_panel_fronted_sa{args.scale_alpha}_da{args.det_alpha}"
         f"_n{len(files)}.jsonl")
 
     # Crash safety + resume: append/fsync per series, skip finished sids.
