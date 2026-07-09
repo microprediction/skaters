@@ -207,7 +207,34 @@ method in the table that keeps its stated alarm budget. Next: censored-ML
 fit (the proper-score twin of this head — CSL scoring), lift the z-clamp
 for exceedances, UCR waveform column for the honest scope statement.
 
-## 6. Still to come
+## 6. The conditional tail fit (FINAL 2026-07-09)
+
+`tail_splice_study.py`: skater (i) = laplace defines a predictable tail
+region (parade z beyond frozen warmup-quantile thresholds); a trailing
+tail skater models the exceedances; the spliced density is scored
+prequentially against plain laplace on 370 non-price FRED series.
+Decoupling rules for propriety: region frozen and exogenous to the
+evaluee, skater (i) never tuned on downstream scores, no feedback into
+the body, score-before-update, binary exceedance term always charged.
+
+| tail | overall LL (median, wins) | per tail tick | CSL |
+|---|---|---|---|
+| GPD splice, MoM | +0.0199, 339/370 | +0.688 | +0.0199 |
+| GPD splice, censored ML | **+0.0219, 356/370** | **+0.840** | **+0.0219** |
+
+Censored ML beats MoM on 238/370 (median +0.0009 CSL) — a modest but
+consistent edge, and principled: the head is then fitted by the same
+proper score it is judged by. The headline: repairing the Gaussian z
+tail is worth ~+0.02 nats/tick on the WHOLE likelihood (96% of series
+win) and +0.84 nats per tail tick — the single largest free improvement
+measured on this branch. Implication: this belongs in the library as a
+predictive-tail option (splice at the leaf in z-space, conjugation
+carries it everywhere: density, CRPS, VaR, and honest tail PITs at the
+source — which would make erfc-on-z calibrated and gpdtail a consumer
+of an already-honest stream). Cost: the JS twin (1e-6 parity) must
+implement the splice too.
+
+## 7. Still to come
 
 - slow-alpha full-250 (running); zbank-60 and default-250 (running,
   detached).
