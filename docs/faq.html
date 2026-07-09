@@ -85,7 +85,10 @@
       remain. The copula reading is exactly the architecture: margins and
       conditional dynamics from the forecaster, any dependence a second stage
       can still find modelled in z, with the log-likelihood accounting
-      additive across the two stages.
+      additive across the two stages. Watch the division of labour live in
+      the <a href="/demos/rosenblatt.html">Rosenblatt demo</a>, or read the
+      twenty lines that do the bookkeeping in
+      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/parade.py">parade.py</a>.
     </p>
 
     <h2>"A nonlinear transform of an optimal estimate is usually not the
@@ -113,10 +116,60 @@
       computed as the expectation of the pulled-back distribution by
       quadrature, which is the optimal estimate <em>of</em> the transform,
       not the transform of an optimal estimate: the rule applied, not
-      violated. And when we deliberately broke it, plugging a point through
-      the inverse map instead, it failed exactly as the old advice predicts,
-      a pathology the results log reports in its own footnote.
+      violated. The codebase in fact contains both the obedient and the
+      disobedient version of the rule: the obedient
+      <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/regression_frontend.py">quadrature
+      map-back</a> (the quantile-trick mean of the pulled-back
+      distribution), and a deliberately disobedient
+      <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/river_data_frontend.py">plug-in
+      point</a> pushed through the inverse map, and the disobedient one lost,
+      measurably, exactly as the old advice predicts; the
+      <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
+      log</a> reports that pathology in its own footnote. Move the slider
+      below to watch the rule at work: a standard normal z pulled back
+      through an increasingly skewed inverse cdf, with the transform of the
+      mean staying put while the mean of the transform walks away.
     </p>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin:10px 0 22px;">
+      <div style="font-size:0.9em;color:var(--muted);margin-bottom:6px;">
+        y = exp(&sigma;z), z ~ N(0,1) &nbsp;&middot;&nbsp; skew &sigma;
+        <input type="range" id="jenSigma" min="10" max="150" value="80" style="vertical-align:middle;width:160px;">
+        <span id="jenLabel" style="font-variant-numeric:tabular-nums;"></span>
+      </div>
+      <svg id="jenSvg" viewBox="0 0 640 150" style="width:100%"></svg>
+    </div>
+    <script>
+    (function () {
+      const svg = document.getElementById("jenSvg");
+      const slider = document.getElementById("jenSigma");
+      const label = document.getElementById("jenLabel");
+      function draw() {
+        const s = slider.value / 100;
+        const naive = 1.0;                       // exp(sigma * E[z]) = 1
+        const truth = Math.exp(s * s / 2);       // E[exp(sigma z)]
+        const xmax = Math.max(4, truth * 1.6);
+        const X = v => 20 + 600 * v / xmax;
+        let d = "";
+        for (let i = 0; i <= 240; i++) {
+          const y = 0.02 + (xmax - 0.02) * i / 240;
+          const pdf = Math.exp(-Math.pow(Math.log(y) / s, 2) / 2)
+                      / (y * s * Math.sqrt(2 * Math.PI));
+          const py = 138 - Math.min(128, 128 * pdf * s * 1.8);
+          d += (i ? "L" : "M") + X(y).toFixed(1) + " " + py.toFixed(1);
+        }
+        svg.innerHTML =
+          '<line x1="20" y1="138" x2="620" y2="138" stroke="#ddd"/>' +
+          '<path d="' + d + '" fill="none" stroke="#9a9a9a" stroke-width="2"/>' +
+          '<line x1="' + X(naive) + '" y1="18" x2="' + X(naive) + '" y2="138" stroke="#c2410c" stroke-width="2" stroke-dasharray="5,4"/>' +
+          '<text x="' + (X(naive) + 5) + '" y="30" font-size="11" fill="#c2410c">transform of the mean = 1</text>' +
+          '<line x1="' + X(truth) + '" y1="40" x2="' + X(truth) + '" y2="138" stroke="var(--accent)" stroke-width="2"/>' +
+          '<text x="' + (X(truth) + 5) + '" y="52" font-size="11" fill="var(--accent)">mean of the transform = ' + truth.toFixed(2) + '</text>';
+        label.textContent = "= " + s.toFixed(2) + "; the gap is exp(\u03c3\u00b2/2) \u2212 1 = " + (truth - 1).toFixed(2);
+      }
+      slider.oninput = draw;
+      draw();
+    })();
+    </script>
 
     <h2>Online methods struggle to adjust parameters without a restart. How
       is that handled?</h2>
@@ -135,6 +188,11 @@
       benchmarks, and that is the price the whole design accepts for running
       unattended at scale. State purity keeps the escape hatch cheap: any
       body can be checkpointed, forked, or restarted from its state dict.
+      The recursion is inspectable: the ensemble reweighting lives in
+      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/terminal.py">terminal.py</a>,
+      and the <a href="/demos/playground.html">playground demo</a> lets you
+      switch data regimes mid-stream and watch the adaptation, calibration
+      included, in the browser.
     </p>
   </main>
 
