@@ -79,15 +79,23 @@
       and what reaches z is only what it missed.
     </p>
     <p>
-      That leftover is measured, and it is small: ARIMA, ETS, GARCH and
-      Prophet add a few hundredths of a nat on transformed streams
+      So the objection is really a claim about the forecaster, and the
+      forecaster earns it. Laplace leads the held-out likelihood race
+      against classical, neural and foundation-model baselines on the
+      non-price universe (<a href="/papers.html">the benchmarks</a>), and
+      the transformed streams show what that buys: hand z to ARIMA, ETS,
+      GARCH or Prophet and they find almost nothing left, a few hundredths
+      of a nat between them
       (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
-      log</a>), and anomaly detectors run several times better in z than on
-      raw data. What does remain as hard as before is cross-stream
-      dependence, which a univariate forecaster cannot see; that is
-      second-stage work in z, with log-likelihood adding across the stages.
-      Watch it in the <a href="/demos/rosenblatt.html">Rosenblatt demo</a>,
-      or read
+      log</a>); hand it to anomaly detectors and they run five times better
+      than on raw data. The dependence problem is not relocated, it is
+      mostly finished by the time z exists.
+    </p>
+    <p>
+      What does remain as hard as before is cross-stream dependence, which
+      a univariate forecaster cannot see; that is second-stage work in z,
+      with log-likelihood adding across the stages. Watch it in the
+      <a href="/demos/rosenblatt.html">Rosenblatt demo</a>, or read
       <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/parade.py">parade.py</a>;
       the bookkeeping is about twenty lines.
     </p>
