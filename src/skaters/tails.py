@@ -277,6 +277,14 @@ class SplicedDist:
                 "g_lo": self.g_lo, "s_lo": self.s_lo,
                 "g_up": self.g_up, "s_up": self.s_up}
 
+    @staticmethod
+    def from_dict(d: dict) -> "SplicedDist":
+        from skaters.dist import Dist                # local: avoid cycle
+        return SplicedDist(Dist.from_dict(d["body"]),
+                           d["t_lo"], d["t_up"],
+                           d["zeta_lo"], d["zeta_up"],
+                           d["g_lo"], d["s_lo"], d["g_up"], d["s_up"])
+
     def __repr__(self) -> str:
         return (f"SplicedDist(zeta=({self.zeta_lo:.4f},{self.zeta_up:.4f}), "
                 f"gamma=({self.g_lo:.3f},{self.g_up:.3f}), body={self.body!r})")
@@ -286,12 +294,30 @@ class SplicedDist:
 # the wrapper
 # ---------------------------------------------------------------------------
 
+_GUARD_SF = 1e-3        # winsorize intake beyond the fitted 1-in-1000 excess
+_ADAPT_AFTER = 10       # consecutive guarded ticks => changepoint, stop capping
+
+
 def _tail_new() -> dict:
-    return {"t": None, "exc": [], "s1": 0.0, "nx": 0,
-            "g": 0.0, "s": 1.0, "since": 0}
+    return {"t": None, "exc": [], "s1": 0.0, "nx": 0, "r": 0.0,
+            "g": 0.0, "s": 1.0, "since": 0, "run": 0}
 
 
 def _tail_add(tail: dict, e: float, nexc: int) -> None:
+    # Contamination guard: a genuine anomaly cluster must not fatten the
+    # fitted tail and deafen everything after it (masking). Excesses beyond
+    # the current fit's 1-in-1000 conditional quantile are winsorised on
+    # intake — but a RUN of guarded ticks is a changepoint, not an anomaly,
+    # so after _ADAPT_AFTER consecutive caps intake resumes uncapped
+    # (mirrors the Huber-guard + escape in skaters.anomaly.mahalanobis).
+    if len(tail["exc"]) >= 20:
+        cap = _gpd_isf(_GUARD_SF, tail["g"], tail["s"])
+        if e > cap:
+            if tail["run"] < _ADAPT_AFTER:
+                e = cap
+            tail["run"] += 1                 # stays escaped while it lasts
+        else:
+            tail["run"] = 0
     tail["exc"].append(e)
     tail["s1"] += e
     tail["nx"] += 1
@@ -305,19 +331,24 @@ def _tail_add(tail: dict, e: float, nexc: int) -> None:
 
 
 def gpdtails(base, k: int, level: float = 0.98, nexc: int = 500,
-             warmup: int = 500):
+             warmup: int = 500, rate_alpha: float = 0.002):
     """Wrap a k-horizon skater so every issued predictive carries GPD tails.
 
     Per horizon: the body's own matured PIT (pushed through the standard
     normal) feeds a two-sided POT model — thresholds frozen at the ``level``
     warm-up quantiles, exceedances fitted by censored ML over the last
-    ``nexc`` per side, exceedance rate empirical. Until a horizon's warm-up
-    completes its dists pass through unchanged. Everything is strictly
-    causal: this tick's dist is spliced with estimates from prior ticks only.
+    ``nexc`` per side, exceedance rate an EWMA of the exceedance indicator
+    (``rate_alpha``; memory ~1/rate_alpha ticks — the rate forgets like
+    everything else in the library, so a regime whose tails thicken against
+    the frozen region re-calibrates within its memory rather than never).
+    Until a horizon's warm-up completes its dists pass through unchanged.
+    Everything is strictly causal: this tick's dist is spliced with
+    estimates from prior ticks only.
     """
     assert k >= 1
     assert 0.5 < level < 1.0
     assert nexc >= 50 and warmup >= 100
+    assert 0.0 < rate_alpha < 0.1
 
     def _skater(y: float, state: dict | None):
         if state is None:
@@ -350,9 +381,14 @@ def gpdtails(base, k: int, level: float = 0.98, nexc: int = 500,
                         elif x < lo["t"]:
                             _tail_add(lo, lo["t"] - x, nexc)
                     th["n"] = len(w)
+                    up["r"] = up["nx"] / len(w)   # seed the EWMA rate
+                    lo["r"] = lo["nx"] / len(w)
                     th["warm"] = []
             else:
                 th["n"] += 1
+                # the exceedance rate forgets, like everything else
+                up["r"] += rate_alpha * ((1.0 if z > up["t"] else 0.0) - up["r"])
+                lo["r"] += rate_alpha * ((1.0 if z < lo["t"] else 0.0) - lo["r"])
                 if z > up["t"]:
                     _tail_add(up, z - up["t"], nexc)
                 elif z < lo["t"]:
@@ -372,8 +408,7 @@ def gpdtails(base, k: int, level: float = 0.98, nexc: int = 500,
                 out.append(d)
                 continue
             out.append(SplicedDist(
-                d, lo["t"], up["t"],
-                lo["nx"] / th["n"], up["nx"] / th["n"],
+                d, lo["t"], up["t"], lo["r"], up["r"],
                 lo["g"], lo["s"], up["g"], up["s"]))
         return out, state
 

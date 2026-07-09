@@ -10,7 +10,7 @@
 //
 // Constants and operation order mirror tails.py for 1e-6 parity.
 
-import { erf } from "./dist.mjs";
+import { erf, Dist, registerDistDecoder } from "./dist.mjs";
 
 const EPS = 1e-12;
 const LOG_SQRT2PI = 0.5 * Math.log(2.0 * Math.PI);
@@ -211,6 +211,11 @@ export class SplicedDist {
     return t1 - 0.5 * t2;
   }
 
+  static fromDict(d) {
+    return new SplicedDist(Dist.fromDict(d.body), d.t_lo, d.t_up,
+                           d.zeta_lo, d.zeta_up, d.g_lo, d.s_lo, d.g_up, d.s_up);
+  }
+
   toDict() {
     return { spliced: true, body: this.body.toDict(),
              t_lo: this.tLo, t_up: this.tUp,
@@ -220,11 +225,24 @@ export class SplicedDist {
   }
 }
 
+const GUARD_SF = 1e-3;   // winsorize intake beyond the fitted 1-in-1000 excess
+const ADAPT_AFTER = 10;  // consecutive guarded ticks => changepoint, stop capping
+
 function tailNew() {
-  return { t: null, exc: [], s1: 0.0, nx: 0, g: 0.0, s: 1.0, since: 0 };
+  return { t: null, exc: [], s1: 0.0, nx: 0, r: 0.0, g: 0.0, s: 1.0, since: 0, run: 0 };
 }
 
 function tailAdd(tail, e, nexc) {
+  // Contamination guard with changepoint escape (mirrors tails.py).
+  if (tail.exc.length >= 20) {
+    const cap = gpdIsf(GUARD_SF, tail.g, tail.s);
+    if (e > cap) {
+      if (tail.run < ADAPT_AFTER) e = cap;
+      tail.run += 1;                 // stays escaped while it lasts
+    } else {
+      tail.run = 0;
+    }
+  }
   tail.exc.push(e);
   tail.s1 += e;
   tail.nx += 1;
@@ -238,7 +256,7 @@ function tailAdd(tail, e, nexc) {
   }
 }
 
-export function gpdtails(base, k, level = 0.98, nexc = 500, warmup = 500) {
+export function gpdtails(base, k, level = 0.98, nexc = 500, warmup = 500, rateAlpha = 0.002) {
   // Wrap a k-horizon skater so every issued predictive carries GPD tails.
   return function skater(y, state) {
     if (state === null || state === undefined) {
@@ -268,10 +286,15 @@ export function gpdtails(base, k, level = 0.98, nexc = 500, warmup = 500) {
             else if (x < lo.t) tailAdd(lo, lo.t - x, nexc);
           }
           th.n = w.length;
+          up.r = up.nx / w.length;   // seed the EWMA rate
+          lo.r = lo.nx / w.length;
           th.warm = [];
         }
       } else {
         th.n += 1;
+        // the exceedance rate forgets, like everything else
+        up.r += rateAlpha * ((z > up.t ? 1.0 : 0.0) - up.r);
+        lo.r += rateAlpha * ((z < lo.t ? 1.0 : 0.0) - lo.r);
         if (z > up.t) tailAdd(up, z - up.t, nexc);
         else if (z < lo.t) tailAdd(lo, lo.t - z, nexc);
       }
@@ -291,9 +314,11 @@ export function gpdtails(base, k, level = 0.98, nexc = 500, warmup = 500) {
         out.push(d);
         continue;
       }
-      out.push(new SplicedDist(d, lo.t, up.t, lo.nx / th.n, up.nx / th.n,
+      out.push(new SplicedDist(d, lo.t, up.t, lo.r, up.r,
                                lo.g, lo.s, up.g, up.s));
     }
     return [out, state];
   };
 }
+
+registerDistDecoder("spliced", (d) => SplicedDist.fromDict(d));

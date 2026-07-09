@@ -250,6 +250,30 @@ improves its deep-tail honesty on waveforms too (1e-3: 4.6e-3 raw ->
 drowns in false alarms on the periodic families — waveforms remain out of
 scope (section 3; skaters#91).
 
+### Hardening + full acceptance (same day)
+
+Three review gaps fixed: the exceedance rate now FORGETS (EWMA of the
+exceedance indicator, rate_alpha=0.002 — cumulative zeta would never
+re-calibrate after a regime shift against the frozen thresholds, and the
+adapting rate is also what makes frozen thresholds safe); intake is
+winsorised at the fitted 1-in-1000 excess with a changepoint escape after
+10 consecutive caps (the DSPOT masking failure, not inherited); and
+SplicedDist round-trips through Dist.from_dict in both languages
+(checkpoint-restore). Acceptance v2, 59 non-price FRED series, new vs
+tails="gaussian":
+
+|  | k=1 | k=3 (horizon 3) |
+|---|---|---|
+| dLL median | +0.0293 (58/59) | +0.0271 (58/59) |
+| z@1e-3 | 9.4e-3 -> 1.7e-3 | 9.0e-3 -> 1.4e-3 |
+| CRPS | wash (median -7e-6, ~0.07%) | |
+| pinball@5% | wash (5% is interior; splice starts ~2%) | |
+
+The multi-step story holds: the splice fixes horizon-3 tails as well as
+one-step. CRPS — the default leaf objective — is untouched to within
+noise, disclosed as a tiny negative median. Downside benefit lives beyond
+the ~2% boundary; pinball at 1% or 0.5% is where to look for it.
+
 ## 8. Still to come
 
 - slow-alpha full-250 (running); zbank-60 and default-250 (running,

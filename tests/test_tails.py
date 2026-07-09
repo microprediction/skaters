@@ -98,3 +98,43 @@ def test_state_is_pure_data():
     tails = state["tails"]
     json.dumps(tails)          # tail state must be JSON-serializable
     assert tails[0]["up"]["t"] is not None
+
+
+def test_exceedance_rate_forgets():
+    """The rate is an EWMA: when a regime shift doubles the tail rate against
+    the frozen thresholds, zeta re-estimates within ~1/rate_alpha ticks."""
+    rng = random.Random(21)
+    f = gpdtails(lambda y, s: ([Dist.gaussian(0.0, 1.0)], s), k=1,
+                 rate_alpha=0.005)
+    state = None
+    for _ in range(2000):                      # N(0,1): ~2% per tail
+        _, state = f(rng.gauss(0, 1), state)
+    r_before = state["tails"][0]["up"]["r"]
+    for _ in range(2000):                      # scale x2: ~13% beyond old t
+        _, state = f(rng.gauss(0, 2), state)
+    r_after = state["tails"][0]["up"]["r"]
+    assert r_after > 3.0 * r_before            # rate followed the regime
+
+
+def test_contamination_guard_winsorises_but_escapes_changepoints():
+    from skaters.tails import _tail_new, _tail_add, _gpd_isf
+    # a fitted tail, then one monster excess: intake is capped
+    t = _tail_new()
+    rng = random.Random(4)
+    for _ in range(200):
+        _tail_add(t, rng.expovariate(2.0), 500)
+    cap = _gpd_isf(1e-3, t["g"], t["s"])
+    _tail_add(t, 50.0 * cap, 500)
+    assert t["exc"][-1] <= cap + 1e-9          # winsorised
+    # ...but a RUN of monsters is a changepoint: capping stops
+    for _ in range(12):
+        _tail_add(t, 50.0 * cap, 500)
+    assert t["exc"][-1] > cap                  # escape engaged
+
+
+def test_spliced_dist_serialization_roundtrip():
+    d = _spliced_example()
+    d2 = Dist.from_dict(d.to_dict())
+    for x in (-4.0, -2.5, 0.3, 2.5, 4.0):
+        assert abs(d.cdf(x) - d2.cdf(x)) < 1e-12
+        assert abs(d.logpdf(x) - d2.logpdf(x)) < 1e-12
