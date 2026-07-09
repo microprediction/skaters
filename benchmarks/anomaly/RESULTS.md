@@ -26,6 +26,26 @@ Reading: DSPOT = weak normaliser + excellent GPD tail head; its stationarity
 premise starves on raw waveforms and feasts on z. The front-end gives its
 theorem the stream it assumes.
 
+### Full 250 (FINAL 2026-07-09)
+
+| detector | raw | fronted | by length (raw -> z) |
+|---|---|---|---|
+| DSPOT | 30/250 = 0.120 | **58/250 = 0.232** | <10k: 5->28; 10-50k: 15->22; >=50k: 10->8 |
+| RRCF | 61/250 = 0.244 | 59/250 = 0.236 | <10k: 15->25; 10-50k: 32->20; >=50k: 14->14 |
+
+DSPOT's lift survives scale (~2x overall, 5.6x on <10k) but decays with
+length; RRCF is a wash overall — 42 series gained, 44 lost, and the flips
+are family-structured: z loses the ECG/heartbeat families (ECG2/3/4,
+ltstdbs), gains the drift/scale-dominated ones (InternalBleeding, GP711,
+respiration, STAFFIII, air temperature). The mechanism is coherent with
+the own-head result: the front-end inherits the forecaster's competence.
+Where laplace models the stream (drift, scale, slow structure), its z
+hands any detector a cleaner exam; on high-frequency waveforms the fixed
+calendar grid can't forecast, z is noise-plus-clamp and destroys exactly
+the periodic template structure RRCF's shingles exploit on raw data.
+The forecaster's periodicity gap is the single root cause across both
+studies — fix that and both the own head and the front-end move together.
+
 ## 2. Forecaster front-end — FINAL (FRED-30, exact change of variables)
 
 One-step log-likelihood in y-space; z-space scores mapped back through the
