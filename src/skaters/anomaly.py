@@ -450,3 +450,120 @@ def zbank(k: int = 3, sigmas: tuple = (0.03, 0.003),
     _skater.__name__ = (f"zbank(k={k}, sigmas={list(sigmas)}, "
                         f"strides={list(strides)})")
     return _skater
+
+
+def gpdtail(base, k: int = 1, level: float = 0.98, nexc: int = 1000,
+            warmup: int = 500):
+    """Wrap a parade-wrapped skater with a POT/GPD tail on the 1-step z.
+
+    The FRED calibration panel (benchmarks/anomaly/RESULTS.md section 5)
+    measured the failure this repairs: the parade z is honest in the bulk
+    (the coverage study's 90% interval) but its Gaussian tail is too thin
+    beyond ~3 sigma — ``erfc`` promises 1e-3 and delivers ~8e-3. Extreme
+    value theory is the tool for exactly this: fit a generalized Pareto to
+    the exceedances of z over a high threshold and read tail probabilities
+    from the fit instead of from N(0,1). Peaks-over-threshold in the spirit
+    of SPOT (Siffer et al., KDD 2017), applied to the forecaster's surprise
+    stream rather than to raw values — the combination the panel found
+    closest to honest (dspot_z), done natively:
+
+    * no drift EWMA on z (the forecaster already centers it);
+    * consistent exceedance rate: zeta = (all exceedances seen)/(all ticks
+      scored), not a capped-buffer ratio;
+    * two tails fit separately (crashes are not rallies), two-sided p.
+
+    Method-of-moments GPD fit over a window of the last ``nexc`` exceedances
+    per tail; thresholds set once from the first ``warmup`` z values at the
+    ``level`` quantile per tail. Scoring precedes updating — a point must
+    not defend itself. Note the parade clamps |z| at ~7.03, so exceedances
+    are truncated there: p-values are meaningful down to ~1e-6, not below.
+
+    After ``dists, state = f(y, state)``:
+        state["pvalue"]  two-sided tail probability of this tick's z under
+                         the fitted GPD tails (None during warmup);
+        state["zside"]   +1/-1 which tail was exceeded, 0 if bulk.
+    """
+    assert k >= 1
+    assert 0.5 < level < 1.0
+    assert nexc >= 50 and warmup >= 100
+
+    def _fit_sf(exc_s1: float, exc_s2: float, cnt: int, e: float) -> float:
+        """GPD survival at excess e, method-of-moments fit from running sums."""
+        m = exc_s1 / cnt
+        v = exc_s2 / cnt - m * m
+        if v <= 0 or cnt < 10:                     # degenerate: exponential
+            return math.exp(-e / max(m, 1e-12))
+        gamma = 0.5 * (1.0 - m * m / v)
+        sigma = max(0.5 * m * (m * m / v + 1.0), 1e-12)
+        if abs(gamma) < 1e-9:
+            return math.exp(-e / sigma)
+        arg = 1.0 + gamma * e / sigma
+        if arg <= 0.0:                             # beyond support (gamma<0)
+            return 1e-300
+        return arg ** (-1.0 / gamma)
+
+    def _skater(y: float, state: dict | None):
+        if state is None:
+            state = {"base": None, "warm": [], "n": 0, "pvalue": None,
+                     "zside": 0,
+                     "up": {"t": None, "exc": [], "s1": 0.0, "s2": 0.0,
+                            "nx": 0},
+                     "lo": {"t": None, "exc": [], "s1": 0.0, "s2": 0.0,
+                            "nx": 0}}
+        dists, state["base"] = base(y, state["base"])
+        bs = state["base"]
+        zv = bs.get("z") if isinstance(bs, dict) else None
+        z = zv[0] if zv else None
+        if z is None:
+            state["pvalue"] = None
+            state["zside"] = 0
+            return dists, state
+
+        if state["up"]["t"] is None:               # threshold not set yet
+            state["warm"].append(z)
+            state["pvalue"] = None
+            state["zside"] = 0
+            if len(state["warm"]) >= warmup:
+                w = state["warm"]
+                idx = min(int(level * len(w)), len(w) - 1)
+                for side, xs in (("up", sorted(w)), ("lo", sorted(-x for x in w))):
+                    tail = state[side]
+                    tail["t"] = xs[idx]
+                    for x in xs[idx + 1:]:
+                        e = x - tail["t"]
+                        tail["exc"].append(e)
+                        tail["s1"] += e
+                        tail["s2"] += e * e
+                        tail["nx"] += 1
+                state["n"] = len(w)
+                state["warm"] = []
+            return dists, state
+
+        # ---- score under current fit, then update ----
+        x, side = (z, "up") if z >= 0 else (-z, "lo")
+        tail = state[side]
+        state["zside"] = 0
+        if x > tail["t"] and tail["exc"]:
+            zeta = tail["nx"] / state["n"]
+            sf = _fit_sf(tail["s1"], tail["s2"], len(tail["exc"]),
+                         x - tail["t"])
+            state["pvalue"] = min(1.0, 2.0 * zeta * sf)
+            state["zside"] = 1 if side == "up" else -1
+        else:
+            state["pvalue"] = 1.0
+
+        state["n"] += 1
+        if x > tail["t"]:
+            e = x - tail["t"]
+            tail["exc"].append(e)
+            tail["s1"] += e
+            tail["s2"] += e * e
+            tail["nx"] += 1
+            if len(tail["exc"]) > nexc:
+                old = tail["exc"].pop(0)
+                tail["s1"] -= old
+                tail["s2"] -= old * old
+        return dists, state
+
+    _skater.__name__ = f"gpdtail(level={level}, nexc={nexc})"
+    return _skater

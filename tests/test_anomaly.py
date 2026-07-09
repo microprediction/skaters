@@ -247,3 +247,33 @@ def test_k1_and_constant_stream_no_crash():
         if state["d2"] is not None:
             assert math.isfinite(state["d2"])
             assert 0.0 <= state["pvalue"] <= 1.0
+
+
+def test_gpdtail_alarm_rate_honesty():
+    """gpdtail's stated tail probabilities must come true on a well-behaved
+    stream: empirical alarm rate within a factor ~2 of nominal, where the
+    Gaussian erfc read of the same z stream runs several-fold over (the
+    FRED calibration panel failure this head repairs)."""
+    import random
+    from skaters import laplace
+    from skaters.anomaly import gpdtail
+
+    rng = random.Random(11)
+    f = gpdtail(laplace(1), k=1)
+    state = None
+    x = 0.0
+    n = alarms2 = alarms3 = 0
+    for t in range(60000):
+        vol = 1.0 + 0.5 * ((t // 10000) % 2)     # regime-switching vol
+        x = 0.6 * x + rng.gauss(0.0, vol)
+        _, state = f(x, state)
+        p = state["pvalue"]
+        if p is not None:
+            n += 1
+            if p < 1e-2:
+                alarms2 += 1
+            if p < 1e-3:
+                alarms3 += 1
+    assert n > 50000
+    assert 0.5e-2 < alarms2 / n < 2.0e-2
+    assert alarms3 / n < 3.0e-3

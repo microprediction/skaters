@@ -44,7 +44,9 @@ from benchmarks import fred_universe  # noqa: E402
 UNIVERSE = os.path.join(_HERE, "..", "data", "universe_daily.json")
 MIN_LEN = 1000
 ALPHAS = (1e-2, 1e-3, 1e-4)
-METHODS = ("mah", "z1", "dspot", "mz", "dspot_z", "mz_z")
+# zgpd: the repair from panel v1 — POT/GPD tails on the parade z
+# (skaters.anomaly.gpdtail), fed the same z stream as the other *_z heads.
+METHODS = ("mah", "z1", "zgpd", "dspot", "mz", "dspot_z", "mz_z")
 _PRICE = {"equity", "fx", "commodity"}
 
 
@@ -59,10 +61,13 @@ def run_one(args):
     t0 = time.time()
 
     from skaters import laplace
-    from skaters.anomaly import mahalanobis
+    from skaters.anomaly import mahalanobis, gpdtail
 
     f = mahalanobis(laplace(k, scale_alpha=scale_alpha), k=k, alpha=det_alpha)
     state = None
+    # gpdtail on the same z stream via a passthrough base (no second laplace)
+    g = gpdtail(lambda y, s: (None, {"z": [y]}), k=1)
+    gstate = None
     d = DSpot(list(xs[:burn]))
     d_z, zcal = None, []
     mz_m, mz_v, mz_n = 0.0, 0.0, 0
@@ -94,6 +99,9 @@ def run_one(args):
         ps["z1"] = math.erfc(abs(z) / math.sqrt(2.0)) if z is not None else 1.0
 
         zv = z if z is not None else 0.0
+        _, gstate = g(zv, gstate)
+        gp = gstate["pvalue"]
+        ps["zgpd"] = gp if gp is not None else 1.0
         if t < burn:
             zcal.append(zv)
         else:
@@ -148,7 +156,7 @@ def main():
             break
 
     out = os.path.join(
-        _HERE, f"calibration_panel_fred_sa{args.scale_alpha}"
+        _HERE, f"calibration_panel_fred_zgpd_sa{args.scale_alpha}"
         f"_da{args.det_alpha}_n{len(picked)}.jsonl")
 
     # Crash safety + resume: append/fsync per series, skip finished sids.
