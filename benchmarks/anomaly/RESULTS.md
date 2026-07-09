@@ -234,7 +234,23 @@ source — which would make erfc-on-z calibrated and gpdtail a consumer
 of an already-honest stream). Cost: the JS twin (1e-6 parity) must
 implement the splice too.
 
-## 7. Still to come
+## 7. Shipped: GPD tails default-on (0.13.0, 2026-07-09)
+
+`skaters.tails.gpdtails` now sits between the body and the parade in
+`laplace` (both languages; `tails="gaussian"` opts out). Acceptance on 85
+non-price FRED series, new default vs old, same series, prequential:
+median dLL +0.0271 nats/tick (84/85 wins); erfc-on-parade-z empirical rate
+at nominal 1e-2: 2.4e-2 -> 1.05e-2; at 1e-3: 8.4e-3 -> 1.38e-3. The z
+stream the anomaly skill documents is now approximately honest as stated.
+Parity 105,658 values across 54 scenarios incl. a splice-active scenario.
+
+UCR fronted calibration panel (full 250, for the record): fronting DSPOT
+improves its deep-tail honesty on waveforms too (1e-3: 4.6e-3 raw ->
+2.9e-3 fronted; 1e-4: 1.6e-3 -> 6.0e-4), but at 1e-3 every method still
+drowns in false alarms on the periodic families — waveforms remain out of
+scope (section 3; skaters#91).
+
+## 8. Still to come
 
 - slow-alpha full-250 (running); zbank-60 and default-250 (running,
   detached).

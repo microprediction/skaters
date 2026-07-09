@@ -30,6 +30,7 @@ from skaters.terminal import terminal_leaf_ensemble
 from skaters.multiscale import multiscale
 from skaters.parade import parade as _parade   # PIT/z calibration state
 from skaters.sticky import sticky as _project  # lattice projection (handles repeats)
+from skaters.tails import gpdtails as _gpdtails  # GPD tail splice (conditional tail fit)
 
 
 def _objective_leaf(objective: str, scale_alpha: float = 0.03):
@@ -269,7 +270,8 @@ def _laplace_single_scale(k, objective, sticky, leaf, scale_alpha):
 
 
 def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
-            scales: list[int] | None = None, scale_alpha: float = 0.03):
+            scales: list[int] | None = None, scale_alpha: float = 0.03,
+            tails: str = "gpd"):
     """The general forecaster.
 
     A likelihood-weighted Bayesian ensemble over the full candidate population
@@ -304,6 +306,16 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
             (~+0.02 nats, ~79% of series) *and* CRPS (~80% of series), on both
             non-price and price series. Pass ``scale_alpha=0.01`` to reproduce
             the earlier default. Ignored when a custom ``leaf`` is given.
+        tails: ``"gpd"`` (default) splices censored-ML generalized-Pareto
+            tails into every issued predictive — the conditional tail fit.
+            The body's own matured PIT defines a frozen tail region per
+            horizon; exceedances fit a GPD per side; the predictive keeps the
+            body's density in the interior and the GPD beyond. Worth ~+0.02
+            nats/tick of held-out log-likelihood on 96% of non-price FRED
+            series, and makes the parade z honest in the tails (a stated
+            1e-3 alarm rate approximately comes true — see
+            ``benchmarks/anomaly/RESULTS.md`` sections 5-6). ``"gaussian"``
+            disables the splice. Costs ~5% runtime.
 
     The returned state also carries calibration diagnostics, resolved online
     against the predictions previously made for each arriving point:
@@ -312,9 +324,12 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
     ``state["z"][m-1]`` the same through the standard-normal quantile (roughly
     N(0,1)); ``None`` until horizon m has matured. See :mod:`skaters.parade`.
     """
+    assert tails in ("gpd", "gaussian")
     f = multiscale(lambda kk: _laplace_single_scale(kk, objective, sticky, leaf, scale_alpha),
                    k=k, scales=scales)
-    f = _parade(f, k=k)
+    if tails == "gpd":
+        f = _gpdtails(f, k=k)     # conditional tail fit: body -> region -> tail
+    f = _parade(f, k=k)           # PIT/z read against the (spliced) predictive
     f.__name__ = f"laplace(k={k})"
     return f
 

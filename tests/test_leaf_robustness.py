@@ -20,6 +20,10 @@ PERIODIC = [0.01, -0.02, 0.0, 0.03, -0.01, 0.02, -0.03, 0.015,
 
 
 def _assert_valid(d):
+    if hasattr(d, "body"):          # GPD tail splice: check it, then the body
+        assert math.isfinite(d.logpdf(d.body.mean))
+        assert 0.0 <= d.cdf(d.body.mean) <= 1.0
+        d = d.body
     wsum = sum(w for w, _, _ in d.components)
     assert abs(wsum - 1.0) < 1e-9
     assert math.isfinite(d.mean) and math.isfinite(d.std) and d.std >= 0.0

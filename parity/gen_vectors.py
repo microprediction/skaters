@@ -98,6 +98,12 @@ def build_scenarios():
     s.append(("spec_diff_ensemble", 1, S.build(spec_conj)))
     s.append(("spec_ema", 1, S.build(S.ema_spec(0.05, 1))))
 
+    # GPD tail splice (fast warm-up so it activates within the 150-pt series)
+    from skaters.tails import gpdtails
+    s.append(("gpd_tails", 1, gpdtails(
+        conjugate(leaf(k=1), ema_transform(0.1), k=1),
+        k=1, level=0.9, nexc=50, warmup=100)))
+
     # Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
     s.append(("scale_mixture_leaf", 1, scale_mixture_leaf(k=1)))
     s.append(("crps_leaf", 1, crps_leaf(k=1)))
