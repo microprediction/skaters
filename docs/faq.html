@@ -69,51 +69,55 @@
     </p>
     <h2>Doesn't the transform leave the hard part, the time-dependence,
       exactly as hard? (the copula objection)</h2>
-    <p>Yes. That is the design.</p>
-    <p>The forecaster is the time-dependence model. z is the leftover.</p>
-    <p>The claim is not that z is independent. The claim is that any
-      dependence left in z equals the improvement still available.</p>
-    <p>Change of variables makes the accounting exact, in nats.</p>
-    <p>This is measured, not assumed. ARIMA, ETS, GARCH and Prophet add a
-      few hundredths of a nat on transformed streams
+    <p>
+      Yes, and that is the design. The forecaster is the time-dependence
+      model, z is what it leaves behind, and any dependence still in z
+      equals the improvement still available, with change of variables
+      keeping the accounting exact in nats. This is measured rather than
+      assumed: ARIMA, ETS, GARCH and Prophet add a few hundredths of a nat
+      on transformed streams
       (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
-      log</a>).</p>
-    <p>The copula reading is the architecture. Margins from the forecaster,
-      remaining dependence from a second stage in z, log-likelihood adding
-      across the two.</p>
-    <p>Watch it in the <a href="/demos/rosenblatt.html">Rosenblatt demo</a>.
-      Or read <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/parade.py">parade.py</a>;
-      the bookkeeping is about twenty lines.</p>
+      log</a>).
+    </p>
+    <p>
+      The copula reading is the architecture: margins and dynamics from the
+      forecaster, remaining dependence from a second stage in z,
+      log-likelihood adding across the two. Watch it in the
+      <a href="/demos/rosenblatt.html">Rosenblatt demo</a>, or read
+      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/parade.py">parade.py</a>;
+      the bookkeeping is about twenty lines.
+    </p>
 
     <h2>"A nonlinear transform of an optimal estimate is usually not the
       optimal estimate of the nonlinear transform." Isn't this exactly
       that mistake?</h2>
-    <p>The rule is E[g(X)] &ne; g(E[X]). It bites when a point goes through
-      a nonlinearity.</p>
-    <p>Distributions do not have this problem. If Y has law F then F(Y) is
-      uniform, and the pullback of a density is exactly a density.</p>
-    <p>There is no Jensen gap in the map itself. The only estimated object
-      is F, as in any model.</p>
-    <p>The stated exception to the rule is maximum likelihood. That
-      exception is the design principle here.</p>
-    <p>Everything is scored by log-likelihood, and
-      log p(y) = log f&#770;(y) + log q(z) &minus; log &phi;(z) holds for
-      the actual estimated f&#770;.</p>
-    <p>So estimation error in F cannot hide inside the nonlinearity. It
-      shows up as measured miscalibration in the parade.</p>
-    <p>When a point is needed it is the mean of the pulled-back
-      distribution, by quadrature. That is the optimal estimate of the
-      transform.</p>
-    <p>The codebase contains both versions of the rule:
+    <p>
+      The rule is E[g(X)] &ne; g(E[X]), and it bites when a point goes
+      through a nonlinearity. Distributions do not have this problem: if Y
+      has law F then F(Y) is uniform, the pullback of a density is exactly a
+      density, and there is no Jensen gap in the map itself. The only
+      estimated object is F, as in any model.
+    </p>
+    <p>
+      The rule's stated exception is maximum likelihood, and that exception
+      is the design principle here. Everything is scored by log-likelihood,
+      the identity log p(y) = log f&#770;(y) + log q(z) &minus; log &phi;(z)
+      holds for the actual estimated f&#770;, and estimation error in F
+      therefore shows up as measured miscalibration in the parade rather
+      than hiding inside the nonlinearity. When a point is needed it is the
+      mean of the pulled-back distribution by quadrature, the optimal
+      estimate of the transform.
+    </p>
+    <p>
+      The codebase contains both versions of the rule: the obedient
       <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/regression_frontend.py">quadrature</a>,
       and a point plugged through the
       <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/river_data_frontend.py">inverse
-      map</a>.</p>
-    <p>The plug-in lost. The
+      map</a>. The plug-in lost, and the
       <a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
-      log</a> reports it in a footnote.</p>
-    <p>Move the slider. The transform of the mean stays at 1. The mean of
-      the transform does not.</p>
+      log</a> reports it in a footnote. Move the slider below: the transform
+      of the mean stays at 1 while the mean of the transform does not.
+    </p>
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin:10px 0 22px;">
       <div style="font-size:0.9em;color:var(--muted);margin-bottom:6px;">
         y = exp(&sigma;z), z ~ N(0,1) &nbsp;&middot;&nbsp; skew &sigma;
@@ -157,34 +161,39 @@
 
     <h2>Online methods struggle to adjust parameters without a restart. How
       is that handled?</h2>
-    <p>There is no fit-then-freeze stage. So there is nothing to restart.</p>
-    <p>Every estimator is recursive with forgetting. The ensemble reweights
-      its candidates every tick.</p>
-    <p>A regime change demotes candidates instead of forcing a refit.
-      Windup guards reset degenerate estimators locally.</p>
-    <p>Adaptation is monitored, not hidden. The parade computes prequential
-      calibration each tick, so parameter lag shows up as miscalibration.</p>
-    <p>Memory speed is a knob, not a buried constant.</p>
-    <p>A structural break still costs something. The benchmarks measure
-      that cost.</p>
-    <p>Any body can be checkpointed, forked or restarted from its state
-      dict.</p>
-    <p>The reweighting is in
-      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/terminal.py">terminal.py</a>.
-      The <a href="/demos/playground.html">playground demo</a> lets you
-      switch regimes mid-stream and watch.</p>
+    <p>
+      There is no fit-then-freeze stage, so there is nothing to restart.
+      Every estimator is recursive with forgetting, the ensemble reweights
+      its candidates every tick, a regime change demotes candidates instead
+      of forcing a refit, and windup guards reset degenerate estimators
+      locally.
+    </p>
+    <p>
+      Adaptation is monitored rather than hidden: the parade computes
+      prequential calibration each tick, so parameter lag shows up as
+      miscalibration, and memory speed is a knob rather than a buried
+      constant. A structural break still costs something, and the benchmarks
+      measure that cost. Any body can be checkpointed, forked or restarted
+      from its state dict; the reweighting is in
+      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/terminal.py">terminal.py</a>,
+      and the <a href="/demos/playground.html">playground demo</a> lets you
+      switch regimes mid-stream and watch.
+    </p>
 
     <h2>Is there a multivariate version?</h2>
-    <p>Not in skaters itself. One stream, one forecaster, one
-      distribution.</p>
-    <p>Cross-stream work happens one layer up. Each stream is reduced to
-      its forecaster's expectation and surprise, and downstream models
-      consume those.</p>
-    <p>The first packaged version is
+    <p>
+      Not in skaters itself: one stream, one forecaster, one distribution.
+      Cross-stream work happens one layer up, where each stream is reduced
+      to its forecaster's expectation and surprise and downstream models
+      consume those instead of raw values.
+    </p>
+    <p>
+      The first packaged version is
       <a href="https://ice-skaters.microprediction.org">ice-skaters</a>,
-      which feeds streaming regressions in river.</p>
-    <p>It is highly preliminary. The benchmarks there report the losing
-      configurations next to the winning ones. Read the boundaries first.</p>
+      which feeds streaming regressions in river. It is highly preliminary:
+      the benchmarks there report the losing configurations next to the
+      winning ones, so read the boundaries first.
+    </p>
   </main>
 
   <footer>
