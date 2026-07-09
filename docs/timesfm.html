@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; Laplace vs TimesFM</title>
+  <meta name="description" content="A per-series comparison of the Laplace forecaster against TimesFM on 120 FRED change-series, with the protocol, the splits, and the open items." />
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+        <a href="https://www.npmjs.com/package/skaters">npm</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Laplace vs TimesFM</h1>
+    <p class="subtitle">One tiny online forecaster against a time-series
+      foundation model, series by series, with the protocol and the losing
+      rows on the table.</p>
+
+    <h2>The setup</h2>
+    <p>
+      TimesFM 2.5 (200M parameters) is run zero-shot, as intended: a fixed
+      256-length context window of preceding one-step changes, predict the
+      next change, no fitting, all windows batched into one call. Its
+      quantile output is reconstructed into the same <code>Dist</code> object
+      every method uses, and <code>laplace</code> is re-scored on the
+      identical series and windows. 120 FRED change-series, 150 test steps
+      each, scored on held-out log-likelihood and CRPS. The harness is
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/foundation_study.py">foundation_study.py</a>
+      and the raw per-series results are
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/results_foundation_tf.csv">checked
+      in</a>.
+    </p>
+
+    <h2>The headline</h2>
+    <p>
+      On the 69 continuous series, Laplace wins log-likelihood on
+      <strong>69 of 69</strong>, with a median gap of 2.26 nats per point
+      (3.02 vs 0.76), and wins CRPS on <strong>50 of 69</strong> with the
+      median CRPS ratio at 0.983. One caveat travels with the likelihood
+      number: the TimesFM density is quantile-reconstructed and
+      tail-limited, so CRPS is the fairer read for it, and Laplace wins that
+      too.
+    </p>
+    <table>
+      <thead><tr><th>split</th><th>n</th><th>LL wins (Laplace)</th><th>CRPS wins (Laplace)</th><th>median LL: Laplace / TimesFM</th></tr></thead>
+      <tbody>
+        <tr><td>continuous</td><td>69</td><td><strong>69/69</strong></td><td><strong>50/69</strong></td><td>3.02 / 0.76</td></tr>
+        <tr><td>repeat-heavy</td><td>51</td><td>21/51</td><td>19/51</td><td>10.37 / 19.80</td></tr>
+        <tr><td>all</td><td>120</td><td>90/120</td><td>69/120</td><td>3.85 / 2.32</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Where TimesFM wins, and what those series are</h2>
+    <p>
+      Every one of the largest TimesFM CRPS wins is a binary recession
+      indicator (CHNRECD, AUSRECD, BRARECD and friends) whose change series
+      is <em>constant</em> over the entire test window. The game there is to
+      predict the same value again, exactly. The TimesFM quantile head emits
+      a literal atom and scores a CRPS near machine zero; the Laplace
+      lattice projection concentrates hard but leaves smooth mass, scoring
+      near 1e-9. Both are saying &ldquo;zero again&rdquo;; one says it
+      bit-exactly. That is a real win, and it is also why the continuous
+      split is the informative one: 51 of the 120 series are dominated by
+      this repeated-value game, where the two scores differ at the ninth
+      decimal place while the ratio looks enormous.
+    </p>
+
+    <h2>Every series at once</h2>
+    <p>
+      One point per series, CRPS on both axes, log scale. Below the diagonal
+      Laplace is better: 69 of the 94 series where both scores are positive.
+      Blue points are the continuous split; gray are repeat-heavy. The 26
+      series missing here are the exact-atom cases above, where a CRPS is
+      zero to machine precision.
+    </p>
+    <div style="margin:14px 0;">
+<svg viewBox="0 0 560 420" style="max-width:560px;width:100%" role="img" aria-label="CRPS per series: TimesFM vs Laplace">
+<line x1="87" y1="374" x2="87" y2="46" stroke="#eee"/>
+<line x1="46" y1="345" x2="514" y2="345" stroke="#eee"/>
+<text x="87" y="390" font-size="10" fill="#888" text-anchor="middle">1e-5</text>
+<text x="40" y="348" font-size="10" fill="#888" text-anchor="end">1e-5</text>
+<line x1="138" y1="374" x2="138" y2="46" stroke="#eee"/>
+<line x1="46" y1="310" x2="514" y2="310" stroke="#eee"/>
+<text x="138" y="390" font-size="10" fill="#888" text-anchor="middle">1e-4</text>
+<text x="40" y="313" font-size="10" fill="#888" text-anchor="end">1e-4</text>
+<line x1="188" y1="374" x2="188" y2="46" stroke="#eee"/>
+<line x1="46" y1="275" x2="514" y2="275" stroke="#eee"/>
+<text x="188" y="390" font-size="10" fill="#888" text-anchor="middle">1e-3</text>
+<text x="40" y="278" font-size="10" fill="#888" text-anchor="end">1e-3</text>
+<line x1="238" y1="374" x2="238" y2="46" stroke="#eee"/>
+<line x1="46" y1="239" x2="514" y2="239" stroke="#eee"/>
+<text x="238" y="390" font-size="10" fill="#888" text-anchor="middle">1e-2</text>
+<text x="40" y="242" font-size="10" fill="#888" text-anchor="end">1e-2</text>
+<line x1="288" y1="374" x2="288" y2="46" stroke="#eee"/>
+<line x1="46" y1="204" x2="514" y2="204" stroke="#eee"/>
+<text x="288" y="390" font-size="10" fill="#888" text-anchor="middle">1e-1</text>
+<text x="40" y="207" font-size="10" fill="#888" text-anchor="end">1e-1</text>
+<line x1="338" y1="374" x2="338" y2="46" stroke="#eee"/>
+<line x1="46" y1="169" x2="514" y2="169" stroke="#eee"/>
+<text x="338" y="390" font-size="10" fill="#888" text-anchor="middle">1e0</text>
+<text x="40" y="172" font-size="10" fill="#888" text-anchor="end">1e0</text>
+<line x1="389" y1="374" x2="389" y2="46" stroke="#eee"/>
+<line x1="46" y1="134" x2="514" y2="134" stroke="#eee"/>
+<text x="389" y="390" font-size="10" fill="#888" text-anchor="middle">1e1</text>
+<text x="40" y="137" font-size="10" fill="#888" text-anchor="end">1e1</text>
+<line x1="439" y1="374" x2="439" y2="46" stroke="#eee"/>
+<line x1="46" y1="99" x2="514" y2="99" stroke="#eee"/>
+<text x="439" y="390" font-size="10" fill="#888" text-anchor="middle">1e2</text>
+<text x="40" y="102" font-size="10" fill="#888" text-anchor="end">1e2</text>
+<line x1="489" y1="374" x2="489" y2="46" stroke="#eee"/>
+<line x1="46" y1="64" x2="514" y2="64" stroke="#eee"/>
+<text x="489" y="390" font-size="10" fill="#888" text-anchor="middle">1e3</text>
+<text x="40" y="67" font-size="10" fill="#888" text-anchor="end">1e3</text>
+<line x1="46.0" y1="374.0" x2="514.0" y2="46.0" stroke="#bbb" stroke-dasharray="5,4"/>
+<text x="510" y="60" font-size="10" fill="#888" text-anchor="end">equal CRPS</text>
+<circle cx="240.8" cy="237.7" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>AAA10Y</title></circle>
+<circle cx="257.7" cy="225.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AAAFF</title></circle>
+<circle cx="454.8" cy="87.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB1020AAAMT</title></circle>
+<circle cx="377.8" cy="141.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB1020AAVOL</title></circle>
+<circle cx="495.1" cy="59.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB14AAAMT</title></circle>
+<circle cx="413.7" cy="116.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB14AAVOL</title></circle>
+<circle cx="456.1" cy="86.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB2140AAAMT</title></circle>
+<circle cx="384.4" cy="137.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB2140AAVOL</title></circle>
+<circle cx="452.6" cy="89.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB4180AAAMT</title></circle>
+<circle cx="379.4" cy="141.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB4180AAVOL</title></circle>
+<circle cx="494.7" cy="56.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB59AAAMT</title></circle>
+<circle cx="415.4" cy="112.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB59AAVOL</title></circle>
+<circle cx="472.5" cy="75.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>ABGT80AAAMT</title></circle>
+<circle cx="398.2" cy="127.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>ABGT80AAVOL</title></circle>
+<circle cx="236.9" cy="239.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>ABSSD678FRBCLE</title></circle>
+<circle cx="229.2" cy="245.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>BAA10Y</title></circle>
+<circle cx="256.2" cy="226.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>BAAFF</title></circle>
+<circle cx="201.3" cy="264.3" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>BBSD678FRBCLE</title></circle>
+<circle cx="251.8" cy="230.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBBCHUSD</title></circle>
+<circle cx="244.7" cy="235.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBBTCUSD</title></circle>
+<circle cx="259.7" cy="225.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBCCIND</title></circle>
+<circle cx="250.6" cy="230.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBETHUSD</title></circle>
+<circle cx="245.4" cy="234.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBLTCUSD</title></circle>
+<circle cx="207.9" cy="259.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBSD678FRBCLE</title></circle>
+<circle cx="240.2" cy="236.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CFSI</title></circle>
+<circle cx="115.2" cy="336.1" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CHLRECD</title></circle>
+<circle cx="109.8" cy="338.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CHLRECDM</title></circle>
+<circle cx="109.8" cy="338.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CHLRECDP</title></circle>
+<circle cx="239.3" cy="235.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CMBSSD678FRBCLE</title></circle>
+<circle cx="213.8" cy="256.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CMRKTSD678FRBCLE</title></circle>
+<circle cx="265.0" cy="220.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CPFF</title></circle>
+<circle cx="232.2" cy="242.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CPTBSD678FRBCLE</title></circle>
+<circle cx="228.6" cy="239.5" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CRESD678FRBCLE</title></circle>
+<circle cx="219.1" cy="252.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DAAA</title></circle>
+<circle cx="215.6" cy="255.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DBAA</title></circle>
+<circle cx="241.6" cy="237.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCD1M</title></circle>
+<circle cx="250.2" cy="232.0" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCD6M</title></circle>
+<circle cx="249.1" cy="233.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCD90</title></circle>
+<circle cx="254.4" cy="228.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCOILBRENTEU</title></circle>
+<circle cx="351.2" cy="161.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCOILWTICO</title></circle>
+<circle cx="228.3" cy="244.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPF1M</title></circle>
+<circle cx="234.8" cy="229.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPF2M</title></circle>
+<circle cx="232.4" cy="243.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPF3M</title></circle>
+<circle cx="228.1" cy="247.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPN2M</title></circle>
+<circle cx="220.3" cy="251.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPN30</title></circle>
+<circle cx="227.1" cy="245.5" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCPN3M</title></circle>
+<circle cx="256.5" cy="226.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DDFUELLA</title></circle>
+<circle cx="253.7" cy="229.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DDFUELNYH</title></circle>
+<circle cx="255.2" cy="227.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DDFUELUSGULF</title></circle>
+<circle cx="165.3" cy="293.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DED1</title></circle>
+<circle cx="208.0" cy="261.3" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DED3</title></circle>
+<circle cx="207.9" cy="260.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DED6</title></circle>
+<circle cx="216.9" cy="254.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXBZUS</title></circle>
+<circle cx="198.3" cy="267.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXCAUS</title></circle>
+<circle cx="183.1" cy="278.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXCHUS</title></circle>
+<circle cx="203.0" cy="264.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXDNUS</title></circle>
+<circle cx="157.3" cy="296.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXHKUS</title></circle>
+<circle cx="203.8" cy="263.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXINUS</title></circle>
+<circle cx="207.7" cy="260.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXJPUS</title></circle>
+<circle cx="216.3" cy="255.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXKOUS</title></circle>
+<circle cx="202.6" cy="264.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXMAUS</title></circle>
+<circle cx="211.3" cy="258.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXMXUS</title></circle>
+<circle cx="212.4" cy="257.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXNOUS</title></circle>
+<circle cx="214.6" cy="256.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSDUS</title></circle>
+<circle cx="220.6" cy="252.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSFUS</title></circle>
+<circle cx="195.3" cy="269.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSIUS</title></circle>
+<circle cx="200.3" cy="266.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSLUS</title></circle>
+<circle cx="209.4" cy="259.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSZUS</title></circle>
+<circle cx="194.8" cy="270.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXTAUS</title></circle>
+<circle cx="211.0" cy="258.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXTHUS</title></circle>
+<circle cx="212.0" cy="258.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSAL</title></circle>
+<circle cx="202.9" cy="264.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSEU</title></circle>
+<circle cx="214.0" cy="257.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSNZ</title></circle>
+<circle cx="206.1" cy="261.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSUK</title></circle>
+<circle cx="208.9" cy="259.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXVZUS</title></circle>
+<circle cx="221.9" cy="251.2" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFEDTAR</title></circle>
+<circle cx="119.6" cy="343.6" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFEDTARL</title></circle>
+<circle cx="89.4" cy="363.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFEDTARU</title></circle>
+<circle cx="129.7" cy="318.2" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFF</title></circle>
+<circle cx="251.1" cy="230.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DFII10</title></circle>
+<circle cx="249.6" cy="231.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFII20</title></circle>
+<circle cx="248.6" cy="232.1" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFII30</title></circle>
+<circle cx="254.3" cy="227.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DFII5</title></circle>
+<circle cx="253.0" cy="228.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFII7</title></circle>
+<circle cx="249.9" cy="231.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGASNYH</title></circle>
+<circle cx="253.2" cy="229.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGASUSGULF</title></circle>
+<circle cx="220.2" cy="252.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS1</title></circle>
+<circle cx="224.4" cy="249.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS10</title></circle>
+<circle cx="236.2" cy="241.2" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DGS1MO</title></circle>
+<circle cx="229.0" cy="245.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS2</title></circle>
+<circle cx="220.1" cy="252.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS20</title></circle>
+<circle cx="229.2" cy="245.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS3</title></circle>
+<circle cx="218.2" cy="253.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS30</title></circle>
+<circle cx="237.4" cy="240.5" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DGS3MO</title></circle>
+<text x="280.0" y="412" font-size="11" fill="#5a5a5a" text-anchor="middle">TimesFM CRPS (log scale)</text>
+<text x="14" y="210.0" font-size="11" fill="#5a5a5a" text-anchor="middle" transform="rotate(-90 14 210.0)">Laplace CRPS (log scale)</text>
+</svg>
+    </div>
+    <div style="font-size:0.85em;color:var(--muted);">
+      <span style="color:#4a3aff;">&#9679;</span> continuous &nbsp;
+      <span style="color:#9a9a9a;">&#9679;</span> repeat-heavy
+    </div>
+    <p>
+      The points hug the diagonal, and that is the truthful reading: on
+      CRPS the two are nearly tied, with a slight Laplace edge in the dense
+      1e-3 to 1e-2 band. The 2.26-nat median likelihood gap is where the
+      real separation lives, and a CRPS scatter deliberately cannot show
+      it: a full density can be far sharper than a quantile reconstruction
+      while their CDF distances stay close. Which score matters is a choice
+      about the downstream use; the case for likelihood is
+      <a href="/metrics.html">made separately</a>.
+    </p>
+
+    <h2>Fairness accounting</h2>
+    <p>
+      What favours Laplace here: the target is the change stream, the object
+      it was built for, while TimesFM was chiefly trained on level series;
+      and Laplace has seen each series&rsquo; full history where TimesFM
+      sees 256 points. What favours TimesFM: it carries knowledge from a
+      vast pretraining corpus that a from-scratch online method cannot have,
+      and the LL comparison is read through its reconstructed density, which
+      is why CRPS is reported with equal weight. Fine-tuning to a single
+      short series was tried for this model family and catastrophically
+      overfits (the paper&rsquo;s footnote), so zero-shot is the intended
+      comparison.
+    </p>
+
+    <h2>What has not been run</h2>
+    <p>
+      Thoroughness includes the ledger of what is missing. Point accuracy
+      (MAE of the median) has not been scored, though CRPS bounds how
+      different it can be. The level-series protocol, the TimesFM home turf,
+      has not been run on this universe. Context lengths other than 256,
+      larger TimesFM checkpoints, and per-series compute cost are unrun.
+      None of these should reverse a 69-of-69 likelihood split, and this
+      page will be updated if any of them is run and says otherwise. The
+      harness needs an environment with <code>timesfm</code> installed and a
+      FRED key; everything else is one command.
+    </p>
+
+    <h2>The context for these numbers</h2>
+    <p>
+      This is one cell of a broader study: the same protocol covers
+      Chronos-Bolt, Moirai and Lag-Llama, and Laplace beats all four on the
+      continuous split, with the native-density models closest. The rolling
+      eight-baseline study, the price caveat where GARCH-t wins, and the
+      full tables are on the <a href="/papers.html">papers page</a>; slice
+      the non-price benchmark yourself in the
+      <a href="/robustness.html">robustness explorer</a>.
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="https://github.com/microprediction/precise">precise</a>,
+    <a href="https://github.com/microprediction/allocation">allocation</a>,
+    <a href="https://github.com/microprediction/humpday">humpday</a>).
+  </footer>
+</body>
+</html>
