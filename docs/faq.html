@@ -88,20 +88,34 @@
       additive across the two stages.
     </p>
 
-    <h2>"Don't do nonlinear things with your estimates, kids." Isn't this
-      exactly that?</h2>
+    <h2>"A nonlinear transform of an optimal estimate is usually not the
+      optimal estimate of the nonlinear transform." Isn't this exactly
+      that mistake?</h2>
     <p>
-      The rule is right, and it is a rule about points. Nothing here pushes a
-      point estimate through a nonlinearity: the object moved through every
-      transform is the whole predictive distribution, and for densities the
-      change of variables is exact, with no Jensen gap to fall into. When a
-      point is finally wanted back in the original coordinates it is computed
-      as a functional of the pulled-back distribution, the mean by
-      quadrature, never the image of a mean. We have even measured the
-      failure the rule predicts when this is shortcut: a plug-in point pushed
-      back through a contaminated forecaster misbehaves exactly as the old
-      advice warns, and the results log reports that pathology in its own
-      footnote rather than hiding it.
+      The rule is E[g(X)] &ne; g(E[X]), and it bites whenever a point summary
+      is pushed through a nonlinearity. Three exact facts put this machinery
+      inside the rule's own exception rather than in its blast radius.
+      First, distributions transform exactly where expectations do not: if Y
+      has conditional law F, then F(Y) is uniform and the pullback of any
+      density on z is exactly a density on y. Change of variables is an
+      isomorphism of measures, so there is no Jensen gap in the transform
+      itself; the only estimated object is F, same as in any model. Second,
+      and this is the direct answer: the rule's stated exception is maximum
+      likelihood, because likelihood is invariant under smooth invertible
+      reparametrisation, and that exception is used here as the design
+      principle. The whole apparatus is scored by log-likelihood, and the
+      identity log p(y) = log f&#770;(y) + log q(z) &minus; log &phi;(z)
+      holds pathwise for the actual estimated f&#770;, however wrong it is.
+      Estimation error in F therefore never becomes a silent bias inside a
+      nonlinearity; it appears as its own explicit, measured term, the
+      prequential miscalibration the parade tracks every tick. Third, when a
+      point is finally wanted back in the original coordinates, it is
+      computed as the expectation of the pulled-back distribution by
+      quadrature, which is the optimal estimate <em>of</em> the transform,
+      not the transform of an optimal estimate: the rule applied, not
+      violated. And when we deliberately broke it, plugging a point through
+      the inverse map instead, it failed exactly as the old advice predicts,
+      a pathology the results log reports in its own footnote.
     </p>
 
     <h2>Online methods struggle to adjust parameters without a restart. How
