@@ -28,8 +28,8 @@
   <main>
     <h1>David v Goliath</h1>
     <p class="subtitle">Laplace vs TimesFM: one tiny online forecaster
-      against a 200-million-parameter foundation model, series by series,
-      with the protocol and the losing rows on the table.</p>
+      against Google&rsquo;s 200-million-parameter foundation model, series
+      by series, with the protocol and the losing rows on the table.</p>
 
     <h2>The setup</h2>
     <p>
@@ -65,181 +65,187 @@
       </tbody>
     </table>
 
-    <h2>Where TimesFM wins, and what those series are</h2>
+    <h2>Where TimesFM wins: predicting zeros</h2>
     <p>
-      Every one of the largest TimesFM CRPS wins is a binary recession
+      TimesFM only beats Laplace on stupid tasks, chiefly predicting zero
+      again. Every one of its largest CRPS wins is a binary recession
       indicator (CHNRECD, AUSRECD, BRARECD and friends) whose change series
-      is <em>constant</em> over the entire test window. The game there is to
-      predict the same value again, exactly. The TimesFM quantile head emits
-      a literal atom and scores a CRPS near machine zero; the Laplace
-      lattice projection concentrates hard but leaves smooth mass, scoring
-      near 1e-9. Both are saying &ldquo;zero again&rdquo;; one says it
-      bit-exactly. That is a real win, and it is also why the continuous
-      split is the informative one: 51 of the 120 series are dominated by
-      this repeated-value game, where the two scores differ at the ninth
-      decimal place while the ratio looks enormous.
+      is <em>constant</em> over the entire test window. Its quantile head
+      emits a literal atom at zero and scores near machine precision;
+      Laplace concentrates hard but leaves smooth mass and scores near
+      1e-9. Both are saying &ldquo;zero again&rdquo;; one says it
+      bit-exactly, and the ratio looks enormous while the scores differ in
+      the ninth decimal. That is 51 of the 120 series, which is why the
+      continuous split carries the verdict.
+    </p>
+    <p>
+      This will not necessarily stay true. Foundation models improve
+      quickly, larger checkpoints and native density heads exist, and the
+      comparison here reads TimesFM through a quantile reconstruction. The
+      rerun conditions are tracked in
+      <a href="https://github.com/microprediction/skaters/issues/97">skaters#97</a>,
+      and this page changes when the numbers do.
     </p>
 
     <h2>Every series at once</h2>
     <p>
-      One point per series, CRPS on both axes, log scale. Below the diagonal
-      Laplace is better: 69 of the 94 series where both scores are positive.
-      Blue points are the continuous split; gray are repeat-heavy. The 26
-      series missing here are the exact-atom cases above, where a CRPS is
-      zero to machine precision.
+      One bar per series, sorted by the per-point log-likelihood gap,
+      Laplace minus TimesFM. Above the zero line Laplace is better: 90 of
+      120 overall, and all 69 continuous series (blue). The gray bars below
+      the line are the repeated-value games above.
     </p>
     <div style="margin:14px 0;">
-<svg viewBox="0 0 560 420" style="max-width:560px;width:100%" role="img" aria-label="CRPS per series: TimesFM vs Laplace">
-<line x1="87" y1="374" x2="87" y2="46" stroke="#eee"/>
-<line x1="46" y1="345" x2="514" y2="345" stroke="#eee"/>
-<text x="87" y="390" font-size="10" fill="#888" text-anchor="middle">1e-5</text>
-<text x="40" y="348" font-size="10" fill="#888" text-anchor="end">1e-5</text>
-<line x1="138" y1="374" x2="138" y2="46" stroke="#eee"/>
-<line x1="46" y1="310" x2="514" y2="310" stroke="#eee"/>
-<text x="138" y="390" font-size="10" fill="#888" text-anchor="middle">1e-4</text>
-<text x="40" y="313" font-size="10" fill="#888" text-anchor="end">1e-4</text>
-<line x1="188" y1="374" x2="188" y2="46" stroke="#eee"/>
-<line x1="46" y1="275" x2="514" y2="275" stroke="#eee"/>
-<text x="188" y="390" font-size="10" fill="#888" text-anchor="middle">1e-3</text>
-<text x="40" y="278" font-size="10" fill="#888" text-anchor="end">1e-3</text>
-<line x1="238" y1="374" x2="238" y2="46" stroke="#eee"/>
-<line x1="46" y1="239" x2="514" y2="239" stroke="#eee"/>
-<text x="238" y="390" font-size="10" fill="#888" text-anchor="middle">1e-2</text>
-<text x="40" y="242" font-size="10" fill="#888" text-anchor="end">1e-2</text>
-<line x1="288" y1="374" x2="288" y2="46" stroke="#eee"/>
-<line x1="46" y1="204" x2="514" y2="204" stroke="#eee"/>
-<text x="288" y="390" font-size="10" fill="#888" text-anchor="middle">1e-1</text>
-<text x="40" y="207" font-size="10" fill="#888" text-anchor="end">1e-1</text>
-<line x1="338" y1="374" x2="338" y2="46" stroke="#eee"/>
-<line x1="46" y1="169" x2="514" y2="169" stroke="#eee"/>
-<text x="338" y="390" font-size="10" fill="#888" text-anchor="middle">1e0</text>
-<text x="40" y="172" font-size="10" fill="#888" text-anchor="end">1e0</text>
-<line x1="389" y1="374" x2="389" y2="46" stroke="#eee"/>
-<line x1="46" y1="134" x2="514" y2="134" stroke="#eee"/>
-<text x="389" y="390" font-size="10" fill="#888" text-anchor="middle">1e1</text>
-<text x="40" y="137" font-size="10" fill="#888" text-anchor="end">1e1</text>
-<line x1="439" y1="374" x2="439" y2="46" stroke="#eee"/>
-<line x1="46" y1="99" x2="514" y2="99" stroke="#eee"/>
-<text x="439" y="390" font-size="10" fill="#888" text-anchor="middle">1e2</text>
-<text x="40" y="102" font-size="10" fill="#888" text-anchor="end">1e2</text>
-<line x1="489" y1="374" x2="489" y2="46" stroke="#eee"/>
-<line x1="46" y1="64" x2="514" y2="64" stroke="#eee"/>
-<text x="489" y="390" font-size="10" fill="#888" text-anchor="middle">1e3</text>
-<text x="40" y="67" font-size="10" fill="#888" text-anchor="end">1e3</text>
-<line x1="46.0" y1="374.0" x2="514.0" y2="46.0" stroke="#bbb" stroke-dasharray="5,4"/>
-<text x="510" y="60" font-size="10" fill="#888" text-anchor="end">equal CRPS</text>
-<circle cx="240.8" cy="237.7" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>AAA10Y</title></circle>
-<circle cx="257.7" cy="225.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AAAFF</title></circle>
-<circle cx="454.8" cy="87.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB1020AAAMT</title></circle>
-<circle cx="377.8" cy="141.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB1020AAVOL</title></circle>
-<circle cx="495.1" cy="59.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB14AAAMT</title></circle>
-<circle cx="413.7" cy="116.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB14AAVOL</title></circle>
-<circle cx="456.1" cy="86.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB2140AAAMT</title></circle>
-<circle cx="384.4" cy="137.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB2140AAVOL</title></circle>
-<circle cx="452.6" cy="89.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB4180AAAMT</title></circle>
-<circle cx="379.4" cy="141.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB4180AAVOL</title></circle>
-<circle cx="494.7" cy="56.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB59AAAMT</title></circle>
-<circle cx="415.4" cy="112.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>AB59AAVOL</title></circle>
-<circle cx="472.5" cy="75.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>ABGT80AAAMT</title></circle>
-<circle cx="398.2" cy="127.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>ABGT80AAVOL</title></circle>
-<circle cx="236.9" cy="239.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>ABSSD678FRBCLE</title></circle>
-<circle cx="229.2" cy="245.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>BAA10Y</title></circle>
-<circle cx="256.2" cy="226.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>BAAFF</title></circle>
-<circle cx="201.3" cy="264.3" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>BBSD678FRBCLE</title></circle>
-<circle cx="251.8" cy="230.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBBCHUSD</title></circle>
-<circle cx="244.7" cy="235.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBBTCUSD</title></circle>
-<circle cx="259.7" cy="225.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBCCIND</title></circle>
-<circle cx="250.6" cy="230.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBETHUSD</title></circle>
-<circle cx="245.4" cy="234.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBLTCUSD</title></circle>
-<circle cx="207.9" cy="259.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CBSD678FRBCLE</title></circle>
-<circle cx="240.2" cy="236.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CFSI</title></circle>
-<circle cx="115.2" cy="336.1" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CHLRECD</title></circle>
-<circle cx="109.8" cy="338.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CHLRECDM</title></circle>
-<circle cx="109.8" cy="338.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CHLRECDP</title></circle>
-<circle cx="239.3" cy="235.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CMBSSD678FRBCLE</title></circle>
-<circle cx="213.8" cy="256.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CMRKTSD678FRBCLE</title></circle>
-<circle cx="265.0" cy="220.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CPFF</title></circle>
-<circle cx="232.2" cy="242.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>CPTBSD678FRBCLE</title></circle>
-<circle cx="228.6" cy="239.5" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>CRESD678FRBCLE</title></circle>
-<circle cx="219.1" cy="252.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DAAA</title></circle>
-<circle cx="215.6" cy="255.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DBAA</title></circle>
-<circle cx="241.6" cy="237.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCD1M</title></circle>
-<circle cx="250.2" cy="232.0" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCD6M</title></circle>
-<circle cx="249.1" cy="233.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCD90</title></circle>
-<circle cx="254.4" cy="228.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCOILBRENTEU</title></circle>
-<circle cx="351.2" cy="161.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCOILWTICO</title></circle>
-<circle cx="228.3" cy="244.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPF1M</title></circle>
-<circle cx="234.8" cy="229.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPF2M</title></circle>
-<circle cx="232.4" cy="243.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPF3M</title></circle>
-<circle cx="228.1" cy="247.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPN2M</title></circle>
-<circle cx="220.3" cy="251.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DCPN30</title></circle>
-<circle cx="227.1" cy="245.5" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DCPN3M</title></circle>
-<circle cx="256.5" cy="226.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DDFUELLA</title></circle>
-<circle cx="253.7" cy="229.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DDFUELNYH</title></circle>
-<circle cx="255.2" cy="227.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DDFUELUSGULF</title></circle>
-<circle cx="165.3" cy="293.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DED1</title></circle>
-<circle cx="208.0" cy="261.3" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DED3</title></circle>
-<circle cx="207.9" cy="260.9" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DED6</title></circle>
-<circle cx="216.9" cy="254.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXBZUS</title></circle>
-<circle cx="198.3" cy="267.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXCAUS</title></circle>
-<circle cx="183.1" cy="278.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXCHUS</title></circle>
-<circle cx="203.0" cy="264.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXDNUS</title></circle>
-<circle cx="157.3" cy="296.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXHKUS</title></circle>
-<circle cx="203.8" cy="263.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXINUS</title></circle>
-<circle cx="207.7" cy="260.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXJPUS</title></circle>
-<circle cx="216.3" cy="255.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXKOUS</title></circle>
-<circle cx="202.6" cy="264.4" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXMAUS</title></circle>
-<circle cx="211.3" cy="258.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXMXUS</title></circle>
-<circle cx="212.4" cy="257.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXNOUS</title></circle>
-<circle cx="214.6" cy="256.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSDUS</title></circle>
-<circle cx="220.6" cy="252.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSFUS</title></circle>
-<circle cx="195.3" cy="269.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSIUS</title></circle>
-<circle cx="200.3" cy="266.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSLUS</title></circle>
-<circle cx="209.4" cy="259.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXSZUS</title></circle>
-<circle cx="194.8" cy="270.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXTAUS</title></circle>
-<circle cx="211.0" cy="258.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXTHUS</title></circle>
-<circle cx="212.0" cy="258.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSAL</title></circle>
-<circle cx="202.9" cy="264.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSEU</title></circle>
-<circle cx="214.0" cy="257.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSNZ</title></circle>
-<circle cx="206.1" cy="261.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXUSUK</title></circle>
-<circle cx="208.9" cy="259.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DEXVZUS</title></circle>
-<circle cx="221.9" cy="251.2" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFEDTAR</title></circle>
-<circle cx="119.6" cy="343.6" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFEDTARL</title></circle>
-<circle cx="89.4" cy="363.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFEDTARU</title></circle>
-<circle cx="129.7" cy="318.2" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFF</title></circle>
-<circle cx="251.1" cy="230.1" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DFII10</title></circle>
-<circle cx="249.6" cy="231.4" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFII20</title></circle>
-<circle cx="248.6" cy="232.1" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFII30</title></circle>
-<circle cx="254.3" cy="227.8" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DFII5</title></circle>
-<circle cx="253.0" cy="228.8" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DFII7</title></circle>
-<circle cx="249.9" cy="231.9" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGASNYH</title></circle>
-<circle cx="253.2" cy="229.5" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGASUSGULF</title></circle>
-<circle cx="220.2" cy="252.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS1</title></circle>
-<circle cx="224.4" cy="249.0" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS10</title></circle>
-<circle cx="236.2" cy="241.2" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DGS1MO</title></circle>
-<circle cx="229.0" cy="245.7" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS2</title></circle>
-<circle cx="220.1" cy="252.2" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS20</title></circle>
-<circle cx="229.2" cy="245.6" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS3</title></circle>
-<circle cx="218.2" cy="253.3" r="4" fill="#4a3aff" fill-opacity="0.65"><title>DGS30</title></circle>
-<circle cx="237.4" cy="240.5" r="4" fill="#9a9a9a" fill-opacity="0.65"><title>DGS3MO</title></circle>
-<text x="280.0" y="412" font-size="11" fill="#5a5a5a" text-anchor="middle">TimesFM CRPS (log scale)</text>
-<text x="14" y="210.0" font-size="11" fill="#5a5a5a" text-anchor="middle" transform="rotate(-90 14 210.0)">Laplace CRPS (log scale)</text>
+<svg viewBox="0 0 640 300" style="max-width:640px;width:100%" role="img" aria-label="Per-series log-likelihood gap, Laplace minus TimesFM, sorted">
+<line x1="40" y1="260" x2="600" y2="260" stroke="#eee"/>
+<text x="34" y="263" font-size="10" fill="#888" text-anchor="end">-8</text>
+<line x1="40" y1="205" x2="600" y2="205" stroke="#eee"/>
+<text x="34" y="208" font-size="10" fill="#888" text-anchor="end">-4</text>
+<line x1="40" y1="150" x2="600" y2="150" stroke="#bbb"/>
+<text x="34" y="153" font-size="10" fill="#888" text-anchor="end">+0</text>
+<line x1="40" y1="95" x2="600" y2="95" stroke="#eee"/>
+<text x="34" y="98" font-size="10" fill="#888" text-anchor="end">+4</text>
+<line x1="40" y1="40" x2="600" y2="40" stroke="#eee"/>
+<text x="34" y="43" font-size="10" fill="#888" text-anchor="end">+8</text>
+<rect x="40.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="44.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="49.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="54.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="58.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="63.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="68.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="72.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="77.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="82.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="86.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="91.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="96.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="100.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="105.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="110.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="114.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="119.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="124.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="128.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="133.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="138.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="142.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="147.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="152.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="156.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="161.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="166.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="170.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="175.3" y="150.0" width="4.1" height="109.2" fill="#b9b6c9"/>
+<rect x="180.0" y="149.8" width="4.1" height="0.8" fill="#4a3aff"/>
+<rect x="184.7" y="148.7" width="4.1" height="1.3" fill="#4a3aff"/>
+<rect x="189.3" y="146.0" width="4.1" height="4.0" fill="#4a3aff"/>
+<rect x="194.0" y="144.1" width="4.1" height="5.9" fill="#4a3aff"/>
+<rect x="198.7" y="143.7" width="4.1" height="6.3" fill="#4a3aff"/>
+<rect x="203.3" y="142.5" width="4.1" height="7.5" fill="#4a3aff"/>
+<rect x="208.0" y="142.4" width="4.1" height="7.6" fill="#b9b6c9"/>
+<rect x="212.7" y="142.0" width="4.1" height="8.0" fill="#4a3aff"/>
+<rect x="217.3" y="141.3" width="4.1" height="8.7" fill="#4a3aff"/>
+<rect x="222.0" y="141.1" width="4.1" height="8.9" fill="#4a3aff"/>
+<rect x="226.7" y="140.8" width="4.1" height="9.2" fill="#b9b6c9"/>
+<rect x="231.3" y="140.4" width="4.1" height="9.6" fill="#4a3aff"/>
+<rect x="236.0" y="139.4" width="4.1" height="10.6" fill="#4a3aff"/>
+<rect x="240.7" y="139.2" width="4.1" height="10.8" fill="#4a3aff"/>
+<rect x="245.3" y="138.6" width="4.1" height="11.4" fill="#4a3aff"/>
+<rect x="250.0" y="138.5" width="4.1" height="11.5" fill="#4a3aff"/>
+<rect x="254.7" y="138.3" width="4.1" height="11.7" fill="#4a3aff"/>
+<rect x="259.3" y="138.2" width="4.1" height="11.8" fill="#4a3aff"/>
+<rect x="264.0" y="138.0" width="4.1" height="12.0" fill="#4a3aff"/>
+<rect x="268.7" y="137.8" width="4.1" height="12.2" fill="#4a3aff"/>
+<rect x="273.3" y="136.0" width="4.1" height="14.0" fill="#4a3aff"/>
+<rect x="278.0" y="135.9" width="4.1" height="14.1" fill="#b9b6c9"/>
+<rect x="282.7" y="135.8" width="4.1" height="14.2" fill="#4a3aff"/>
+<rect x="287.3" y="135.7" width="4.1" height="14.3" fill="#4a3aff"/>
+<rect x="292.0" y="135.5" width="4.1" height="14.5" fill="#4a3aff"/>
+<rect x="296.7" y="135.5" width="4.1" height="14.5" fill="#b9b6c9"/>
+<rect x="301.3" y="135.4" width="4.1" height="14.6" fill="#4a3aff"/>
+<rect x="306.0" y="135.2" width="4.1" height="14.8" fill="#4a3aff"/>
+<rect x="310.7" y="135.2" width="4.1" height="14.8" fill="#4a3aff"/>
+<rect x="315.3" y="134.4" width="4.1" height="15.6" fill="#4a3aff"/>
+<rect x="320.0" y="134.4" width="4.1" height="15.6" fill="#4a3aff"/>
+<rect x="324.7" y="133.8" width="4.1" height="16.2" fill="#4a3aff"/>
+<rect x="329.3" y="133.8" width="4.1" height="16.2" fill="#b9b6c9"/>
+<rect x="334.0" y="133.8" width="4.1" height="16.2" fill="#4a3aff"/>
+<rect x="338.7" y="132.8" width="4.1" height="17.2" fill="#4a3aff"/>
+<rect x="343.3" y="132.7" width="4.1" height="17.3" fill="#4a3aff"/>
+<rect x="348.0" y="132.6" width="4.1" height="17.4" fill="#4a3aff"/>
+<rect x="352.7" y="132.5" width="4.1" height="17.5" fill="#4a3aff"/>
+<rect x="357.3" y="132.4" width="4.1" height="17.6" fill="#4a3aff"/>
+<rect x="362.0" y="132.0" width="4.1" height="18.0" fill="#b9b6c9"/>
+<rect x="366.7" y="131.8" width="4.1" height="18.2" fill="#b9b6c9"/>
+<rect x="371.3" y="131.5" width="4.1" height="18.5" fill="#4a3aff"/>
+<rect x="376.0" y="131.4" width="4.1" height="18.6" fill="#4a3aff"/>
+<rect x="380.7" y="129.6" width="4.1" height="20.4" fill="#b9b6c9"/>
+<rect x="385.3" y="128.6" width="4.1" height="21.4" fill="#b9b6c9"/>
+<rect x="390.0" y="125.1" width="4.1" height="24.9" fill="#b9b6c9"/>
+<rect x="394.7" y="124.5" width="4.1" height="25.5" fill="#b9b6c9"/>
+<rect x="399.3" y="123.0" width="4.1" height="27.0" fill="#4a3aff"/>
+<rect x="404.0" y="122.6" width="4.1" height="27.4" fill="#4a3aff"/>
+<rect x="408.7" y="122.5" width="4.1" height="27.5" fill="#4a3aff"/>
+<rect x="413.3" y="122.4" width="4.1" height="27.6" fill="#4a3aff"/>
+<rect x="418.0" y="122.4" width="4.1" height="27.6" fill="#b9b6c9"/>
+<rect x="422.7" y="122.2" width="4.1" height="27.8" fill="#4a3aff"/>
+<rect x="427.3" y="122.0" width="4.1" height="28.0" fill="#b9b6c9"/>
+<rect x="432.0" y="121.2" width="4.1" height="28.8" fill="#4a3aff"/>
+<rect x="436.7" y="120.4" width="4.1" height="29.6" fill="#4a3aff"/>
+<rect x="441.3" y="117.8" width="4.1" height="32.2" fill="#4a3aff"/>
+<rect x="446.0" y="117.5" width="4.1" height="32.5" fill="#4a3aff"/>
+<rect x="450.7" y="115.5" width="4.1" height="34.5" fill="#4a3aff"/>
+<rect x="455.3" y="114.3" width="4.1" height="35.7" fill="#4a3aff"/>
+<rect x="460.0" y="113.3" width="4.1" height="36.7" fill="#4a3aff"/>
+<rect x="464.7" y="110.9" width="4.1" height="39.1" fill="#4a3aff"/>
+<rect x="469.3" y="109.3" width="4.1" height="40.7" fill="#4a3aff"/>
+<rect x="474.0" y="109.0" width="4.1" height="41.0" fill="#b9b6c9"/>
+<rect x="478.7" y="108.7" width="4.1" height="41.3" fill="#4a3aff"/>
+<rect x="483.3" y="98.6" width="4.1" height="51.4" fill="#4a3aff"/>
+<rect x="488.0" y="95.4" width="4.1" height="54.6" fill="#4a3aff"/>
+<rect x="492.7" y="94.8" width="4.1" height="55.2" fill="#4a3aff"/>
+<rect x="497.3" y="93.8" width="4.1" height="56.2" fill="#4a3aff"/>
+<rect x="502.0" y="92.6" width="4.1" height="57.4" fill="#4a3aff"/>
+<rect x="506.7" y="88.3" width="4.1" height="61.7" fill="#4a3aff"/>
+<rect x="511.3" y="88.1" width="4.1" height="61.9" fill="#4a3aff"/>
+<rect x="516.0" y="85.2" width="4.1" height="64.8" fill="#4a3aff"/>
+<rect x="520.7" y="73.7" width="4.1" height="76.3" fill="#4a3aff"/>
+<rect x="525.3" y="70.9" width="4.1" height="79.1" fill="#4a3aff"/>
+<rect x="530.0" y="68.7" width="4.1" height="81.3" fill="#b9b6c9"/>
+<rect x="534.7" y="68.4" width="4.1" height="81.6" fill="#b9b6c9"/>
+<rect x="539.3" y="67.2" width="4.1" height="82.8" fill="#4a3aff"/>
+<rect x="544.0" y="65.0" width="4.1" height="85.0" fill="#b9b6c9"/>
+<rect x="548.7" y="64.5" width="4.1" height="85.5" fill="#b9b6c9"/>
+<rect x="553.3" y="52.4" width="4.1" height="97.6" fill="#4a3aff"/>
+<rect x="558.0" y="46.2" width="4.1" height="103.8" fill="#4a3aff"/>
+<rect x="562.7" y="42.2" width="4.1" height="107.8" fill="#4a3aff"/>
+<rect x="567.3" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="572.0" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="576.7" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="581.3" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="586.0" y="40.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="590.7" y="40.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="595.3" y="40.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<text x="600" y="34" font-size="10" fill="#5a5a5a" text-anchor="end">Laplace better &uarr; (clipped at &plusmn;8 nats)</text>
+<text x="40" y="292" font-size="11" fill="#5a5a5a">120 series, sorted by per-point log-likelihood gap (Laplace &minus; TimesFM)</text>
 </svg>
     </div>
-    <div style="font-size:0.85em;color:var(--muted);">
-      <span style="color:#4a3aff;">&#9679;</span> continuous &nbsp;
-      <span style="color:#9a9a9a;">&#9679;</span> repeat-heavy
-    </div>
+
+    <h2>Footprint</h2>
     <p>
-      The points hug the diagonal, and that is the truthful reading: on
-      CRPS the two are nearly tied, with a slight Laplace edge in the dense
-      1e-3 to 1e-2 band. The 2.26-nat median likelihood gap is where the
-      real separation lives, and a CRPS scatter deliberately cannot show
-      it: a full density can be far sharper than a quantile reconstruction
-      while their CDF distances stay close. Which score matters is a choice
-      about the downstream use; the case for likelihood is
-      <a href="/metrics.html">made separately</a>.
+      The two artifacts are not the same kind of object, and the size gap is
+      part of the result. These are measured on this machine, single CPU
+      core, except the TimesFM figures, which are the published ones.
     </p>
+    <table>
+      <thead><tr><th></th><th>Laplace</th><th>TimesFM 2.5</th></tr></thead>
+      <tbody>
+        <tr><td>shipped artifact</td><td>136 KB of pure Python, zero dependencies</td><td>200M parameters, hundreds of MB of weights, plus a deep-learning runtime</td></tr>
+        <tr><td>working memory</td><td>22 MB process, 17 KB of state per stream</td><td>GB-class</td></tr>
+        <tr><td>speed</td><td>~4,300 ticks/sec per core, 0.23 ms/tick, online</td><td>batched inference; interactive per-tick use needs a GPU</td></tr>
+        <tr><td>runs in a browser</td><td>yes (the JS twin and Pyodide)</td><td>no</td></tr>
+      </tbody>
+    </table>
 
     <h2>Fairness accounting</h2>
     <p>
@@ -266,6 +272,19 @@
       page will be updated if any of them is run and says otherwise. The
       harness needs an environment with <code>timesfm</code> installed and a
       FRED key; everything else is one command.
+    </p>
+
+    <h2>Run this study yourself</h2>
+    <p>
+      The whole protocol is packaged as a copyable skill: hand it to Claude
+      with your own series and it reproduces the study, the splits, the
+      fairness accounting and the report format. Get it from the
+      <a href="/skills.html#timesfm-study">skills page</a> or
+      <a href="https://github.com/microprediction/skaters/blob/main/skills/timesfm-study.md">on
+      GitHub</a>. The reference harness is
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/foundation_study.py">foundation_study.py</a>;
+      it needs an environment with <code>timesfm</code> installed and a FRED
+      key, and everything else is one command.
     </p>
 
     <h2>The context for these numbers</h2>
