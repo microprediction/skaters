@@ -151,7 +151,36 @@ confounded measure. v2: score the planted window's rank percentile in the
 full score ordering (robust to dominant natural events), and/or mask known
 crisis windows. Keep argmax row for reference.
 
-## 5. Still to come
+## 5. Calibration panel — FRED home field (FINAL 2026-07-09)
+
+`calibration_panel_fred.py`: empirical false-alarm rate vs nominal alpha,
+strictly prequential, 379 non-price FRED change series (1.02M ticks after
+burn-in), forecasting defaults. Median per-series rate / fraction of series
+within [alpha/2, 2*alpha]:
+
+| method | @1e-2 | @1e-3 | @1e-4 |
+|---|---|---|---|
+| mah | 2.7e-2 / 8% | 1.1e-2 / 1% | 5.9e-3 / 0% |
+| z1 | 2.3e-2 / 31% | 8.3e-3 / 5% | 3.7e-3 / 0% |
+| dspot (raw) | 1.6e-2 / 37% | **2.3e-3 / 24%** | 6.3e-4 / 0% |
+| mz | 2.2e-2 / 27% | 8.7e-3 / 4% | 4.6e-3 / 0% |
+| dspot_z | 2.1e-2 / 40% | **2.5e-3 / 22%** | **4.6e-4** / 0% |
+| mz_z | **1.8e-2 / 55%** | 6.0e-3 / 6% | 2.6e-3 / 0% |
+
+The home-field run does NOT vindicate the current head. Medians are
+crisis-robust, so this is genuine miscalibration, not 2008/COVID: the
+parade z is honest in the bulk (the coverage study's 90% interval) but its
+1e-3 tail fires ~8x nominal — the predictive tails are too thin at 3+
+sigma — and the Mahalanobis empirical-null machinery amplifies (11x) rather
+than repairs it. The pattern across methods is the finding: z-fronting wins
+the bulk (mz_z best at 1e-2), the GPD tail wins the deep tail (dspot/dspot_z
+best at 1e-3/1e-4, ~2.3-4.6x), and nobody is honest at 1e-4. Conclusion:
+calibrated alarms need BOTH halves — the forecaster to manufacture
+stationarity, EVT to convert the tail. The concrete ticket: a GPD/POT tail
+head on the parade z (the planned `pickands`/`siffer`), replacing erfc and
+the chi-square null for |z| beyond ~2.5.
+
+## 6. Still to come
 
 - slow-alpha full-250 (running); zbank-60 and default-250 (running,
   detached).
