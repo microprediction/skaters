@@ -70,20 +70,24 @@
     <h2>Doesn't the transform leave the hard part, the time-dependence,
       exactly as hard? (the copula objection)</h2>
     <p>
-      Yes, and that is the design. The forecaster is the time-dependence
-      model, z is what it leaves behind, and any dependence still in z
-      equals the improvement still available, with change of variables
-      keeping the accounting exact in nats. This is measured rather than
-      assumed: ARIMA, ETS, GARCH and Prophet add a few hundredths of a nat
-      on transformed streams
-      (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
-      log</a>).
+      No, and the distinction is worth being precise about. The copula
+      instinct is right for the static transform: push a series through a
+      fixed marginal F and all the serial dependence is still sitting in the
+      uniforms, exactly as hard as before. This transform is the conditional
+      one. F is a one-step-ahead forecast, refreshed every tick, so the
+      time-dependence the forecaster can model is removed before z exists,
+      and what reaches z is only what it missed.
     </p>
     <p>
-      The copula reading is the architecture: margins and dynamics from the
-      forecaster, remaining dependence from a second stage in z,
-      log-likelihood adding across the two. Watch it in the
-      <a href="/demos/rosenblatt.html">Rosenblatt demo</a>, or read
+      That leftover is measured, and it is small: ARIMA, ETS, GARCH and
+      Prophet add a few hundredths of a nat on transformed streams
+      (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
+      log</a>), and anomaly detectors run several times better in z than on
+      raw data. What does remain as hard as before is cross-stream
+      dependence, which a univariate forecaster cannot see; that is
+      second-stage work in z, with log-likelihood adding across the stages.
+      Watch it in the <a href="/demos/rosenblatt.html">Rosenblatt demo</a>,
+      or read
       <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/parade.py">parade.py</a>;
       the bookkeeping is about twenty lines.
     </p>
