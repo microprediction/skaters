@@ -321,7 +321,23 @@ splice's value is density height at extreme ticks (log-lik) and alarm
 calibration — tail QUANTILE location moves only slightly. Report it that
 way; do not oversell the VaR angle.
 
-## 10. Still to come
+## 10. Tail coverage: the 99.9% interval that is actually 99.9%
+
+`benchmarks/tail_coverage.py`, 142 non-price series, median empirical
+central coverage, prequential:
+
+| nominal | gaussian tails | gpd tails (default) |
+|---|---|---|
+| 90% | 89.17% | 90.08% |
+| 99% | 97.62% | **98.93%** |
+| 99.9% | 99.13% | **99.85%** |
+
+The gaussian 99.9% interval breaches 8.7x its budget; the spliced one is
+within 0.05 points of nominal. This extends the coverage study's claim
+from the bulk to the deep tail and is the one-sentence public version of
+the whole 0.13.0 feature.
+
+## 11. Still to come
 
 - slow-alpha full-250 (running); zbank-60 and default-250 (running,
   detached).

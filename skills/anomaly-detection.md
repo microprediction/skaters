@@ -52,13 +52,29 @@ thresholds never race an infinity.
 - **One-sided risk** (only crashes matter): threshold `state["pit"][0] < 1e-4`
   instead of `|z|` — the PIT is the tail probability itself.
 
+## The thresholds mean what they say (0.13.0)
+
+Since 0.13.0 `laplace` splices censored-ML generalized-Pareto tails into
+every predictive (the conditional tail fit), so the z-thresholds above are
+measured claims, not aspirations: on ~380 non-price FRED series the
+empirical alarm rate of `erfc(|z|/sqrt(2)) < alpha` is ~1.0e-2 at nominal
+1e-2 and ~1.4e-3 at nominal 1e-3 (the residue is the genuine-anomaly base
+rate) — and the same holds on price series and at multi-step horizons.
+Convert an alarm budget directly: one page a week on minutely data is
+`alpha = 1/10080`. Do NOT stack an extra GPD head
+(`skaters.anomaly.gpdtail`) on default `laplace` — double-splicing
+over-alarms; that head is for gaussian-tail bodies only.
+
 ## Trust, but verify the detector
 
 Before believing any threshold, check calibration on YOUR stream: collect a few
 hundred `state["pit"][0]` values from a quiet period and eyeball the histogram.
 Flat means the z-thresholds mean what they say. U-shaped means the model is
 overconfident there (heavier tails than it thinks — raise the threshold);
-hump-shaped means underconfident (alarms will be rare and late).
+hump-shaped means underconfident (alarms will be rare and late). On
+near-deterministic waveform data (ECG-like periodic streams) expect the
+U-shape and over-alarming: that regime needs template matching, not
+innovation modelling — the histogram is the regime detector.
 
 Two caveats. On **grid/repeating series** (posted prices, policy rates) the
 lattice projection places near-Dirac mass on revisited values, so PITs cluster

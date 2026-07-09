@@ -97,6 +97,15 @@ the standard-normal quantile (roughly N(0,1) — so `abs(z) > 4` is an anomaly
 detector with no extra compute; z is clamped to ±7.03, never infinite). See
 the [anomaly-detection skill](https://skaters.microprediction.org/skills.html#anomaly-detection).
 
+**Honest tails (v0.13.0).** Every predictive carries censored-ML
+generalized-Pareto tails beyond the body's ~2% region (the *conditional tail
+fit*; `tails="gaussian"` opts out). Measured prequentially on FRED: +0.03
+nats/tick held-out log-likelihood (96%+ of series, price and non-price, all
+horizons), and the tail probabilities keep their promises — the empirical
+alarm rate at nominal 1e-3 is ~1.4e-3, and the nominal 99.9% interval covers
+99.85% (the Gaussian read covers 99.13%). An alarm budget converts directly:
+alarm when `erfc(|z|/sqrt(2)) < alpha`.
+
 **Price/return series** (`garch_leaf`). The default terminal leaf tracks its scale
 with an EWMA (RiskMetrics/IGARCH — no variance mean-reversion). For series with
 volatility *clustering and reversion* (equity/fx/commodity returns), swap in a
