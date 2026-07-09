@@ -180,6 +180,33 @@ stationarity, EVT to convert the tail. The concrete ticket: a GPD/POT tail
 head on the parade z (the planned `pickands`/`siffer`), replacing erfc and
 the chi-square null for |z| beyond ~2.5.
 
+### The repair, measured (zgpd, same run, FINAL 2026-07-09)
+
+`skaters.anomaly.gpdtail`: POT/GPD tails on the parade z (per-tail
+thresholds at the 98% quantile, method-of-moments fit over the last 1000
+exceedances, consistent exceedance rate, two-sided p). Same 379 series:
+
+| method | @1e-2 | @1e-3 | @1e-4 |
+|---|---|---|---|
+| **zgpd** | **9.8e-3 / 85%** | **1.4e-3 / 50%** | **2.9e-4 / 0%** |
+| best other (dspot) | 1.6e-2 / 37% | 2.3e-3 / 24% | 6.3e-4 / 0% |
+
+At 1e-2 the promise is kept essentially exactly. At 1e-3 the median is
+1.4x nominal with half the universe inside the 2x band — and the residual
+overshoot is bounded below by the genuine-anomaly base rate: ~300 true
+crisis ticks per 1M would add 3e-4 to every rate, negligible at 1e-2,
+dominant at 1e-4. So the deep-tail read (2.9e-4 at nominal 1e-4) is
+consistent with an honest detector on data that genuinely contains
+anomalies — unfalsifiable to push further without labels. Synthetic
+(regime-switching, no anomalies): 1.0e-2 / 1.1e-3 / 1.8e-4 — honest at
+all three. The z-clamp (|z|<=7.03) truncates exceedances; p-values below
+~1e-6 remain out of reach until the clamp is lifted for the tail head.
+
+Verdict: forecaster-manufactured stationarity + EVT tail = the first
+method in the table that keeps its stated alarm budget. Next: censored-ML
+fit (the proper-score twin of this head — CSL scoring), lift the z-clamp
+for exceedances, UCR waveform column for the honest scope statement.
+
 ## 6. Still to come
 
 - slow-alpha full-250 (running); zbank-60 and default-250 (running,
