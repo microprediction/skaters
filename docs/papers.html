@@ -26,7 +26,7 @@
         <a href="/guide.html">Guide</a>
         <a href="/faq.html">FAQ</a>
         <a href="/papers.html">Papers</a>
-        <a href="/timesfm.html">David v Goliath</a>
+        <a href="/challengers.html">Challengers</a>
         <a href="/skills.html">Skills</a>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
         <a href="https://pypi.org/project/skaters/">PyPI</a>
@@ -119,40 +119,9 @@
 
     <h2>Challengers</h2>
     <p>
-      Everyone who has stepped up, in one table. Numbers are per-series
-      win-rates for <code>laplace</code>, log-likelihood first, CRPS second,
-      each on the challenger&rsquo;s row above. Every row links its tape.
-      The one belt we do not hold is at the bottom.
-    </p>
-    <table>
-      <thead><tr><th>challenger</th><th>corner</th><th>LL</th><th>CRPS</th><th>tape</th></tr></thead>
-      <tbody>
-        <tr><td>AutoARIMA (statsforecast)</td><td>classical</td><td>82%</td><td>53%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></tr>
-        <tr><td>auto.arima (real R)</td><td>classical</td><td>79%</td><td>51%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-autoarima">bout</a></td></tr>
-        <tr><td>AutoETS</td><td>classical</td><td>97%</td><td>83%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
-        <tr><td>ETS / SARIMAX (statsmodels)</td><td>classical</td><td>96% / 87%</td><td>81% / 53%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
-        <tr><td>Theta (the M3 winner, R)</td><td>classical</td><td>87%</td><td>63%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-theta">bout</a></td></tr>
-        <tr><td>ADAM (smooth, R)</td><td>state space</td><td>96%</td><td>82%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-adam">bout</a></td></tr>
-        <tr><td>BSTS (full Bayesian posterior, R)</td><td>state space</td><td>97%</td><td>80%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-bsts">bout</a></td></tr>
-        <tr><td>nnetar (neural AR, R)</td><td>neural</td><td>96%</td><td>76%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-nnetar">bout</a></td></tr>
-        <tr><td>NF-StudentT (NeuralForecast)</td><td>neural</td><td>100%</td><td>78%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
-        <tr><td>CSP (incl. adaptive)</td><td>conformal</td><td>99%</td><td>100%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
-        <tr><td>AutoARIMA + conformal / ACI</td><td>conformal</td><td>86% / 88%</td><td>31% / 29%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
-        <tr><td><strong>TimesFM 2.5, 200M (Google)</strong></td><td>foundation</td><td>100% cont.</td><td>72% cont.</td><td><a href="/timesfm.html"><strong>David v Goliath</strong></a></td></tr>
-        <tr><td>Chronos-Bolt (Amazon)</td><td>foundation</td><td>100% cont.</td><td>88% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
-        <tr><td>Moirai (Salesforce)</td><td>foundation</td><td>97% cont.</td><td>93% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
-        <tr><td>Lag-Llama</td><td>foundation</td><td>99% cont.</td><td>94% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
-        <tr><td>GARCH-t, non-price series</td><td>heavy-tail SOTA</td><td>68&ndash;82%</td><td>53&ndash;54%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-garch">bout</a></td></tr>
-        <tr><td><em>GARCH-t, price/return series</em></td><td>heavy-tail SOTA</td><td colspan="2"><em>the belt is theirs; we recommend it there</em></td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
-      </tbody>
-    </table>
-    <p>
-      Fine print that keeps the table meaningful: everyone is converted to
-      the same <code>Dist</code> and scored by the same code on the same
-      held-out points; conformal and GARCH-t keep their CRPS strongholds and
-      the table says so; foundation numbers are the continuous split, with
-      the repeated-value caveat told in full on the
-      <a href="/timesfm.html">David v Goliath</a> page.
+      Every method that has stepped up, one row each with its tape, lives on
+      its own page now, built for the ones still coming:
+      <a href="/challengers.html">Challengers</a>.
     </p>
 
     <h2>Related reading</h2>
