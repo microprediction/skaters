@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; David v Goliath</title>
+  <meta name="description" content="A per-series comparison of the Laplace forecaster against TimesFM on 120 FRED change-series, with the protocol, the splits, and the open items." />
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/challengers.html">Challengers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+        <a href="https://www.npmjs.com/package/skaters">npm</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>David v Goliath</h1>
+    <p class="subtitle">Laplace vs TimesFM: one tiny online forecaster
+      against Google&rsquo;s 200-million-parameter foundation model, series
+      by series, with the protocol and the losing rows on the table.</p>
+
+    <h2>The setup</h2>
+    <p>
+      TimesFM 2.5 (200M parameters) is run zero-shot, as intended: a fixed
+      256-length context window of preceding one-step changes, predict the
+      next change, no fitting, all windows batched into one call. Its
+      quantile output is reconstructed into the same <code>Dist</code> object
+      every method uses, and <code>laplace</code> is re-scored on the
+      identical series and windows. 120 FRED change-series, 150 test steps
+      each, scored on held-out log-likelihood and CRPS. The harness is
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/foundation_study.py">foundation_study.py</a>
+      and the raw per-series results are
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/results_foundation_tf.csv">checked
+      in</a>.
+    </p>
+
+    <h2>The headline</h2>
+    <p>
+      On the 69 continuous series, Laplace wins log-likelihood on
+      <strong>69 of 69</strong>, with a median gap of 2.26 nats per point
+      (3.02 vs 0.76), and wins CRPS on <strong>50 of 69</strong> with the
+      median CRPS ratio at 0.983. One caveat travels with the likelihood
+      number: the TimesFM density is quantile-reconstructed and
+      tail-limited, so CRPS is the fairer read for it, and Laplace wins that
+      too.
+    </p>
+    <table>
+      <thead><tr><th>split</th><th>n</th><th>LL wins (Laplace)</th><th>CRPS wins (Laplace)</th><th>median LL: Laplace / TimesFM</th></tr></thead>
+      <tbody>
+        <tr><td>continuous</td><td>69</td><td><strong>69/69</strong></td><td><strong>50/69</strong></td><td>3.02 / 0.76</td></tr>
+        <tr><td>repeat-heavy</td><td>51</td><td>21/51</td><td>19/51</td><td>10.37 / 19.80</td></tr>
+        <tr><td>all</td><td>120</td><td>90/120</td><td>69/120</td><td>3.85 / 2.32</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Where TimesFM wins: predicting zeros</h2>
+    <p>
+      TimesFM only beats Laplace on stupid tasks, chiefly predicting zero
+      again. Every one of its largest CRPS wins is a binary recession
+      indicator (CHNRECD, AUSRECD, BRARECD and friends) whose change series
+      is <em>constant</em> over the entire test window. Its quantile head
+      emits a literal atom at zero and scores near machine precision;
+      Laplace concentrates hard but leaves smooth mass and scores near
+      1e-9. Both are saying &ldquo;zero again&rdquo;; one says it
+      bit-exactly, and the ratio looks enormous while the scores differ in
+      the ninth decimal. That is 51 of the 120 series, which is why the
+      continuous split carries the verdict.
+    </p>
+    <p>
+      This will not necessarily stay true. Foundation models improve
+      quickly, larger checkpoints and native density heads exist, and the
+      comparison here reads TimesFM through a quantile reconstruction. The
+      rerun conditions are tracked in
+      <a href="https://github.com/microprediction/skaters/issues/97">skaters#97</a>,
+      and this page changes when the numbers do.
+    </p>
+
+    <h2>Every series at once</h2>
+    <p>
+      One bar per series, sorted by the per-point log-likelihood gap,
+      Laplace minus TimesFM. Above the zero line Laplace is better: 90 of
+      120 overall, and all 69 continuous series (blue). The gray bars below
+      the line are the repeated-value games above.
+    </p>
+    <div style="margin:14px 0;">
+<svg viewBox="0 0 640 300" style="max-width:640px;width:100%" role="img" aria-label="Per-series log-likelihood gap, Laplace minus TimesFM, sorted">
+<line x1="40" y1="260" x2="600" y2="260" stroke="#eee"/>
+<text x="34" y="263" font-size="10" fill="#888" text-anchor="end">-8</text>
+<line x1="40" y1="205" x2="600" y2="205" stroke="#eee"/>
+<text x="34" y="208" font-size="10" fill="#888" text-anchor="end">-4</text>
+<line x1="40" y1="150" x2="600" y2="150" stroke="#bbb"/>
+<text x="34" y="153" font-size="10" fill="#888" text-anchor="end">+0</text>
+<line x1="40" y1="95" x2="600" y2="95" stroke="#eee"/>
+<text x="34" y="98" font-size="10" fill="#888" text-anchor="end">+4</text>
+<line x1="40" y1="40" x2="600" y2="40" stroke="#eee"/>
+<text x="34" y="43" font-size="10" fill="#888" text-anchor="end">+8</text>
+<rect x="40.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="44.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="49.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="54.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="58.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="63.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="68.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="72.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="77.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="82.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="86.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="91.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="96.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="100.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="105.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="110.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="114.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="119.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="124.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="128.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="133.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="138.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="142.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="147.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="152.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="156.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="161.3" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="166.0" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="170.7" y="150.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="175.3" y="150.0" width="4.1" height="109.2" fill="#b9b6c9"/>
+<rect x="180.0" y="149.8" width="4.1" height="0.8" fill="#4a3aff"/>
+<rect x="184.7" y="148.7" width="4.1" height="1.3" fill="#4a3aff"/>
+<rect x="189.3" y="146.0" width="4.1" height="4.0" fill="#4a3aff"/>
+<rect x="194.0" y="144.1" width="4.1" height="5.9" fill="#4a3aff"/>
+<rect x="198.7" y="143.7" width="4.1" height="6.3" fill="#4a3aff"/>
+<rect x="203.3" y="142.5" width="4.1" height="7.5" fill="#4a3aff"/>
+<rect x="208.0" y="142.4" width="4.1" height="7.6" fill="#b9b6c9"/>
+<rect x="212.7" y="142.0" width="4.1" height="8.0" fill="#4a3aff"/>
+<rect x="217.3" y="141.3" width="4.1" height="8.7" fill="#4a3aff"/>
+<rect x="222.0" y="141.1" width="4.1" height="8.9" fill="#4a3aff"/>
+<rect x="226.7" y="140.8" width="4.1" height="9.2" fill="#b9b6c9"/>
+<rect x="231.3" y="140.4" width="4.1" height="9.6" fill="#4a3aff"/>
+<rect x="236.0" y="139.4" width="4.1" height="10.6" fill="#4a3aff"/>
+<rect x="240.7" y="139.2" width="4.1" height="10.8" fill="#4a3aff"/>
+<rect x="245.3" y="138.6" width="4.1" height="11.4" fill="#4a3aff"/>
+<rect x="250.0" y="138.5" width="4.1" height="11.5" fill="#4a3aff"/>
+<rect x="254.7" y="138.3" width="4.1" height="11.7" fill="#4a3aff"/>
+<rect x="259.3" y="138.2" width="4.1" height="11.8" fill="#4a3aff"/>
+<rect x="264.0" y="138.0" width="4.1" height="12.0" fill="#4a3aff"/>
+<rect x="268.7" y="137.8" width="4.1" height="12.2" fill="#4a3aff"/>
+<rect x="273.3" y="136.0" width="4.1" height="14.0" fill="#4a3aff"/>
+<rect x="278.0" y="135.9" width="4.1" height="14.1" fill="#b9b6c9"/>
+<rect x="282.7" y="135.8" width="4.1" height="14.2" fill="#4a3aff"/>
+<rect x="287.3" y="135.7" width="4.1" height="14.3" fill="#4a3aff"/>
+<rect x="292.0" y="135.5" width="4.1" height="14.5" fill="#4a3aff"/>
+<rect x="296.7" y="135.5" width="4.1" height="14.5" fill="#b9b6c9"/>
+<rect x="301.3" y="135.4" width="4.1" height="14.6" fill="#4a3aff"/>
+<rect x="306.0" y="135.2" width="4.1" height="14.8" fill="#4a3aff"/>
+<rect x="310.7" y="135.2" width="4.1" height="14.8" fill="#4a3aff"/>
+<rect x="315.3" y="134.4" width="4.1" height="15.6" fill="#4a3aff"/>
+<rect x="320.0" y="134.4" width="4.1" height="15.6" fill="#4a3aff"/>
+<rect x="324.7" y="133.8" width="4.1" height="16.2" fill="#4a3aff"/>
+<rect x="329.3" y="133.8" width="4.1" height="16.2" fill="#b9b6c9"/>
+<rect x="334.0" y="133.8" width="4.1" height="16.2" fill="#4a3aff"/>
+<rect x="338.7" y="132.8" width="4.1" height="17.2" fill="#4a3aff"/>
+<rect x="343.3" y="132.7" width="4.1" height="17.3" fill="#4a3aff"/>
+<rect x="348.0" y="132.6" width="4.1" height="17.4" fill="#4a3aff"/>
+<rect x="352.7" y="132.5" width="4.1" height="17.5" fill="#4a3aff"/>
+<rect x="357.3" y="132.4" width="4.1" height="17.6" fill="#4a3aff"/>
+<rect x="362.0" y="132.0" width="4.1" height="18.0" fill="#b9b6c9"/>
+<rect x="366.7" y="131.8" width="4.1" height="18.2" fill="#b9b6c9"/>
+<rect x="371.3" y="131.5" width="4.1" height="18.5" fill="#4a3aff"/>
+<rect x="376.0" y="131.4" width="4.1" height="18.6" fill="#4a3aff"/>
+<rect x="380.7" y="129.6" width="4.1" height="20.4" fill="#b9b6c9"/>
+<rect x="385.3" y="128.6" width="4.1" height="21.4" fill="#b9b6c9"/>
+<rect x="390.0" y="125.1" width="4.1" height="24.9" fill="#b9b6c9"/>
+<rect x="394.7" y="124.5" width="4.1" height="25.5" fill="#b9b6c9"/>
+<rect x="399.3" y="123.0" width="4.1" height="27.0" fill="#4a3aff"/>
+<rect x="404.0" y="122.6" width="4.1" height="27.4" fill="#4a3aff"/>
+<rect x="408.7" y="122.5" width="4.1" height="27.5" fill="#4a3aff"/>
+<rect x="413.3" y="122.4" width="4.1" height="27.6" fill="#4a3aff"/>
+<rect x="418.0" y="122.4" width="4.1" height="27.6" fill="#b9b6c9"/>
+<rect x="422.7" y="122.2" width="4.1" height="27.8" fill="#4a3aff"/>
+<rect x="427.3" y="122.0" width="4.1" height="28.0" fill="#b9b6c9"/>
+<rect x="432.0" y="121.2" width="4.1" height="28.8" fill="#4a3aff"/>
+<rect x="436.7" y="120.4" width="4.1" height="29.6" fill="#4a3aff"/>
+<rect x="441.3" y="117.8" width="4.1" height="32.2" fill="#4a3aff"/>
+<rect x="446.0" y="117.5" width="4.1" height="32.5" fill="#4a3aff"/>
+<rect x="450.7" y="115.5" width="4.1" height="34.5" fill="#4a3aff"/>
+<rect x="455.3" y="114.3" width="4.1" height="35.7" fill="#4a3aff"/>
+<rect x="460.0" y="113.3" width="4.1" height="36.7" fill="#4a3aff"/>
+<rect x="464.7" y="110.9" width="4.1" height="39.1" fill="#4a3aff"/>
+<rect x="469.3" y="109.3" width="4.1" height="40.7" fill="#4a3aff"/>
+<rect x="474.0" y="109.0" width="4.1" height="41.0" fill="#b9b6c9"/>
+<rect x="478.7" y="108.7" width="4.1" height="41.3" fill="#4a3aff"/>
+<rect x="483.3" y="98.6" width="4.1" height="51.4" fill="#4a3aff"/>
+<rect x="488.0" y="95.4" width="4.1" height="54.6" fill="#4a3aff"/>
+<rect x="492.7" y="94.8" width="4.1" height="55.2" fill="#4a3aff"/>
+<rect x="497.3" y="93.8" width="4.1" height="56.2" fill="#4a3aff"/>
+<rect x="502.0" y="92.6" width="4.1" height="57.4" fill="#4a3aff"/>
+<rect x="506.7" y="88.3" width="4.1" height="61.7" fill="#4a3aff"/>
+<rect x="511.3" y="88.1" width="4.1" height="61.9" fill="#4a3aff"/>
+<rect x="516.0" y="85.2" width="4.1" height="64.8" fill="#4a3aff"/>
+<rect x="520.7" y="73.7" width="4.1" height="76.3" fill="#4a3aff"/>
+<rect x="525.3" y="70.9" width="4.1" height="79.1" fill="#4a3aff"/>
+<rect x="530.0" y="68.7" width="4.1" height="81.3" fill="#b9b6c9"/>
+<rect x="534.7" y="68.4" width="4.1" height="81.6" fill="#b9b6c9"/>
+<rect x="539.3" y="67.2" width="4.1" height="82.8" fill="#4a3aff"/>
+<rect x="544.0" y="65.0" width="4.1" height="85.0" fill="#b9b6c9"/>
+<rect x="548.7" y="64.5" width="4.1" height="85.5" fill="#b9b6c9"/>
+<rect x="553.3" y="52.4" width="4.1" height="97.6" fill="#4a3aff"/>
+<rect x="558.0" y="46.2" width="4.1" height="103.8" fill="#4a3aff"/>
+<rect x="562.7" y="42.2" width="4.1" height="107.8" fill="#4a3aff"/>
+<rect x="567.3" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="572.0" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="576.7" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="581.3" y="40.0" width="4.1" height="110.0" fill="#4a3aff"/>
+<rect x="586.0" y="40.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="590.7" y="40.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<rect x="595.3" y="40.0" width="4.1" height="110.0" fill="#b9b6c9"/>
+<text x="600" y="34" font-size="10" fill="#5a5a5a" text-anchor="end">Laplace better &uarr; (clipped at &plusmn;8 nats)</text>
+<text x="40" y="292" font-size="11" fill="#5a5a5a">120 series, sorted by per-point log-likelihood gap (Laplace &minus; TimesFM)</text>
+</svg>
+    </div>
+
+    <h2>Footprint</h2>
+    <p>
+      The two artifacts are not the same kind of object, and the size gap is
+      part of the result. These are measured on this machine, single CPU
+      core, except the TimesFM figures, which are the published ones.
+    </p>
+    <table>
+      <thead><tr><th></th><th>Laplace</th><th>TimesFM 2.5</th></tr></thead>
+      <tbody>
+        <tr><td>shipped artifact</td><td>136 KB of pure Python, zero dependencies</td><td>200M parameters, hundreds of MB of weights, plus a deep-learning runtime</td></tr>
+        <tr><td>working memory</td><td>22 MB process, 17 KB of state per stream</td><td>GB-class</td></tr>
+        <tr><td>speed</td><td>~4,300 ticks/sec per core, 0.23 ms/tick, online</td><td>batched inference; interactive per-tick use needs a GPU</td></tr>
+        <tr><td>runs in a browser</td><td>yes (the JS twin and Pyodide)</td><td>no</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Fairness accounting</h2>
+    <p>
+      What favours Laplace here: the target is the change stream, the object
+      it was built for, while TimesFM was chiefly trained on level series;
+      and Laplace has seen each series&rsquo; full history where TimesFM
+      sees 256 points. What favours TimesFM: it carries knowledge from a
+      vast pretraining corpus that a from-scratch online method cannot have,
+      and the LL comparison is read through its reconstructed density, which
+      is why CRPS is reported with equal weight. Fine-tuning to a single
+      short series was tried for this model family and catastrophically
+      overfits (the paper&rsquo;s footnote), so zero-shot is the intended
+      comparison.
+    </p>
+
+    <h2>What has not been run</h2>
+    <p>
+      Thoroughness includes the ledger of what is missing. Point accuracy
+      (MAE of the median) has not been scored, though CRPS bounds how
+      different it can be. The level-series protocol, the TimesFM home turf,
+      has not been run on this universe. Context lengths other than 256,
+      larger TimesFM checkpoints, and per-series compute cost are unrun.
+      None of these should reverse a 69-of-69 likelihood split, and this
+      page will be updated if any of them is run and says otherwise. The
+      harness needs an environment with <code>timesfm</code> installed and a
+      FRED key; everything else is one command.
+    </p>
+
+    <h2>Run this study yourself</h2>
+    <p>
+      The whole protocol is packaged as a copyable skill: hand it to Claude
+      with your own series and it reproduces the study, the splits, the
+      fairness accounting and the report format. Get it from the
+      <a href="/skills.html#timesfm-study">skills page</a> or
+      <a href="https://github.com/microprediction/skaters/blob/main/skills/timesfm-study.md">on
+      GitHub</a>. The reference harness is
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/foundation_study.py">foundation_study.py</a>;
+      it needs an environment with <code>timesfm</code> installed and a FRED
+      key, and everything else is one command.
+    </p>
+
+    <h2>The context for these numbers</h2>
+    <p>
+      This is one cell of a broader study: the same protocol covers
+      Chronos-Bolt, Moirai and Lag-Llama, and Laplace beats all four on the
+      continuous split, with the native-density models closest. The rolling
+      eight-baseline study, the price caveat where GARCH-t wins, and the
+      full tables are on the <a href="/papers.html">papers page</a>; slice
+      the non-price benchmark yourself in the
+      <a href="/robustness.html">robustness explorer</a>.
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="https://github.com/microprediction/precise">precise</a>,
+    <a href="https://github.com/microprediction/allocation">allocation</a>,
+    <a href="https://github.com/microprediction/humpday">humpday</a>).
+  </footer>
+</body>
+</html>

@@ -218,6 +218,12 @@ class Dist:
                         break
                 if best_i is not None:
                     break
+            if best_i is None:
+                # Only reachable when a mean is NaN: every comparison above
+                # is False, for the argmin and the threshold scan alike.
+                # Merge the first pair so pruning terminates instead of
+                # indexing with None.
+                best_i, best_j = 0, 1
             # Merge the pair (moment-matching)
             wi, mi, si = comps[best_i]
             wj, mj, sj = comps[best_j]
