@@ -104,7 +104,9 @@ nats/tick held-out log-likelihood (96%+ of series, price and non-price, all
 horizons), and the tail probabilities keep their promises — the empirical
 alarm rate at nominal 1e-3 is ~1.4e-3, and the nominal 99.9% interval covers
 99.85% (the Gaussian read covers 99.13%). An alarm budget converts directly:
-alarm when `erfc(|z|/sqrt(2)) < alpha`.
+alarm when `erfc(|z|/sqrt(2)) < alpha`. Essay:
+[Honest tails](https://skaters.microprediction.org/honest-tails.html); long form:
+[When to alarm](papers/when-to-alarm.md).
 
 **Price/return series** (`garch_leaf`). The default terminal leaf tracks its scale
 with an EWMA (RiskMetrics/IGARCH — no variance mean-reversion). For series with

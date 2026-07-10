@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — honest tails</title>
+  <meta name="description" content="The 99.9% interval that is actually 99.9%: how (and why) every skaters predictive carries censored-ML generalized-Pareto tails, and the alarm budgets that now come true." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — honest tails" />
+  <meta property="og:description" content="The 99.9% interval that is actually 99.9%: censored-ML GPD tails in every predictive, and alarm budgets that come true." />
+  <meta property="og:url" content="https://skaters.microprediction.org/honest-tails.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+    onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+        <a href="https://www.npmjs.com/package/skaters">npm</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Honest tails</h1>
+    <p class="subtitle">The 99.9% interval that is actually 99.9% — and alarm
+      budgets that come true.</p>
+
+    <p class="lead">
+      As of v0.13.0 every <code>laplace</code> predictive carries
+      generalized-Pareto tails, fitted online by censored maximum likelihood
+      to the forecaster's own surprises. This page says what that means, why
+      the obvious alternative is inconsistent, and what changed — measured,
+      strictly prequentially, with the raw study files committed next to
+      their results.
+    </p>
+
+    <h2>The problem: promises that don't come true</h2>
+    <p>
+      A density forecaster makes quantitative promises. "This point sits
+      outside my 99.9% interval" should happen once per thousand points;
+      "alarm me when the tail probability drops below $10^{-3}$" should page
+      you once per thousand quiet ticks. We built the test no benchmark runs
+      — count what a stated false-alarm budget actually delivers on
+      certified-quiet data — and failed it ourselves: the Gaussian read of
+      the calibration state fired at <strong>8&times;</strong> its promised
+      rate at nominal $10^{-3}$ on real economic series. The bulk was fine
+      (the <a href="/robustness.html">coverage study</a>'s 90% interval was
+      honest); beyond three sigma, the tails were too thin. Volatility
+      clocks, seasonality, drift — the forecaster absorbs those. The shape
+      of extremes is a different failure, and extreme value theory exists
+      for exactly it.
+    </p>
+
+    <h2>The fix that doesn't work, and the one that does</h2>
+    <p>
+      You cannot simply re-weight the likelihood toward the tail and refit:
+      the weighted log score $w(y)\log f(y)$ is improper — a forecaster
+      maximizes it by inflating the region you weighted, not by telling the
+      truth (Gneiting &amp; Ranjan, 2011). The consistent tool is the
+      <em>censored likelihood</em> (Diks, Panchenko &amp; van Dijk, 2011):
+      inside the tail region, score the full density; outside, score only
+      the stated probability of staying outside. Its extra term is not a
+      technicality but a theorem — no proper score can assess tail shape
+      without also charging for tail <em>mass</em> (Brehmer &amp; Strokorb,
+      2019).
+    </p>
+    <p>
+      That score licenses a clean construction — the <em>conditional tail
+      fit</em>. The body forecaster defines a predictable tail region: its
+      own calibration z beyond thresholds frozen at warm-up quantiles, set
+      before each observation arrives. A trailing tail model fits a
+      generalized Pareto to the exceedances (censored ML factorizes into the
+      exceedance <em>rate</em>, an EWMA that forgets like everything else in
+      the library, plus the conditional GPD <em>shape</em>). Each issued
+      predictive is then spliced: the body's density in the interior,
+      rescaled so mass is exact; the GPD beyond. Information flows
+      <strong>body &rarr; region &rarr; tail &rarr; output, never
+      backwards</strong> — the body never sees the tail's opinion, so the
+      surprises keep their meaning. The splice sits under the calibration
+      state, so <code>logpdf</code>, <code>cdf</code>, <code>quantile</code>,
+      CRPS and <code>state["z"]</code> all read the corrected tail.
+    </p>
+
+    <h2>What changed, measured</h2>
+    <table>
+      <thead><tr><th>nominal central interval</th><th>gaussian tails</th><th>gpd tails (default)</th></tr></thead>
+      <tbody>
+        <tr><td>90%</td><td>89.17%</td><td><strong>90.08%</strong></td></tr>
+        <tr><td>99%</td><td>97.62%</td><td><strong>98.93%</strong></td></tr>
+        <tr><td>99.9%</td><td>99.13%</td><td><strong>99.85%</strong></td></tr>
+      </tbody>
+    </table>
+    <p>
+      (142 non-price FRED series, median empirical coverage, one-pass
+      prequential. The gaussian 99.9% interval breached its budget
+      8.7&times;.) Held-out log-likelihood improved on <strong>96%+ of
+      series</strong> — about +0.03 nats/tick — on non-price <em>and</em>
+      price series, at one-step and multi-step horizons; CRPS, the default
+      leaf objective, is unchanged to within noise. And the alarm arithmetic
+      now converts directly: alarm when
+      $\operatorname{erfc}(|z|/\sqrt{2}) &lt; \alpha$, and the measured rate
+      at nominal $10^{-3}$ is $\approx 1.4\times10^{-3}$ — the residue
+      consistent with the genuine anomalies real series contain.
+    </p>
+
+    <h2>What it does not do</h2>
+    <p>
+      Honesty includes the boundaries. The splice buys density height at
+      extreme ticks and alarm calibration — tail <em>quantile location</em>
+      moves only slightly (pinball at 1% is a wash). It does not rescue
+      near-deterministic waveform data (ECG-like periodic streams): that
+      regime belongs to template matching, and the PIT histogram tells you
+      which regime you are in — flat means these claims hold, U-shaped means
+      they don't. And p-values below ${\sim}10^{-6}$ remain out of reach of
+      the calibration state's clamp. Costs: ~5% runtime, and the JavaScript
+      twin implements the splice to 1e-6 parity, enforced along with
+      adversarial release gates in both languages.
+    </p>
+
+    <p>
+      Long form with every table, the propriety rules, and the negative
+      results: <a
+      href="https://github.com/microprediction/skaters/blob/main/papers/when-to-alarm.md">When
+      to alarm</a>. Context in the literature: <a
+      href="/anomaly-literature.html">the anomaly-detection literature
+      map</a>.
+    </p>
+
+    <p class="byline">2026-07-10. Reproduce:
+      <code>benchmarks/tail_coverage.py</code>,
+      <code>benchmarks/anomaly/calibration_panel_fred.py</code>,
+      <code>benchmarks/anomaly/tail_splice_study.py</code>.</p>
+  </main>
+</body>
+</html>
