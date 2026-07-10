@@ -39,6 +39,7 @@ TB_ARMS=comma list to restrict arms.
 from __future__ import annotations
 import os, sys, gc, time, csv, math, warnings
 warnings.filterwarnings("ignore")
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 
