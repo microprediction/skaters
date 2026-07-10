@@ -101,7 +101,7 @@ the [anomaly-detection skill](https://skaters.microprediction.org/skills.html#an
 generalized-Pareto tails beyond the body's ~2% region (the *conditional tail
 fit*; `tails="gaussian"` opts out). Measured prequentially on FRED: +0.03
 nats/tick held-out log-likelihood (96%+ of series, price and non-price, all
-horizons), and the tail probabilities keep their promises — the empirical
+horizons), and the tail probabilities keep their promises. The empirical
 alarm rate at nominal 1e-3 is ~1.4e-3, and the nominal 99.9% interval covers
 99.85% (the Gaussian read covers 99.13%). An alarm budget converts directly:
 alarm when `erfc(|z|/sqrt(2)) < alpha`. Essay:
