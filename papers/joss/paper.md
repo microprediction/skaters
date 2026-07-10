@@ -74,8 +74,10 @@ conjugation recursion.
 
 # Acknowledgements
 
-Benchmark data are drawn from the Federal Reserve Economic Data (FRED)
-service. The UCR Anomaly Archive [@wu2023current] supports the
-calibration studies.
+Intech Investments funded the now-defunct microprediction distributional
+prediction platform whose multi-level residual-stream mechanism this
+package distills. Benchmark data are drawn from the Federal Reserve
+Economic Data (FRED) service. The UCR Anomaly Archive [@wu2023current]
+supports the calibration studies.
 
 # References
