@@ -207,5 +207,15 @@ no TabFM weights had touched any wide-study code path at amendment time.
 
 ## Deviations
 
-- (to be filled when the Studio run starts: device, torch version,
-  per-series timing)
+- 2026-07-10, run start (Mac Studio): device mps, torch 2.4.1, python
+  3.11.15. First logged timings: clf pass 95s (series 1, RIMLPBAARNB) and
+  91s (series 2, SOFR1), roughly 4x the 16 GB laptop's smoke pace. Recorded
+  from the progress log only; no result row read.
+- The checkout executing the run is skaters 0.13.0 (PR #98 branch), which
+  postdates this statement: laplace predictives carry GPD tails by default
+  as of 2026-07-09. This changes the laplace opponent arm relative to the
+  smoke-tested laplace only in its tail shape; arms, universe, and scoring
+  are untouched. Noted before any result is read.
+- Environment deviation from the runbook: no conda on the Studio; a uv
+  python 3.11 venv with the same package set was used instead. tabfm's
+  pip metadata omits absl-py and jaxtyping; both installed explicitly.
