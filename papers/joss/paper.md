@@ -11,7 +11,7 @@ tags:
   - extreme value theory
 authors:
   - name: Peter Cotton
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-1832-2924
     affiliation: 1
 affiliations:
   - name: Independent researcher, United States
