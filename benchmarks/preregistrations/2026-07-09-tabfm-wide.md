@@ -39,24 +39,45 @@ pre-test history only (the final TEST=150 changes never inform selection):
 - Stratified sample: 5 martingality bins (lag-1 autocorrelation of changes:
   below -0.2, -0.2 to -0.05, -0.05 to 0.05, 0.05 to 0.2, above 0.2) crossed
   with 3 repeat bins (repeat fraction below 0.05, 0.05 to 0.35, above 0.35),
-  up to 24 series per cell, numpy seed 20260709.
+  up to 48 series per cell, numpy seed 20260709.
+- Family diversity: within each cell, selection round-robins across FRED
+  families (the leading capital run of the id, the standing `family` rule)
+  with at most 2 series per family per cell, so a yield curve or panel of
+  near-duplicates cannot crowd out diversity.
 
-Result: 242 series over 14 populated cells, listed with strata in the
-committed universe file. Run order interleaves strata round-robin so partial
-results stay representative. 28 of the 242 overlap the first bout's universe.
+Result: 226 series over 14 populated cells and 112 distinct families, with
+per-series characteristics (family, lag-1 autocorrelation, repeat fraction,
+excess kurtosis 0.2 to 845, volatility clustering -0.16 to 0.90) recorded in
+the committed universe file. Run order interleaves strata round-robin so
+partial results stay representative.
 
 ## Arms (frozen)
 
 All arms: zero-shot, context CTX=256 changes arranged as lag tables,
 in-context table refreshed every STRIDE=10 steps, NE=4 ensemble members,
 TEST=150 rolling one-step, scored through the same `Dist` code as every
-prior study (logpdf floor -20). `laplace` re-run on identical windows.
+prior study, except that the per-point logpdf floor of -20 applies to any
+value below it, not only non-finite ones, for every method identically,
+laplace included (see the amendment note). `laplace` re-run on identical
+windows.
 
 - **clf8**: decile-bin classifier density, 8 lags. The replication arm,
   identical in design to bout 1.
-- **clf16**: as clf8 with 16 lags.
+- **clf16**, **clf32**: as clf8 with 16 and 32 lags (lag depth).
 - **clfew**: as clf8 but equal-width bins spanning the 1st to 99th
   percentile of training targets (outermost edges at the training min/max).
+- **clf2g**: two staggered decile grids (the second offset half a decile),
+  densities averaged: roughly 20 effective bins under the model's 10-class
+  ceiling (bin resolution).
+- **clfx100**: clf8 run on 100x the series, scored on 100x the targets, then
+  adjusted back by the exact affine change of variables (logpdf plus
+  log 100, CRPS over 100). Equal to clf8 if and only if the pipeline is
+  scale-invariant; the per-series deviation measures scale sensitivity.
+- **blr8**, **blr2**: controls, not TabFM. Conjugate Bayesian linear
+  regression (evidence-maximised ridge) on the identical 8-lag and a minimal
+  2-lag table, predictive Gaussian per step. If a closed-form linear
+  posterior matches TabFM on the same table, the in-context learning added
+  nothing.
 - **regres**: the regressor. Per block, fit on all but the last 40 training
   rows, predict those 40 held-out rows and the block's test rows in one
   call; the density is a Gaussian-KDE of the 40 held-out residuals centred
@@ -79,14 +100,19 @@ constant training windows fall back to an atom with bandwidth 1e-9.
   log-likelihood win rate of `laplace` differs between the strongest
   mean-reversion bin (autocorrelation below -0.2) and the near-martingale
   bin (-0.05 to 0.05).
+- H5 (control): on the continuous stratum, the per-series log-likelihood
+  win rate of clf8 over blr8 differs from 50%.
 
-No direction is asserted for any hypothesis.
+No direction is asserted for any hypothesis. Scale invariance (clfx100 vs
+clf8) and all other arm-vs-arm contrasts are reported descriptively.
 
 ## Analysis plan
 
-H1-H3: two-sided exact binomial sign tests at alpha 0.05, ties as
+H1-H3 and H5: two-sided exact binomial sign tests at alpha 0.05, ties as
 half-wins. H4: two-sided Fisher exact test at alpha 0.05 on the win/loss
-counts of the two named bins. The full arm-by-stratum table of win rates
+counts of the two named bins. Family-weighted win rates (one vote per FRED
+family, the standing robustness check) are reported alongside raw rates for
+every named hypothesis. The full arm-by-stratum table of win rates
 and median log-likelihood gaps is reported descriptively for every arm and
 every populated cell, wins and losses alike. Arm-vs-arm comparisons and
 everything not named above are exploratory and will be labelled so. Nothing
@@ -128,6 +154,25 @@ discovered later is reported, not silently reconciled.
   verify resume logic, which also surfaced the NASDAQ selection leak fixed
   and disclosed above.
 - No TabFM weights were used in any wide-study code path before filing.
+
+## Amendments (2026-07-09, later the same evening, still pre-run)
+
+Made after first filing but before any real TabFM inference in this study;
+no TabFM weights had touched any wide-study code path at amendment time.
+
+1. Universe cap raised from 24 to 48 per cell and the family-diversity rule
+   added (at most 2 per family per cell), on the author's direction to
+   widen the sample and take greater care over diversity. The universe file
+   was regenerated once under the amended rule: 226 series, 112 families.
+2. Arms added on the author's direction: clf32 (more lags), clf2g (more
+   effective bins), clfx100 (scale invariance), blr8/blr2 (Bayesian linear
+   regression controls).
+3. Scoring floor amended: the stub-model sweep over the full universe
+   exposed administered-rate step series (IOER, IORR) where a policy jump
+   lands far outside a 1e-9-bandwidth atom and the finite per-point logpdf
+   reaches -5e14, letting a single point decide a series. The -20 floor now
+   applies to any lower value, every method identically. No real model
+   output informed this: the affected scores came from stub predictors.
 
 ## Deviations
 

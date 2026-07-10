@@ -11,19 +11,28 @@ changes, whose pre-test history is not constant. Series are characterized on
 the pre-test history ONLY (the last TEST changes never inform selection):
 repeat fraction and lag-1 autocorrelation of changes (martingality). The
 universe is a stratified sample: 5 martingality bins x 3 repeat bins, up to
-24 series per cell, deterministic seed. The selected list with strata is
+48 series per cell, at most 2 per FRED family per cell (diversity), fixed
+seed. The selected list with strata and characteristics is
 committed at benchmarks/preregistrations/tabfm_wide_universe.txt. The run
 order interleaves strata round-robin so partial results stay representative.
 
 Arms (all zero-shot, CTX=256 context arranged as lag tables, STRIDE=10
 in-context refresh, NE=4 ensemble members):
-  clf8   decile-bin classifier density, 8 lags   (replication of bout 1)
-  clf16  decile-bin classifier density, 16 lags  (does lag depth help?)
-  clfew  equal-width-bin classifier density, 8 lags, bins spanning the
-         1st-99th percentile of training targets (does the binning matter?)
-  regres regressor point + residual density: fit on all but the last 40
-         training rows, take residuals on those 40 held-out rows, centre a
-         Gaussian-KDE of the residuals on each test prediction
+  clf8    decile-bin classifier density, 8 lags   (replication of bout 1)
+  clf16   decile-bin classifier density, 16 lags  (lag depth)
+  clf32   decile-bin classifier density, 32 lags  (lag depth, further)
+  clfew   equal-width bins spanning the 1st-99th percentile (binning scheme)
+  clf2g   two staggered decile grids averaged: ~20 effective bins under the
+          model's 10-class ceiling (bin resolution)
+  clfx100 clf8 on 100x the series, scores adjusted back by the exact affine
+          change of variables (scale invariance: equals clf8 iff invariant)
+  blr8    control: conjugate Bayesian linear regression on the same 8-lag
+          table, predictive Gaussian (does 1.6B of in-context learning beat
+          a closed-form linear posterior on the identical table?)
+  blr2    control: the same with a minimal 2-lag table
+  regres  regressor point + residual density: fit on all but the last 40
+          training rows, take residuals on those 40 held-out rows, centre a
+          Gaussian-KDE of the residuals on each test prediction
 The regres arm also yields the MAE undercard (its raw point vs the median
 of laplace's predictive).
 
@@ -50,8 +59,10 @@ from skaters.dist import Dist
 from skaters.api import laplace
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(_HERE, "results_tabfm_wide.csv")
-MAE_RESULTS = os.path.join(_HERE, "results_tabfm_wide_mae.csv")
+FAKE = os.environ.get("TB_FAKE", "") == "1"
+_SUFFIX = "_fake" if FAKE else ""      # fake runs must never touch real resume files
+RESULTS = os.path.join(_HERE, f"results_tabfm_wide{_SUFFIX}.csv")
+MAE_RESULTS = os.path.join(_HERE, f"results_tabfm_wide_mae{_SUFFIX}.csv")
 UNIVERSE_TXT = os.path.join(_HERE, "preregistrations", "tabfm_wide_universe.txt")
 WEIGHTS = os.path.expanduser("~/.cache/tabfm_bin")
 
@@ -59,14 +70,15 @@ STRIDE = int(os.environ.get("TB_STRIDE", 10))
 NE = int(os.environ.get("TB_NE", 4))
 DEVICE = os.environ.get("TB_DEVICE", "cpu")
 N_SMOKE = int(os.environ.get("TB_SMOKE", 0))
-FAKE = os.environ.get("TB_FAKE", "") == "1"
 TEST, CTX, HIST = fs.TEST, fs.CTX, 1000
-PER_CELL = int(os.environ.get("TB_PER_CELL", 24))
+PER_CELL = int(os.environ.get("TB_PER_CELL", 48))
 SEED = 20260709
 RESID_ROWS = 40
 
-CLF_ARMS = ["clf8", "clf16", "clfew"]
+CLF_ARMS = ["clf8", "clf16", "clf32", "clfew", "clf2g", "clfx100",
+            "blr8", "blr2"]
 REG_ARMS = ["regres"]
+X100 = 100.0                                   # scale for the invariance arm
 _sel = os.environ.get("TB_ARMS", "")
 if _sel:
     keep = set(_sel.split(","))
@@ -86,14 +98,22 @@ def _titles():
 
 
 def characterize(hist_ch):
-    """Repeat fraction and lag-1 autocorrelation on the PRE-TEST history."""
+    """Character of the PRE-TEST history: repeat fraction, lag-1
+    autocorrelation of changes (martingality), excess kurtosis, and lag-1
+    autocorrelation of absolute changes (volatility clustering)."""
     a = np.asarray(hist_ch, float)
     rf = float(np.mean(a[1:] == a[:-1])) if len(a) > 1 else 1.0
     v = float(np.var(a))
     if v <= 0:
-        return rf, None
+        return rf, None, None, None
     rho1 = float(np.corrcoef(a[:-1], a[1:])[0, 1])
-    return rf, rho1
+    if not math.isfinite(rho1):
+        return rf, None, None, None
+    kurt = float(np.mean((a - a.mean()) ** 4) / v ** 2 - 3.0)
+    ab = np.abs(a)
+    vv = float(np.var(ab))
+    vcl = float(np.corrcoef(ab[:-1], ab[1:])[0, 1]) if vv > 0 else 0.0
+    return rf, rho1, kurt, vcl
 
 
 def _rho_bin(rho):
@@ -133,28 +153,52 @@ def select_universe():
         if len(ch) < HIST:
             continue
         ch = ch[-HIST:]
-        rf, rho1 = characterize(ch[:-TEST])
-        if rho1 is None:            # constant pre-test history: measures the
-            continue                # fallback convention, not the model
-        cells.setdefault((_rho_bin(rho1), _rf_bin(rf)), []).append(sid)
+        rf, rho1, kurt, vcl = characterize(ch[:-TEST])
+        if rho1 is None:            # constant or degenerate pre-test history:
+            continue                # measures the fallback, not the model
+        key = (_rho_bin(rho1), _rf_bin(rf))
+        cells.setdefault(key, []).append(
+            (sid, fu.family(sid), rho1, rf, kurt, vcl))
+    # Within each cell, round-robin across FRED families (at most
+    # FAM_CAP per family per cell) so a curve or panel of near-duplicate
+    # series cannot crowd out diversity; families and series within a
+    # family are visited in seeded random order.
+    FAM_CAP = 2
     rng = np.random.default_rng(SEED)
-    picked = []                     # (sid, stratum, position-in-cell)
+    picked = []                     # (record, stratum, position-in-cell)
     for key in sorted(cells):
-        pool = sorted(cells[key])
-        take = list(rng.permutation(len(pool))[:PER_CELL])
-        for pos, i in enumerate(take):
-            picked.append((pool[int(i)], "|".join(key), pos))
+        fams = {}
+        for rec in sorted(cells[key]):
+            fams.setdefault(rec[1], []).append(rec)
+        fam_order = [sorted(fams)[int(i)]
+                     for i in rng.permutation(len(fams))]
+        for f in fam_order:
+            fams[f] = [fams[f][int(i)]
+                       for i in rng.permutation(len(fams[f]))][:FAM_CAP]
+        chosen, depth = [], 0
+        while len(chosen) < PER_CELL:
+            row = [fams[f][depth] for f in fam_order if depth < len(fams[f])]
+            if not row:
+                break
+            chosen.extend(row[:PER_CELL - len(chosen)])
+            depth += 1
+        for pos, rec in enumerate(chosen):
+            picked.append((rec, "|".join(key), pos))
     # round-robin over strata so partial runs stay representative
     picked.sort(key=lambda t: (t[2], t[1]))
-    return [(sid, stratum) for sid, stratum, _ in picked]
+    return [(rec[0], stratum, rec[1], rec[2], rec[3], rec[4], rec[5])
+            for rec, stratum, _ in picked]
 
 
 def write_universe(sel):
     os.makedirs(os.path.dirname(UNIVERSE_TXT), exist_ok=True)
     with open(UNIVERSE_TXT, "w") as fh:
-        fh.write("# series_id\tstratum (rho1 bin | repeat bin), run order\n")
-        for sid, stratum in sel:
-            fh.write(f"{sid}\t{stratum}\n")
+        fh.write("# series_id\tstratum\tfamily\trho1\trepeat_frac\t"
+                 "excess_kurtosis\tvol_clustering  (run order; "
+                 "characteristics from pre-test history only)\n")
+        for sid, stratum, fam, rho1, rf, kurt, vcl in sel:
+            fh.write(f"{sid}\t{stratum}\t{fam}\t{rho1:.4f}\t{rf:.4f}\t"
+                     f"{kurt:.2f}\t{vcl:.4f}\n")
 
 
 def load_universe():
@@ -163,12 +207,12 @@ def load_universe():
         for line in open(UNIVERSE_TXT):
             if line.startswith("#"):
                 continue
-            sid, stratum = line.rstrip("\n").split("\t")
-            out.append((sid, stratum))
+            parts = line.rstrip("\n").split("\t")
+            out.append((parts[0], parts[1]))
         return out
     sel = select_universe()
     write_universe(sel)
-    return sel
+    return [(t[0], t[1]) for t in sel]
 
 
 # ---------------------------------------------------------------- densities
@@ -187,6 +231,14 @@ def width_edges(train_y):
     if hi <= lo:
         return decile_edges(train_y)
     inner = np.linspace(lo, hi, 9)
+    return np.unique(np.concatenate([[train_y.min()], inner, [train_y.max()]]))
+
+
+def stagger_edges(train_y):
+    """The second grid of the clf2g arm: 9 inner quantiles offset half a
+    decile from the decile grid, bracketed by the training min/max, so the
+    averaged pair acts like ~20 bins despite the 10-class ceiling."""
+    inner = np.quantile(train_y, np.linspace(0.05, 0.95, 9))
     return np.unique(np.concatenate([[train_y.min()], inner, [train_y.max()]]))
 
 
@@ -215,6 +267,28 @@ def laplace_dists(ch):
             out.append(pend[0])
         d, st = f(yv, st); pend = d
     return out
+
+
+# Scoring for this study: per-point logpdf is floored at -20 whether it is
+# non-finite OR merely astronomically negative. The stub-model sweep exposed
+# administered-rate step series (IOER, IORR) where a policy jump lands far
+# outside a 1e-9-bandwidth atom and the finite logpdf reaches -5e14, letting
+# one point decide the series. The floor applies to every method identically,
+# laplace included; adopted before any real TabFM result existed.
+def score_steps(dists, y):
+    lp = cr = 0.0
+    for d, yt in zip(dists, y):
+        yv = float(yt)
+        v = d.logpdf(yv)
+        lp += max(v, -20.0) if math.isfinite(v) else -20.0
+        cr += d.crps(yv)
+    n = len(dists)
+    return lp / n, cr / n
+
+
+def laplace_scores(ch):
+    dists = laplace_dists(ch)
+    return score_steps(dists, ch[len(ch) - TEST:])
 
 
 # ---------------------------------------------------------------- fake models
@@ -266,28 +340,62 @@ def _open_results(path, header):
     return fh, w
 
 
-def clf_arm_dists(ch, lags, edger, model, TabFMClassifier):
+def _grid_dists(Xtr, ytr, Xte, edges, model, TabFMClassifier):
+    """Per-test-row bar Dists for one bin grid, or None if degenerate."""
+    if len(edges) < 2:
+        return None
+    if len(edges) == 2:
+        return [bar_dist(edges, [1.0]) for _ in range(len(Xte))]
+    lab = labels_for(edges, ytr)
+    clf = TabFMClassifier(model=model, n_estimators=NE)
+    clf.fit(Xtr, lab)
+    probs = clf.predict_proba(Xte)
+    full = np.zeros((len(Xte), len(edges) - 1))
+    for col, c in enumerate(clf.classes_):
+        full[:, int(c)] = probs[:, col]
+    return [bar_dist(edges, row) for row in full]
+
+
+def clf_arm_dists(ch, lags, edgers, model, TabFMClassifier):
+    """Classifier-arm densities; `edgers` is a list of bin-grid builders and
+    the per-step Dist averages the grids (one grid for plain arms, two for
+    the staggered clf2g arm)."""
     n = len(ch)
     dists = []
     for lo, hi in _blocks(n):
         Xtr, ytr = lag_rows(ch, lo - CTX + lags, lo, lags)
         Xte, _ = lag_rows(ch, lo, hi, lags)
-        edges = edger(ytr)
-        if len(edges) < 2:
+        per_grid = [_grid_dists(Xtr, ytr, Xte, e(ytr), model, TabFMClassifier)
+                    for e in edgers]
+        per_grid = [g for g in per_grid if g is not None]
+        if not per_grid:
             v = float(np.median(ytr))
             dists += [Dist([(1.0, v, 1e-9)])] * (hi - lo)
             continue
-        if len(edges) == 2:
-            dists += [bar_dist(edges, [1.0])] * (hi - lo)
+        for i in range(hi - lo):
+            row = [g[i] for g in per_grid]
+            dists.append(row[0] if len(row) == 1 else Dist.combine(row))
+    return dists
+
+
+def blr_arm_dists(ch, lags):
+    """Control arm: conjugate Bayesian linear regression (evidence-maximised
+    ridge) on the identical lag table, predictive Gaussian per step."""
+    from sklearn.linear_model import BayesianRidge
+    n = len(ch)
+    dists = []
+    for lo, hi in _blocks(n):
+        Xtr, ytr = lag_rows(ch, lo - CTX + lags, lo, lags)
+        Xte, _ = lag_rows(ch, lo, hi, lags)
+        if float(np.ptp(ytr)) == 0.0:
+            v = float(ytr[0])
+            dists += [Dist([(1.0, v, 1e-9)])] * (hi - lo)
             continue
-        lab = labels_for(edges, ytr)
-        clf = TabFMClassifier(model=model, n_estimators=NE)
-        clf.fit(Xtr, lab)
-        probs = clf.predict_proba(Xte)
-        full = np.zeros((len(Xte), len(edges) - 1))
-        for col, c in enumerate(clf.classes_):
-            full[:, int(c)] = probs[:, col]
-        dists += [bar_dist(edges, row) for row in full]
+        m = BayesianRidge()
+        m.fit(np.asarray(Xtr, float), ytr)
+        mu, sd = m.predict(np.asarray(Xte, float), return_std=True)
+        dists += [Dist([(1.0, float(a), max(float(b), 1e-9))])
+                  for a, b in zip(mu, sd)]
     return dists
 
 
@@ -326,12 +434,15 @@ def classification_pass(universe):
                        device=None if DEVICE == "cpu" else DEVICE)
     done = _done_pairs(RESULTS)
     fh, w = _open_results(RESULTS, ["series", "method", "logpdf", "crps", "n", "stratum"])
-    arms = {"clf8": (8, decile_edges), "clf16": (16, decile_edges),
-            "clfew": (8, width_edges)}
-    arms = {k: v for k, v in arms.items() if k in CLF_ARMS}
+    tab_arms = {"clf8": (8, [decile_edges]), "clf16": (16, [decile_edges]),
+                "clf32": (32, [decile_edges]), "clfew": (8, [width_edges]),
+                "clf2g": (8, [decile_edges, stagger_edges])}
+    blr_arms = {"blr8": 8, "blr2": 2}
+    tab_arms = {k: v for k, v in tab_arms.items() if k in CLF_ARMS}
+    blr_arms = {k: v for k, v in blr_arms.items() if k in CLF_ARMS}
     with fh:
         for j, (sid, stratum) in enumerate(universe):
-            todo = [a for a in arms if (sid, a) not in done]
+            todo = [a for a in CLF_ARMS if (sid, a) not in done]
             need_lap = (sid, "laplace") not in done
             if not todo and not need_lap:
                 continue
@@ -339,12 +450,25 @@ def classification_pass(universe):
             ch = _load_ch(sid)
             y = ch[len(ch) - TEST:]
             if need_lap:
-                lp, cr = fs.laplace_scores(ch)
+                lp, cr = laplace_scores(ch)
                 w.writerow([sid, "laplace", f"{lp:.6f}", f"{cr:.6f}", TEST, stratum])
             for a in todo:
-                lags, edger = arms[a]
-                dists = clf_arm_dists(ch, lags, edger, model, Clf)
-                aa, bb = fs.score_steps(dists, y)
+                if a == "clfx100":
+                    # scale-invariance arm: identical design on X100*series,
+                    # scored on X100*y, then adjusted back by the exact
+                    # affine change of variables. Equal to clf8 iff the
+                    # pipeline is scale-invariant.
+                    sch = [X100 * v for v in ch]
+                    dists = clf_arm_dists(sch, 8, [decile_edges], model, Clf)
+                    aa, bb = score_steps(dists, [X100 * v for v in y])
+                    aa, bb = aa + math.log(X100), bb / X100
+                elif a in tab_arms:
+                    lags, edgers = tab_arms[a]
+                    dists = clf_arm_dists(ch, lags, edgers, model, Clf)
+                    aa, bb = score_steps(dists, y)
+                else:
+                    dists = blr_arm_dists(ch, blr_arms[a])
+                    aa, bb = score_steps(dists, y)
                 w.writerow([sid, a, f"{aa:.6f}", f"{bb:.6f}", TEST, stratum])
             fh.flush()
             print(f"  clf {j+1}/{len(universe)} {sid} [{stratum}] "
@@ -375,7 +499,7 @@ def regression_pass(universe):
             y = np.array(ch[len(ch) - TEST:])
             dists, points = reg_arm(ch, 8, model, Reg)
             if (sid, "regres") not in done:
-                aa, bb = fs.score_steps(dists, list(y))
+                aa, bb = score_steps(dists, list(y))
                 w.writerow([sid, "regres", f"{aa:.6f}", f"{bb:.6f}", TEST, stratum])
                 fh.flush()
             if (sid, "regres") not in done_mae:
@@ -443,7 +567,7 @@ if __name__ == "__main__":
         sel = select_universe(); write_universe(sel)
         from collections import Counter
         print(f"{len(sel)} series -> {UNIVERSE_TXT}")
-        for k, v in sorted(Counter(s for _, s in sel).items()):
+        for k, v in sorted(Counter(t[1] for t in sel).items()):
             print(f"  {k:28s}{v:4d}")
     else:
         run()
