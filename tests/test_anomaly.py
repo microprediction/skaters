@@ -249,11 +249,11 @@ def test_k1_and_constant_stream_no_crash():
             assert 0.0 <= state["pvalue"] <= 1.0
 
 
-def test_gpdtail_alarm_rate_honesty():
+def test_gpdtail_alarm_rate_matches_nominal():
     """gpdtail's stated tail probabilities must come true on a well-behaved
     stream: empirical alarm rate within a factor ~2 of nominal, where the
     Gaussian erfc read of the same z stream runs several-fold over (the
-    FRED calibration panel failure this head repairs)."""
+    FRED calibration-panel failure this head repairs)."""
     import random
     from skaters import laplace
     from skaters.anomaly import gpdtail

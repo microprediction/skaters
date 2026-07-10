@@ -1,6 +1,6 @@
 """GPD tail splice: the conditional tail fit, in the predictive itself.
 
-The parade z of a well-tuned body is honest in the bulk and too thin in the
+The parade z of a well-tuned body is calibrated in the bulk and too thin in the
 tails (the calibration panel measured ~8x the promised alarm rate at 1e-3 on
 non-price FRED; repairing it was worth +0.022 nats/tick of held-out
 log-likelihood on 96% of series — benchmarks/anomaly/RESULTS.md sections 5-6).

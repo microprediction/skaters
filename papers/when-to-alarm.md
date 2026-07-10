@@ -1,4 +1,4 @@
-# When to alarm: honest tails for an online forecaster
+# When to alarm: tails that keep their stated rates
 
 *The findings and rationale behind skaters 0.13.0 (the conditional tail
 fit), the calibration panel that motivated it, and the negative results
@@ -17,13 +17,17 @@ matrix-profile methods dominate UCR-style discord tasks (our fixed-window
 DAMP replication scores 0.587 raw), and the modern leaderboard tops are
 simple statistical methods. **Job 2, when to alarm,** is threshold
 selection with a false-alarm rate you can state in advance and verify
-afterwards. A verified forward-citation sweep (2026-07) found this seat
-effectively empty. Three academic lines circle it, in mutual isolation:
+afterwards.
+
+A verified forward-citation sweep (2026-07) found this seat effectively
+empty. Three academic lines circle it, in mutual isolation:
 weighted conformal (W1-ACAS, ICLR 2026), conformal + online FDR
 (Rebjock et al., C-PP-COAD, e-LOND/e-GAI), and e-processes (e-detectors,
 PITMonitor). None cites SPOT/DSPOT, telemanom, or each other, and every
 formal guarantee assumes i.i.d. or exchangeable inputs that drifting,
-seasonal streams violate. Benchmarks are no help: VUS/AUC metrics are
+seasonal streams violate.
+
+Benchmarks are no help: VUS/AUC metrics are
 invariant to monotone score transforms (calibration is unmeasurable by
 construction) and TAB sweeps thresholds and reports the best, which is an
 oracle, not an alarm rule.
@@ -34,9 +38,10 @@ online forecaster (each arriving point resolved against the prediction
 made *for it*) is exactly the input the entire calibrated-alarm
 literature assumes and cannot create. That is the seam skaters lives on.
 
-## 2. The calibration panel: re-running their benchmarks honestly
+## 2. The calibration panel: re-running their benchmarks for calibration
 
-Since no benchmark measures false-alarm honesty, we built the protocol on
+Since no benchmark measures whether stated false-alarm rates come true,
+we built the protocol on
 the field's own data. The UCR Anomaly Archive certifies each series'
 prefix anomaly-free, about 5M labeled-normal points; the FRED cache supplies
 the economic universe skaters actually claims. Per series, prequentially:
@@ -48,9 +53,10 @@ The panel's first finding embarrassed everyone, including us. On home
 field (379 non-price FRED series, median per-series rates): the parade z
 under a Gaussian read fired **8x its promised rate at nominal 1e-3**; the
 Mahalanobis detector head amplified that to 11x; DSPOT, the 2017 EVT
-incumbent, was closest at 2.3x. The pattern across methods was the
-diagnosis: z-fronted heads won the bulk (1e-2), GPD-tailed heads won the
-deep tail. The parade z is honest in the bulk (the coverage study's 90%
+incumbent, was closest at 2.3x.
+
+The pattern across methods was the diagnosis: z-fronted heads won the bulk (1e-2), GPD-tailed heads won the
+deep tail. The parade z is calibrated in the bulk (the coverage study's 90%
 interval) and too thin beyond ~3 sigma; extreme value theory exists for
 precisely this failure.
 
@@ -58,12 +64,13 @@ precisely this failure.
 
 "Fix the tails" invites a trap. The naive tail-weighted log score
 w(y)·log f(y) (Amisano–Giacomini) is **improper**: a forecaster wins by
-inflating the weighted region (Gneiting–Ranjan 2011). The consistent
-version is the **censored likelihood score** (Diks–Panchenko–van Dijk
-2011): inside the region score log f(y) in full; outside, score only
+inflating the weighted region (Gneiting–Ranjan 2011).
+
+The consistent version is the **censored likelihood score**
+(Diks–Panchenko–van Dijk 2011): inside the region score log f(y) in full; outside, score only
 log P(not region). That is the likelihood of a censored sample. Its price
 is forced by a theorem: no proper score depends on tail shape alone
-(Brehmer–Strokorb 2019); every honest tail claim also pays for the
+(Brehmer–Strokorb 2019); every consistent tail claim also pays for the
 probability of *reaching* the tail.
 
 This yields a two-skater construction that is proper by design. Skater
@@ -110,7 +117,9 @@ regime shift against the frozen thresholds, and the forgetting rate is
 also what makes frozen thresholds safe; intake is winsorised at the
 fitted 1-in-1000 excess with a changepoint escape after 10 consecutive
 caps (DSPOT's documented masking failure, not inherited); spliced
-predictives round-trip through `Dist.from_dict`. Cost: ~5% runtime,
+predictives round-trip through `Dist.from_dict`.
+
+Cost: ~5% runtime,
 ~1e-6 JS parity maintained (105,658 values, 54 scenarios, including a
 splice-active scenario).
 
@@ -121,7 +130,7 @@ Acceptance, all prequential, new default vs `tails="gaussian"`:
 | held-out LL, k=1 (85 non-price series) | **+0.029 nats/tick, 84/85 wins** |
 | held-out LL, k=3 horizon 3 | **+0.027 nats/tick, 58/59** |
 | erfc-on-z alarm rate @ nominal 1e-3 | 8.4e-3 → **1.4e-3** (both horizons; residue ≈ genuine-anomaly base rate) |
-| price series (109) | +0.018 nats/tick, 107/109; z-honesty likewise |
+| price series (109) | +0.018 nats/tick, 107/109; z alarm rates likewise |
 | central interval coverage (142 series) | 90%: 89.17→**90.08**; 99%: 97.62→**98.93**; 99.9%: 99.13→**99.85** |
 | CRPS (the default leaf objective) | wash (median −0.07%) |
 | pinball @5% / @1% / @0.5% | wash / wash / +1.0% |
@@ -136,12 +145,12 @@ comes true.
 
 These are load-bearing; the claim is credible because they are recorded.
 
-- **The Mahalanobis head did not heal** on honest z (~9x at 1e-3
+- **The Mahalanobis head did not heal** on the corrected z (~9x at 1e-3
   unchanged): its overconfidence is the empirical-null machinery's own
   defect. Until repaired it is a ranking head, not an alarm head.
 - **Do not stack the `gpdtail` head on the new default.** A second
   splice fits near-degenerate GPDs to the thin exceedances of
-  already-honest z and over-alarms on some series. Measured; documented
+  already-corrected z and over-alarms on some series. Measured; documented
   in the head's docstring.
 - **The GARCH leaf and the splice do not stack on price series.** The
   splice alone is the best within-library price configuration
@@ -149,8 +158,8 @@ These are load-bearing; the claim is credible because they are recorded.
   unconditional tail shape compete for the same signal. The rematch
   against a true GARCH-t opponent under the new default is unplayed.
 - **Waveforms are out of scope, and self-diagnosingly so.** On UCR's
-  near-deterministic periodic families (ECG, gait) every method's alarm
-  rate is dishonest and the own head ranks at the top of the trivial
+  near-deterministic periodic families (ECG, gait) every method exceeds
+  its stated alarm rate and the own head ranks at the top of the trivial
   band: that regime is template matching's game (DAMP raw 0.587;
   fronting it with z *hurts*, 0.427). The PIT histogram is the regime
   detector: flat means the calibration claims hold; U-shaped means
@@ -158,14 +167,14 @@ These are load-bearing; the claim is credible because they are recorded.
 - **Quantile location moves little.** The splice buys density height at
   extreme ticks and alarm calibration, not VaR accuracy; pinball gains
   are modest and confined beyond the ~2% boundary.
-- **The z-clamp still caps honesty near 1e-6**; extreme p-values below
+- **The z-clamp still floors p-values near 1e-6**; anything below
   that await lifting the clamp for the tail path.
 
 ## 6. What this sets up
 
-Per-tick honest p-values are the input the anytime-valid literature
+Per-tick calibrated p-values are the input the anytime-valid literature
 assumes: an e-process layer over the parade (accumulate evidence, alarm
-when it exceeds 1/alpha) would upgrade per-tick honesty to
+when it exceeds 1/alpha) would upgrade the per-tick guarantee to
 "probability of *ever* falsely alarming ≤ alpha" under continuous
 monitoring, a composition (forecaster-manufactured PITs + e-detectors /
 e-GAI) that, per the verified sweep, nobody has published. The

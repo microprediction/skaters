@@ -490,15 +490,17 @@ $h$ draws only on scales $s \le h$, so at $k=1$ the wrapper is exactly
 \code{laplace(1)} --- multi-scale is free where it has nothing to add.
 
 %% -------------------------------------------------------------------------
-\section{Honest tails: the conditional tail fit} \label{sec:tails}
+\section{The conditional tail fit} \label{sec:tails}
 
 A density forecaster makes quantitative promises, and the deepest ones are
 tail probabilities. Measured prequentially on the study universe, the
 library's own promises initially failed there: the calibration $z$ of
-Section~\ref{sec:software} was honest in the bulk (its nominal central 90\%
+Section~\ref{sec:software} was calibrated in the bulk (its nominal central 90\%
 interval covered 89.2\%) but its Gaussian read fired at roughly eight times
 the stated rate at tail probability $10^{-3}$: the predictive tails were
-too thin beyond three sigma. The repair cannot be a tail-weighted refit: the
+too thin beyond three sigma.
+
+The repair cannot be a tail-weighted refit: the
 weighted log score $w(y)\log f(y)$ is improper, rewarding densities that
 inflate the weighted region \citep{gneiting2011comparing}. The consistent
 objective is the \emph{censored likelihood} \citep{diks2011likelihood}:
@@ -511,10 +513,12 @@ generalized-Pareto tails: peaks-over-threshold in the spirit of
 \citet{siffer2017anomaly}, applied to the forecaster's own surprise stream.
 The body defines a \emph{predictable} tail region (its calibration $z$
 beyond thresholds frozen at warm-up quantiles, fixed before each
-observation); a trailing tail model fits the exceedances per side by
+observation). A trailing tail model fits the exceedances per side by
 censored maximum likelihood, which factorizes into an exceedance rate (an
 EWMA, forgetting like every other estimator in the library) and a
-conditional GPD shape (Grimshaw profile). Each issued \code{Dist} is spliced: body density in the interior,
+conditional GPD shape (Grimshaw profile).
+
+Each issued \code{Dist} is spliced: body density in the interior,
 rescaled so mass is exact, and GPD beyond. The splice sits \emph{below}
 the calibration state, so \code{logpdf}, \code{cdf}, \code{quantile},
 CRPS and \code{state["z"]} all read the corrected tail. Information flows body $\to$ region $\to$ tail $\to$ output
@@ -545,7 +549,9 @@ The Gaussian 99.9\% interval breached its budget $8.7\times$; the spliced
 one is within 0.05 points of nominal, and a stated alarm budget now
 converts directly: alarm when $\mathrm{erfc}(|z|/\sqrt{2}) < \alpha$, with
 measured rate ${\approx}1.4\times10^{-3}$ at nominal $10^{-3}$, the residue
-consistent with the genuine anomalies real series contain. The findings, the propriety construction, and the negative results that
+consistent with the genuine anomalies real series contain.
+
+The findings, the propriety construction, and the negative results that
 scope the claim (tail \emph{quantile} location moves little;
 near-deterministic waveform streams remain out of scope) are written up in
 the repository (\code{papers/when-to-alarm.md}).

@@ -1,4 +1,4 @@
-"""The calibration panel: re-run the UCR archive under an honest protocol.
+"""The calibration panel: re-run the UCR archive for stated-rate accuracy.
 
 Academic TSAD benchmarks score ranking (VUS/AUC, argmax) and are blind to
 the operator's question: "if I set the alarm budget to alpha, do I get
@@ -46,7 +46,7 @@ ALPHAS = (1e-2, 1e-3, 1e-4)
 DELAY_ALPHA = 1e-3
 # *_z variants are the same heads fed the parade 1-step z instead of raw y:
 # the front-end question for job 2 — does the transform make THEIR alarm
-# rates honest?
+# rates match nominal?
 METHODS = ("mah", "z1", "dspot", "mz", "dspot_z", "mz_z")
 
 

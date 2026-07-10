@@ -63,7 +63,7 @@ def test_laplace_emits_spliced_dists_after_warmup():
         _, s0 = f0(0.0, s0)
 
 
-def test_z_tail_honesty_on_heavy_tailed_stream():
+def test_z_tail_alarm_rate_on_heavy_tailed_stream():
     """The point of the splice: erfc on the parade z must keep its promise
     at 1e-2/1e-3 on a heavy-tailed stream, where the Gaussian read runs hot."""
     rng = random.Random(9)

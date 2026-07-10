@@ -124,7 +124,7 @@ memory, is the missing ingredient there. Union of the two configs' best
 scorers reaches 95/250 = 0.38 (oracle ceiling on this axis: parameter
 diversity buys real coverage). Own head sits at the top of the trivial
 band, well under good classical (0.50-0.60); the UCR credibility row
-should quote the n<=50k subset (64/150 = 0.43) alongside the honest 0.304.
+should quote the n<=50k subset (64/150 = 0.43) alongside the full-archive 0.304.
 
 Context bands (full 250, published): trivial 0.30-0.40; good single classical
 methods 0.50-0.60; DAMP/matrix-profile 0.65-0.75; 2021 contest ensembles
@@ -169,12 +169,12 @@ within [alpha/2, 2*alpha]:
 
 The home-field run does NOT vindicate the current head. Medians are
 crisis-robust, so this is genuine miscalibration, not 2008/COVID: the
-parade z is honest in the bulk (the coverage study's 90% interval) but its
+parade z is calibrated in the bulk (the coverage study's 90% interval) but its
 1e-3 tail fires ~8x nominal — the predictive tails are too thin at 3+
 sigma — and the Mahalanobis empirical-null machinery amplifies (11x) rather
 than repairs it. The pattern across methods is the finding: z-fronting wins
 the bulk (mz_z best at 1e-2), the GPD tail wins the deep tail (dspot/dspot_z
-best at 1e-3/1e-4, ~2.3-4.6x), and nobody is honest at 1e-4. Conclusion:
+best at 1e-3/1e-4, ~2.3-4.6x), and nobody holds its stated rate at 1e-4. Conclusion:
 calibrated alarms need BOTH halves — the forecaster to manufacture
 stationarity, EVT to convert the tail. The concrete ticket: a GPD/POT tail
 head on the parade z (the planned `pickands`/`siffer`), replacing erfc and
@@ -196,16 +196,16 @@ At 1e-2 the promise is kept essentially exactly. At 1e-3 the median is
 overshoot is bounded below by the genuine-anomaly base rate: ~300 true
 crisis ticks per 1M would add 3e-4 to every rate, negligible at 1e-2,
 dominant at 1e-4. So the deep-tail read (2.9e-4 at nominal 1e-4) is
-consistent with an honest detector on data that genuinely contains
+consistent with a calibrated detector on data that genuinely contains
 anomalies — unfalsifiable to push further without labels. Synthetic
-(regime-switching, no anomalies): 1.0e-2 / 1.1e-3 / 1.8e-4 — honest at
+(regime-switching, no anomalies): 1.0e-2 / 1.1e-3 / 1.8e-4, at nominal at
 all three. The z-clamp (|z|<=7.03) truncates exceedances; p-values below
 ~1e-6 remain out of reach until the clamp is lifted for the tail head.
 
 Verdict: forecaster-manufactured stationarity + EVT tail = the first
 method in the table that keeps its stated alarm budget. Next: censored-ML
 fit (the proper-score twin of this head — CSL scoring), lift the z-clamp
-for exceedances, UCR waveform column for the honest scope statement.
+for exceedances, UCR waveform column for the scope statement.
 
 ## 6. The conditional tail fit (FINAL 2026-07-09)
 
@@ -229,9 +229,9 @@ tail is worth ~+0.02 nats/tick on the WHOLE likelihood (96% of series
 win) and +0.84 nats per tail tick — the single largest free improvement
 measured on this branch. Implication: this belongs in the library as a
 predictive-tail option (splice at the leaf in z-space, conjugation
-carries it everywhere: density, CRPS, VaR, and honest tail PITs at the
+carries it everywhere: density, CRPS, VaR, and calibrated tail PITs at the
 source — which would make erfc-on-z calibrated and gpdtail a consumer
-of an already-honest stream). Cost: the JS twin (1e-6 parity) must
+of an already-corrected stream). Cost: the JS twin (1e-6 parity) must
 implement the splice too.
 
 ## 7. Shipped: GPD tails default-on (0.13.0, 2026-07-09)
@@ -241,11 +241,12 @@ implement the splice too.
 non-price FRED series, new default vs old, same series, prequential:
 median dLL +0.0271 nats/tick (84/85 wins); erfc-on-parade-z empirical rate
 at nominal 1e-2: 2.4e-2 -> 1.05e-2; at 1e-3: 8.4e-3 -> 1.38e-3. The z
-stream the anomaly skill documents is now approximately honest as stated.
+stream the anomaly skill documents now delivers approximately its stated
+rates.
 Parity 105,658 values across 54 scenarios incl. a splice-active scenario.
 
 UCR fronted calibration panel (full 250, for the record): fronting DSPOT
-improves its deep-tail honesty on waveforms too (1e-3: 4.6e-3 raw ->
+moves its deep-tail rate toward nominal on waveforms too (1e-3: 4.6e-3 raw ->
 2.9e-3 fronted; 1e-4: 1.6e-3 -> 6.0e-4), but at 1e-3 every method still
 drowns in false alarms on the periodic families — waveforms remain out of
 scope (section 3; skaters#91).
@@ -277,7 +278,7 @@ the ~2% boundary; pinball at 1% or 0.5% is where to look for it.
 ## 8. Post-ship panel recheck (87 series, new default, 2026-07-09)
 
 With the splice in the forecaster, the panel harness confirms the product
-claim end-to-end: **plain erfc on state["z"] is now the honest alarm rule**
+claim end-to-end: **plain erfc on state["z"] now keeps its stated rate**
 — median 1.0e-2 at nominal 1e-2 (89% of series in the 2x band), 1.3e-3 at
 1e-3 (59% in band). Two negative findings with design consequences:
 
@@ -288,7 +289,7 @@ claim end-to-end: **plain erfc on state["z"] is now the honest alarm rule**
   until then the multivariate geometry is for RANKING (argmax), not for
   calibrated alarming.
 * **Do not stack gpdtail on the new laplace** (double splice): median is
-  fine but a few series blow up (thin exceedances of already-honest z fit
+  fine but a few series blow up (thin exceedances of already-corrected z fit
   near-degenerate GPDs), dragging pooled rates above nominal. With
   tails="gpd" (the default), threshold erfc(|z|/sqrt2) directly; the
   gpdtail head remains useful only over gaussian-tail bodies.

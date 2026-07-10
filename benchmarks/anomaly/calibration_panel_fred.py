@@ -6,13 +6,13 @@ This measures the same question as calibration_panel.py — "if I set the alarm
 budget to alpha, do I get alpha?" — strictly prequentially, on real economic
 series.
 
-FRED has no anomaly labels, so there is no delay panel and one honest caveat:
+FRED has no anomaly labels, so there is no delay panel, and one caveat:
 real series contain genuine anomalies (2008, COVID), so a calibrated method
 should run slightly ABOVE nominal on pooled counts. Three statistics per
 method and alpha, in decreasing crisis-sensitivity:
     pooled:  total alarms / total ticks (crisis-inflated upper read)
     median:  median per-series alarm rate (a few crisis series can't move it)
-    honest%: fraction of series with rate in [alpha/2, 2*alpha]
+    inband%: fraction of series with rate in [alpha/2, 2*alpha]
 
 Methods as in calibration_panel.py: mah, z1 (ours), dspot, mz (raw
 incumbents), dspot_z, mz_z (same heads fed the parade z — the front-end
@@ -201,7 +201,7 @@ def main():
     print(f"\n=== FRED non-price FPR panel: {len(results)} series, "
           f"{ticks} ticks ===")
     print(f"{'method':8s}" + "".join(
-        f"  pooled@{al:g} / median / honest%".ljust(34) for al in ALPHAS))
+        f"  pooled@{al:g} / median / inband%".ljust(34) for al in ALPHAS))
     for m in METHODS:
         row = f"{m:8s}"
         for al in ALPHAS:
@@ -209,9 +209,9 @@ def main():
             pooled = sum(r[m][key] for r in results) / ticks
             rates = sorted(r[m][key] / r["ticks"] for r in results)
             med = rates[len(rates) // 2]
-            honest = sum(1 for x in rates if al / 2 <= x <= 2 * al) \
+            inband = sum(1 for x in rates if al / 2 <= x <= 2 * al) \
                 / len(rates)
-            row += f"  {pooled:.1e} / {med:.1e} / {honest:.0%}".ljust(34)
+            row += f"  {pooled:.1e} / {med:.1e} / {inband:.0%}".ljust(34)
         print(row)
     print(f"\nwrote {out}")
 

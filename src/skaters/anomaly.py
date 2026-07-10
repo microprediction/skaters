@@ -457,7 +457,7 @@ def gpdtail(base, k: int = 1, level: float = 0.98, nexc: int = 1000,
     """Wrap a parade-wrapped skater with a POT/GPD tail on the 1-step z.
 
     NOTE (0.13.0): ``laplace`` now splices GPD tails into the predictive
-    itself (``skaters.tails``), so its ``state["z"]`` is already honest —
+    itself (``skaters.tails``), so its ``state["z"]`` is already corrected:
     threshold ``erfc(|z|/sqrt(2))`` directly and do NOT stack this head on
     top (a second splice fits near-degenerate GPDs to the thin exceedances
     of already-corrected z and over-alarms on some series; measured in
@@ -466,7 +466,7 @@ def gpdtail(base, k: int = 1, level: float = 0.98, nexc: int = 1000,
     ``laplace(tails="gaussian")``.
 
     The FRED calibration panel (benchmarks/anomaly/RESULTS.md section 5)
-    measured the failure this repairs: the parade z is honest in the bulk
+    measured the failure this repairs: the parade z is calibrated in the bulk
     (the coverage study's 90% interval) but its Gaussian tail is too thin
     beyond ~3 sigma — ``erfc`` promises 1e-3 and delivers ~8e-3. Extreme
     value theory is the tool for exactly this: fit a generalized Pareto to
@@ -474,7 +474,7 @@ def gpdtail(base, k: int = 1, level: float = 0.98, nexc: int = 1000,
     from the fit instead of from N(0,1). Peaks-over-threshold in the spirit
     of SPOT (Siffer et al., KDD 2017), applied to the forecaster's surprise
     stream rather than to raw values — the combination the panel found
-    closest to honest (dspot_z), done natively:
+    nearest its nominal rate (dspot_z), done natively:
 
     * no drift EWMA on z (the forecaster already centers it);
     * consistent exceedance rate: zeta = (all exceedances seen)/(all ticks

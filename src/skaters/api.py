@@ -312,8 +312,8 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
             horizon; exceedances fit a GPD per side; the predictive keeps the
             body's density in the interior and the GPD beyond. Worth ~+0.02
             nats/tick of held-out log-likelihood on 96% of non-price FRED
-            series, and makes the parade z honest in the tails (a stated
-            1e-3 alarm rate approximately comes true — see
+            series, and makes the parade z calibrated in the tails (a
+            stated 1e-3 alarm rate approximately comes true — see
             ``benchmarks/anomaly/RESULTS.md`` sections 5-6). ``"gaussian"``
             disables the splice. Costs ~5% runtime.
 
