@@ -1,0 +1,287 @@
+\begin{thebibliography}{45}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Ansari et~al.(2024)]{ansari2024chronos}
+Abdul~Fatir Ansari et~al.
+\newblock Chronos: Learning the language of time series.
+\newblock \emph{Transactions on Machine Learning Research}, 2024.
+
+\bibitem[Assimakopoulos and Nikolopoulos(2000)]{assimakopoulos2000theta}
+Vassilis Assimakopoulos and Konstantinos Nikolopoulos.
+\newblock The theta model: a decomposition approach to forecasting.
+\newblock \emph{International Journal of Forecasting}, 16\penalty0
+  (4):\penalty0 521--530, 2000.
+
+\bibitem[Bollerslev(1986)]{bollerslev1986generalized}
+Tim Bollerslev.
+\newblock Generalized autoregressive conditional heteroskedasticity.
+\newblock \emph{Journal of Econometrics}, 31\penalty0 (3):\penalty0 307--327,
+  1986.
+
+\bibitem[Bollerslev(1987)]{bollerslev1987conditionally}
+Tim Bollerslev.
+\newblock A conditionally heteroskedastic time series model for speculative
+  prices and rates of return.
+\newblock \emph{The Review of Economics and Statistics}, 69\penalty0
+  (3):\penalty0 542--547, 1987.
+
+\bibitem[Box and Cox(1964)]{box1964analysis}
+George~EP Box and David~R Cox.
+\newblock An analysis of transformations.
+\newblock \emph{Journal of the Royal Statistical Society: Series B},
+  26\penalty0 (2):\penalty0 211--243, 1964.
+
+\bibitem[Brehmer and Strokorb(2019)]{brehmer2019tails}
+Jonas~R. Brehmer and Kirstin Strokorb.
+\newblock Why scoring functions cannot assess tail properties.
+\newblock \emph{Electronic Journal of Statistics}, 13\penalty0 (2):\penalty0
+  4015--4034, 2019.
+
+\bibitem[Chandola et~al.(2009)Chandola, Banerjee, and
+  Kumar]{chandola2009anomaly}
+Varun Chandola, Arindam Banerjee, and Vipin Kumar.
+\newblock Anomaly detection: A survey.
+\newblock \emph{ACM Computing Surveys}, 41\penalty0 (3):\penalty0 1--58, 2009.
+
+\bibitem[Cotton(2021)]{cotton2021timemachines}
+Peter Cotton.
+\newblock timemachines: Evaluation of online time-series forecasting
+  algorithms.
+\newblock \url{https://github.com/microprediction/timemachines}, 2021.
+
+\bibitem[Cotton(2022)]{cotton2022microprediction}
+Peter Cotton.
+\newblock \emph{Microprediction: Building an Open AI Network}.
+\newblock MIT Press, Cambridge, MA, 2022.
+
+\bibitem[Creal et~al.(2013)Creal, Koopman, and Lucas]{creal2013generalized}
+Drew Creal, Siem~Jan Koopman, and Andr{\'e} Lucas.
+\newblock Generalized autoregressive score models with applications.
+\newblock \emph{Journal of Applied Econometrics}, 28\penalty0 (5):\penalty0
+  777--795, 2013.
+
+\bibitem[Das et~al.(2024)Das, Kong, Sen, and Zhou]{das2024timesfm}
+Abhimanyu Das, Weihao Kong, Rajat Sen, and Yichen Zhou.
+\newblock A decoder-only foundation model for time-series forecasting.
+\newblock \emph{International Conference on Machine Learning}, 2024.
+
+\bibitem[Diks et~al.(2011)Diks, Panchenko, and van Dijk]{diks2011likelihood}
+Cees Diks, Valentyn Panchenko, and Dick van Dijk.
+\newblock Likelihood-based scoring rules for comparing density forecasts in
+  tails.
+\newblock \emph{Journal of Econometrics}, 163\penalty0 (2):\penalty0 215--230,
+  2011.
+
+\bibitem[Engle(1982)]{engle1982autoregressive}
+Robert~F Engle.
+\newblock Autoregressive conditional heteroscedasticity with estimates of the
+  variance of united kingdom inflation.
+\newblock \emph{Econometrica}, 50\penalty0 (4):\penalty0 987--1007, 1982.
+
+\bibitem[{Federal Reserve Bank of St.\ Louis}()]{fred}
+{Federal Reserve Bank of St.\ Louis}.
+\newblock Federal reserve economic data ({FRED}).
+\newblock \url{https://fred.stlouisfed.org}.
+
+\bibitem[Garza et~al.(2022)Garza, Mergenthaler~Canseco, Challu, and
+  Olivares]{garza2022statsforecast}
+Federico Garza, Max Mergenthaler~Canseco, Cristian Challu, and Kin~G Olivares.
+\newblock {StatsForecast}: Lightning fast forecasting with statistical and
+  econometric models.
+\newblock \emph{PyCon Salt Lake City, Utah, US 2022}, 2022.
+\newblock Nixtla.
+
+\bibitem[Ghalanos(2022)]{ghalanos2022rugarch}
+Alexios Ghalanos.
+\newblock \pkg{rugarch}: Univariate garch models, 2022.
+\newblock R package version 1.4-9.
+
+\bibitem[Gibbs and Cand{\`e}s(2021)]{gibbs2021adaptive}
+Isaac Gibbs and Emmanuel Cand{\`e}s.
+\newblock Adaptive conformal inference under distribution shift.
+\newblock \emph{Advances in Neural Information Processing Systems},
+  34:\penalty0 1660--1672, 2021.
+
+\bibitem[Gneiting and Raftery(2007)]{gneiting2007strictly}
+Tilmann Gneiting and Adrian~E Raftery.
+\newblock Strictly proper scoring rules, prediction, and estimation.
+\newblock \emph{Journal of the American Statistical Association}, 102\penalty0
+  (477):\penalty0 359--378, 2007.
+
+\bibitem[Gneiting and Ranjan(2011)]{gneiting2011comparing}
+Tilmann Gneiting and Roopesh Ranjan.
+\newblock Comparing density forecasts using threshold- and quantile-weighted
+  scoring rules.
+\newblock \emph{Journal of Business \& Economic Statistics}, 29\penalty0
+  (3):\penalty0 411--422, 2011.
+
+\bibitem[Hansen and Tong(2026)]{hansen2026tweedie}
+Peter~Reinhard Hansen and Chen Tong.
+\newblock Tweedie's formula and score-driven updating.
+\newblock \emph{arXiv preprint arXiv:2605.15902}, 2026.
+
+\bibitem[Harvey(2013)]{harvey2013dynamic}
+Andrew~C Harvey.
+\newblock \emph{Dynamic Models for Volatility and Heavy Tails: With
+  Applications to Financial and Economic Time Series}.
+\newblock Cambridge University Press, 2013.
+
+\bibitem[Hoeting et~al.(1999)Hoeting, Madigan, Raftery, and
+  Volinsky]{hoeting1999bayesian}
+Jennifer~A Hoeting, David Madigan, Adrian~E Raftery, and Chris~T Volinsky.
+\newblock Bayesian model averaging: a tutorial.
+\newblock \emph{Statistical Science}, 14\penalty0 (4):\penalty0 382--401, 1999.
+
+\bibitem[Hyndman and Khandakar(2008)]{hyndman2008automatic}
+Rob~J Hyndman and Yeasmin Khandakar.
+\newblock Automatic time series forecasting: the forecast package for {R}.
+\newblock \emph{Journal of Statistical Software}, 27\penalty0 (3):\penalty0
+  1--22, 2008.
+
+\bibitem[Hyndman et~al.(2002)Hyndman, Koehler, Snyder, and
+  Grose]{hyndman2002state}
+Rob~J Hyndman, Anne~B Koehler, Ralph~D Snyder, and Simone Grose.
+\newblock A state space framework for automatic forecasting using exponential
+  smoothing methods.
+\newblock \emph{International Journal of Forecasting}, 18\penalty0
+  (3):\penalty0 439--454, 2002.
+
+\bibitem[Kelly(1956)]{kelly1956new}
+John~L Kelly.
+\newblock A new interpretation of information rate.
+\newblock \emph{The Bell System Technical Journal}, 35\penalty0 (4):\penalty0
+  917--926, 1956.
+
+\bibitem[Kim et~al.(2022)Kim, Choi, Choi, Lee, and Yoon]{kim2022rigorous}
+Siwon Kim, Kukjin Choi, Hyun-Soo Choi, Byunghan Lee, and Sungroh Yoon.
+\newblock Towards a rigorous evaluation of time-series anomaly detection.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial
+  Intelligence}, volume~36, pages 7194--7201, 2022.
+
+\bibitem[Lavin and Ahmad(2015)]{lavin2015nab}
+Alexander Lavin and Subutai Ahmad.
+\newblock Evaluating real-time anomaly detection algorithms --- the numenta
+  anomaly benchmark.
+\newblock In \emph{IEEE 14th International Conference on Machine Learning and
+  Applications (ICMLA)}, pages 38--44, 2015.
+
+\bibitem[Lo and MacKinlay(1988)]{lo1988stock}
+Andrew~W Lo and A~Craig MacKinlay.
+\newblock Stock market prices do not follow random walks: Evidence from a
+  simple specification test.
+\newblock \emph{The Review of Financial Studies}, 1\penalty0 (1):\penalty0
+  41--66, 1988.
+
+\bibitem[Manokhin(2026)]{manokhin2026csp}
+Valery Manokhin.
+\newblock Conformal seasonal pools for distribution-free time-series
+  prediction.
+\newblock \emph{arXiv preprint arXiv:2605.03789}, 2026.
+
+\bibitem[Matheson and Winkler(1976)]{matheson1976scoring}
+James~E Matheson and Robert~L Winkler.
+\newblock Scoring rules for continuous probability distributions.
+\newblock \emph{Management Science}, 22\penalty0 (10):\penalty0 1087--1096,
+  1976.
+
+\bibitem[Raftery et~al.(2005)Raftery, Gneiting, Balabdaoui, and
+  Polakowski]{raftery2005using}
+Adrian~E Raftery, Tilmann Gneiting, Fadoua Balabdaoui, and Michael Polakowski.
+\newblock Using {Bayesian} model averaging to calibrate forecast ensembles.
+\newblock \emph{Monthly Weather Review}, 133\penalty0 (5):\penalty0 1155--1174,
+  2005.
+
+\bibitem[Rasul et~al.(2023)]{rasul2023lagllama}
+Kashif Rasul et~al.
+\newblock Lag-{Llama}: Towards foundation models for probabilistic time series
+  forecasting.
+\newblock \emph{arXiv preprint arXiv:2310.08278}, 2023.
+
+\bibitem[Rezende and Mohamed(2015)]{rezende2015variational}
+Danilo Rezende and Shakir Mohamed.
+\newblock Variational inference with normalizing flows.
+\newblock In \emph{International Conference on Machine Learning}, pages
+  1530--1538. PMLR, 2015.
+
+\bibitem[Salinas et~al.(2020)Salinas, Flunkert, Gasthaus, and
+  Januschowski]{salinas2020deepar}
+David Salinas, Valentin Flunkert, Jan Gasthaus, and Tim Januschowski.
+\newblock {DeepAR}: Probabilistic forecasting with autoregressive recurrent
+  networks.
+\newblock \emph{International Journal of Forecasting}, 36\penalty0
+  (3):\penalty0 1181--1191, 2020.
+
+\bibitem[Siffer et~al.(2017)Siffer, Fouque, Termier, and
+  Largou{\"e}t]{siffer2017anomaly}
+Alban Siffer, Pierre-Alain Fouque, Alexandre Termier, and Christine
+  Largou{\"e}t.
+\newblock Anomaly detection in streams with extreme value theory.
+\newblock In \emph{Proceedings of the 23rd ACM SIGKDD International Conference
+  on Knowledge Discovery and Data Mining}, pages 1067--1075, 2017.
+
+\bibitem[Svetunkov(2023)]{svetunkov2023adam}
+Ivan Svetunkov.
+\newblock \emph{Forecasting and Analytics with the Augmented Dynamic Adaptive
+  Model (ADAM)}.
+\newblock Chapman and Hall/CRC, 2023.
+
+\bibitem[Taylor and Letham(2018)]{taylor2018prophet}
+Sean~J Taylor and Benjamin Letham.
+\newblock Forecasting at scale.
+\newblock \emph{The American Statistician}, 72\penalty0 (1):\penalty0 37--45,
+  2018.
+
+\bibitem[{The Pyodide development team}(2021)]{pyodide2021}
+{The Pyodide development team}.
+\newblock Pyodide: Python with the scientific stack, compiled to {WebAssembly}.
+\newblock \url{https://pyodide.org}, 2021.
+
+\bibitem[Vovk et~al.(2005)Vovk, Gammerman, and Shafer]{vovk2005algorithmic}
+Vladimir Vovk, Alexander Gammerman, and Glenn Shafer.
+\newblock \emph{Algorithmic Learning in a Random World}.
+\newblock Springer, 2005.
+
+\bibitem[Vovk et~al.(2019)Vovk, Nouretdinov, Manokhin, and
+  Gammerman]{vovk2019conformal}
+Vladimir Vovk, Ilia Nouretdinov, Valery Manokhin, and Alexander Gammerman.
+\newblock Conformal predictive distributions with kernels.
+\newblock In \emph{Conformal and Probabilistic Prediction and Applications},
+  2019.
+
+\bibitem[Welford(1962)]{welford1962note}
+BP~Welford.
+\newblock Note on a method for calculating corrected sums of squares and
+  products.
+\newblock \emph{Technometrics}, 4\penalty0 (3):\penalty0 419--420, 1962.
+
+\bibitem[Wolpert and Macready(1997)]{wolpert1997no}
+David~H Wolpert and William~G Macready.
+\newblock No free lunch theorems for optimization.
+\newblock \emph{IEEE Transactions on Evolutionary Computation}, 1\penalty0
+  (1):\penalty0 67--82, 1997.
+
+\bibitem[Woo et~al.(2024)Woo, Liu, Kumar, Xiong, Savarese, and
+  Sahoo]{woo2024moirai}
+Gerald Woo, Chenghao Liu, Akshat Kumar, Caiming Xiong, Silvio Savarese, and
+  Doyen Sahoo.
+\newblock Unified training of universal time series forecasting transformers.
+\newblock \emph{International Conference on Machine Learning}, 2024.
+
+\bibitem[Wu and Keogh(2023)]{wu2023current}
+Renjie Wu and Eamonn~J Keogh.
+\newblock Current time series anomaly detection benchmarks are flawed and are
+  creating the illusion of progress.
+\newblock \emph{IEEE Transactions on Knowledge and Data Engineering},
+  35\penalty0 (3):\penalty0 2421--2429, 2023.
+
+\bibitem[Yeo and Johnson(2000)]{yeo2000new}
+In-Kwon Yeo and Richard~A Johnson.
+\newblock A new family of power transformations to improve normality or
+  symmetry.
+\newblock \emph{Biometrika}, 87\penalty0 (4):\penalty0 954--959, 2000.
+
+\end{thebibliography}
