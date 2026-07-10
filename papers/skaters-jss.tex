@@ -22,9 +22,7 @@
 
 %% JSS article information
 \author{
-  Peter Cotton\\
-  Microprediction\\
-  \email{peter.cotton@microprediction.com}\\
+  Peter Cotton\thanks{\email{peter.cotton@microprediction.com}}\\
   \url{https://skaters.microprediction.org}
 }
 
@@ -56,9 +54,9 @@ unchanged in a browser.
 \skatersabstract
 \end{abstract}
 
-\noindent\textbf{Keywords:} probabilistic forecasting, time series, proper
-scoring rules, conformal prediction, online learning, \proglang{Python},
-\proglang{JavaScript}, \pkg{skaters}.
+\noindent\textbf{Keywords:} time series, probabilistic forecasting, online
+learning, proper scoring rules, calibration, extreme value theory, Bayesian
+model averaging, \proglang{Python}, \proglang{JavaScript}, \pkg{skaters}.
 
 %% -------------------------------------------------------------------------
 \section{Introduction} \label{sec:intro}
@@ -76,27 +74,32 @@ Classical state-space and exponential-smoothing models
 filter. Conditional-heteroscedasticity models \citep{engle1982autoregressive,
 bollerslev1986generalized} capture the heavy tails and volatility clustering of
 financial data, but commit to a single parametric form and are refit in batch.
+
 At the other extreme, conformal prediction
 \citep{vovk2005algorithmic,vovk2019conformal} is distribution-free and online,
 but a conformal predictive system outputs a cumulative distribution
-function, not a density. Its finite-sample guarantee is \emph{marginal
-coverage} --- not CRPS optimality --- and its native output (a set, interval,
+function, not a density.
+
+Its finite-sample guarantee is \emph{marginal
+coverage}, not CRPS optimality, and its native output (a set, interval,
 quantile family, or CDF) carries no unambiguous Lebesgue density, so
 log-likelihood scoring requires additional smoothing choices on which the
 resulting likelihood then depends; an unsmoothed empirical conformal CDF
-assigns zero density --- and hence $-\infty$ log-likelihood --- to any value
-outside the observed residual range. Modern neural and foundation models
+assigns zero density, and hence $-\infty$ log-likelihood, to any value
+outside the observed residual range.
+
+Modern neural and foundation models
 \citep{salinas2020deepar,ansari2024chronos,das2024timesfm,woo2024moirai} are
 powerful distributional learners, but are built for global cross-series training
 on hardware accelerators, not for a single univariate stream running in a
 browser.
 
-\pkg{skaters} takes a third route. Every node --- transform, ensemble, or leaf
---- is a function \code{(y, state) -> ([Dist], state)} that consumes one
+\pkg{skaters} takes a third route. Every node (transform, ensemble, or leaf)
+is a function \code{(y, state) -> ([Dist], state)} that consumes one
 observation and emits a list of \code{Dist} objects, one per forecast horizon,
 where a \code{Dist} is a weighted Gaussian mixture. Because the type is closed
-under composition, an entire model is a stack of invertible transforms ---
-transforms all the way down --- with one distributional leaf at the bottom, and
+under composition, an entire model is a stack of invertible transforms
+(transforms all the way down) with one distributional leaf at the bottom, and
 ensembles are simply skaters that combine other skaters. This single abstraction
 yields three contributions developed in turn:
 
@@ -106,7 +109,7 @@ yields three contributions developed in turn:
   log-likelihood it models the conditional distribution directly; with the
   terminal leaf instead pointed at CRPS while the likelihood-weighted trunk is
   unchanged, the same forecaster becomes competitive with a CRPS specialist on
-  CRPS and stronger on likelihood --- the objective is a knob at the base of the
+  CRPS and stronger on likelihood: the objective is a knob at the base of the
   recursion, not a property of the method.
 \item \emph{Distributional structure that survives composition}
   (Sections~\ref{sec:lattice}--\ref{sec:doob}): a mean-preserving lattice
@@ -125,7 +128,7 @@ yields three contributions developed in turn:
   \pkg{rugarch}), the reference \proglang{R} forecasters (the real Hyndman
   \pkg{auto.arima}, \pkg{thetaf}, Svetunkov's \pkg{ADAM}, \pkg{nnetar}), and
   \pkg{AutoARIMA} paired with split- and adaptive-conformal residuals plus
-  conformal seasonal pools --- the CRPS-optimised methods hardest to beat on that
+  conformal seasonal pools, the CRPS-optimised methods hardest to beat on that
   metric. Every method is scored on held-out log-likelihood and CRPS through a
   single, identical \code{Dist}-based protocol.
 \end{enumerate}
@@ -140,14 +143,18 @@ of a poor one by draining its weight as evidence accumulates.
 No-Free-Lunch also fixes the scope of our claim. We position \pkg{skaters} as a
 general-purpose forecaster for economic and other non-price series, and that is
 where the benchmark of Section~\ref{sec:experiments} is run. Asset-price and
-return series are the hard case --- but not because of heavy tails, which the
+return series are the hard case, but not because of heavy tails, which the
 scale-mixture leaf (Section~\ref{sec:leaf}) already models. They are hard because
 they are close to \emph{martingales}: the conditional mean carries almost no
 signal, so what forecasting skill remains lives in the conditional \emph{variance},
 where the dedicated recursion of a \pkg{GARCH}$(1,1)$-$t$ still tracks volatility
-clustering better than our online scale. There we do not claim to win, recommend
+clustering better than our online scale.
+
+There we do not claim to win, recommend
 \pkg{GARCH}-$t$, and report the result as a split rather than dilute it into a
-pooled average. The distinction is not the price label but the martingality axis
+pooled average.
+
+The distinction is not the price label but the martingality axis
 itself (Section~\ref{sec:martingality}): prices are merely its random-walk-heavy
 extreme, and the \pkg{GARCH}-$t$ contest is governed by where a series falls along
 it. The library's
@@ -196,7 +203,8 @@ for the inner skater, \emph{conjugation} is
 (D'_{1:k},\; u_{t+1}) &= g(z_t,\; u_t) \\
 D_{1:k} &= T.\code{inverse\_k}(D'_{1:k},\; s_{t+1}),
 \end{align*}
-and the \emph{terminal-leaf ensemble} over candidates $g_1,\dots,g_n$ with
+
+The \emph{terminal-leaf ensemble} over candidates $g_1,\dots,g_n$ with
 depths $d_i$ updates, per observation,
 \begin{align*}
 \ell_i &\leftarrow \gamma\,\ell_i + \eta \log p_i(y_t) - c\,d_i,
@@ -207,7 +215,9 @@ D_h = \code{leaf}_h(r_t) \text{ shifted by } \hat\mu_h,
 \end{align*}
 with $\gamma = 0.99$ (forgetting), $\eta = 0.8$ (learning rate), $c = 0.005$
 (per-depth complexity penalty), and $p_i$ the candidate's resolved one-step
-predictive. These constants are fixed defaults, not exposed parameters; they are
+predictive.
+
+These constants are fixed defaults, not exposed parameters; they are
 the same for every series in every experiment below.
 
 \paragraph{Reproducibility.}
@@ -224,7 +234,9 @@ with $\sigma_i>0$ and $\sum_i w_i = 1$. It exposes \code{mean}, \code{std},
 \code{pdf}, \code{cdf}, \code{logpdf}, \code{quantile}, and a closed-form
 \code{crps}, together with the affine maps (\code{shift}, \code{scale},
 \code{affine}) and a moment-matching \code{prune} needed to propagate it through
-transform inverses and to bound component growth in ensembles. The Gaussian
+transform inverses and to bound component growth in ensembles.
+
+The Gaussian
 mixture is a deliberate choice: it is closed under affine maps and mixing, admits
 a closed-form CRPS through the elementary identity
 $\mathbb{E}\,|\mathcal N(m,s^2)| = 2 s\,\phi(m/s) + m\,(2\Phi(m/s)-1)$, and
@@ -237,49 +249,63 @@ A \emph{transform} is a stateful causal map
 whose \code{forward} consumes one observation and the stored state and emits one
 transformed value, paired with an \code{inverse\_k} that reconstructs predictive
 distributions for future $y$'s from $k$ \code{Dist}s in the transformed space,
-\emph{conditional on the current transform state} $s_t$. Several of these maps
+\emph{conditional on the current transform state} $s_t$.
+
+Several of these maps
 (differencing, standardisation, autoregression) are not scalar bijections on
 $\mathbb R$; they are invertible as maps on paths given the stored state, which
 is exactly what \code{inverse\_k} receives. Differencing, exponential smoothing,
 drift, Holt's linear trend, fractional differencing, autoregression (via online
 recursive least squares), \pkg{GARCH}-style scaling, seasonal differencing,
 power and Yeo--Johnson coordinates \citep{box1964analysis,yeo2000new}, and
-standardisation are all transforms. \emph{Conjugation} composes a transform with
+standardisation are all transforms.
+
+\emph{Conjugation} composes a transform with
 an inner skater,
 \[
 y \;\xrightarrow{\;T\;}\; y' \;\to\; \text{inner} \;\to\; D'
   \;\xrightarrow{\;T^{-1}\;}\; D ,
 \]
 and because every step is online and the inverse propagates the full mixture,
-multi-step uncertainty accumulates through the inverse. One caveat is stated
+multi-step uncertainty accumulates through the inverse.
+
+One caveat is stated
 once and holds throughout: the emitted list contains one \emph{marginal}
 predictive per horizon, not a joint law over the path. Linear inverses propagate
 means exactly and propagate variances under the library's recursive
-independent-innovation convention --- the differenced inverse, for example, adds
+independent-innovation convention: the differenced inverse, for example, adds
 the marginal innovation variances, $\sum_{h}\sigma_h^2$, which is exact when
 future transformed innovations are conditionally uncorrelated and an
-approximation otherwise. The convention is audited rather than merely stated:
-the returned state carries per-horizon calibration diagnostics --- the
+approximation otherwise.
+
+The convention is audited rather than merely stated:
+the returned state carries per-horizon calibration diagnostics (the
 probability integral transform of each arriving observation under the
 prediction issued $m$ steps earlier \emph{for it}, and its standard-normal
-quantile $z$ --- and the empirical standard deviation of the horizon-$m$ $z$
+quantile $z$), and the empirical standard deviation of the horizon-$m$ $z$
 sequence estimates precisely the factor by which the independent-innovation
 convention mis-states the $m$-step scale. (Even under perfect calibration the
 horizon-$m$ $z$ values are $(m{-}1)$-dependent, from overlapping forecast
-windows, so consecutive values are not independent evidence.) The inner skater is unconstrained: it may
+windows, so consecutive values are not independent evidence.)
+
+The inner skater is unconstrained: it may
 itself be a conjugation, or an ensemble of conjugations, so a model is
-\emph{transforms all the way down}, bottoming out at a single distributional leaf
---- the one non-transform in the stack.
+\emph{transforms all the way down}, bottoming out at a single distributional leaf,
+the one non-transform in the stack.
 
 Structurally this is the recipe of a normalizing flow
-\citep{rezende2015variational} --- a base density pushed through invertible maps
---- but the regime is inverted. A flow \emph{learns} its coupling layers by
+\citep{rezende2015variational}, a base density pushed through invertible maps,
+but the regime is inverted.
+
+A flow \emph{learns} its coupling layers by
 stochastic gradient descent over a batch; here the transforms are \emph{fixed and
 analytically invertible} as scalar maps (for nonlinear coordinates the
 \emph{pushforward of the predictive} uses a delta-method linearisation,
 Section~\ref{sec:coord}), their few parameters adapting \emph{online} by
 score-driven, Tweedie-style updates \citep{creal2013generalized} one observation
-at a time, in $O(1)$, with no training phase and no gradients. The base is a
+at a time, in $O(1)$, with no training phase and no gradients.
+
+The base is a
 weighted mixture with a pluggable proper-scoring objective, not a fixed Gaussian.
 It is a flow's compositional structure carried into a streaming, closed-form,
 univariate-forecasting regime.
@@ -299,10 +325,12 @@ Bayesian model averaging over a heterogeneous pool
 distributions. In this implementation that dilutes the very shape the leaf is
 for: with dozens of candidates the pooled mixture is dominated by the dispersion
 of the candidate \emph{means} (and by component pruning), so a carefully shaped
-heavy-tailed leaf inside the pool has little influence on the output tail. We therefore use the candidate models
+heavy-tailed leaf inside the pool has little influence on the output tail.
+
+We therefore use the candidate models
 only as mean forecasters, weight them online by predictive likelihood
 (with a learning-rate shrinkage and a per-depth complexity penalty, in the
-spirit of gradient boosting),\footnote{The penalty is charged per step ---
+spirit of gradient boosting),\footnote{The penalty is charged per step:
 rent, not a prior. Under geometric forgetting of the accumulated log-evidence
 (the shipped policy discounts at $\lambda=0.99$) the discounted rent
 telescopes to a bounded handicap proportional to $\text{depth}/(1-\lambda)$,
@@ -316,10 +344,12 @@ the combined residual with a single terminal leaf:
  r = y-\hat\mu \;\to\; \text{leaf} \;\to\; D, \qquad
  \hat D = D \text{ shifted by } \hat\mu .
 \]
-Because exactly one leaf reaches the output, its shape --- heavy tails, learned
-online --- survives undiluted. The trunk is a likelihood-weighted ensemble whose
+
+Because exactly one leaf reaches the output, its shape (heavy tails, learned
+online) survives undiluted. The trunk is a likelihood-weighted ensemble whose
 only job is to get the conditional mean right; the shaping of the distribution is
 left to the base of the recursion.
+
 The candidate pool spans exponential smoothing, differencing, drift, Holt's
 linear trend, autoregression, grouped long-lag autoregression, fractional
 differencing, a seasonal block, a Yeo--Johnson coordinate grid
@@ -328,19 +358,21 @@ differencing, a seasonal block, a Yeo--Johnson coordinate grid
 %% -------------------------------------------------------------------------
 \section{Metric-agnostic leaves: a pluggable base} \label{sec:leaf}
 
-The leaf is itself a fixed Gaussian \emph{scale mixture} --- components
+The leaf is itself a fixed Gaussian \emph{scale mixture}: components
 $\mathcal N\!\big(0, (c_k\,\hat\sigma)^2\big)$ over a fixed log-spaced
 dictionary $\{c_k\}$ of standard-deviation multipliers, with $\hat\sigma$ an
-exponentially weighted scale --- whose only learned quantities are the mixture
-weights $\{w_k\}$ on the simplex. Student-$t$ laws are particular Gaussian
+exponentially weighted scale. Its only learned quantities are the mixture
+weights $\{w_k\}$ on the simplex.
+
+Student-$t$ laws are particular Gaussian
 scale mixtures (an inverse-gamma mixing law over the variance), and the finite
 log-spaced dictionary approximates such heavy-tailed scale mixtures while
 remaining a plain \code{Dist}. The weights are fit online by
 a proper scoring rule \citep{gneiting2007strictly}:
 \begin{itemize}
-\item \code{likelihood} --- recency-weighted expectation--maximisation on the
+\item \code{likelihood}: recency-weighted expectation--maximisation on the
   component responsibilities;
-\item \code{crps} --- exponentiated-gradient descent on the simplex minimising the
+\item \code{crps}: exponentiated-gradient descent on the simplex minimising the
   closed-form mixture CRPS \citep{matheson1976scoring}; the gradient is exact,
   since the mixture CRPS is a finite sum of $\mathbb E\,|\mathcal N(m,s^2)|$ terms.
 \end{itemize}
@@ -351,6 +383,7 @@ objective for modelling is likelihood, a proper, tail-sensitive score that is,
 up to a constant, the Kelly log-growth criterion \citep{kelly1956new}; corrupting
 it to chase CRPS would surrender the density, as conformal systems do by
 construction.
+
 Pointing only the terminal leaf at CRPS shapes the residual tail without touching
 the model above it. Section~\ref{sec:ablations} shows this configuration
 improving on a pure-likelihood policy on CRPS and on likelihood alike: a CRPS-fit
@@ -364,14 +397,14 @@ moment matching and requires a finite second moment. Minimising expected CRPS
 projects in the Cram\'er distance $\int (F-G)^2$, and $\mathrm{CRPS}(F,y)$ is
 finite whenever $F$ has a first moment \citep{gneiting2007strictly}. On
 fat-tailed streams the CRPS leaf therefore remains well-defined in regimes
-where variance matching does not --- a theoretical companion to the robustness
+where variance matching does not, a theoretical companion to the robustness
 observed empirically.
 
 %% -------------------------------------------------------------------------
 \section{The lattice projection} \label{sec:lattice}
 
-Administrative and grid-quoted series --- policy rates, posted prices, pegged
-exchange rates --- revisit a small set of exact values, and a continuous
+Administrative and grid-quoted series (policy rates, posted prices, pegged
+exchange rates) revisit a small set of exact values, and a continuous
 predictive density cannot place mass there. We add a \emph{projection}: a
 recency-weighted frequency table of exact values, with near-Dirac atoms on the
 values revisited above a noise floor, each carrying its observed frequency as
@@ -379,7 +412,7 @@ probability. The atom is mean-preserving: the continuous part is
 recentred so the atoms add mass without moving the ensemble mean.
 
 Two properties make this a safe default. First, on continuous data nothing is
-revisited, no atom fires, and the projection vanishes identically --- it is free
+revisited, no atom fires, and the projection vanishes identically: it is free
 when unused. Second, unlike a last-value spike it captures values that recur
 often but never consecutively (a rate that repeatedly returns to a round number).
 The pull of the level (its tendency to persist) is left to the trunk, where the
@@ -394,24 +427,30 @@ mass is the value's observed recency-weighted revisit frequency (total atom mass
 capped at $0.999$), and a value qualifies only once revisited above a noise
 floor ($1.8\times$ the table's EMA rate), never on first sight. The density is
 therefore an ordinary Lebesgue density and every method is scored by the same
-rule. The convention matters for log-likelihood: at a revisited exact value the
+rule.
+
+The convention matters for log-likelihood: at a revisited exact value the
 score grows like $\log(1/\text{width})$, so the projection is a bandwidth-%
 dependent log-score machine on grid series. That is precisely why
 Table~\ref{tab:sota} restricts to \emph{continuous} series (under $5\%$
 repeating changes), where the projection fires rarely and its contribution to
-the reported win-rates is immaterial. On grid-heavy series we measured the
+the reported win-rates is immaterial.
+
+On grid-heavy series we measured the
 sensitivity directly: sweeping the atom width over two orders of magnitude
 ($0.0005$--$0.05$ of the predictive std, $400$ grid-heavy series) moves the
-median held-out log-likelihood from $+7.8$ to $+5.1$ (off: $+3.2$) --- the
-magnitudes are bandwidth artefacts, as the scaling predicts --- while the
+median held-out log-likelihood from $+7.8$ to $+5.1$ (off: $+3.2$); the
+magnitudes are bandwidth artefacts, as the scaling predicts. Meanwhile the
 per-series \emph{winner} against \pkg{AutoETS} agrees on $91\%$ of series
 between the extreme widths (win-rate $66\%$ vs $57\%$), and CRPS, being
 bounded, barely moves ($0.0035$ vs $0.0053$). Grid-series log-likelihood
 magnitudes should be read as qualitative; the orderings survive the bandwidth
-choice. The convention has one further consequence, this time favourable:
+choice.
+
+The convention has one further consequence, this time favourable:
 evaluating the mixture cdf at a revisited value $v$ carrying atom mass $p$
-yields, as the atom width shrinks, $F(v^-)+p/2$ --- the nonrandomised
-\emph{mid-PIT} recommended for discrete data \citep{czado2009predictive} ---
+yields, as the atom width shrinks, $F(v^-)+p/2$, the nonrandomised
+\emph{mid-PIT} recommended for discrete data \citep{czado2009predictive},
 so probability-integral-transform diagnostics remain centred on lattice series
 without any explicit discrete-data correction.
 
@@ -420,8 +459,8 @@ without any explicit discrete-data correction.
 
 Whether a series is simple in a linear, log/multiplicative, or root coordinate is
 itself learnable. We add a coarse grid of Yeo--Johnson $\lambda$
-candidates --- the signed Box--Cox family \citep{box1964analysis,yeo2000new},
-defined on all of $\mathbb R$ --- to the pool, so the ensemble learns the
+candidates (the signed Box--Cox family \citep{box1964analysis,yeo2000new},
+defined on all of $\mathbb R$) to the pool, so the ensemble learns the
 coordinate online rather than committing up front. This is No-Free-Lunch-safe: a
 wrong coordinate is simply down-weighted by likelihood. The same mechanism
 expresses a non-negativity prior at $\lambda=0$ (the log coordinate), though we
@@ -437,9 +476,11 @@ divides by a learned conditional standard deviation; an Ornstein--Uhlenbeck
 transform (\code{ou\_transform}) reverts the level toward a running mean at a
 learned speed; and a \pkg{GARCH}$(1,1)$-$t$ terminal leaf (\code{garch\_leaf})
 gives the conform-last stage a conditional-variance recursion with Student-$t$
-tails. These are building blocks: \code{laplace} already carries an OU group in
+tails.
+
+These are building blocks: \code{laplace} already carries an OU group in
 its multi-step ($k>1$) candidate pool, and \code{laplace(leaf=garch\_leaf)} swaps
-in the conditional-variance leaf for heavy-tailed series --- no second named model
+in the conditional-variance leaf for heavy-tailed series: no second named model
 required. (On asset-price/return series the right tool remains a fitted
 \pkg{GARCH}-$t$; see the price caveat of Section~\ref{sec:experiments}.)
 
@@ -448,7 +489,9 @@ update \citep{creal2013generalized,harvey2013dynamic}: the \pkg{GARCH} variance
 recursion $h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$ is, term for term, the
 inverse-Fisher-scaled conditional score, and \citet{hansen2026tweedie} show via
 Tweedie's formula that under a conjugate prior and local precision discounting it
-is the \emph{exact} Bayesian posterior-mean correction for the variance. The same
+is the \emph{exact} Bayesian posterior-mean correction for the variance.
+
+The same
 analysis identifies the smoothing factor $\alpha = 1-\delta$ that governs the
 exponential-smoothing and \pkg{GARCH}-style transforms of
 Section~\ref{sec:dist}, and recovers the Gaussian-location update as the Kalman
@@ -463,13 +506,15 @@ Multi-step forecasting exposes one more axis a forecaster silently commits to:
 the \emph{sampling granularity}. Natively, \code{laplace(k)} reaches horizon $h$
 by fanning its one-step model out $h$ steps, and on long horizons that fan-out
 can inflate the predictive variance badly. A model running on a \emph{decimated}
-clock --- every $s$-th observation --- reaches the same fine horizon $h$ in only
+clock (every $s$-th observation) reaches the same fine horizon $h$ in only
 $\mathrm{round}(h/s)$ of its own steps, so its predictive stays tight; the price
 is blindness to the skipped points. Neither clock dominates: empirically
 (Section~\ref{sec:multistep}) the fine scale wins short horizons and the coarse
-scale long ones. The response is the library's usual one --- do not choose. The
-\code{multiscale} wrapper --- the default inside \code{laplace} whenever $k>1$
-(opt out with \code{scales=[1]}) --- runs a full
+scale long ones.
+
+The response is the library's usual one: do not choose. The
+\code{multiscale} wrapper, the default inside \code{laplace} whenever $k>1$
+(opt out with \code{scales=[1]}), runs a full
 \code{laplace} on each of several decimated clocks (default strides $\{1,
 \lceil\sqrt{k}\rceil, k\}$) and, per horizon, mixes their predictive
 distributions with \code{Dist.combine} under likelihood softmax weights, so each
@@ -481,13 +526,15 @@ the pool, which is why it is a wrapper rather than a transform. Decimation is
 many-ticks-to-one, breaking the scalar-in/scalar-out contract of
 \code{conjugate}; and a coarse-clock model emits no fine one-step predictive,
 so the trunk's one-step likelihood weighting (Section~\ref{sec:trunk}) has
-nothing to score it by. Two details matter. \emph{Phase}: a fixed-phase stride-$s$
+nothing to score it by.
+
+Two details matter. \emph{Phase}: a fixed-phase stride-$s$
 model is up to $s-1$ ticks stale at forecast time, so the wrapper keeps $s$
-phase-shifted copies per scale, of which exactly one steps per tick --- the
+phase-shifted copies per scale, of which exactly one steps per tick; the
 freshest coarse forecast is always anchored at the current tick, at a per-tick
 cost of one base step per scale regardless of $s$. \emph{Degeneracy}: horizon
 $h$ draws only on scales $s \le h$, so at $k=1$ the wrapper is exactly
-\code{laplace(1)} --- multi-scale is free where it has nothing to add.
+\code{laplace(1)}; multi-scale is free where it has nothing to add.
 
 %% -------------------------------------------------------------------------
 \section{The conditional tail fit} \label{sec:tails}
@@ -563,20 +610,25 @@ the repository (\code{papers/when-to-alarm.md}).
 To avoid a hand-picked series list we draw from the Federal Reserve Economic Data
 \citep{fred}, taking cached daily series and auto-transforming each to its
 one-step \emph{changes} (log-difference for strictly positive levels, else first
-difference) --- the stationary-ish innovation stream where heavy tails and regime
+difference), the stationary-ish innovation stream where heavy tails and regime
 shifts live. The rule is part of the shared task definition: every method, ours
-and the baselines', forecasts the \emph{same} change stream. Two caveats. Scale
+and the baselines', forecasts the \emph{same} change stream.
+
+Two caveats. Scale
 comparability of absolute log-likelihoods holds only on the log-differenced
-(unitless) subset --- first differences keep the series' units, and a rescaling
-$y \mapsto ay$ shifts the log-density by $-\log a$ --- so cross-series averages
-of absolute scores are indicative at best, and all win-rates and paired score
+(unitless) subset: first differences keep the series' units, and a rescaling
+$y \mapsto ay$ shifts the log-density by $-\log a$. Cross-series averages
+of absolute scores are therefore indicative at best, and all win-rates and paired score
 differences are computed \emph{within} series, where the Jacobian cancels.
+
 And because the log-vs-linear choice is a coordinate decision made before any
 model sees data, we checked its effect directly: rerunning the contest on $250$
 strictly-positive continuous series with plain first differences for every
 method moves \code{laplace}'s log-likelihood win-rates from $94/94/70\%$ to
-$98/96/72\%$ (vs \pkg{AutoARIMA}/\pkg{AutoETS}/\pkg{GARCH}-$t$) --- the rule
-does not manufacture the edge; if anything it understates it. We keep the last $1000$ changes per series and score the last $300$ as a
+$98/96/72\%$ (vs \pkg{AutoARIMA}/\pkg{AutoETS}/\pkg{GARCH}-$t$): the rule
+does not manufacture the edge; if anything it understates it.
+
+We keep the last $1000$ changes per series and score the last $300$ as a
 rolling one-step-ahead test window after a burn-in. Consistent with the scope set
 in Section~\ref{sec:intro}, the evaluation universe is the \emph{non-price}
 economic series: we classify each series a priori from its FRED title and exclude
@@ -591,13 +643,17 @@ On the non-price universe we compare the general forecaster \code{laplace}
 against the distributional one-step baselines we could run on CPU at this
 scale. From
 \pkg{statsforecast} \citep{garza2022statsforecast}: \pkg{AutoARIMA} and
-\pkg{AutoETS}. From the \proglang{R} forecasting ecosystem --- the reference
-implementations, not Python ports --- the actual Hyndman \pkg{auto.arima} and
+\pkg{AutoETS}.
+
+From the \proglang{R} forecasting ecosystem (the reference
+implementations, not Python ports), the actual Hyndman \pkg{auto.arima} and
 \pkg{thetaf} (the \pkg{forecast} package \citep{hyndman2008automatic}; the Theta
 method \citep{assimakopoulos2000theta} won the M3 competition), Svetunkov's
 \pkg{ADAM} auto state-space model \citep{svetunkov2023adam}, a neural
 autoregression (\pkg{nnetar}), and a \pkg{rugarch} \pkg{GARCH}$(1,1)$-$t$
-\citep{ghalanos2022rugarch}. From \pkg{arch}, a constant-mean \pkg{GARCH}$(1,1)$
+\citep{ghalanos2022rugarch}.
+
+From \pkg{arch}, a constant-mean \pkg{GARCH}$(1,1)$
 with Student-$t$ innovations
 \citep{bollerslev1986generalized,bollerslev1987conditionally}, the classical
 heavy-tail / volatility-clustering state of the art. And four conformal opponents:
@@ -608,17 +664,23 @@ heavy-tail / volatility-clustering state of the art. And four conformal opponent
 KDE-smoothed into a density so it is scored on likelihood as well as CRPS.
 
 The protocol is a \emph{fair rolling one-step-ahead}: each baseline is fit on an
-expanding or rolling window with periodic refit, and every method --- ours and
-theirs --- is turned into the \emph{same} \code{Dist} and scored on held-out
-log-likelihood \emph{and} CRPS over the same test window. Parametric Student-$t$
+expanding or rolling window with periodic refit, and every method, ours and
+theirs, is turned into the \emph{same} \code{Dist} and scored on held-out
+log-likelihood \emph{and} CRPS over the same test window.
+
+Parametric Student-$t$
 predictives (\pkg{arch} and \pkg{rugarch} \pkg{GARCH}, \pkg{ADAM}) are represented
 as finite Gaussian scale mixtures matching the analytic $t$ density to $\sim
 10^{-3}$; sample- or quantile-based emitters (\pkg{nnetar}, CSP) are
-kernel-smoothed into the same \code{Dist}. We report per-series win-rates (the
+kernel-smoothed into the same \code{Dist}.
+
+We report per-series win-rates (the
 fraction of series on which \code{laplace} scores better) on the $5{,}402$
-continuous series --- those with under $5\%$ exactly-repeating one-step changes --- since on repeating/grid series
+continuous series (those with under $5\%$ exactly-repeating one-step changes), since on repeating/grid series
 the lattice projection (Section~\ref{sec:lattice}) gives a large but
-metric-specific advantage that would otherwise dominate the aggregate. Because
+metric-specific advantage that would otherwise dominate the aggregate.
+
+Because
 many \proglang{FRED} families are panels (a yield curve, an index family) that are
 far from independent, we report each win-rate both \emph{raw} and
 \emph{family-weighted} (one vote per leading-letter family). Table~\ref{tab:sota}
@@ -630,7 +692,7 @@ changing volatility faster; validated out-of-sample on the continuous non-price
 universe this improves \code{laplace}'s held-out log-likelihood (${\sim}{+}0.01$ to
 ${+}0.02$ nats, ${\sim}79\%$ of series) \emph{and} its CRPS (${\sim}80\%$ of series)
 uniformly, on both non-price and price series, nudging every win-rate up by roughly a
-point or two --- it strengthens the reported figures rather than altering the picture.
+point or two. It strengthens the reported figures rather than altering the picture.
 Every table reproduces exactly with \code{laplace(scale\_alpha=0.01)}.}
 
 \begin{table}[t!]
@@ -654,7 +716,7 @@ CSP-adaptive                           & \textbf{98 / 97\,\%} & \textbf{98 / 97\
 \bottomrule
 \end{tabular}
 \caption{Per-series win-rate of \code{laplace} versus each baseline on the
-\textbf{non-price} \proglang{FRED} universe --- $5{,}402$ continuous daily
+\textbf{non-price} \proglang{FRED} universe: $5{,}402$ continuous daily
 change-series ($1{,}213$ correlated families), from a $7{,}607$-series sweep
 spanning daily, weekly, and monthly frequencies. Slower baselines cover a
 per-method subset under their compute budget (column $N$); \code{laplace} and CSP
@@ -664,8 +726,8 @@ Section~\ref{sec:ablations}). LL counts series where \code{laplace} has the high
 held-out log-likelihood, CRPS where it has the lower CRPS; bold marks a
 \code{laplace} win ($>50\%$). ``Mean LL'' is the \emph{baseline's} mean held-out
 log-likelihood (\code{laplace}: $\mathbf{1.56}$; higher is better). Only
-\pkg{GARCH}-$t$ (\pkg{arch}) escapes a \code{laplace} per-series likelihood win
---- a $50/50$ coin-flip that Section~\ref{sec:martingality} resolves by
+\pkg{GARCH}-$t$ (\pkg{arch}) escapes a \code{laplace} per-series likelihood win,
+a $50/50$ coin-flip that Section~\ref{sec:martingality} resolves by
 martingality.}
 \label{tab:sota}
 \end{table}
@@ -700,7 +762,7 @@ family; the interval is a $2{,}000$-draw block bootstrap over families. Paired
 differences are scale-invariant (the Jacobian of the change transform cancels
 within a series), unlike the absolute ``Mean LL'' column of
 Table~\ref{tab:sota}. Every median and every family-weighted mean is positive;
-against the \pkg{arch} \pkg{GARCH}-$t$ the median is $+0.003$ --- a genuine
+against the \pkg{arch} \pkg{GARCH}-$t$ the median is $+0.003$: a genuine
 near-tie, resolved along the martingality axis in
 Section~\ref{sec:martingality}.}
 \label{tab:paired}
@@ -709,35 +771,41 @@ Section~\ref{sec:martingality}.}
 \paragraph{The likelihood race.}
 On the non-price universe \code{laplace} wins the per-series held-out
 log-likelihood race against \emph{eleven of the twelve} baselines by a wide
-margin --- the \pkg{ARIMA} family (both \pkg{statsforecast} and the real
+margin: the \pkg{ARIMA} family (both \pkg{statsforecast} and the real
 \proglang{R} \pkg{auto.arima}), the smoothing and state-space models
 (\pkg{AutoETS}, \pkg{thetaf}, \pkg{ADAM}), the neural autoregression
-(\pkg{nnetar}), the \pkg{rugarch} \pkg{GARCH}-$t$, and both conformal families ---
-typically on $82$--$98\%$ of series, and the win survives family-clustering. The
+(\pkg{nnetar}), the \pkg{rugarch} \pkg{GARCH}-$t$, and both conformal families.
+The win is typically on $82$--$98\%$ of series and survives family-clustering. The
 lone exception is the \pkg{arch} \pkg{GARCH}$(1,1)$-$t$, a $50/50$ tie treated
-next. Because win-rates discard magnitude and absolute mean log-likelihoods are
+next.
+
+Because win-rates discard magnitude and absolute mean log-likelihoods are
 not scale-comparable across mixed-unit series, Table~\ref{tab:paired} adds the
 natural aggregate for a proper scoring rule: the \emph{paired} per-series
-log-score difference, whose Jacobian term cancels within a series. The paired
+log-score difference, whose Jacobian term cancels within a series.
+
+The paired
 view sharpens the claim: the median and family-weighted mean $\Delta$LL are
 positive against all twelve baselines, and the \pkg{arch} \pkg{GARCH}-$t$
 contest is a genuine near-tie (median $+0.003$, family CI $[+0.00, +0.11]$)
 whose apparent mean-LL reversal in Table~\ref{tab:sota} ($1.69$ vs $1.56$,
 computed over different coverage) is an artefact of absolute-score averaging
-that the paired column resolves --- driven by the near-random-walk tail, which
-is exactly the martingality effect of Section~\ref{sec:martingality}.
+that the paired column resolves; the reversal is driven by the near-random-walk
+tail, which is exactly the martingality effect of Section~\ref{sec:martingality}.
 
 \paragraph{\pkg{GARCH}-$t$, and the price caveat.}
 \pkg{GARCH}$(1,1)$-$t$ is the strongest opponent on log-likelihood, purpose-built
 for the heavy tails and volatility clustering of financial change-series. On the
 non-price universe it is the only baseline \code{laplace} does not clearly beat on
-likelihood --- a $51/50\%$ coin-flip --- and that near-tie hides the real
+likelihood (a $51/50\%$ coin-flip), and that near-tie hides the real
 structure: more than for any other baseline, the \pkg{GARCH}-$t$ contest is governed
 almost entirely by how
 \emph{martingale-like} the series is, which we make precise in
-Section~\ref{sec:martingality}. The other half is the price regime.
+Section~\ref{sec:martingality}.
+
+The other half is the price regime.
 Restricting instead to the asset-price classes we
-excluded --- equity, FX, commodity returns --- reverses the verdict, and
+excluded (equity, FX, commodity returns) reverses the verdict, and
 Table~\ref{tab:price} makes the caveat quantitative rather than narrative. We
 make no general-purpose claim on price series and recommend \pkg{GARCH}-$t$
 there; this is No-Free-Lunch, reported as a split rather than hidden inside a
@@ -768,25 +836,27 @@ one-step protocol: \pkg{GARCH}-$t$ wins the per-series likelihood race $9$
 to $1$, the martingale-heavy extreme of the same axis. Swapping in the
 library's \pkg{GARCH}$(1,1)$-$t$ terminal leaf (\code{laplace(leaf=garch\_leaf)})
 roughly halves the paired deficit (mean $\Delta$LL $-0.027 \to -0.015$) without
-closing it --- and both \code{laplace} variants still beat \pkg{AutoARIMA} and
+closing it, and both \code{laplace} variants still beat \pkg{AutoARIMA} and
 \pkg{AutoETS} on $68\%$ of the same price series.}
 \label{tab:price}
 \end{table}
 
 \paragraph{CRPS.}
 As ever, CRPS tells a mixed story. \code{laplace} beats the mean-model and
-state-space baselines on CRPS --- family-weighted, \pkg{AutoARIMA} $63\%$,
+state-space baselines on CRPS (family-weighted: \pkg{AutoARIMA} $63\%$,
 \pkg{AutoETS} $78\%$, \pkg{thetaf} $79\%$, \pkg{ADAM} $82\%$, and the
-density-emitting CSP $97\%$ --- but the split tightens against the specialists: it
+density-emitting CSP $97\%$), but the split tightens against the specialists: it
 is roughly even with the \pkg{arch} \pkg{GARCH}-$t$ ($48\%$) and \emph{below} the
 fitted-mean conformal variants ($49\%$), which are CRPS-optimised (or
-volatility-specialised) by construction. This is
+volatility-specialised) by construction.
+
+This is
 exactly the thesis of Section~\ref{sec:leaf}: likelihood is the metric where a
 faithful density wins; CRPS is what the conformal variants are constructed to
 optimise and where the volatility specialists are strongest, and there we are
 competitive but not dominant. A practitioner who truly only cares about CRPS
 can repoint the leaf (Section~\ref{sec:ablations}); a practitioner who cares about
-the density --- for risk, sizing, or combination --- should prefer the
+the density (for risk, sizing, or combination) should prefer the
 log-likelihood column.
 
 \paragraph{Coverage.}
@@ -794,9 +864,11 @@ Proper scores reward calibration only implicitly; we also measured it directly.
 On $1{,}000$ continuous non-price series (same rolling protocol), the empirical
 coverage of each method's \emph{nominal central $90\%$} interval over the
 $300$ held-out points: \code{laplace} covers a median $89.3\%$ (mean $88.4\%$)
-and is within $\pm2$ points of nominal on $65\%$ of series --- its aggregate
+and is within $\pm2$ points of nominal on $65\%$ of series; its aggregate
 PIT histogram is nearly flat (bin shares $0.046$--$0.059$ against an ideal
-$0.050$). The baselines are systematically overdispersed: \pkg{AutoARIMA},
+$0.050$).
+
+The baselines are systematically overdispersed: \pkg{AutoARIMA},
 \pkg{AutoETS}, and \pkg{GARCH}-$t$ deliver $93.7$--$95.0\%$ median coverage
 from their $90\%$ bands and land within $\pm2$ points on only $12$--$17\%$ of
 series. An interval that quietly covers $95\%$ is not conservative comfort; it
@@ -809,26 +881,32 @@ the thresholds mean what they say
 \paragraph{Conformal prediction, specifically.}
 The conformal opponents deserve a separate word; two kinds appear here. Conformal
 seasonal pools (CSP) sample a seasonal residual pool and KDE-smooth it into a
-density, so --- unlike a raw conformal predictive system, whose cumulative
+density, so, unlike a raw conformal predictive system (whose cumulative
 distribution assigns zero density, and hence $-\infty$ log-likelihood, outside the
-observed residual range --- CSP \emph{can} be scored on likelihood. \code{laplace}
+observed residual range), CSP \emph{can} be scored on likelihood. \code{laplace}
 beats it on both metrics ($97\%$ family-weighted on each), because a recency-blind
-seasonal pool tracks neither drift nor the volatility clock. Against the stronger
+seasonal pool tracks neither drift nor the volatility clock.
+
+Against the stronger
 \emph{fitted-mean} conformal variants (\pkg{AutoARIMA}-mean residuals,
 split-conformal and ACI) the split is clean: \code{laplace} has the
 higher held-out log-likelihood on the large majority ($80$--$81\%$
 family-weighted), while the conformal variants roughly match it on CRPS
-($\sim 49\%$). That is exactly as it should be --- finite-sample marginal coverage is
+($\sim 49\%$).
+
+That is exactly as it should be: finite-sample marginal coverage is
 conformal's actual guarantee, CRPS the score its interval-like output does well
-on, and it has no density to surrender on likelihood --- and it is the
+on, and it has no density to surrender on likelihood. It is also the
 empirical face of the pluggable-base argument: the
 right objective for \emph{modelling} is the density, and the one place a
 downstream score should get a vote is the terminal leaf where the conjugation
-bottoms out. A user who wants CRPS-trained
+bottoms out.
+
+A user who wants CRPS-trained
 residual shaping can have it inside the same library by repointing that leaf to
-CRPS (Section~\ref{sec:ablations}) --- a CRPS-fit density, not conformal's
-finite-sample coverage guarantee --- without giving up the density the conformal
-systems cannot provide.
+CRPS (Section~\ref{sec:ablations}), without giving up the density the conformal
+systems cannot provide; what that buys is a CRPS-fit density, not conformal's
+finite-sample coverage guarantee.
 
 \paragraph{Scope.}
 The non-price economic universe ($5{,}402$ continuous change-series of a
@@ -843,7 +921,7 @@ foundation models get their own protocol in Section~\ref{sec:foundation}.
 The one baseline \code{laplace} does not simply dominate is \pkg{GARCH}-$t$, and
 the reason is not the price/non-price label per se but a property that varies
 \emph{within} the non-price universe: how close each change-series is to a
-martingale. A pure martingale difference has no exploitable conditional mean ---
+martingale. A pure martingale difference has no exploitable conditional mean:
 only its conditional \emph{variance} can be modelled, which is exactly what
 \pkg{GARCH} specialises in; a series with mean structure (mean reversion,
 momentum) hands a forecaster signal that \pkg{GARCH}'s constant mean discards.
@@ -853,34 +931,43 @@ $\mathrm{VR}(q) = \operatorname{Var}\!\big(\sum_{i=1}^{q}\Delta_{t+i}\big) /
 \big(q\operatorname{Var}(\Delta_t)\big)$: $\mathrm{VR}=1$ is a random walk,
 $\mathrm{VR}<1$ mean reversion, $\mathrm{VR}>1$ momentum. We score martingality
 $m = \exp(-\lvert\ln \mathrm{VR}(5)\rvert) \in (0,1]$, with $m\to 1$ the pure
-random walk. Binning the daily-continuous non-price series into martingality
+random walk.
+
+Binning the daily-continuous non-price series into martingality
 terciles exposes the same axis in \emph{every} contest, with a sign that reveals
 what each baseline models (Table~\ref{tab:mart}). The \pkg{GARCH}-$t$ (\pkg{arch})
 contest is the extreme: \code{laplace} wins the held-out log-likelihood on $98\%$
 of the most mean-predictable series and only $5\%$ of the near-random-walks, so its
 aggregate ($\approx 50\%$) is not a close-run tie but the average of a decisive win
-and a decisive loss. The gradient is not unique to it, though. It runs the
-\emph{same} way, more mildly, for every conditional-variance or trend model --- the
-\pkg{rugarch} \pkg{GARCH}-$t$ ($100 \!\to\! 73\%$), \pkg{thetaf} ($98 \!\to\! 69\%$),
-\pkg{AutoETS} ($98 \!\to\! 85\%$) --- because a random walk leaves only the variance
+and a decisive loss.
+
+The gradient is not unique to it, though. It runs the
+\emph{same} way, more mildly, for every conditional-variance or trend model (the
+\pkg{rugarch} \pkg{GARCH}-$t$, $100 \!\to\! 73\%$; \pkg{thetaf}, $98 \!\to\! 69\%$;
+\pkg{AutoETS}, $98 \!\to\! 85\%$), because a random walk leaves only the variance
 to model, their comparative strength. It runs the \emph{other} way for the mean
 models: against \pkg{AutoARIMA}, \code{laplace} wins \emph{least} on the
 mean-predictable end ($67\%$, where an \pkg{ARIMA} mean genuinely fits) and
 \emph{more} toward the random walk ($87\%$). And it is flat, near $100\%$
 throughout, for the strong general models (\pkg{ADAM}, \pkg{nnetar}, CSP).
-Martingality is thus a general organising axis --- it sorts the opponents by what
+
+Martingality is thus a general organising axis: it sorts the opponents by what
 they model, variance specialists one way, mean specialists the other, generalists
-not at all --- and \pkg{GARCH}-$t$ is simply its sharpest case. The axis is not
+not at all; \pkg{GARCH}-$t$ is simply its sharpest case.
+
+The axis is not
 an artefact of the variance-ratio statistic. Binning instead by the absolute
 lag-one autocorrelation of the changes reproduces the same structure: against
 \pkg{GARCH}-$t$, \code{laplace} wins $27\%$ of the least-autocorrelated
 tercile and $81\%$ of the most; against \pkg{AutoARIMA} the gradient runs the
 other way ($92\%$ down to $78\%$); the generalists stay flat. We note the
-variance ratio is a second-order diagnostic --- ``martingale-like'' here means
+variance ratio is a second-order diagnostic: ``martingale-like'' here means
 low second-order mean predictability, not a complete characterisation of the
-conditional mean. This is also the
+conditional mean.
+
+This is also the
 mechanism behind the price caveat: price/return series are the martingale-heavy
-extreme of the axis, so the recommendation is precise --- reach for \pkg{GARCH}-$t$
+extreme of the axis, so the recommendation is precise: reach for \pkg{GARCH}-$t$
 not ``on prices'' but ``on whatever is close to a random walk.''
 
 \begin{table}[t!]
@@ -889,19 +976,19 @@ not ``on prices'' but ``on whatever is close to a random walk.''
 \toprule
 Opponent (what it models) & low $m$ & mid & high $m$ \\
 \midrule
-\pkg{GARCH}-$t$ (\pkg{arch}) --- variance    & \textbf{98} & $42$ & $5$ \\
-\pkg{GARCH}-$t$ (\pkg{rugarch}) --- variance & \textbf{100} & \textbf{86} & \textbf{73} \\
-\pkg{thetaf} --- trend                        & \textbf{98} & \textbf{92} & \textbf{69} \\
-\pkg{AutoETS} --- smoothing                   & \textbf{98} & \textbf{96} & \textbf{85} \\
+\pkg{GARCH}-$t$ (\pkg{arch}): variance    & \textbf{98} & $42$ & $5$ \\
+\pkg{GARCH}-$t$ (\pkg{rugarch}): variance & \textbf{100} & \textbf{86} & \textbf{73} \\
+\pkg{thetaf}: trend                        & \textbf{98} & \textbf{92} & \textbf{69} \\
+\pkg{AutoETS}: smoothing                   & \textbf{98} & \textbf{96} & \textbf{85} \\
 \midrule
-\pkg{ADAM} --- state-space                    & \textbf{100} & \textbf{100} & \textbf{99} \\
-\pkg{nnetar} --- neural AR                    & \textbf{100} & \textbf{99} & \textbf{97} \\
-CSP, CSP-adaptive --- conformal pool          & \textbf{100} & \textbf{100} & \textbf{100} \\
+\pkg{ADAM}: state-space                    & \textbf{100} & \textbf{100} & \textbf{99} \\
+\pkg{nnetar}: neural AR                    & \textbf{100} & \textbf{99} & \textbf{97} \\
+CSP, CSP-adaptive: conformal pool          & \textbf{100} & \textbf{100} & \textbf{100} \\
 \pkg{AutoARIMA} + conformal                   & \textbf{82} & \textbf{80} & \textbf{83} \\
 \pkg{AutoARIMA} + ACI                         & \textbf{83} & \textbf{86} & \textbf{86} \\
 \midrule
-\pkg{auto.arima} (\proglang{R}) --- mean      & \textbf{68} & \textbf{85} & \textbf{77} \\
-\pkg{AutoARIMA} (\pkg{statsforecast}) --- mean & \textbf{67} & \textbf{93} & \textbf{87} \\
+\pkg{auto.arima} (\proglang{R}): mean      & \textbf{68} & \textbf{85} & \textbf{77} \\
+\pkg{AutoARIMA} (\pkg{statsforecast}): mean & \textbf{67} & \textbf{93} & \textbf{87} \\
 \bottomrule
 \end{tabular}
 \caption{Per-series held-out log-likelihood win-rate of \code{laplace} (\%) by
@@ -919,14 +1006,16 @@ strong general and conformal opponents (middle) it is flat near $100\%$.
 
 \paragraph{Robustness of the win.}
 The likelihood win is not an artefact of one slice of the universe. It holds
-across observation frequency --- \code{laplace} wins the log-likelihood race
-against every baseline on daily, weekly, \emph{and} monthly non-price series --- and
+across observation frequency (\code{laplace} wins the log-likelihood race
+against every baseline on daily, weekly, \emph{and} monthly non-price series), and
 across sequence length (from the $200$-change minimum upward) and stickiness (the
 fraction of exactly-repeating, zero-change steps, where the lattice projection of
-Section~\ref{sec:lattice} contributes). An interactive companion recomputes every
+Section~\ref{sec:lattice} contributes).
+
+An interactive companion recomputes every
 per-series win-rate and the accuracy/speed frontier live over any user-selected
-subset --- sampled at random, balanced by category, or filtered by frequency,
-length, stickiness, or martingality --- at
+subset (sampled at random, balanced by category, or filtered by frequency,
+length, stickiness, or martingality) at
 \url{https://skaters.microprediction.org/robustness.html}.
 
 \subsection{Multi-step horizons and the granularity mixture} \label{sec:multistep}
@@ -936,11 +1025,13 @@ length, stickiness, or martingality --- at
 %% method "laplace-msw" (the shipped default, evaluated online).
 Multi-step is where the granularity axis of Section~\ref{sec:granularity}
 earns its place. The target is stated exactly: at origin $t$ and horizon $h \in
-\{1, 5, 20\}$, every forecaster emits a predictive for $\Delta_{t+h}$ --- the
-\emph{single} one-period change realised $h$ steps later --- not the cumulative
+\{1, 5, 20\}$, every forecaster emits a predictive for $\Delta_{t+h}$, the
+\emph{single} one-period change realised $h$ steps later, not the cumulative
 $h$-period change and not the level. Each horizon's predictive is scored as the
 same \code{Dist} on held-out log-likelihood and CRPS at $24$ evenly spaced
-origins per series. The opponents are the baselines for which a multi-step
+origins per series.
+
+The opponents are the baselines for which a multi-step
 predictive is principled rather than improvised: \pkg{AutoARIMA} and
 \pkg{AutoETS} (\code{forecast(h)} from a periodically refit window),
 \pkg{GARCH}$(1,1)$-$t$ (its analytic $h$-step variance ladder), and
@@ -968,8 +1059,8 @@ contrast the single-scale variant (\code{scales=[1]}, the native fan-out) with
 the multi-scale mixture that is the default at $k>1$
 (Section~\ref{sec:granularity}); at $h=1$ the two coincide by construction and
 the multi-scale row is omitted. Bold marks a win ($>50\%$). The single-scale
-fan-out decays with horizon --- mean held-out log-likelihood $+2.65$, $+2.44$,
-$+1.10$ at $h = 1, 5, 20$ --- while the granularity mixture holds it ($+2.70$,
+fan-out decays with horizon (mean held-out log-likelihood $+2.65$, $+2.44$,
+$+1.10$ at $h = 1, 5, 20$) while the granularity mixture holds it ($+2.70$,
 $+2.53$ at $h = 5, 20$), lifts every $h\ge 5$ log-likelihood contest by
 $3$--$13$ points, and beats the single-scale variant head-to-head on $68\%$ of
 series at $h=20$ ($59\%$ at $h=5$; exact ties at $h=1$).}
@@ -980,31 +1071,36 @@ Three findings (Table~\ref{tab:multistep}). First, the native fan-out decays
 with horizon: \code{laplace} wins the likelihood race against everything at
 $h=1$ but slides toward a coin-flip against \pkg{GARCH}-$t$ by $h=20$, and its
 mean log-likelihood drops from $+2.65$ to $+1.10$ as the $k$-step variance
-inflates --- severely so on a small set of series that dominate the (therefore
-unreported) mean CRPS. Second, a \emph{fixed} coarse clock is not the answer:
+inflates, severely so on a small set of series that dominate the (therefore
+unreported) mean CRPS.
+
+Second, a \emph{fixed} coarse clock is not the answer:
 decimating to stride $h$ and forecasting one step rescues the $h=20$ density
 (mean $+2.43$) but throws away the intermediate points and loses to the mixture
-on $72\%$ of series at $h=20$ ($75\%$ at $h=5$). Third, the likelihood-weighted
+on $72\%$ of series at $h=20$ ($75\%$ at $h=5$).
+
+Third, the likelihood-weighted
 mixture of scales recovers both ends: it beats the native fan-out on $68\%$ of
 series at $h=20$, leaves $h=1$ untouched by construction (the wrapper passes
 scale one through), and wins every $h\ge5$ log-likelihood contest. The gain is flat across autocorrelation terciles ($63/59/63\%$ vs
 native), consistent with its mechanism: it repairs the variance fan-out rather
 than exploiting mean structure. Granularity behaves like the other candidate
-axes --- mixed under likelihood weights, the wrong scale costs only its softmax
+axes: mixed under likelihood weights, the wrong scale costs only its softmax
 share.
 
 \subsection{Against zero-shot foundation models} \label{sec:foundation}
 
 Pretrained time-series foundation models use a fundamentally different protocol:
 they are applied \emph{zero-shot}, conditioning on a context window with no
-fitting. We evaluate four ---
+fitting. We evaluate four on 120 change-series (69 continuous):
 Chronos-Bolt \citep{ansari2024chronos}, TimesFM~2.5 \citep{das2024timesfm},
-Moirai \citep{woo2024moirai}, and Lag-Llama \citep{rasul2023lagllama} --- on 120
-change-series (69 continuous). At each step the model receives a fixed
+Moirai \citep{woo2024moirai}, and Lag-Llama \citep{rasul2023lagllama}.
+
+At each step the model receives a fixed
 $256$-length window of the preceding changes and predicts the next change, with
 all windows for a series batched into one inference call. Each predictive is
-turned into the same \code{Dist} --- the native Student-$t$ head for
-Moirai/Lag-Llama, a sample/quantile reconstruction for Chronos-Bolt/TimesFM ---
+turned into the same \code{Dist} (the native Student-$t$ head for
+Moirai/Lag-Llama, a sample/quantile reconstruction for Chronos-Bolt/TimesFM),
 and \code{laplace} is re-scored on the identical window. Table~\ref{tab:foundation}
 reports per-series win-rates.
 
@@ -1032,19 +1128,21 @@ On the continuous series \code{laplace} beats all four foundation models
 zero-shot on both metrics (97--100\% LL, 72--94\% CRPS). The native-density
 models (Moirai, Lag-Llama) are the meaningful likelihood opponents and the
 closest, but still lose per-series. On repeat-heavy/grid series the foundation
-models are competitive or better --- Lag-Llama even beats \code{laplace} on mean
+models are competitive or better: Lag-Llama even beats \code{laplace} on mean
 log-likelihood over the \emph{full} universe ($6.54$ vs $4.52$) by placing tight
-mass on revisited values, the same effect as the lattice projection --- which is
-why the continuous split matters. We emphasise in the main text, not as a
+mass on revisited values, the same effect as the lattice projection. That is
+why the continuous split matters.
+
+We emphasise in the main text, not as a
 footnote, that this is a \emph{narrow} comparison and not a broad
 foundation-model verdict: zero-shot, no refit, a fixed $256$ context, and
 forecasting differenced streams rather than the levels these models were
-chiefly trained on --- a protocol chosen because it is the one a practitioner
+chiefly trained on, a protocol chosen because it is the one a practitioner
 with a single stream and no fitting budget actually faces.\footnote{One
 exploratory check: naively fine-tuning Lag-Llama on a single series' history
 (5 epochs) overfit badly, collapsing held-out log-likelihood from $+1.5$ to
 below $-100$ at $\sim$15$\times$ the cost. We draw no general conclusion about
-fine-tuning from a single naive configuration --- adapting a pretrained model to
+fine-tuning from a single naive configuration: adapting a pretrained model to
 one short univariate stream is outside its design regime, and domain-level
 fine-tuning across many series remains untested here; the zero-shot result is
 the headline because zero-shot is the intended use.}
@@ -1056,7 +1154,7 @@ A companion sweep on $10{,}822$ \proglang{FRED} series (every daily-tagged serie
 by popularity) isolates the effect of the terminal-leaf objective against the
 \pkg{crepes} conformal predictive system (scored on its own CDF via the pinball
 decomposition of CRPS). \code{laplace} runs in its fixed default configuration on
-every series --- no per-series tuning --- while the opponent gets its best
+every series (no per-series tuning) while the opponent gets its best
 calibration window per series. Because this conformal opponent uses a naive
 (zero-change) mean, we read it as an ablation of our own objective knob rather
 than a state-of-the-art claim. Per-policy, de-correlating to one vote per
@@ -1091,7 +1189,9 @@ across $25$ series with $\geq 2000$ changes the conventional prior-flavoured
 policies (trend, long-memory, drift, minimax, fast/slow) sit within $0.0006$ nats
 of the uniform-prior general forecaster on the second half of each series, and the
 first-half winner beats the general forecaster on the second half only $44\%$ of
-the time, worse than chance. Conform-last is near-free: on idealised light-tailed
+the time, worse than chance.
+
+Conform-last is near-free: on idealised light-tailed
 processes the CRPS leaf costs $0.005$--$0.007$ nats versus the likelihood leaf,
 while on heavy-tailed and stochastic-volatility processes it helps (up to
 $+0.04$); real data lives in the second regime. And the lattice projection is free
@@ -1109,9 +1209,11 @@ The unifying theme is No-Free-Lunch \citep{wolpert1997no} taken seriously. Every
 response is not to choose one but to make the priors explicit, weight them online,
 and bound the cost of a wrong prior by how fast the weighting abandons it. Read
 that way, the named methods of classical forecasting are convenience bundles, and
-the natural object is a single adaptive ensemble with two orthogonal terminal knobs
---- \emph{which proper scoring rule the leaf optimises}, and \emph{whether a
-lattice projection is active} --- neither of which is a prior over the trunk. The
+the natural object is a single adaptive ensemble with two orthogonal terminal
+knobs: \emph{which proper scoring rule the leaf optimises}, and \emph{whether a
+lattice projection is active}. Neither is a prior over the trunk.
+
+The
 granularity mixture of Section~\ref{sec:granularity} is the same argument applied
 to the sampling clock: which time scale a forecaster commits to is one more
 implicit prior, and the multi-step results show it too is better weighted online
@@ -1123,32 +1225,42 @@ state exposes, at every horizon $m \le k$, the probability integral transform
 of each arriving point under the predictive issued $m$ steps earlier
 (\code{state["pit"]}, approximately Uniform when the stream behaves) and its
 standard-normal image (\code{state["z"]}), so a threshold on $|z|$ is an alarm
-whose false-positive rate means what it says --- the coverage results above are
-precisely the license --- and the multi-horizon structure separates one-off
+whose false-positive rate means what it says (the coverage results above are
+precisely the license), and the multi-horizon structure separates one-off
 spikes (surprising at $m=1$, forgotten by $m=20$) from genuine breaks
-(surprising at every matured horizon at once). Because the model has already
+(surprising at every matured horizon at once).
+
+Because the model has already
 absorbed drift, the volatility clock, seasonality, and coordinate, what remains
 surprising is surprising relative to an adapted forecast rather than to a
-rolling window. We deliberately stop short of a benchmark claim, for two reasons.
+rolling window.
+
+We deliberately stop short of a benchmark claim, for two reasons.
 First, the definition itself is unsettled: an anomaly is only ever ``a pattern
 that does not conform to expected behaviour'' \citep{chandola2009anomaly},
-which makes the concept relative to a model of expectation and a purpose ---
+which makes the concept relative to a model of expectation and a purpose:
 our $|z|$ is precise about \emph{whose} expectation (the adapted predictive's),
 but whether that coincides with what a benchmark's human labeller meant is
-exactly the unresolved part. Second, the empirical evaluation is notoriously
-fraught --- \citet{wu2023current} argue that the prevailing benchmark suites
+exactly the unresolved part.
+
+Second, the empirical evaluation is notoriously
+fraught: \citet{wu2023current} argue that the prevailing benchmark suites
 are flawed to the point of ``creating the illusion of progress,'' and
 \citet{kim2022rigorous} show that a common scoring adjustment lets even random
-scores appear state-of-the-art --- and our own preliminary experiments on the Numenta
+scores appear state-of-the-art.
+
+Our own preliminary experiments on the Numenta
 benchmark \citep{lavin2015nab} indicate that leaderboard position there is
 dominated by detector-layer machinery (per-stream score normalisation and
 thresholding economics) rather than by the quality of the underlying
 predictive. Turning a calibrated surprise stream into a benchmark-competitive
-detector, and finding an evaluation worth competing on, is future research. The
+detector, and finding an evaluation worth competing on, is future research.
+
+The
 empirical headline supports the design: against the strongest distributional
 opponents available on CPU, including the heavy-tail and neural state of the art,
-the general forecaster wins the likelihood race, and where it does not lead ---
-CRPS --- the deficit is confined to methods explicitly optimised for that metric
+the general forecaster wins the likelihood race, and where it does not lead
+(CRPS), the deficit is confined to methods explicitly optimised for that metric
 and is recoverable by repointing a single knob.
 
 %% -------------------------------------------------------------------------
@@ -1161,13 +1273,15 @@ the microprediction platform \citep{cotton2022microprediction}, where forecasts
 were scored continuously as full distributions. The conjugation recursion has a
 direct antecedent there: the platform's \emph{multi-level distributional
 prediction} routed each stream
-into derived residual streams --- the so-called \emph{z-streams} --- that were
+into derived residual streams (the so-called \emph{z-streams}) that were
 themselves predicted distributionally and composed back, ``transforms all the way
 down'' avant la lettre; \pkg{skaters} distils that platform mechanism into a
-single online, dependency-free abstraction. The library is implemented twice --- pure \proglang{Python} and
-zero-dependency \proglang{JavaScript} --- and a parity suite checks roughly
-$100{,}000$ probe values to $10^{-6}$ on every run, so results are reproducible
-across both runtimes and in the browser via \pkg{Pyodide} \citep{pyodide2021}.
+single online, dependency-free abstraction. The library is implemented twice,
+in pure \proglang{Python} and in zero-dependency \proglang{JavaScript}, and a
+parity suite checks roughly $100{,}000$ probe values to $10^{-6}$ on every
+run, so results are reproducible across both runtimes and in the browser via
+\pkg{Pyodide} \citep{pyodide2021}.
+
 The benchmark of Section~\ref{sec:experiments} is a single parallel harness
 (\code{benchmarks/study.py}, invoked as \code{study.py sota}) that scores every
 method through the identical \code{Dist} interface; given a \proglang{FRED} key
