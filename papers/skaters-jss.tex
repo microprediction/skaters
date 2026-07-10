@@ -42,9 +42,10 @@ function with no exposed tuning parameters, \code{laplace}, which leads the
 per-series held-out log-likelihood race against classical, neural, and
 foundation-model baselines on \proglang{FRED} series; on asset prices a
 \pkg{GARCH}-$t$ model remains better, a split we report rather than average
-away. The library is written twice, in pure \proglang{Python} and in
-zero-dependency \proglang{JavaScript} agreeing to $10^{-6}$, so models
-run unchanged in a browser.
+away. The library is written twice, in pure \proglang{Python}
+(\code{pip install skaters}) and in zero-dependency \proglang{JavaScript}
+(\code{npm install skaters}) agreeing to $10^{-6}$, so models run
+unchanged in a browser.
 }
 
 \begin{document}
@@ -158,9 +159,10 @@ dependency-free recursion is future work, not a present claim.
 %% -------------------------------------------------------------------------
 \section{Using the package} \label{sec:software}
 
-\pkg{skaters} is pure \proglang{Python} with no required dependencies
-(\code{pip install skaters}); the \proglang{JavaScript} twin lives in the same
-repository and loads as an ES module. The entire public surface is one factory
+\pkg{skaters} is pure \proglang{Python} with no required dependencies,
+published on PyPI (\code{pip install skaters}); the \proglang{JavaScript}
+twin is published on npm (\code{npm install skaters}), lives in the same
+repository, and loads as an ES module. The entire public surface is one factory
 and one value type:
 
 \begin{verbatim}
