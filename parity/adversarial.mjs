@@ -102,6 +102,20 @@ soak(new Array(4000).fill(3.7), "constant");
   check(alarms / n < 0.06, `spike: alarm rate ${(alarms / n).toFixed(4)} after recovery`);
 }
 
+// 3b. extreme finite tick: the input gate must keep the tree alive
+{
+  const rand = lcg(29);
+  const f = laplace(1);
+  let state = null, dists = null;
+  for (let i = 0; i < 1500; i++) [dists, state] = f(gauss(rand), state);
+  [dists, state] = f(1e300, state);            // near the double limit
+  assertWellformed(dists[0], 0.0, "extreme:after");
+  for (let i = 0; i < 1500; i++) {
+    [dists, state] = f(gauss(rand), state);
+    if (i % 500 === 0) assertWellformed(dists[0], 0.0, "extreme:recovery");
+  }
+}
+
 // 4. scale collapse and recovery
 {
   const rand = lcg(31);
