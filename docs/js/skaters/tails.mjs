@@ -126,6 +126,7 @@ export class SplicedDist {
     this._plo = phi(tLo); this._pup = phi(tUp);
     const interior = Math.max(this._pup - this._plo, 1e-12);
     this._c = Math.max(1.0 - zetaLo - zetaUp, 1e-12) / interior;
+    this._grid = null;
   }
 
   _z(x) {
@@ -178,9 +179,12 @@ export class SplicedDist {
   }
 
   _qgrid() {
-    const out = new Array(GRID_N);
-    for (let i = 0; i < GRID_N; i++) out[i] = this.quantile((i + 0.5) / GRID_N);
-    return out;
+    if (this._grid === null) {          // one grid serves mean/var/crps
+      const out = new Array(GRID_N);
+      for (let i = 0; i < GRID_N; i++) out[i] = this.quantile((i + 0.5) / GRID_N);
+      this._grid = out;
+    }
+    return this._grid;
   }
 
   get mean() {

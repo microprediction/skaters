@@ -177,7 +177,8 @@ class SplicedDist:
     """
 
     __slots__ = ("body", "t_lo", "t_up", "zeta_lo", "zeta_up",
-                 "g_lo", "s_lo", "g_up", "s_up", "_c", "_plo", "_pup")
+                 "g_lo", "s_lo", "g_up", "s_up", "_c", "_plo", "_pup",
+                 "_grid")
 
     def __init__(self, body, t_lo, t_up, zeta_lo, zeta_up,
                  g_lo, s_lo, g_up, s_up):
@@ -187,6 +188,7 @@ class SplicedDist:
         self.g_lo, self.s_lo = g_lo, s_lo
         self.g_up, self.s_up = g_up, s_up
         self._plo, self._pup = _phi(t_lo), _phi(t_up)
+        self._grid = None
         interior = max(self._pup - self._plo, 1e-12)
         self._c = max(1.0 - zeta_lo - zeta_up, 1e-12) / interior
 
@@ -242,8 +244,10 @@ class SplicedDist:
     _GRID_N = 65
 
     def _qgrid(self) -> list:
-        n = self._GRID_N
-        return [self.quantile((i + 0.5) / n) for i in range(n)]
+        if self._grid is None:                # one grid serves mean/var/crps
+            n = self._GRID_N
+            self._grid = [self.quantile((i + 0.5) / n) for i in range(n)]
+        return self._grid
 
     @property
     def mean(self) -> float:
