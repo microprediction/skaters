@@ -38,6 +38,10 @@ The rules a statement must satisfy:
 
 - [2026-07-09 — TabFM (Google) vs laplace](2026-07-09-tabfm.md), harness
   `benchmarks/tabfm_study.py`.
+- [2026-07-09 — TabFM wide study](2026-07-09-tabfm-wide.md): four designs,
+  242 stratified non-price series, martingality interaction. Harness
+  `benchmarks/tabfm_wide_study.py`, universe frozen in
+  [tabfm_wide_universe.txt](tabfm_wide_universe.txt).
 
 ## References
 
