@@ -26,6 +26,8 @@ in-context refresh, NE=4 ensemble members):
           model's 10-class ceiling (bin resolution)
   clfx100 clf8 on 100x the series, scores adjusted back by the exact affine
           change of variables (scale invariance: equals clf8 iff invariant)
+  clf8h5  clf8 forecasting the change 5 steps ahead; scored against
+  clf8h20 laplace's native 5- and 20-step predictives (laplace_h5/h20 rows)
   blr8    control: conjugate Bayesian linear regression on the same 8-lag
           table, predictive Gaussian (does 1.6B of in-context learning beat
           a closed-form linear posterior on the identical table?)
@@ -76,7 +78,7 @@ SEED = 20260709
 RESID_ROWS = 40
 
 CLF_ARMS = ["clf8", "clf16", "clf32", "clfew", "clf2g", "clfx100",
-            "blr8", "blr2"]
+            "clf8h5", "clf8h20", "blr8", "blr2"]
 REG_ARMS = ["regres"]
 X100 = 100.0                                   # scale for the invariance arm
 _sel = os.environ.get("TB_ARMS", "")
@@ -216,8 +218,12 @@ def load_universe():
 
 
 # ---------------------------------------------------------------- densities
-def lag_rows(ch, lo, hi, lags):
-    X = np.array([ch[j - lags:j] for j in range(lo, hi)], dtype=np.float32)
+def lag_rows(ch, lo, hi, lags, h=1):
+    """Rows j in [lo, hi): features are `lags` consecutive changes ending
+    h steps before the target ch[j], so the forecast of ch[j] uses only
+    information available h steps earlier."""
+    X = np.array([ch[j - h - lags + 1:j - h + 1] for j in range(lo, hi)],
+                 dtype=np.float32)
     y = np.array(ch[lo:hi], dtype=np.float64)
     return X, y
 
@@ -259,13 +265,18 @@ def resid_dist(residuals, pred):
     return fs.sample_dist(residuals).shift(float(pred))
 
 
-def laplace_dists(ch):
-    f = laplace(1); st = None; pend = None; out = []
+def laplace_dists(ch, h=1):
+    """Per-step laplace predictive for horizon h over the test window: the
+    h-th element of the k-step list emitted h observations earlier."""
+    f = laplace(h); st = None; queue = []; out = []
     start = len(ch) - TEST
     for i, yv in enumerate(ch):
-        if pend is not None and i >= start:
-            out.append(pend[0])
-        d, st = f(yv, st); pend = d
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
     return out
 
 
@@ -356,15 +367,15 @@ def _grid_dists(Xtr, ytr, Xte, edges, model, TabFMClassifier):
     return [bar_dist(edges, row) for row in full]
 
 
-def clf_arm_dists(ch, lags, edgers, model, TabFMClassifier):
+def clf_arm_dists(ch, lags, edgers, model, TabFMClassifier, h=1):
     """Classifier-arm densities; `edgers` is a list of bin-grid builders and
     the per-step Dist averages the grids (one grid for plain arms, two for
-    the staggered clf2g arm)."""
+    the staggered clf2g arm). h>1 forecasts the change h steps ahead."""
     n = len(ch)
     dists = []
     for lo, hi in _blocks(n):
-        Xtr, ytr = lag_rows(ch, lo - CTX + lags, lo, lags)
-        Xte, _ = lag_rows(ch, lo, hi, lags)
+        Xtr, ytr = lag_rows(ch, lo - CTX + lags + h - 1, lo, lags, h)
+        Xte, _ = lag_rows(ch, lo, hi, lags, h)
         per_grid = [_grid_dists(Xtr, ytr, Xte, e(ytr), model, TabFMClassifier)
                     for e in edgers]
         per_grid = [g for g in per_grid if g is not None]
@@ -434,9 +445,11 @@ def classification_pass(universe):
                        device=None if DEVICE == "cpu" else DEVICE)
     done = _done_pairs(RESULTS)
     fh, w = _open_results(RESULTS, ["series", "method", "logpdf", "crps", "n", "stratum"])
-    tab_arms = {"clf8": (8, [decile_edges]), "clf16": (16, [decile_edges]),
-                "clf32": (32, [decile_edges]), "clfew": (8, [width_edges]),
-                "clf2g": (8, [decile_edges, stagger_edges])}
+    tab_arms = {"clf8": (8, [decile_edges], 1), "clf16": (16, [decile_edges], 1),
+                "clf32": (32, [decile_edges], 1), "clfew": (8, [width_edges], 1),
+                "clf2g": (8, [decile_edges, stagger_edges], 1),
+                "clf8h5": (8, [decile_edges], 5),
+                "clf8h20": (8, [decile_edges], 20)}
     blr_arms = {"blr8": 8, "blr2": 2}
     tab_arms = {k: v for k, v in tab_arms.items() if k in CLF_ARMS}
     blr_arms = {k: v for k, v in blr_arms.items() if k in CLF_ARMS}
@@ -452,6 +465,11 @@ def classification_pass(universe):
             if need_lap:
                 lp, cr = laplace_scores(ch)
                 w.writerow([sid, "laplace", f"{lp:.6f}", f"{cr:.6f}", TEST, stratum])
+            for h in (5, 20):
+                if f"clf8h{h}" in CLF_ARMS and (sid, f"laplace_h{h}") not in done:
+                    la, lb = score_steps(laplace_dists(ch, h), ch[len(ch) - TEST:])
+                    w.writerow([sid, f"laplace_h{h}", f"{la:.6f}", f"{lb:.6f}",
+                                TEST, stratum])
             for a in todo:
                 if a == "clfx100":
                     # scale-invariance arm: identical design on X100*series,
@@ -463,8 +481,8 @@ def classification_pass(universe):
                     aa, bb = score_steps(dists, [X100 * v for v in y])
                     aa, bb = aa + math.log(X100), bb / X100
                 elif a in tab_arms:
-                    lags, edgers = tab_arms[a]
-                    dists = clf_arm_dists(ch, lags, edgers, model, Clf)
+                    lags, edgers, h = tab_arms[a]
+                    dists = clf_arm_dists(ch, lags, edgers, model, Clf, h)
                     aa, bb = score_steps(dists, y)
                 else:
                     dists = blr_arm_dists(ch, blr_arms[a])
@@ -535,12 +553,16 @@ def summarize():
         by.setdefault(r["series"], {})[r["method"]] = (
             float(r["logpdf"]), float(r["crps"]))
         strat[r["series"]] = r["stratum"]
-    arms = sorted({m for d in by.values() for m in d} - {"laplace"})
+    arms = sorted({m for d in by.values() for m in d}
+                  - {"laplace", "laplace_h5", "laplace_h20"})
+    base_for = lambda a: ("laplace_h5" if a.endswith("h5") else
+                          "laplace_h20" if a.endswith("h20") else "laplace")
     print(f"\n=== TabFM wide study: {len(by)} series scored ===")
     print(f"{'arm':8s}{'split':22s}{'n':>5s}{'lap LL wins':>13s}{'lap CRPS wins':>15s}"
           f"{'med LL gap':>12s}")
     for a in arms:
-        pairs = {s: d for s, d in by.items() if a in d and "laplace" in d}
+        base = base_for(a)
+        pairs = {s: d for s, d in by.items() if a in d and base in d}
         groups = {"ALL": set(pairs)}
         for s in pairs:
             groups.setdefault(strat[s], set()).add(s)
@@ -548,9 +570,9 @@ def summarize():
             sub = [pairs[s] for s in groups[g]]
             if not sub:
                 continue
-            ll = 100 * sum(1 for d in sub if d["laplace"][0] > d[a][0]) / len(sub)
-            cr = 100 * sum(1 for d in sub if d["laplace"][1] < d[a][1]) / len(sub)
-            gap = float(np.median([d["laplace"][0] - d[a][0] for d in sub]))
+            ll = 100 * sum(1 for d in sub if d[base][0] > d[a][0]) / len(sub)
+            cr = 100 * sum(1 for d in sub if d[base][1] < d[a][1]) / len(sub)
+            gap = float(np.median([d[base][0] - d[a][0] for d in sub]))
             print(f"{a:8s}{g:22s}{len(sub):5d}{ll:12.0f}%{cr:14.0f}%{gap:12.2f}")
     if os.path.exists(MAE_RESULTS):
         rows = list(csv.DictReader(open(MAE_RESULTS)))

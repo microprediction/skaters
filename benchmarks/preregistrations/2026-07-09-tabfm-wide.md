@@ -73,6 +73,11 @@ windows.
   adjusted back by the exact affine change of variables (logpdf plus
   log 100, CRPS over 100). Equal to clf8 if and only if the pipeline is
   scale-invariant; the per-series deviation measures scale sensitivity.
+- **clf8h5**, **clf8h20**: clf8 forecasting the change 5 and 20 steps
+  ahead (features end h steps before the target, in training rows and test
+  rows alike), scored against laplace's native 5- and 20-step predictives,
+  the h-th element of its k-step list emitted h observations earlier. The
+  horizons match the standing multi-step study (1, 5, 20).
 - **blr8**, **blr2**: controls, not TabFM. Conjugate Bayesian linear
   regression (evidence-maximised ridge) on the identical 8-lag and a minimal
   2-lag table, predictive Gaussian per step. If a closed-form linear
@@ -102,13 +107,16 @@ constant training windows fall back to an atom with bandwidth 1e-9.
   bin (-0.05 to 0.05).
 - H5 (control): on the continuous stratum, the per-series log-likelihood
   win rate of clf8 over blr8 differs from 50%.
+- H6 (horizon): on the continuous stratum, the per-series log-likelihood
+  win rate of laplace's 5-step predictive over clf8h5 differs from 50%.
+  The 20-step horizon is reported descriptively.
 
 No direction is asserted for any hypothesis. Scale invariance (clfx100 vs
 clf8) and all other arm-vs-arm contrasts are reported descriptively.
 
 ## Analysis plan
 
-H1-H3 and H5: two-sided exact binomial sign tests at alpha 0.05, ties as
+H1-H3, H5 and H6: two-sided exact binomial sign tests at alpha 0.05, ties as
 half-wins. H4: two-sided Fisher exact test at alpha 0.05 on the win/loss
 counts of the two named bins. Family-weighted win rates (one vote per FRED
 family, the standing robustness check) are reported alongside raw rates for
@@ -168,7 +176,10 @@ no TabFM weights had touched any wide-study code path at amendment time.
 2. Arms added on the author's direction: clf32 (more lags), clf2g (more
    effective bins), clfx100 (scale invariance), blr8/blr2 (Bayesian linear
    regression controls).
-3. Scoring floor amended: the stub-model sweep over the full universe
+3. Horizon arms clf8h5 and clf8h20 added with hypothesis H6, on the
+   author's observation that every arm so far was one-step-ahead ("we kinda
+   forgot about k>1"). Horizons follow the standing multi-step study.
+4. Scoring floor amended: the stub-model sweep over the full universe
    exposed administered-rate step series (IOER, IORR) where a policy jump
    lands far outside a 1e-9-bandwidth atom and the finite per-point logpdf
    reaches -5e14, letting a single point decide a series. The -20 floor now
