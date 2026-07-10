@@ -143,8 +143,9 @@ discovered later is reported, not silently reconciled.
   median continuous gap 0.24 nats) and CRPS on 63 of 120 (41 of 69
   continuous), with TabFM ahead on the repeat-heavy split and on six
   commercial-paper amount/volume series. This directly motivated the
-  stratification by repeat structure and martingality. 28 of this study's
-  242 series overlap that universe.
+  stratification by repeat structure and martingality. 47 of this study's
+  226 series overlap that universe (recomputed after the family-diversity
+  amendment reshaped the sample; 28 under the original 242-series draft).
 - The first bout's MAE undercard had 4 smoke rows at filing (three
   degenerate ties and one laplace win); its regressor pass was still
   running and unread beyond the progress log.
