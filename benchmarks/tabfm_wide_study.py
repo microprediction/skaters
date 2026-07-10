@@ -436,6 +436,22 @@ def reg_arm(ch, lags, model, TabFMRegressor):
     return dists, points
 
 
+def _mps_shim():
+    """Apple's MPS framework has no float64. The tabfm wrapper moves numpy
+    arrays to the device as-is, so on mps every float64 array is cast to
+    float32 on the way in. The cpu path is untouched."""
+    if DEVICE != "mps" or FAKE:
+        return
+    from tabfm.src import classifier_and_regressor as car
+    orig = car._predict_step_pytorch
+    def safe(*args, **kw):
+        args = tuple(a.astype(np.float32)
+                     if isinstance(a, np.ndarray) and a.dtype == np.float64
+                     else a for a in args)
+        return orig(*args, **kw)
+    car._predict_step_pytorch = safe
+
+
 def classification_pass(universe):
     if FAKE:
         model, Clf = None, _FakeClf
@@ -443,6 +459,7 @@ def classification_pass(universe):
         from tabfm import TabFMClassifier as Clf, tabfm_v1_0_0_pytorch as V
         model = V.load(model_type="classification", checkpoint_path=WEIGHTS,
                        device=None if DEVICE == "cpu" else DEVICE)
+        _mps_shim()
     done = _done_pairs(RESULTS)
     fh, w = _open_results(RESULTS, ["series", "method", "logpdf", "crps", "n", "stratum"])
     tab_arms = {"clf8": (8, [decile_edges], 1), "clf16": (16, [decile_edges], 1),
@@ -503,6 +520,7 @@ def regression_pass(universe):
         from tabfm import TabFMRegressor as Reg, tabfm_v1_0_0_pytorch as V
         model = V.load(model_type="regression", checkpoint_path=WEIGHTS,
                        device=None if DEVICE == "cpu" else DEVICE)
+        _mps_shim()
     done = _done_pairs(RESULTS)
     done_mae = _done_pairs(MAE_RESULTS)
     fh, w = _open_results(RESULTS, ["series", "method", "logpdf", "crps", "n", "stratum"])

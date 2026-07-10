@@ -186,9 +186,26 @@ no TabFM weights had touched any wide-study code path at amendment time.
    applies to any lower value, every method identically. No real model
    output informed this: the affected scores came from stub predictors.
 
+## Smoke log (2026-07-10, pre-run)
+
+- Real-weights CPU smoke: 2 series (RIMLPBAARNB, SOFR1) through every arm
+  then available; all rows present, resume intact. Run before the horizon
+  arms existed.
+- Full-universe stub sweep rerun after the horizon arms: 226 series x 14
+  methods, full coverage, no duplicates, no below-floor scores.
+- Real-weights MPS smoke: first attempt crashed because Apple's MPS
+  framework has no float64 and the tabfm wrapper moves numpy arrays to the
+  device as-is. Fixed with a harness-level shim active only on mps that
+  casts float64 arrays to float32 on the way in; the cpu path is untouched.
+  Rerun: 1 series through all 14 methods on mps, exit clean. Timing on the
+  16 GB development machine: 382s for the eight classifier-pass TabFM arm
+  units, 39s for the regressor pass, roughly 2.5x the cpu pace, projecting
+  about 26 hours for the full universe at this machine's pace; the Mac
+  Studio should improve on that.
+- All smoke result rows were deleted after verifying execution and
+  coverage; no score was read beyond what the progress log prints.
+
 ## Deviations
 
-- (to be filled when the run starts: device, torch version, timing; and a
-  real-weights smoke test on a handful of series, run after the first
-  bout's process releases the checkpoint memory, results unread beyond
-  confirming the harness executes)
+- (to be filled when the Studio run starts: device, torch version,
+  per-series timing)
