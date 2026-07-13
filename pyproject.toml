@@ -22,6 +22,9 @@ Issues = "https://github.com/microprediction/skaters/issues"
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# Opt-in accelerated backend (PyO3 skin over the Rust core). Same numerics as
+# the pure Python reference; see rust/python/.
+fast = ["skaters-fast"]
 
 [build-system]
 requires = ["uv_build>=0.10.12,<0.11.0"]

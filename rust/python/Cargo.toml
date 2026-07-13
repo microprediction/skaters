@@ -1,0 +1,19 @@
+[package]
+name = "skaters-fast"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+description = "Opt-in accelerated backend for the skaters online forecasting core (PyO3 skin over skaters-core)."
+license = "MIT"
+
+[lib]
+name = "skaters_fast"
+crate-type = ["cdylib"]
+
+[dependencies]
+skaters-core = { path = ".." }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[dependencies.pyo3]
+version = "0.22"
+features = ["abi3-py39", "extension-module"]
