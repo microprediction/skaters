@@ -35,13 +35,13 @@
         <a href="/">Home</a>
         <a href="/demos/">Demos</a>
         <a href="/guide.html">Guide</a>
+        <a href="/languages.html">Languages</a>
+        <a href="/sandwich.html">Sandwich</a>
+        <a href="/challengers.html">Challengers</a>
         <a href="/faq.html">FAQ</a>
         <a href="/papers.html">Papers</a>
-        <a href="/challengers.html">Challengers</a>
         <a href="/skills.html">Skills</a>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
-        <a href="https://pypi.org/project/skaters/">PyPI</a>
-        <a href="https://www.npmjs.com/package/skaters">npm</a>
       </nav>
     </div>
   </header>
@@ -251,7 +251,10 @@
         // each decimation stride is scored by its trailing one-step logpdf on
         // its own clock; the horizon then mixes eligible scales by these weights.
         let scaleW = null;
-        const msState = st && st.base && st.base.score ? st.base : st;   // parade wraps multiscale
+        // walk down the wrapper stack (parade, tails, future layers) to the
+        // multiscale bookkeeping; 0.13.0 added a layer and broke a direct read
+        let msState = st;
+        while (msState && !msState.score && msState.base) msState = msState.base;
         if (msState && msState.score) {
           const entries = Object.entries(msState.score);
           const vals = entries.map(([, m]) => m).filter((m) => m !== null);
