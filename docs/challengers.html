@@ -107,12 +107,25 @@
       likelihood race against every arm (71&ndash;88% of series), the best
       arm trailing by 0.39 nats median. Sandwiched, its regressor converges
       to 0.019 nats behind laplace; as a component supplying the conditional
-      mean, it subtracts value. A pre-registered rerun of its strongest
-      configuration on 921 series produced the program's one genuine upset:
-      fine binning on 100&times; the parade z is a discrete density head,
-      and on repeat-heavy series it beats laplace by 1.99 nats median (the
-      only challenger to win anywhere at scale), pointing at an atom-aware
-      residual head as the next library work item. The paper's foundation-model section
+      mean, it subtracts value.
+    </p>
+    <p>
+      <strong>The upset.</strong> A
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-tabfm-x100-wide.md">second
+      pre-registered study</a> reran TabFM's strongest configuration alone
+      on the full 921-series universe, with the selection effect disclosed
+      in advance (the arm was chosen for having won, so regression toward
+      the pack was the stated prior). It did not regress: raw, its gap
+      narrowed to 0.155 nats (0.22 family-weighted) and it won the
+      repeat-heavy stratum outright. Sandwiched, its unweighted epsilon is
+      the familiar &minus;0.020, but family-weighted it is <strong>+0.87,
+      with a +1.99-nat median win on repeat-heavy series</strong>: the only
+      challenger configuration to beat laplace anywhere at scale. The
+      mechanism is disclosed in the statement's read: fine binning applied
+      to 100&times; the parade z acts as a discrete density head and models
+      the atom structure that lattice-heavy series carry into z
+      coordinates. The constructive consequence is a library work item, an
+      atom-aware residual head. The paper's foundation-model section
       carries the full tables, the strata reading, and the deployed
       footprint comparison (12&thinsp;GB and 45&thinsp;ms per forecast on a
       GPU, against 988&thinsp;KB and 0.3&thinsp;ms on one CPU core).
@@ -123,9 +136,11 @@
       Twelve classical and neural distributional baselines and four
       zero-shot foundation models are scored on the
       <a href="/papers.html">papers page</a> under the same one-pass
-      protocols. The sandwich result generalizes across them: fed laplace's
-      z stream, every opponent tried so far converges to laplace plus or
-      minus a few hundredths of a nat.
+      protocols. The sandwich verdict across all of them now has two
+      regimes: on continuous series every opponent converges to laplace
+      plus or minus a few hundredths of a nat, and on repeat-heavy series
+      a discrete inner head recovers structure laplace's continuous
+      predictive misses. The residual test gave a constructive answer.
     </p>
 
     <p class="byline">Updated 2026-07-13. Reproduce:
