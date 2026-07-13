@@ -61,3 +61,29 @@ jobs:
         run: |
           cat digest-*.txt
           [ "$(sort -u digest-*.txt | wc -l)" -eq 1 ] || { echo "BIT DIVERGENCE ACROSS PLATFORMS"; exit 1; }
+
+  # Build on the declared MSRV (rust-version in rust/Cargo.toml). Keeps the
+  # crate honest about the oldest toolchain it claims to support.
+  msrv:
+    needs: vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.74.0
+      - uses: actions/download-artifact@v4
+        with: {name: vectors, path: parity}
+      - name: build core on MSRV
+        run: cargo build --release --manifest-path rust/Cargo.toml
+
+  # Advisory-database scan of the dependency tree.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with: {tool: cargo-audit}
+      - name: cargo audit
+        run: |
+          cargo generate-lockfile --manifest-path rust/Cargo.toml
+          cargo audit --file rust/Cargo.lock
