@@ -35,7 +35,7 @@
   <main>
     <h1>Featured bout: TabFM</h1>
     <p class="subtitle">A 12&thinsp;GB tabular foundation model, met under a
-      pre-registered protocol. Eleven arms, one rematch, and one finding worth keeping.</p>
+      pre-registered protocol. Eleven arms against the reference. The record, in full.</p>
 
     <h2>The tale of the tape</h2>
     <table>
@@ -64,55 +64,18 @@
       tracking is the job.
     </p>
 
-    <h2>Round two: the sandwich and the body</h2>
-    <p>
-      Run in laplace's coordinates (<a href="/sandwich.html">the
-      sandwich</a>), TabFM's regressor closed from 0.75 nats behind to
-      0.019: the front-end pattern every challenger shows. Used as a body
-      (its conditional mean with laplace on the residuals), it subtracted
-      value everywhere: &minus;0.59 median, worst exactly where the
-      statement predicted.
-    </p>
-
-    <h2>Round three: the rematch and the upset</h2>
-    <p>
-      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-tabfm-x100-wide.md">Pre-registered
-      again</a>, best arm alone on the full 921-series universe, with the
-      selection effect disclosed in advance: picking a winner invites
-      regression toward the pack. It did not regress. Raw, the gap
-      narrowed to 0.155 nats and the arm won the repeat stratum outright.
-      Sandwiched, its unweighted epsilon was the familiar &minus;0.020,
-      but family-weighted it came in at <strong>+0.87, with +1.99 nats
-      median on repeat-heavy series</strong>. To be precise about what
-      that is: a sandwich finding, not a challenger victory. laplace
-      supplies the coordinates inside that combination; what the number
-      shows is real discrete structure on lattice-heavy series that
-      laplace alone leaves unmodelled and TabFM's binned head captures.
-    </p>
-    <p>
-      The mechanism, from the statement's first read: fine binning applied
-      to 100&times; the parade z is a discrete density head, and it models
-      the atom structure that lattice-heavy series carry into z
-      coordinates, structure laplace's continuous predictive leaves on the
-      table. The bout therefore ended constructively: an atom-aware
-      residual head is now on the library's work list, and the challenger
-      earned it.
-    </p>
-
     <h2>The verdict</h2>
     <p>
       On density forecasting across the universe, laplace by a wide
       margin, at one ten-thousandth the footprint. On point forecasts,
-      TabFM is genuinely decent. And inside the sandwich on repeat-heavy
-      series, the collaboration outscored laplace alone, which is worth
-      more than any knockout: it told us something true about what
-      laplace misses.
+      TabFM is genuinely decent (it takes the MAE undercard on continuous
+      series by hairline shading). What TabFM contributes in cooperation
+      with laplace is a different subject with its own numbers: see
+      <a href="/sandwich.html">the sandwich</a>.
     </p>
 
     <p class="byline">All numbers from committed studies:
-      <code>benchmarks/tabfm_wide_study.py</code>,
-      <code>benchmarks/tabfm_sandwich_study.py</code>,
-      <code>benchmarks/tabfm_x100_wide.py</code>, results CSVs beside
+      <code>benchmarks/tabfm_wide_study.py</code>, results CSVs beside
       them, statements in <code>benchmarks/preregistrations/</code>.</p>
   </main>
 </body>
