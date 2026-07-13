@@ -40,3 +40,18 @@ def test_js_adversarial_gate():
     subprocess.run(
         ["node", os.path.join(ROOT, "parity", "adversarial.mjs")],
         check=True, cwd=ROOT)
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_rust_parity():
+    """The Rust core (rust/) must reproduce the Python numerics: regenerate
+    the vectors, then run the crate's parity gate against them. Same
+    lockstep contract as the JS twin: a numerics change cannot merge
+    without its Rust mirror."""
+    subprocess.run(
+        [sys.executable, os.path.join(ROOT, "parity", "gen_vectors.py")],
+        check=True, cwd=ROOT,
+        env={**os.environ, "PYTHONPATH": os.path.join(ROOT, "src")})
+    subprocess.run(
+        ["cargo", "test", "--release", "--test", "parity"],
+        check=True, cwd=os.path.join(ROOT, "rust"))
