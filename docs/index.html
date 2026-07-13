@@ -56,14 +56,6 @@
       <span class="tag">Python · JS · R · Julia</span>
     </div>
 
-    <figure class="hero-figure">
-      <img src="./assets/frontier.svg" alt="Accuracy vs speed frontier: laplace dominates the
-        baselines, with higher held-out likelihood at a fraction of the runtime." />
-      <figcaption>Held-out accuracy vs. runtime on 894 non-price FRED series. <code>laplace</code>
-        sits alone in the top-right — best likelihood, fastest — while the classical, neural, and
-        foundation-model baselines trade accuracy for orders of magnitude more compute.
-        <a href="/papers.html">The benchmarks →</a></figcaption>
-    </figure>
 
     <p>
       On 894 continuous non-price FRED series, scored one step ahead per series,
@@ -86,6 +78,15 @@
       it is a calibrated detector at no extra cost.
       <a href="/demos/normalization.html">See it live →</a>
     </p>
+
+    <figure class="hero-figure">
+      <img src="./assets/frontier.svg" alt="Accuracy vs speed frontier: laplace dominates the
+        baselines, with higher held-out likelihood at a fraction of the runtime." />
+      <figcaption>Held-out accuracy vs. runtime on 894 non-price FRED series. <code>laplace</code>
+        sits alone in the top-right — best likelihood, fastest — while the classical, neural, and
+        foundation-model baselines trade accuracy for orders of magnitude more compute.
+        <a href="/papers.html">The benchmarks →</a></figcaption>
+    </figure>
 
     <p>
       <code>pip install skaters</code>. Every prediction is a <code>Dist</code> — a weighted
