@@ -6,6 +6,9 @@
 //! spec_ema, periodicity, cov.
 
 use serde_json::Value;
+
+static DIGEST: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0xcbf2_9ce4_8422_2325);
 use skaters_core::api::{laplace, Forecaster};
 use skaters_core::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
 use skaters_core::skater::{
@@ -164,6 +167,13 @@ fn run_scenario(
                 d.quantile(Q_HI),
                 d.crps(PROBE),
             ];
+            for v in got.iter() {
+                let cur = DIGEST.load(std::sync::atomic::Ordering::Relaxed);
+                DIGEST.store(
+                    (cur ^ v.to_bits()).wrapping_mul(0x0000_0100_0000_01b3),
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+            }
             let exp: Vec<f64> = step_exp[h]
                 .as_array()
                 .unwrap()
@@ -256,6 +266,9 @@ fn parity_vectors() {
     }
 
     println!("parity: {n_scenarios} scenarios, {checked} values checked");
+    // Bit digest: FNV-1a over the bit patterns of every computed probe.
+    // Identical across platforms iff the portable-math claim holds.
+    println!("PARITY_DIGEST={:016x}", DIGEST.load(std::sync::atomic::Ordering::Relaxed));
     if !failures.is_empty() {
         panic!(
             "parity failures ({} shown):\n{}",

@@ -1,0 +1,63 @@
+name: rust
+on: [push, pull_request]
+jobs:
+  vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: PYTHONPATH=src python parity/gen_vectors.py
+      - uses: actions/upload-artifact@v4
+        with: {name: vectors, path: parity/vectors.json}
+
+  core:
+    needs: vectors
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-13, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
+        with: {name: vectors, path: parity}
+      - name: parity and robustness
+        shell: bash
+        run: |
+          cd rust
+          cargo test --release --test parity -- --nocapture | tee parity.out
+          cargo test --release --test robustness
+          grep -o 'PARITY_DIGEST=[0-9a-f]*' parity.out > "digest-${{ matrix.os }}.txt"
+      - uses: actions/upload-artifact@v4
+        with: {name: "digest-${{ matrix.os }}", path: "rust/digest-${{ matrix.os }}.txt"}
+
+  wasm:
+    needs: vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: {targets: wasm32-wasip1}
+      - uses: bytecodealliance/actions/wasmtime/setup@v1
+      - uses: actions/download-artifact@v4
+        with: {name: vectors, path: parity}
+      - name: parity on wasm32
+        run: |
+          cd rust
+          export CARGO_TARGET_WASM32_WASIP1_RUNNER="wasmtime --dir=.. --env SKATERS_VECTORS=../parity/vectors.json"
+          cargo test --release --target wasm32-wasip1 --test parity -- --nocapture | tee parity.out
+          grep -o 'PARITY_DIGEST=[0-9a-f]*' parity.out > digest-wasm.txt
+      - uses: actions/upload-artifact@v4
+        with: {name: digest-wasm, path: rust/digest-wasm.txt}
+
+  digests-agree:
+    needs: [core, wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {pattern: "digest-*", merge-multiple: true}
+      - name: identical bits everywhere
+        run: |
+          cat digest-*.txt
+          [ "$(sort -u digest-*.txt | wc -l)" -eq 1 ] || { echo "BIT DIVERGENCE ACROSS PLATFORMS"; exit 1; }
