@@ -2,14 +2,24 @@
 //! compare the seven probes (mean, std, logpdf@0.3, cdf@0.3, q0.1, q0.9,
 //! crps@0.3) against parity/vectors.json at atol = rtol = 1e-6.
 //!
-//! Out of scope (as in the R port): search_default, spec_diff_ensemble,
-//! spec_ema, periodicity, cov.
+//! Out of scope: search_default, spec_diff_ensemble, spec_ema, periodicity.
 
 use serde_json::Value;
 
 static DIGEST: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0xcbf2_9ce4_8422_2325);
+
+/// Fold one computed value into the FNV-1a bit digest.
+fn digest_push(v: f64) {
+    let cur = DIGEST.load(std::sync::atomic::Ordering::Relaxed);
+    DIGEST.store(
+        (cur ^ v.to_bits()).wrapping_mul(0x0000_0100_0000_01b3),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
+
 use skaters_core::api::{laplace, Forecaster};
+use skaters_core::cov::{EmaCov, LedoitWolfCov, RunningCov};
 use skaters_core::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
 use skaters_core::skater::{
     bayesian_ensemble, conjugate, ema, multiscale, precision_weighted_ensemble, sticky, Sk,
@@ -41,6 +51,28 @@ fn parse_val(v: &Value) -> f64 {
             _ => panic!("bad sentinel {s}"),
         },
         _ => panic!("bad probe value {v:?}"),
+    }
+}
+
+/// Compare a computed flat vector against an expected JSON array, folding
+/// every computed value into the digest.
+fn check_vec(
+    label: &str,
+    got: &[f64],
+    exp: &Value,
+    checked: &mut u64,
+    failures: &mut Vec<String>,
+) {
+    let exp: Vec<f64> = exp.as_array().unwrap().iter().map(parse_val).collect();
+    assert_eq!(exp.len(), got.len(), "{label}: length mismatch");
+    for (p, (&g, &e)) in got.iter().zip(exp.iter()).enumerate() {
+        digest_push(g);
+        *checked += 1;
+        if !close(g, e) && failures.len() < 20 {
+            failures.push(format!(
+                "{label}[{p}]: got {g:.12e} expected {e:.12e}"
+            ));
+        }
     }
 }
 
@@ -168,11 +200,7 @@ fn run_scenario(
                 d.crps(PROBE),
             ];
             for v in got.iter() {
-                let cur = DIGEST.load(std::sync::atomic::Ordering::Relaxed);
-                DIGEST.store(
-                    (cur ^ v.to_bits()).wrapping_mul(0x0000_0100_0000_01b3),
-                    std::sync::atomic::Ordering::Relaxed,
-                );
+                digest_push(*v);
             }
             let exp: Vec<f64> = step_exp[h]
                 .as_array()
@@ -262,6 +290,63 @@ fn parity_vectors() {
             &mut checked,
             &mut failures,
         );
+        n_scenarios += 1;
+    }
+
+    // Covariance estimators on the fixed multivariate series (cov block).
+    let vec_series: Vec<Vec<f64>> = v["vec_series"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            row.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_f64().unwrap())
+                .collect()
+        })
+        .collect();
+    let cov_block = v["cov"].as_object().unwrap();
+    let mut cov_ests: Vec<(&str, Box<dyn FnMut(&[f64]) -> (Vec<f64>, Vec<f64>)>)> = vec![
+        ("running", {
+            let mut e = RunningCov::new();
+            Box::new(move |y: &[f64]| e.update(y))
+        }),
+        ("ema", {
+            let mut e = EmaCov::new();
+            Box::new(move |y: &[f64]| e.update(y))
+        }),
+        ("ledoit", {
+            let mut e = LedoitWolfCov::new();
+            Box::new(move |y: &[f64]| e.update(y))
+        }),
+    ];
+    for (nm, est) in cov_ests.iter_mut() {
+        let out = cov_block[*nm].as_array().unwrap();
+        let mut oi = 0usize;
+        for (i, y) in vec_series.iter().enumerate() {
+            let (mean, cmat) = est(y);
+            if i < burn {
+                continue;
+            }
+            let step = out[oi].as_array().unwrap();
+            check_vec(
+                &format!("cov/{nm} step {i} mean"),
+                &mean,
+                &step[0],
+                &mut checked,
+                &mut failures,
+            );
+            check_vec(
+                &format!("cov/{nm} step {i} cov"),
+                &cmat,
+                &step[1],
+                &mut checked,
+                &mut failures,
+            );
+            oi += 1;
+        }
+        assert_eq!(oi, out.len(), "cov/{nm}: scored-step count mismatch");
         n_scenarios += 1;
     }
 

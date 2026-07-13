@@ -23,7 +23,7 @@ is `cargo test --release` against `parity/vectors.json` at 1e-6.
 | adaptive search (dantzig) | search.py | open |
 | spec build path | spec.py | open |
 | periodicity detector | periodicity.py | open |
-| covariance estimators | cov/ | open |
+| covariance estimators | cov/ | DONE |
 
 Porting notes specific to Rust:
 
