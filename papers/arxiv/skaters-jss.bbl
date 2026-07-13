@@ -1,4 +1,4 @@
-\begin{thebibliography}{45}
+\begin{thebibliography}{46}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -118,6 +118,11 @@ Tilmann Gneiting and Roopesh Ranjan.
   scoring rules.
 \newblock \emph{Journal of Business \& Economic Statistics}, 29\penalty0
   (3):\penalty0 411--422, 2011.
+
+\bibitem[{Google Research}(2026)]{tabfm2026}
+{Google Research}.
+\newblock Tabfm 1.0.0: A tabular foundation model ({PyTorch} release).
+\newblock \url{https://huggingface.co/google/tabfm-1.0.0-pytorch}, 2026.
 
 \bibitem[Hansen and Tong(2026)]{hansen2026tweedie}
 Peter~Reinhard Hansen and Chen Tong.

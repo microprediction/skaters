@@ -105,9 +105,14 @@
       under a <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-09-tabfm-wide.md">pre-registered
       eleven-arm study</a> on the 226-series universe: laplace wins the
       likelihood race against every arm (71&ndash;88% of series), the best
-      arm trailing by 0.39 nats median. Sandwiched, TabFM converges to
-      0.019 nats behind laplace; as a component supplying the conditional
-      mean, it subtracts value. The paper's foundation-model section
+      arm trailing by 0.39 nats median. Sandwiched, its regressor converges
+      to 0.019 nats behind laplace; as a component supplying the conditional
+      mean, it subtracts value. A pre-registered rerun of its strongest
+      configuration on 921 series produced the program's one genuine upset:
+      fine binning on 100&times; the parade z is a discrete density head,
+      and on repeat-heavy series it beats laplace by 1.99 nats median (the
+      only challenger to win anywhere at scale), pointing at an atom-aware
+      residual head as the next library work item. The paper's foundation-model section
       carries the full tables, the strata reading, and the deployed
       footprint comparison (12&thinsp;GB and 45&thinsp;ms per forecast on a
       GPU, against 988&thinsp;KB and 0.3&thinsp;ms on one CPU core).

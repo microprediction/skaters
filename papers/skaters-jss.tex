@@ -1290,10 +1290,20 @@ $+0.03$ does not replicate beyond that first small sample.
 Two readings follow. Practically, the sandwich is a deployment path: an
 existing model, however trained, can be improved without retraining it,
 by feeding it z and mapping its output back. Scientifically, it is a
-residual test: after four classical opponents, a calendar model, and a
-tabular foundation model, the largest epsilon found on economic series
-is a few hundredths of a nat, which bounds how much conditional
-structure \code{laplace} leaves on the table.
+residual test, and a pre-registered rerun of TabFM's strongest
+configuration on the full universe sharpened the verdict into two
+regimes. On continuous series the bound is tight: after four classical
+opponents, a calendar model, and a tabular foundation model, no
+challenger recovers more than a few hundredths of a nat. On
+repeat-heavy series the story inverts: fine binning applied to $100
+\times z$ acts as a \emph{discrete} density head, models the atom
+structure the z coordinates inherit, and beats \code{laplace} itself by
+$1.99$ nats median there ($+0.87$ family-weighted across the whole
+universe), the only challenger configuration to do so anywhere at
+scale. The residual test therefore returns a constructive answer: the
+structure \code{laplace} leaves on the table is discrete, concentrated
+on lattice-heavy series, and an atom-aware residual head is the
+corresponding work item.
 
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
