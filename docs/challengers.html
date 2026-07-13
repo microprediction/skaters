@@ -41,17 +41,22 @@
       autonomous univariate distributional prediction.
     </p>
 
-    <div class="callout">
-      <strong>Featured challenger: TabFM.</strong> Google's 12&thinsp;GB
-      tabular foundation model, met under a pre-registered eleven-arm
-      protocol on 226 stratified series: laplace won the likelihood race
-      against every arm, the strongest trailing by 0.39 nats median. The
-      rematch (best arm alone, 921 series, selection effect disclosed in
-      advance) produced the program's one upset: sandwiched, its discrete
-      head beat laplace by 1.99 nats median on repeat-heavy series, and an
-      atom-aware residual head is now on the library's work list. Deployed
-      footprint: 12&thinsp;GB and 45&thinsp;ms per forecast on a GPU,
-      against 988&thinsp;KB and 0.3&thinsp;ms on one CPU core.
+    <h2>Featured bouts</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>TabFM</h3>
+        <p>A 12&thinsp;GB tabular foundation model, pre-registered, eleven
+          arms, a rematch, and the program's one genuine upset. laplace by
+          a wide margin at one ten-thousandth the footprint, but the
+          challenger landed a clean hit that became a library work item.
+          <a href="/challengers/tabfm.html">The bout &rarr;</a></p>
+      </div>
+      <div class="card">
+        <h3>Prophet</h3>
+        <p>Three scales, 30 to 921 series. Raw: 4 wins in 921. Sandwiched:
+          97% of the gap closed without retraining, and a drop-in package.
+          <a href="/sandwich.html">The sandwich &rarr;</a></p>
+      </div>
     </div>
 
     <h2>The record</h2>
