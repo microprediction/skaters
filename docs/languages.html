@@ -76,12 +76,25 @@
       CRAN submission is planned once the surface and documentation settle.
     </p>
 
-    <h2>Next</h2>
+    <h2>Rust core and the fast backend</h2>
     <p>
-      Julia is the next hand port. After that the plan changes shape: a
-      Rust core compiled to WebAssembly and a C ABI, so further languages
-      get bindings rather than rewrites, with the same vectors as the
-      referee throughout.
+      A Rust implementation of the whole composition lives in the main
+      repository (<code>rust/</code>), lockstep-gated beside the JS twin so
+      a numerics change cannot merge without both mirrors. Its mathematics
+      is portable (identical bits on x86, ARM, and WebAssembly, enforced by
+      a cross-platform digest job in CI), and it steps laplace at about 14
+      microseconds per observation. For Python users it ships as the
+      opt-in <code>skaters[fast]</code> backend: same interface, roughly
+      20x the step rate, bit-exact checkpoint resume, with pure Python
+      remaining the reference and the default.
+    </p>
+
+    <h2>Julia</h2>
+    <p>
+      A complete Julia port (laplace end to end, 96,040 parity values at
+      1e-6) exists and is being prepared for release. Further languages
+      arrive as bindings to the Rust core rather than rewrites, with the
+      same vectors as the referee throughout.
     </p>
 
     <p class="byline">Updated 2026-07-13. The parity harness lives in
