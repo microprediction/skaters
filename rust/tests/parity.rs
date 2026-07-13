@@ -2,7 +2,7 @@
 //! compare the seven probes (mean, std, logpdf@0.3, cdf@0.3, q0.1, q0.9,
 //! crps@0.3) against parity/vectors.json at atol = rtol = 1e-6.
 //!
-//! Out of scope: search_default, spec_diff_ensemble, spec_ema.
+//! Out of scope: search_default.
 
 use serde_json::Value;
 
@@ -21,6 +21,7 @@ fn digest_push(v: f64) {
 use skaters_core::api::{laplace, Forecaster};
 use skaters_core::cov::{EmaCov, LedoitWolfCov, RunningCov};
 use skaters_core::periodicity::PeriodDetector;
+use skaters_core::spec;
 use skaters_core::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
 use skaters_core::skater::{
     bayesian_ensemble, conjugate, ema, multiscale, precision_weighted_ensemble, sticky, Sk,
@@ -146,13 +147,18 @@ fn build(name: &str, k: usize) -> Forecaster {
             1,
         )),
         "sticky_ema" => f(sticky(conjugate(leaf(1), ema_transform(0.1), 1), 1)),
+        "spec_diff_ensemble" => f(spec::build(&spec::conjugate_spec(
+            spec::ensemble_spec(vec![spec::ema_spec(0.01, 1), spec::ema_spec(0.1, 1)], 1),
+            spec::diff_spec(),
+        ))),
+        "spec_ema" => f(spec::build(&spec::ema_spec(0.05, 1))),
         _ => panic!("unknown scenario {name}"),
     }
 }
 
 fn scenario_name(full: &str) -> Option<(&str, usize)> {
     // returns (base_name, k) for names we implement; None to skip.
-    let skipped = ["search_default", "spec_diff_ensemble", "spec_ema"];
+    let skipped = ["search_default"];
     if skipped.contains(&full) {
         return None;
     }

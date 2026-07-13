@@ -21,7 +21,7 @@ is `cargo test --release` against `parity/vectors.json` at 1e-6.
 | parade (PIT/z state, finite-input gate) | parade.py | DONE |
 | laplace composition, candidate population | api.py | DONE |
 | adaptive search (dantzig) | search.py | open |
-| spec build path | spec.py | open |
+| spec build path | spec.py | DONE |
 | periodicity detector | periodicity.py | DONE |
 | covariance estimators | cov/ | DONE |
 
