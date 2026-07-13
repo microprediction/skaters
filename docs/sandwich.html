@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — the sandwich</title>
+  <meta name="description" content="Every model improved by the laplace sandwich: run it in laplace's coordinates, map back exactly. Forecasters and detectors, with the measured lifts." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — the sandwich" />
+  <meta property="og:description" content="Every model improved by the laplace sandwich, with the measured lifts." />
+  <meta property="og:url" content="https://skaters.microprediction.org/sandwich.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/languages.html">Languages</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>The sandwich</h1>
+    <p class="subtitle">Run any model in laplace's coordinates, map back
+      exactly. Everyone improves.</p>
+
+    <p class="lead">
+      laplace defines a causal bijection on paths: the Rosenblatt transform
+      of each observation under the predictive issued for it. Feed the
+      resulting z stream to any model, map its output back through the
+      exact Jacobian, and the model operates on a stationarised, unit-scale
+      stream instead of raw data. No retraining, no approximation in the
+      accounting. The <a href="https://github.com/microprediction/skaters/blob/main/skills/laplace-sandwich.md">skill</a>
+      has the recipe; <a href="https://github.com/microprediction/prophet-laplace">prophet-laplace</a>
+      is the drop-in package for Prophet.
+    </p>
+
+    <h2>Forecasters, one-step log-likelihood vs plain laplace</h2>
+    <table>
+      <thead><tr><th>model</th><th>universe</th><th>raw</th><th>sandwiched</th></tr></thead>
+      <tbody>
+        <tr><td>ETS</td><td>FRED-30</td><td>&minus;2.03</td><td>+0.01</td></tr>
+        <tr><td>AutoARIMA</td><td>FRED-30</td><td>&minus;2.03</td><td><strong>+0.05</strong></td></tr>
+        <tr><td>GARCH(1,1)</td><td>FRED-30</td><td>&minus;1.94</td><td>+0.03</td></tr>
+        <tr><td>Prophet</td><td>FRED-30</td><td>&minus;2.04</td><td>+0.03</td></tr>
+        <tr><td>Prophet</td><td>921 series, pre-registered</td><td>&minus;0.76 (&minus;4.6 family-weighted)</td><td>&minus;0.02</td></tr>
+        <tr><td>TabFM (regressor)</td><td>226 series</td><td>&minus;0.75</td><td>&minus;0.02</td></tr>
+        <tr><td>TabFM (x100 classifier)</td><td>921 series, pre-registered</td><td>&minus;0.15</td><td><strong>+0.87 family-weighted; +1.99 on repeat-heavy series</strong></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Numbers are median nats per observation relative to laplace alone
+      (FRED-30 rows are means relative to laplace's 3.674). The pattern:
+      raw models trail by whole nats; sandwiched, they converge to laplace
+      plus or minus a small epsilon, and the epsilon measures conditional
+      structure laplace missed. The one large positive epsilon is the
+      discrete TabFM head on repeat-heavy series, which found real
+      structure and became a library work item.
+    </p>
+
+    <h2>Detectors</h2>
+    <table>
+      <thead><tr><th>detector</th><th>measure</th><th>raw</th><th>sandwiched</th></tr></thead>
+      <tbody>
+        <tr><td>DSPOT (EVT thresholding)</td><td>UCR accuracy, 250 series</td><td>0.120</td><td><strong>0.232</strong></td></tr>
+        <tr><td>DSPOT</td><td>alarm rate at nominal 1e-3 (FRED, median)</td><td>2.3e-3</td><td>2.5e-3, and best-in-table deep-tail behavior</td></tr>
+        <tr><td>RRCF (random cut forest)</td><td>UCR accuracy</td><td>0.244</td><td>0.236 (a wash; carries its own normalizer)</td></tr>
+        <tr><td>left-discord matrix profile</td><td>UCR accuracy, 150 series</td><td><strong>0.587</strong></td><td>0.427 (hurt; z whitens its templates)</td></tr>
+      </tbody>
+    </table>
+    <p>
+      The detector rows locate the boundary: the sandwich lifts methods
+      whose theorems want a stationary, calibrated input, does little for
+      weak structural methods, and hurts template matchers. It transfers
+      the forecaster's competence, in both directions.
+    </p>
+
+    <p>
+      Full protocols, statements filed before results, and every table's
+      source: the <a href="/challengers.html">challengers page</a>, the
+      paper's sandwich section, and
+      <code>benchmarks/anomaly/RESULTS.md</code> in the repository.
+    </p>
+
+    <p class="byline">Updated 2026-07-13. Reproduce:
+      <code>benchmarks/anomaly/frontend_loglik.py</code>,
+      <code>benchmarks/prophet_wide_study.py</code>,
+      <code>benchmarks/tabfm_sandwich_study.py</code>,
+      <code>benchmarks/tabfm_x100_wide.py</code>,
+      <code>benchmarks/anomaly/frontend_run.py</code>.</p>
+  </main>
+</body>
+</html>
