@@ -40,7 +40,8 @@ function with no exposed tuning parameters, \code{laplace}, which leads the
 per-series held-out log-likelihood race against classical, neural, and
 foundation-model baselines on \proglang{FRED} series; on asset prices a
 \pkg{GARCH}-$t$ model remains better, a split we report rather than average
-away. The library is implemented in pure \proglang{Python}
+away. Run in \code{laplace}'s coordinates and mapped back exactly (the
+sandwich), existing models improve dramatically without retraining. The library is implemented in pure \proglang{Python}
 (\code{pip install skaters}), zero-dependency \proglang{JavaScript}
 (\code{npm install skaters}), \proglang{R}, and a portable \proglang{Rust}
 core, held to $10^{-6}$ agreement by a shared parity suite, so models run
