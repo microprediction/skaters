@@ -50,6 +50,12 @@
       the parity vectors are generated here, the benchmarks and papers run
       here, and features land here first.
     </p>
+    <p>
+      An opt-in accelerated backend, <code>skaters-fast</code> (a PyO3 skin
+      over the Rust core, <code>pip install skaters[fast]</code>), runs the
+      identical <code>laplace</code> model at about 20x the per-step rate with
+      the same bits on every platform.
+    </p>
 
     <h2>JavaScript</h2>
     <p><code>npm install skaters</code></p>

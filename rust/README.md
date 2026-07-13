@@ -59,6 +59,14 @@ state (`Parade::pit`, `Parade::z`). At k > 1 it runs multi-scale over
 decimated clocks. Building blocks (`conjugate`, transforms, leaves,
 ensembles) are exported for composition.
 
+## Python backend (skaters-fast)
+
+`rust/python/` is `skaters-fast`, an opt-in PyO3 skin that lets Python run the
+identical `laplace` model at about 20x the per-step rate of the pure Python
+reference with the same bits on every platform. Build it into a venv with
+`maturin develop --release -m rust/python/Cargo.toml`. See
+[rust/python/README.md](python/README.md).
+
 ## Benchmark
 
 `cargo run --release --bin bench` times `laplace(1)` over 5000 ticks (the
