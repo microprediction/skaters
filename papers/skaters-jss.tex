@@ -1147,6 +1147,68 @@ one short univariate stream is outside its design regime, and domain-level
 fine-tuning across many series remains untested here; the zero-shot result is
 the headline because zero-shot is the intended use.}
 
+\subsection{Against a tabular foundation model, pre-registered}
+\label{sec:tabfm}
+
+Tabular foundation models are a second pretrained family with a claim on
+this problem: express forecasting as regression on lag features and let a
+large prior over tabular functions do the rest. We evaluated \pkg{TabFM}
+1.0.0 \citep{tabfm2026} under a pre-registered protocol: the statement,
+universe, arms, and scoring were committed before any result existed
+(\code{benchmarks/preregistrations/2026-07-09-tabfm-wide.md}). The
+universe is 226 non-price change-series, stratified over five lag-1
+autocorrelation bins crossed with three repeat-fraction bins, with at most
+two series per FRED family per cell. Eleven arms sweep lag depth, four
+binning schemes for a classifier-based density, ensemble and horizon
+variants, and a residual-based density from the regressor, so the
+comparison bounds the adaptation, not one adapter.
+
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+arm & \code{laplace} LL wins & CRPS wins & median LL gap \\
+\hline
+blr2    & 88\% & 51\% & $+0.94$ \\
+blr8    & 86\% & 50\% & $+0.87$ \\
+clfew   & 88\% & 38\% & $+0.79$ \\
+clf32   & 84\% & 54\% & $+0.75$ \\
+regres  & 88\% & 39\% & $+0.75$ \\
+clf16   & 82\% & 50\% & $+0.72$ \\
+clf8    & 82\% & 52\% & $+0.69$ \\
+clf2g   & 79\% & 43\% & $+0.58$ \\
+clf8h5  & 83\% & 60\% & $+0.57$ \\
+clf8h20 & 83\% & 48\% & $+0.51$ \\
+clfx100 & 71\% & 52\% & $+0.39$ \\
+\hline
+\end{tabular}
+\end{center}
+
+\code{laplace} wins the per-series likelihood race against every arm; the
+strongest configuration (fine \code{x100} binning) still trails by 0.39
+nats at the median. The strata locate the gap. On continuous, strongly
+mean-reverting series TabFM is near parity (gaps of about 0.1 nats):
+there the problem reduces to a conditional-mean mapping from lag
+features, a tabular regression. On repeat-heavy series it trails by 2 to
+4 nats: it has no concept of an atom, and a post-hoc decomposition of the
+point-forecast undercard shows it cannot execute ``predict no change''
+even where that is optimal (its MAE runs 21\% above a constant-zero
+predictor on those series, while \code{laplace}'s lattice-projected
+median sits within 0.1\% of it). CRPS is a wash throughout.
+
+Point forecasts are TabFM's better half. It takes the MAE undercard
+64--36, though the decomposition shows the margin is hairline shading on
+near-martingale series where every sensible point forecast sits within
+one percent of zero. We do not report a squared-error undercard: excess
+kurtosis in this universe reaches 845, so RMSE verdicts are decided by a
+handful of outlier days per series and elicit noise rather than skill.
+
+The reading we take is constructive: as configured (256-row context, four
+ensemble members) the tabular route produces serviceable points and weak
+densities, and its parity on mean-reverting continuous series suggests a
+role as a \emph{body} inside the conjugation, contributing a conditional
+mean while the surrounding machinery supplies the lattice handling, the
+volatility clock, and the tails.
+
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
 
