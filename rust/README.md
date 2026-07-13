@@ -16,15 +16,16 @@ compares seven probes per step and horizon (mean, std, logpdf at 0.3, cdf at
 
 ```
 cargo test --release
-# parity: 52 scenarios, 96040 values checked
+# parity: 59 scenarios, 105658 values checked
 ```
 
-Covered scenarios include every transform and leaf at k=1 and k=3, the
+Coverage is the full library: every transform and leaf at k=1 and k=3, the
 ensembles (precision-weighted, bayesian, terminal-leaf), multiscale, sticky
-(on the repeat-heavy series), the GPD tail splice, and the full `laplace`
-composition (`pol_laplace`, `pol_laplace_k3`). Out of scope, matching the R
-port: adaptive search, the spec build path, the periodicity detector, and the
-covariance estimators.
+(on the repeat-heavy series), the GPD tail splice, the full `laplace`
+composition (`pol_laplace`, `pol_laplace_k3`), the adaptive search
+(`search_default`), the spec build path (`spec_diff_ensemble`, `spec_ema`),
+the periodicity detector (ranked lag/acf block), and the covariance
+estimators (running, EMA, Ledoit-Wolf blocks). Nothing is skipped.
 
 Two details matter for agreement beyond ordinary care with operation order.
 Sums that Python computes with the built-in `sum()` use a Neumaier-compensated

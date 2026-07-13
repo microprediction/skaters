@@ -27,6 +27,7 @@ pub enum Sk {
     Terminal(Box<TerminalEnsemble>),
     Multiscale(Box<Multiscale>),
     Sticky(Box<Sticky>),
+    Search(Box<crate::search::Search>),
 }
 
 impl Sk {
@@ -42,6 +43,7 @@ impl Sk {
             Sk::Terminal(s) => s.step(y),
             Sk::Multiscale(s) => s.step(y),
             Sk::Sticky(s) => s.step(y),
+            Sk::Search(s) => s.step(y),
         }
     }
 }

@@ -1,8 +1,7 @@
-//! The gate: replay every implemented scenario over the embedded series and
-//! compare the seven probes (mean, std, logpdf@0.3, cdf@0.3, q0.1, q0.9,
-//! crps@0.3) against parity/vectors.json at atol = rtol = 1e-6.
-//!
-//! Out of scope: search_default.
+//! The gate: replay every scenario over the embedded series and compare the
+//! seven probes (mean, std, logpdf@0.3, cdf@0.3, q0.1, q0.9, crps@0.3)
+//! against parity/vectors.json at atol = rtol = 1e-6, plus the cov and
+//! periodicity blocks. Full library coverage: nothing is skipped.
 
 use serde_json::Value;
 
@@ -21,6 +20,7 @@ fn digest_push(v: f64) {
 use skaters_core::api::{laplace, Forecaster};
 use skaters_core::cov::{EmaCov, LedoitWolfCov, RunningCov};
 use skaters_core::periodicity::PeriodDetector;
+use skaters_core::search::search;
 use skaters_core::spec;
 use skaters_core::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
 use skaters_core::skater::{
@@ -152,16 +152,18 @@ fn build(name: &str, k: usize) -> Forecaster {
             spec::diff_spec(),
         ))),
         "spec_ema" => f(spec::build(&spec::ema_spec(0.05, 1))),
+        "search_default" => {
+            // Python: adaptive_search(k=1, expand_interval=50)
+            let mut s = search(1);
+            s.expand_interval = 50;
+            f(Sk::Search(Box::new(s)))
+        }
         _ => panic!("unknown scenario {name}"),
     }
 }
 
 fn scenario_name(full: &str) -> Option<(&str, usize)> {
-    // returns (base_name, k) for names we implement; None to skip.
-    let skipped = ["search_default"];
-    if skipped.contains(&full) {
-        return None;
-    }
+    // returns (base_name, k) for names we implement.
     if full == "pol_laplace" {
         return Some(("pol_laplace", 1));
     }

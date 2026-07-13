@@ -20,7 +20,7 @@ is `cargo test --release` against `parity/vectors.json` at 1e-6.
 | tails (Acklam phi_inv, censored-ML GPD, SplicedDist, gpdtails) | tails.py | DONE |
 | parade (PIT/z state, finite-input gate) | parade.py | DONE |
 | laplace composition, candidate population | api.py | DONE |
-| adaptive search (dantzig) | search.py | open |
+| adaptive search (dantzig) | search.py | DONE |
 | spec build path | spec.py | DONE |
 | periodicity detector | periodicity.py | DONE |
 | covariance estimators | cov/ | DONE |
@@ -50,6 +50,17 @@ embedded as literals verified against CPython.
 
 Multiscale keeps one sub-skater instance per phase per scale (Python keeps
 one closure and swaps state dicts; same arithmetic, different plumbing).
+
+The adaptive search stores each pool candidate as a live `Sk` value next to
+its transform-name recipe, so the whole state stays plain serde data (the
+same finding the R port reached). Tie-breaking mirrors Python exactly:
+expansion order is the `(score, index)` tuple sort with `reverse=True`
+(score descending, then pool index descending), the pool-cap prune removes
+the first argmin, and the logpdf loss is clamped to [-20, 20] with the lower
+clamp catching NaN. A detected seasonal period injects a second grammar
+entry that can shadow a base `seas(p)` by name; recipe rebuilds resolve
+names last-wins, as Python's dict comprehension does. The infinite default
+cost budget round-trips JSON as null.
 
 Parity vectors provenance: `parity/vectors.json` is copied from
 microprediction/skaters (`parity/vectors.json` there); refresh by rerunning

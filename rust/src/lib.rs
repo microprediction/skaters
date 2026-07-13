@@ -13,6 +13,7 @@ pub mod periodicity;
 pub mod leaf;
 pub mod transform;
 pub mod skater;
+pub mod search;
 pub mod spec;
 pub mod tails;
 pub mod parade;
@@ -22,6 +23,7 @@ pub use api::{build_candidates, laplace, Forecaster};
 pub use cov::{EmaCov, LedoitWolfCov, RunningCov};
 pub use dist::Dist;
 pub use periodicity::{top_periods, PeriodDetector};
+pub use search::{search, Search};
 pub use spec::{Spec, TransformSpec};
 pub use skater::{
     bayesian_ensemble, conjugate, ema, multiscale, precision_weighted_ensemble, sticky,
