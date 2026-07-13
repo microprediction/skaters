@@ -40,10 +40,11 @@ function with no exposed tuning parameters, \code{laplace}, which leads the
 per-series held-out log-likelihood race against classical, neural, and
 foundation-model baselines on \proglang{FRED} series; on asset prices a
 \pkg{GARCH}-$t$ model remains better, a split we report rather than average
-away. The library is written twice, in pure \proglang{Python}
-(\code{pip install skaters}) and in zero-dependency \proglang{JavaScript}
-(\code{npm install skaters}) agreeing to $10^{-6}$, so models run
-unchanged in a browser.
+away. The library is implemented in pure \proglang{Python}
+(\code{pip install skaters}), zero-dependency \proglang{JavaScript}
+(\code{npm install skaters}), \proglang{R}, and a portable \proglang{Rust}
+core, held to $10^{-6}$ agreement by a shared parity suite, so models run
+unchanged on a server or in a browser.
 }
 
 \begin{document}
@@ -1434,11 +1435,19 @@ prediction} routed each stream
 into derived residual streams (the so-called \emph{z-streams}) that were
 themselves predicted distributionally and composed back, ``transforms all the way
 down'' avant la lettre; \pkg{skaters} distils that platform mechanism into a
-single online, dependency-free abstraction. The library is implemented twice,
-in pure \proglang{Python} and in zero-dependency \proglang{JavaScript}, and a
-parity suite checks roughly $100{,}000$ probe values to $10^{-6}$ on every
-run, so results are reproducible across both runtimes and in the browser via
-\pkg{Pyodide} \citep{pyodide2021}.
+single online, dependency-free abstraction. The library is implemented four
+times. Pure \proglang{Python} is the reference; zero-dependency
+\proglang{JavaScript} and a \proglang{Rust} core live in the same
+repository and are gated by the same test suite, so a numerics change
+cannot merge without its mirrors; an \proglang{R} port
+(\code{microprediction/skaters-r}) covers \code{laplace} end to end
+against a pinned copy of the same vectors. The parity suite checks
+roughly $100{,}000$ probe values to $10^{-6}$ per implementation, so
+results are reproducible across runtimes and in the browser via
+\pkg{Pyodide} \citep{pyodide2021}. The Rust core uses portable
+mathematics (\pkg{libm}), producing identical bits on x86, ARM, and
+WebAssembly, and steps \code{laplace} at roughly $14$ microseconds per
+observation, twenty times the pure-\proglang{Python} rate.
 
 The benchmark of Section~\ref{sec:experiments} is a single parallel harness
 (\code{benchmarks/study.py}, invoked as \code{study.py sota}) that scores every
