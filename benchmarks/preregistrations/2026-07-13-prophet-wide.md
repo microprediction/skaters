@@ -42,7 +42,7 @@ arms, universe, or scoring, which were already committed.
 
 - Read 2026-07-13. 921 of 1,367 scored. The 446 unscored series are all
   length skips, zero fit failures: the selector screened at the wide
-  study's HIST (1,150 changes) while the runner inherits the front-end
+  study's HIST (1,000 changes) while the runner inherits the front-end
   study's MIN_LEN=1500. The universe freeze and the runner requirement
   were inconsistent; the effective universe is the 921 series meeting
   both, and no result influenced which. Disclosed as a design error.
