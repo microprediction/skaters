@@ -41,6 +41,19 @@
       autonomous univariate distributional prediction.
     </p>
 
+    <div class="callout">
+      <strong>Featured challenger: TabFM.</strong> Google's 12&thinsp;GB
+      tabular foundation model, met under a pre-registered eleven-arm
+      protocol on 226 stratified series: laplace won the likelihood race
+      against every arm, the strongest trailing by 0.39 nats median. The
+      rematch (best arm alone, 921 series, selection effect disclosed in
+      advance) produced the program's one upset: sandwiched, its discrete
+      head beat laplace by 1.99 nats median on repeat-heavy series, and an
+      atom-aware residual head is now on the library's work list. Deployed
+      footprint: 12&thinsp;GB and 45&thinsp;ms per forecast on a GPU,
+      against 988&thinsp;KB and 0.3&thinsp;ms on one CPU core.
+    </div>
+
     <h2>The record</h2>
     <p>
       Numbers are per-series win-rates for <code>laplace</code>,
