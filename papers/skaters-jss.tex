@@ -1202,12 +1202,35 @@ one percent of zero. We do not report a squared-error undercard: excess
 kurtosis in this universe reaches 845, so RMSE verdicts are decided by a
 handful of outlier days per series and elicit noise rather than skill.
 
+The deployed footprints differ by four orders of magnitude, measured on
+the machine that ran the study (Apple silicon; TabFM on the GPU,
+\code{laplace} on one CPU core):
+
+\begin{center}
+\begin{tabular}{lcc}
+\hline
+ & \pkg{TabFM} (as configured) & \code{laplace} \\
+\hline
+model artifact      & 12\,GB weights            & 988\,KB source (148\,KB JS) \\
+dependencies        & 560\,MB env (torch)       & none \\
+peak process memory & ${\sim}$10\,GB            & interpreter + 18\,KB state \\
+time per forecast   & 45\,ms (regressor arm)    & 0.3\,ms \\
+                    & 0.5\,s (classifier arms)  & \\
+\hline
+\end{tabular}
+\end{center}
+
+Per forecast the regressor arm costs roughly 150x \code{laplace}'s CPU
+tick while using an accelerator, and the density-bearing classifier arms
+cost roughly 1,600x; a CPU-only TabFM run is a further ${\sim}$2.5x.
+
 The reading we take is constructive: as configured (256-row context, four
 ensemble members) the tabular route produces serviceable points and weak
 densities, and its parity on mean-reverting continuous series suggests a
 role as a \emph{body} inside the conjugation, contributing a conditional
 mean while the surrounding machinery supplies the lattice handling, the
-volatility clock, and the tails.
+volatility clock, and the tails. The footprint table bounds what that
+would buy: the mean would have to be worth its four orders of magnitude.
 
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
