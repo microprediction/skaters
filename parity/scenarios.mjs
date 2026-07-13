@@ -13,6 +13,7 @@ import { laplace } from "../docs/js/skaters/api.mjs";
 import { multiscale } from "../docs/js/skaters/multiscale.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
+import { gpdtails } from "../docs/js/skaters/tails.mjs";
 import {
   build as specBuild, emaSpec, ensembleSpec, conjugateSpec, diffSpec,
 } from "../docs/js/skaters/spec.mjs";
@@ -62,6 +63,9 @@ export function buildScenarios() {
   s.push(["spec_ema", 1, specBuild(emaSpec(0.05, 1))]);
 
   // Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
+  // GPD tail splice (fast warm-up so it activates within the 150-pt series)
+  s.push(["gpd_tails", 1, gpdtails(conjugate(leaf(1), emaTransform(0.1), 1), 1, 0.9, 50, 100)]);
+
   s.push(["scale_mixture_leaf", 1, scaleMixtureLeaf(1)]);
   s.push(["crps_leaf", 1, crpsLeaf(1)]);
   s.push(["garch_leaf", 1, garchLeaf(1)]);

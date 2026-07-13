@@ -67,6 +67,10 @@ def parade(base, k: int):
             y_fed = min(max(y_fed, -1e60), 1e60)
             if n:
                 d1 = pend[-1][0]              # the 1-step predictive for y
+                # A tail-spliced predictive computes exact moments by numeric
+                # quantile grid (expensive); the gate only needs a location
+                # and scale proxy, and the body's closed forms are both.
+                d1 = getattr(d1, "body", d1)
                 mp, sp = d1.mean, d1.std
                 if math.isfinite(mp) and math.isfinite(sp):
                     w = 1e12 * (1.0 + abs(mp) + sp)

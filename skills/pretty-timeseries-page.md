@@ -49,6 +49,15 @@ canvas.width = cssW * dpr; canvas.height = cssH * dpr;
 ctx.scale(dpr, dpr);
 ```
 
+**The read-back trap** (learned the hard way on the timemachines demo): never
+derive `cssW`/`cssH` from the canvas's own `width`/`height` attributes — you
+scaled those by `dpr` last frame, so on retina the canvas doubles every redraw
+and the page "jumps." Pin the CSS size somewhere nothing rewrites (a `data-h`
+attribute, a constant), and resize the backing store **only when the layout
+size actually changed**. If the y-range is recomputed per frame, smooth it
+(EWMA toward the new range, never clipping data) so a spike scrolling in or
+out glides instead of snapping the axes.
+
 - One light baseline (`#e2e2e2`, 1px) is the only axis chrome. **No gridlines,
   no border box, no tick forest.** The data is the decoration.
 - Observations: small dots (~1.7px radius), never a connecting line — the line

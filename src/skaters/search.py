@@ -125,23 +125,31 @@ def search(
             entry["dists"] = dists
             entry["age"] += 1
 
-        # 2. Score: resolve queued predictions
+        # 2+3. Queue current predictions, then resolve the ones that have
+        # matured. Horizon h (0-based) is (h+1)-step-ahead, so the Dist issued
+        # h+1 steps ago is the one that targeted the current y: buffer h+1
+        # predictions before scoring. (At h=0 this is the ordinary one-step
+        # lag.)
         for entry in pool:
             for h in range(k):
                 q = entry["queues"][h]
-                if q:
+                q.append(entry["dists"][h])
+                if len(q) > h + 1:
                     past_dist = q.popleft()
                     if entry["warmed"]:
-                        lp = max(past_dist.logpdf(y), -20.0)
+                        lp = past_dist.logpdf(y)
+                        # Bounded loss: clamp both tails so neither -inf nor a
+                        # +inf (exact hit on a Dirac atom) can dominate or
+                        # NaN-poison the log-weight; `not (lp >= -20)` also
+                        # catches NaN.
+                        if lp > 20.0:
+                            lp = 20.0
+                        elif not (lp >= -20.0):
+                            lp = -20.0
                         entry["log_w"][h] += (
                             learning_rate * lp
                             - complexity_penalty * entry["depth"]
                         )
-
-        # 3. Queue current predictions
-        for entry in pool:
-            for h in range(k):
-                entry["queues"][h].append(entry["dists"][h])
 
         # 3b. Run period detector
         scores, state["pd_state"] = _pd_func(y, state["pd_state"])

@@ -73,8 +73,8 @@ differencing, drift, Holt, AR, fractional differencing, seasonal, a Yeo-Johnson
 (`k>1`) — an **Ornstein–Uhlenbeck mean-reversion** group). Three things are on by
 default, each a free or near-free win:
 
-- **model first, conform last** — the trunk is weighted by **likelihood** (honest
-  modelling); the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
+- **model first, conform last** — the trunk is weighted by **likelihood**;
+  the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
   2,500-series FRED study this matches a CRPS specialist on CRPS *and* lifts
   likelihood on real data. Switch back with `objective="likelihood"`.
 - **lattice projection** (`sticky=True`) — near-Dirac atoms on the exact values a
@@ -96,6 +96,17 @@ integral transform under the m-step-ahead predictive issued m steps ago
 the standard-normal quantile (roughly N(0,1) — so `abs(z) > 4` is an anomaly
 detector with no extra compute; z is clamped to ±7.03, never infinite). See
 the [anomaly-detection skill](https://skaters.microprediction.org/skills.html#anomaly-detection).
+
+**Tails that keep their stated rates (v0.13.0).** Every predictive carries censored-ML
+generalized-Pareto tails beyond the body's ~2% region (the *conditional tail
+fit*; `tails="gaussian"` opts out). Measured prequentially on FRED: +0.03
+nats/tick held-out log-likelihood (96%+ of series, price and non-price, all
+horizons), and the tail probabilities keep their stated rates. The empirical
+alarm rate at nominal 1e-3 is ~1.4e-3, and the nominal 99.9% interval covers
+99.85% (the Gaussian read covers 99.13%). An alarm budget converts directly:
+alarm when `erfc(|z|/sqrt(2)) < alpha`. Essay:
+[The 99.9% interval that is actually 99.9%](https://skaters.microprediction.org/tails.html);
+long form: [When to alarm](papers/when-to-alarm.md).
 
 **Price/return series** (`garch_leaf`). The default terminal leaf tracks its scale
 with an EWMA (RiskMetrics/IGARCH — no variance mean-reversion). For series with
@@ -270,14 +281,20 @@ f = bayesian_ensemble(
 )
 ```
 
-### Adaptive search (beam search over transform grammar)
+### `dantzig` — adaptive search (beam search over transform grammar)
 
-Grows the candidate population online: expand top performers with new transforms, replay recent history to warm-start, prune losers.
+Where `laplace` weights a fixed candidate population, `dantzig` explores a
+growing one: expand top performers with new transforms (including seasonal
+differences at periods its online detector finds), replay recent history to
+warm-start, prune losers. Named for Dantzig 1947 — the simplex method walks
+from vertex to better neighbouring vertex without enumerating the polytope,
+which is exactly this expand-and-prune walk through the model grammar.
+(`search` remains exported as the underlying machinery.)
 
 ```python
-from skaters import search
+from skaters import dantzig
 
-f = search(
+f = dantzig(
     k=1,
     expand_interval=100,  # expand top performers every 100 obs
     max_depth=3,          # maximum transform chain depth

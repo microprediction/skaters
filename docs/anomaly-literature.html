@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — anomaly detection literature map</title>
+  <meta name="description" content="An annotated map of the streaming anomaly detection literature, organized around one question: who can promise a false-alarm rate on a drifting stream?" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — anomaly detection literature map" />
+  <meta property="og:description" content="An annotated map of the streaming anomaly detection literature, organized around one question: who can promise a false-alarm rate on a drifting stream?" />
+  <meta property="og:url" content="https://skaters.microprediction.org/anomaly-literature.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+        <a href="https://pypi.org/project/skaters/">PyPI</a>
+        <a href="https://www.npmjs.com/package/skaters">npm</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Anomaly detection: a literature map</h1>
+    <p class="subtitle">Organized around one question: who can promise a false-alarm rate
+      on a drifting stream?</p>
+
+    <p class="lead">
+      Streaming anomaly detection is two jobs wearing one name. <strong>Job 1 — where is the
+      anomaly</strong> — is subsequence search and ranking, and it is well occupied. <strong>Job 2
+      — when to alarm</strong> — is threshold selection with a false-alarm rate you can state in
+      advance and verify afterwards, and it is nearly empty: every formal guarantee in the 2024–26
+      literature assumes exchangeability or i.i.d.-ness that real drifting, seasonal streams
+      violate. The map below groups the literature by which job it does and which assumption it
+      leans on. Forward citations verified against primary sources 2026-07; corrections welcome via
+      <a href="https://github.com/microprediction/skaters/issues">GitHub issues</a>.
+    </p>
+
+    <div class="callout">
+      <strong>The map in one table.</strong> Each line's promise, its load-bearing assumption, and
+      what breaks it on a real stream.
+    </div>
+
+    <table>
+      <thead><tr><th>lineage</th><th>promise</th><th>assumption</th><th>fails on</th></tr></thead>
+      <tbody>
+        <tr><td>Matrix profile / discords (job 1)</td><td>rank the strangest subsequence</td><td>anomaly = unlike any earlier template</td><td>no alarm semantics at all</td></tr>
+        <tr><td>EVT thresholding (SPOT/DSPOT)</td><td>threshold at tail prob q</td><td>near-stationary after naive de-drift</td><td>trend, seasonality, contaminated calibration</td></tr>
+        <tr><td>Conformal p-values</td><td>exact per-observation p</td><td>exchangeability</td><td>any drift; weighted variants pay an unknown TV slack</td></tr>
+        <tr><td>Online FDR (alpha-investing)</td><td>FDR over the alarm stream</td><td>super-uniform, weakly dependent p-values</td><td>dependence; alpha-death when anomalies are rare</td></tr>
+        <tr><td>e-processes / anytime-valid</td><td>P(ever falsely alarm) &le; &alpha;</td><td>i.i.d.-under-null or nonparametric class</td><td>nonstationarity inflates long-run FAR</td></tr>
+        <tr><td>Forecast-residual thresholding (telemanom)</td><td>practical alarms in production</td><td>none stated</td><td>no guarantee of any kind</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The seat everyone is circling — <em>exact per-observation false-alarm calibration under
+      gradual drift and seasonality</em> — is open. The three modern lines (weighted conformal,
+      conformal + online FDR, e-processes) all claim principled alarm control, none cites or
+      benchmarks against SPOT/DSPOT or telemanom, and none delivers the guarantee off
+      exchangeability. A forecaster that reduces the stream to calibrated PIT/z residuals is one
+      candidate key to that seat: it manufactures the near-i.i.d. input every line above assumes.
+      That is the skaters angle — see <a
+      href="https://github.com/microprediction/skaters/blob/main/benchmarks/anomaly/RESULTS.md">the
+      study log</a>.
+    </p>
+
+    <h2>The core: calibrated alarms on streams</h2>
+    <ul>
+      <li><strong>Siffer, Fouque, Termier &amp; Largouët (KDD 2017)</strong> — <a
+        href="https://dl.acm.org/doi/10.1145/3097983.3098144">Anomaly detection in streams with
+        extreme value theory</a>. SPOT/DSPOT: POT/GPD tails turn a target tail probability into a
+        streaming threshold. Still the deployed default nine years on (author-maintained <a
+        href="https://pypi.org/project/libspot/">libspot</a> 3.0.0, 2026-04); assumes
+        quasi-stationarity after EWMA de-drift and has a documented masking failure under
+        contaminated calibration.</li>
+      <li><strong>Hundman et al. (KDD 2018)</strong> — <a
+        href="https://arxiv.org/abs/1802.04431">Detecting spacecraft anomalies using LSTMs and
+        nonparametric dynamic thresholding</a>. Telemanom: forecast-then-threshold in production at
+        NASA; the ancestor of every "residual + moving threshold" pipeline, with no calibration
+        guarantee.</li>
+      <li><strong>Shin, Ramdas &amp; Rinaldo (NEJSDS 2023)</strong> — <a
+        href="https://arxiv.org/abs/2203.03532">E-detectors: a nonparametric framework for
+        sequential change detection</a>. Anytime-valid alarms with nonasymptotic average-run-length
+        control for composite nonparametric classes. "Distribution-free" means membership in a
+        stated class (bounded, sub-Gaussian), not arbitrary drift.</li>
+      <li><strong>Rebjock, Kuhn, Joppen &amp; Amini (NeurIPS 2021)</strong> — <a
+        href="https://arxiv.org/abs/2112.03196">Online false discovery rate control for anomaly
+        detection in time series</a>. The paper that treats when-to-alarm as its own problem:
+        memory-decay LORD/SAFFRON/ADDIS variants fix alpha-death on long streams, with mFDR control
+        under locally dependent p-values.</li>
+      <li><strong>Xu &amp; Ramdas (AISTATS 2024)</strong> — <a
+        href="https://arxiv.org/abs/2311.06412">Online multiple testing with e-values</a>. e-LOND:
+        online FDR under arbitrary dependence — the dependence-robustness the LORD family lacks,
+        bought with power.</li>
+      <li><strong>Zhang et al. (ICML 2025)</strong> — <a
+        href="https://arxiv.org/abs/2506.01452">e-GAI: e-value generalized alpha-investing</a>.
+        e-LORD/e-SAFFRON with dynamic level allocation; the most technically mature
+        dependence-robust alarm-budget machinery. Targets FDR, not per-observation rates; never
+        benchmarked against POT.</li>
+      <li><strong>IBM Research — W1-ACAS (ICLR 2026)</strong> — <a
+        href="https://arxiv.org/abs/2604.20122">Adaptive conformal anomaly detection with time
+        series foundation models</a>. The most direct current occupant: weighted conformal
+        p-values (Barber et al. 2023) with weights tuned online toward PIT uniformity. Its drift
+        guarantee is &alpha; <em>plus an unknowable total-variation slack</em> (Prop. 3.1) — the
+        strongest calibration claim found for drifting streams, and it is approximate. Notably the
+        first evaluation reporting calibration error and FPR as headline metrics.</li>
+      <li><strong>Farzaneh &amp; Simeone (2025)</strong> — <a
+        href="https://arxiv.org/abs/2505.01783">C-PP-COAD: context-aware online conformal anomaly
+        detection</a>. Conformal p-values + LORD thresholds + prediction-powered synthetic
+        calibration; smoothed-FDR control assuming i.i.d.-within-known-context — regime switching
+        yes, gradual drift no.</li>
+      <li><strong>PITMonitor (2026, preprint)</strong> — <a
+        href="https://arxiv.org/abs/2603.13156">anytime-valid monitoring of forecast
+        calibration</a>. Ville's inequality on a mixture e-process over PITs: P(ever alarm | H0)
+        &le; &alpha; with no clean baseline period. Validity requires i.i.d. PITs under the null —
+        the closest published machinery to the skaters parade, and the same open edge.</li>
+      <li><strong>CALIBURN (2026, preprint)</strong> — <a
+        href="https://arxiv.org/abs/2605.24696">conformal risk control for streaming intrusion
+        alerts</a>. Converts an operator alert budget into a threshold with a marginal FP
+        guarantee under bounded drift, and candidly documents two collapse modes of conformal
+        thresholding at small budgets. Evidence the conformal route is not yet a drop-in POT
+        replacement.</li>
+    </ul>
+
+    <h2>Antecedents: the probability machinery</h2>
+    <ul>
+      <li><strong>Rosenblatt (1952)</strong> — <a
+        href="https://doi.org/10.1214/aoms/1177729394">Remarks on a multivariate
+        transformation</a>. The transform that reduces any stream, under a correct sequential
+        model, to i.i.d. uniforms — the bridge between forecasting and every calibrated-alarm line
+        above.</li>
+      <li><strong>Dawid (1984)</strong> — <a
+        href="https://doi.org/10.2307/2981683">The prequential approach</a>. Statistics done
+        strictly one-step-ahead; the evaluation protocol no modern TSAD benchmark implements.</li>
+      <li><strong>Diebold, Gunther &amp; Tay (1998)</strong> — <a
+        href="https://www.jstor.org/stable/2527342">Evaluating density forecasts</a>. PIT
+        histograms as the calibration check; the econometrics ancestor of PIT-based alarming.</li>
+      <li><strong>Page (1954)</strong> — <a
+        href="https://doi.org/10.1093/biomet/41.1-2.100">Continuous inspection schemes</a>. CUSUM;
+        with Lorden (1971) and Shiryaev, the source of run-length false-alarm semantics that
+        e-detectors made nonparametric.</li>
+      <li><strong>Adams &amp; MacKay (2007)</strong> — <a
+        href="https://arxiv.org/abs/0710.3742">Bayesian online changepoint detection</a>. BOCPD:
+        the one classical method that outputs an intervention <em>probability</em> — calibrated
+        exactly to the extent its model is true.</li>
+      <li><strong>Vovk, Gammerman &amp; Shafer (2005)</strong> — <a
+        href="https://link.springer.com/book/10.1007/b106715">Algorithmic learning in a random
+        world</a>. Conformal prediction; Laxhammar &amp; Falkman (2015) specialize it to sequential
+        anomaly detection under exchangeability.</li>
+      <li><strong>Gibbs &amp; Candès (NeurIPS 2021)</strong> — <a
+        href="https://arxiv.org/abs/2106.00170">Adaptive conformal inference under distribution
+        shift</a>; with <strong>Barber, Candès, Ramdas &amp; Tibshirani (2023)</strong> — <a
+        href="https://arxiv.org/abs/2202.13415">Conformal prediction beyond exchangeability</a> —
+        the two escape hatches from exchangeability that W1-ACAS and the drift-aware conformal line
+        build on.</li>
+      <li><strong>Efron (2004)</strong> — <a
+        href="https://doi.org/10.1198/016214504000000089">The empirical null</a>. Estimate the null
+        from the stream itself rather than trusting theory — the move the skaters detector makes
+        with its Satterthwaite-matched d² null.</li>
+      <li><strong>Ramdas, Grünwald, Vovk &amp; Shafer (2023)</strong> — <a
+        href="https://arxiv.org/abs/2210.01948">Game-theoretic statistics and safe anytime-valid
+        inference</a>. The survey that frames e-values as the currency for acting on accumulating
+        evidence — the natural formalism for intervention decisions.</li>
+    </ul>
+
+    <h2>Job 1: the scoring heads</h2>
+    <ul>
+      <li><strong>Yeh et al. (ICDM 2016)</strong> — <a
+        href="https://www.cs.ucr.edu/~eamonn/MatrixProfile.html">the matrix profile</a>; and
+        <strong>Lu et al. (KDD 2022)</strong> — <a
+        href="https://dl.acm.org/doi/10.1145/3534678.3539271">DAMP</a>, its streaming left-discord
+        form. The strongest classical head on UCR-style tasks (0.65–0.75 published; 0.587 in our
+        fixed-window replication). Carries its own subsequence normalizer — which is why a
+        forecaster front-end <em>hurts</em> it (raw 0.587 vs fronted 0.427).</li>
+      <li><strong>Guha et al. (ICML 2016)</strong> — <a
+        href="https://proceedings.mlr.press/v48/guha16.html">Robust random cut forest</a>.
+        Streaming isolation scoring; front-end-neutral in our tests (0.244 raw vs 0.236
+        fronted).</li>
+      <li><strong>Sub-PCA / KShapeAD / POLY</strong> — the current <a
+        href="https://thedatumorg.github.io/TSB-AD/">TSB-AD-U leaderboard</a> top (VUS-PR 0.42,
+        0.40, 0.39): subsequence PCA, shape clustering, polynomial fits. Simple statistical methods
+        lead; deep and foundation models trail on univariate data.</li>
+      <li><strong>Ahmad, Lavin, Purdy &amp; Agha (2017)</strong> — <a
+        href="https://doi.org/10.1016/j.neucom.2017.04.070">HTM and the NAB benchmark</a>.
+        Streaming-native scoring with windowed rewards; label quality since discredited, repo
+        frozen.</li>
+    </ul>
+
+    <h2>Benchmarks and the metrics critique</h2>
+    <ul>
+      <li><strong>Wu &amp; Keogh (TKDE 2023)</strong> — <a
+        href="https://arxiv.org/abs/2009.13807">Current time series anomaly detection benchmarks
+        are flawed</a>. The critique that produced the <a
+        href="https://www.cs.ucr.edu/~eamonn/time_series_data_2018/UCR_TimeSeriesAnomalyDatasets2021.zip">UCR
+        Anomaly Archive</a> (250 series, one anomaly each, argmax scoring).</li>
+      <li><strong>Kim et al. (AAAI 2022)</strong> — <a
+        href="https://arxiv.org/abs/2109.05257">Rigorous evaluation of deep AD</a>. Point-adjust F1
+        lets <em>random scores</em> reach SOTA; the metric is dead, and a large slice of pre-2022
+        deep-TSAD claims died with it.</li>
+      <li><strong>Paparrizos et al. (PVLDB 2022)</strong> — <a
+        href="https://www.vldb.org/pvldb/vol15/p2774-paparrizos.pdf">Volume under the surface
+        (VUS)</a>. Range-aware, threshold-free AUC — and therefore invariant to monotone score
+        transforms: structurally blind to calibration.</li>
+      <li><strong>Liu &amp; Paparrizos (NeurIPS 2024)</strong> — <a
+        href="https://openreview.net/forum?id=R6kJtWsTGy">TSB-AD</a>. The current standard (40
+        detectors, 1,070 series); crowns VUS-PR and never evaluates threshold-setters or
+        false-alarm rates. <strong>TAB (PVLDB 2025)</strong> — <a
+        href="https://arxiv.org/abs/2506.18046">unified TSAD benchmarking</a> — sweeps ten
+        threshold percentages and reports the best: an oracle protocol, not an alarm rule.
+        <strong>EasyTSAD/TimeSeriesBench (ISSRE 2024)</strong> — <a
+        href="https://github.com/dawnvince/EasyTSAD">event-based, delay-aware online metrics</a> —
+        the closest to deployment reality, still without calibration scoring.</li>
+      <li><strong>Verified gap (2026-07):</strong> no major benchmark runs a strictly prequential
+        protocol, and none scores whether a stated false-alarm rate comes true. The only
+        calibration-aware evaluation found anywhere is inside the W1-ACAS paper itself.</li>
+    </ul>
+
+    <h2>Where skaters sits</h2>
+    <p>
+      The library's claim is upstream of every line above: <code>laplace</code> is an online
+      forecaster whose parade state exposes PIT/z residuals — manufacturing, on a drifting
+      seasonal stream, the near-i.i.d. uniforms that conformal, online-FDR, and e-process
+      machinery all assume and none can create. The <a
+      href="https://github.com/microprediction/skaters/blob/main/benchmarks/anomaly/RESULTS.md">full-archive
+      studies</a> locate the value precisely: the front-end lifts distributional alarm heads
+      (DSPOT 2–5&times;), does nothing for similarity-search heads (they carry their own
+      normalizer) — and the calibration panel (empirical false-alarm rate vs nominal &alpha;,
+      prequentially, on the benchmarks' own certified-clean data) first <em>failed</em> the
+      library's Gaussian tails at 1e-3, then, as of v0.13.0, passes them: censored-ML GPD tails
+      are spliced into every predictive (SPOT's theorem, native to the surprise stream), the
+      stated alarm rate comes true within the genuine-anomaly base rate, and the 99.9% interval
+      is empirically 99.85% (Gaussian read: 99.13%). See the
+      <a href="/robustness.html">coverage study</a> — the 90% interval that is actually 90%,
+      now extended to the tail.
+    </p>
+
+    <p class="byline">Assembled 2026-07-09 from a verified forward-citation sweep (25/25 claims
+      confirmed against primary sources). Additions and corrections: <a
+      href="https://github.com/microprediction/skaters/issues">open an issue</a>.</p>
+  </main>
+</body>
+</html>

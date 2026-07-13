@@ -95,6 +95,11 @@ export function fsum(values) {
   return s + c;
 }
 
+// Extended dist types (e.g. the GPD tail splice) register their decoders
+// here at module load, keeping the import graph one-directional.
+const _distDecoders = {};
+export function registerDistDecoder(tag, fn) { _distDecoders[tag] = fn; }
+
 export class Dist {
   // components: array of [weight, mean, std]
   constructor(components) {
@@ -288,6 +293,11 @@ export class Dist {
   }
 
   static fromDict(d) {
+    if (d.spliced) {
+      const fn = _distDecoders.spliced;
+      if (!fn) throw new Error("spliced dist: import tails.mjs before fromDict");
+      return fn(d);
+    }
     return new Dist(d.components.map((c) => c.slice()));
   }
 

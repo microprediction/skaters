@@ -34,7 +34,27 @@ export function parade(base, k) {
         z[m - 1] = STD_NORMAL.quantile(u);
       }
     }
-    const [dists, st] = base(y, state.base);
+    // Port of the Python parade's extreme-input gate: double arithmetic in
+    // the transforms dies long before the float range ends, so clamp the
+    // observation before the tree consumes it. Magnitude-relative window
+    // (NOT sigma-relative); PIT/z above are computed on the raw y; identity
+    // on any stream doubles represent comfortably. A tail-spliced
+    // predictive's exact moments are numeric grids, so read the body's
+    // closed forms: a location/scale proxy is all the gate needs.
+    let yFed = y;
+    if (Number.isFinite(yFed)) {
+      yFed = Math.min(Math.max(yFed, -1e60), 1e60);
+      if (n) {
+        let d1 = pend[n - 1][0];              // the 1-step predictive for y
+        d1 = d1.body ?? d1;
+        const mp = d1.mean, sp = d1.std;
+        if (Number.isFinite(mp) && Number.isFinite(sp)) {
+          const w = 1e12 * (1.0 + Math.abs(mp) + sp);
+          yFed = Math.min(Math.max(yFed, mp - w), mp + w);
+        }
+      }
+    }
+    const [dists, st] = base(yFed, state.base);
     state.base = st;
     pend.push(dists.slice());
     if (pend.length > k) pend.shift();

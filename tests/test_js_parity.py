@@ -30,3 +30,13 @@ def test_js_python_parity():
         print(result.stdout)
         print(result.stderr)
     assert result.returncode == 0, "JS/Python parity check failed"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_adversarial_gate():
+    """The JS twin must survive the deployment pathologies (constant,
+    lattice, monster spike, scale collapse, vol whiplash) — the release
+    gate mirroring tests/test_tails_robustness.py."""
+    subprocess.run(
+        ["node", os.path.join(ROOT, "parity", "adversarial.mjs")],
+        check=True, cwd=ROOT)

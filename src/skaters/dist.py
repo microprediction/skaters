@@ -248,7 +248,10 @@ class Dist:
         return {"components": self.components}
 
     @staticmethod
-    def from_dict(d: dict) -> Dist:
+    def from_dict(d: dict):
+        if d.get("spliced"):
+            from skaters.tails import SplicedDist   # local: avoid cycle
+            return SplicedDist.from_dict(d)
         return Dist([tuple(c) for c in d["components"]])
 
     # --- Dunder ---

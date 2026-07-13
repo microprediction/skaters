@@ -27,9 +27,10 @@ from skaters.transform import (
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import laplace
+from skaters.api import laplace, dantzig
 from skaters.multiscale import multiscale
 from skaters.parade import parade
+from skaters.anomaly import mahalanobis, zbank
 from skaters.sticky import sticky
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -43,6 +44,7 @@ __all__ = [
     "Skater",
     # Search policies (the main user API)
     "laplace",
+    "dantzig",
     "sticky",
     "period_detector",
     "top_periods",
@@ -73,6 +75,8 @@ __all__ = [
     "terminal_leaf_ensemble",
     "multiscale",
     "parade",
+    "mahalanobis",
+    "zbank",
     "search",
     # Spec system
     "build",

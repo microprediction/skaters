@@ -5,6 +5,27 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## 0.13.0
+
+GPD tails by default — the conditional tail fit. Every `laplace` predictive now
+splices censored-ML generalized-Pareto tails over the body's own tail region
+(`tails.mjs`; pass `tails = "gaussian"` to opt out). The body's matured PIT
+defines frozen warm-up-quantile thresholds per horizon; exceedances fit a GPD
+per side (Grimshaw profile); the predictive keeps the body density in the
+interior and the GPD beyond, so `logpdf`, `cdf`, `quantile`, `crps` and the
+parade's `state.z` all read the corrected tail. Measured on non-price FRED:
+**+0.027 nats/tick** median held-out log-likelihood (84/85 series) and the
+parade-z alarm rate at nominal 1e-3 drops from ~8x over budget to ~1.4x
+(consistent with the genuine-anomaly base rate); at k=3 the horizon-3
+predictive gains the same (+0.027 nats, z3 rate at nominal 1e-3:
+9.0e-3 -> 1.4e-3). CRPS, the default leaf objective, is unchanged to
+within noise. The exceedance
+rate is an EWMA (`rateAlpha = 0.002`) so the splice re-calibrates after
+regime shifts; intake is winsorised at the fitted 1-in-1000 excess with a
+changepoint escape (masking resistance); spliced predictives round-trip
+through `Dist.fromDict`. ~5% runtime. Parity: 105,658 values, 54 scenarios
+(new `gpd_tails` scenario exercises the splice directly).
+
 ## 0.12.1
 
 - Skater state is now pure data (picklable/serialisable for checkpoint-restore

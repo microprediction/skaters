@@ -238,3 +238,8 @@ benchmarks/results_nonprice.csv
 benchmarks/nonprice_study.log
 benchmarks/results_overnight.csv
 benchmarks/overnight_horserace.log
+
+# arXiv staging: tarball is the artifact, intermediates are not
+papers/arxiv/*.aux
+papers/arxiv/*.out
+papers/arxiv/*.pdf
