@@ -1338,8 +1338,13 @@ Our own preliminary experiments on the Numenta
 benchmark \citep{lavin2015nab} indicate that leaderboard position there is
 dominated by detector-layer machinery (per-stream score normalisation and
 thresholding economics) rather than by the quality of the underlying
-predictive. Turning a calibrated surprise stream into a benchmark-competitive
-detector, and finding an evaluation worth competing on, is future research.
+predictive. We also note a scope boundary: on waveform-heavy data (electrocardiograms,
+vibration traces) the anomaly of interest is a deformed \emph{shape} rather
+than a surprising next value, and shape-native methods such as matrix-profile
+discord discovery are likely the better tool. Turning a calibrated surprise
+stream into a benchmark-competitive detector on its own turf --- levels,
+rates, and counts with stochastic dynamics --- and finding an evaluation
+worth competing on, is future research.
 
 The
 empirical headline supports the design: against the strongest distributional
