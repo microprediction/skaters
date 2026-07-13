@@ -40,4 +40,27 @@ arms, universe, or scoring, which were already committed.
 
 ## Deviations
 
-- (fill at read time)
+- Read 2026-07-13. 921 of 1,367 scored. The 446 unscored series are all
+  length skips, zero fit failures: the selector screened at the wide
+  study's HIST (1,150 changes) while the runner inherits the front-end
+  study's MIN_LEN=1500. The universe freeze and the runner requirement
+  were inconsistent; the effective universe is the 921 series meeting
+  both, and no result influenced which. Disclosed as a design error.
+- Concentration is severe and the family-weighted view is therefore the
+  primary lens, per the plan: one family (IHLI) is 438 of 921 scored
+  series (48%).
+
+## Results (first read, per the frozen plan)
+
+Sandwich: PRIMARY median -0.0196 (77/921 wins, 8%); family-weighted
+(120 families) -0.0249, 16% of families positive. The success criterion
+([-0.05, +0.01]) is met on both views: the epsilon holds at full scale.
+Strata: every rho bin sits between -0.011 and -0.022 except the two
+lattice-dominated slices (repeat -1.23, rho~0 -0.82), where Prophet's
+Gaussian head cannot express atoms even in z coordinates.
+
+Raw: PRIMARY median -0.755 (4/921 wins); family-weighted -4.60 with 0%
+of families positive, the unweighted median being flattered by the one
+giant continuous family. Repeat-heavy series run at -11.3 median.
+Question 2 answered: the collapse pattern persists and deepens at scale.
+
