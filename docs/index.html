@@ -44,18 +44,16 @@
       time-series prediction.</p>
 
     <p class="lead">One call, zero dependencies, every prediction a full probability
-      <em>distribution</em> computed online in O(1) — in pure Python and JavaScript alike. A
-      general-purpose forecaster for <strong>non-price economic series</strong>: on held-out
-      likelihood <code>laplace</code> beats AutoARIMA, AutoETS, SARIMAX, conformal, zero-shot
-      foundation models like Chronos and TimesFM, <em>and</em> GARCH-t — all heavier and slower.
-      (No free lunch on price/returns: there GARCH-t wins, and you should use it.)</p>
+      <em>distribution</em> computed online in O(1). A general-purpose forecaster for
+      <strong>non-price economic series</strong>, with one model available across several
+      languages.</p>
 
     <div class="tag-row">
       <span class="tag">distributional</span>
       <span class="tag">O(1) online</span>
       <span class="tag">automatic</span>
       <span class="tag">zero-dependency</span>
-      <span class="tag">Python + JavaScript</span>
+      <span class="tag">Python · JS · R · Julia</span>
     </div>
 
     <figure class="hero-figure">
@@ -67,45 +65,27 @@
         <a href="/papers.html">The benchmarks →</a></figcaption>
     </figure>
 
-    <div class="callout">
-      <strong>One library, two languages — verified identical.</strong> The pure-Python package is
-      mirrored by a zero-dependency <a href="/guide.html">JavaScript port</a>, checked against it to
-      1e-6, so the same models run server-side, natively in the browser, or in
-      <a href="https://pyodide.org/">Pyodide</a>.
-      <a href="./demos/">Try the live demos →</a>
-    </div>
-
-    <div class="callout">
-      <strong>It wins the likelihood race against every baseline on non-price series.</strong> On
-      894 continuous non-price FRED series (rolling one-step-ahead, per series), <code>laplace</code>
-      has the highest mean held-out <strong>log-likelihood</strong> (3.20) and the best win-rate
-      against <strong>AutoARIMA</strong> (82%), <strong>AutoETS</strong> (97%), statsmodels
-      <strong>SARIMAX</strong> (87%), <em>conformal</em>, and — the real test — the heavy-tail SOTA
-      <strong>GARCH-t</strong> (68% raw / 65% family-weighted; mean LL 3.20 vs 3.03). On CRPS it
-      loses only to the CRPS-specialists (conformal, GARCH-t). <strong>No free lunch on
-      price/returns</strong> — there GARCH-t wins, and we recommend it.
+    <p>
+      On 894 continuous non-price FRED series, scored one step ahead per series,
+      <code>laplace</code> has the best held-out log-likelihood in the field, ahead of
+      AutoARIMA, AutoETS, SARIMAX, conformal methods, the heavy-tail GARCH-t, and four
+      zero-shot foundation models. It gives up ground only on CRPS, to the CRPS
+      specialists, and on price and return series, where GARCH-t is the better choice.
       <a href="/papers.html">The benchmarks →</a>
-    </div>
+    </p>
 
-    <div class="callout">
-      <strong>…and it beats the foundation models too — zero-shot.</strong> On 120 FRED change-series,
-      <code>laplace</code> beats <strong>Chronos</strong>, <strong>TimesFM</strong>,
-      <strong>Moirai</strong>, and <strong>Lag-Llama</strong> used zero-shot, on the continuous series,
-      on both <strong>log-likelihood</strong> (97–100%) and <strong>CRPS</strong> (72–94%) — a
-      zero-dependency online ensemble holding its own against 200M-parameter transformers.
-      <a href="/papers.html">The foundation study →</a>
-    </div>
+    <p>
+      The same model runs in Python, JavaScript, R, and Julia, over a portable Rust core,
+      every implementation checked against the reference to 1e-6. A model fit on a server
+      resumes unchanged in the browser. <a href="/languages.html">The languages →</a>
+    </p>
 
-    <div class="callout">
-      <strong>Anomaly detection falls out for free.</strong> Every arriving point is scored
-      against the forecast that was made <em>for it</em>: the state carries its probability
-      integral transform (<code>state["pit"]</code>, ~Uniform when the stream behaves) and its
-      normalized surprise (<code>state["z"]</code>, ~N(0,1)) at every horizon — running
-      normalization with no extra compute, and a threshold on |z| is an anomaly detector
-      calibrated by construction.
-      <a href="/demos/normalization.html">See it live →</a> ·
-      <a href="/skills.html#anomaly-detection">the skill →</a>
-    </div>
+    <p>
+      Anomaly detection comes with the state. Each point is scored against the forecast
+      issued for it, so <code>state["z"]</code> is a normalized surprise and a threshold on
+      it is a calibrated detector at no extra cost.
+      <a href="/demos/normalization.html">See it live →</a>
+    </p>
 
     <p>
       <code>pip install skaters</code>. Every prediction is a <code>Dist</code> — a weighted
