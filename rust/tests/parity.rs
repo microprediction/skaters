@@ -2,7 +2,7 @@
 //! compare the seven probes (mean, std, logpdf@0.3, cdf@0.3, q0.1, q0.9,
 //! crps@0.3) against parity/vectors.json at atol = rtol = 1e-6.
 //!
-//! Out of scope: search_default, spec_diff_ensemble, spec_ema, periodicity.
+//! Out of scope: search_default, spec_diff_ensemble, spec_ema.
 
 use serde_json::Value;
 
@@ -20,6 +20,7 @@ fn digest_push(v: f64) {
 
 use skaters_core::api::{laplace, Forecaster};
 use skaters_core::cov::{EmaCov, LedoitWolfCov, RunningCov};
+use skaters_core::periodicity::PeriodDetector;
 use skaters_core::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
 use skaters_core::skater::{
     bayesian_ensemble, conjugate, ema, multiscale, precision_weighted_ensemble, sticky, Sk,
@@ -347,6 +348,46 @@ fn parity_vectors() {
             oi += 1;
         }
         assert_eq!(oi, out.len(), "cov/{nm}: scored-step count mismatch");
+        n_scenarios += 1;
+    }
+
+    // Periodicity detector: ranked (lag, acf) block on the main series.
+    {
+        let out = v["periodicity"].as_array().unwrap();
+        let mut pd = PeriodDetector::new();
+        let mut oi = 0usize;
+        for (i, &y) in series.iter().enumerate() {
+            let scores = pd.step(y);
+            if i < burn {
+                continue;
+            }
+            let step_exp = out[oi].as_array().unwrap();
+            assert_eq!(
+                step_exp.len(),
+                scores.len(),
+                "periodicity: score count mismatch at step {i}"
+            );
+            for (r, &(lag, acf)) in scores.iter().enumerate() {
+                let pair = step_exp[r].as_array().unwrap();
+                let exp_lag = pair[0].as_u64().unwrap() as usize;
+                let exp_acf = parse_val(&pair[1]);
+                digest_push(lag as f64);
+                digest_push(acf);
+                checked += 2;
+                if lag != exp_lag && failures.len() < 20 {
+                    failures.push(format!(
+                        "periodicity step {i} rank {r}: got lag {lag} expected {exp_lag}"
+                    ));
+                }
+                if !close(acf, exp_acf) && failures.len() < 20 {
+                    failures.push(format!(
+                        "periodicity step {i} rank {r} acf: got {acf:.12e} expected {exp_acf:.12e}"
+                    ));
+                }
+            }
+            oi += 1;
+        }
+        assert_eq!(oi, out.len(), "periodicity: scored-step count mismatch");
         n_scenarios += 1;
     }
 
