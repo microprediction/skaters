@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — languages</title>
+  <meta name="description" content="One model, several languages: Python, JavaScript and R today, verified against each other to 1e-6 on every run. Install lines, parity discipline, and the roadmap." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — languages" />
+  <meta property="og:description" content="Python, JavaScript and R, verified against each other to 1e-6 on every run." />
+  <meta property="og:url" content="https://skaters.microprediction.org/languages.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/languages.html">Languages</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Languages</h1>
+    <p class="subtitle">One model, several runtimes, and a referee that keeps
+      them identical.</p>
+
+    <p class="lead">
+      Every implementation is verified against the Python reference by a
+      parity suite: the same fixed series through every scenario, with
+      roughly 100,000 distributional probe values required to agree to
+      1e-6 before anything ships. A model trained in one language resumes
+      bit-compatibly in another; the state is pure data.
+    </p>
+
+    <h2>Python (reference)</h2>
+    <p><code>pip install skaters</code></p>
+    <p>
+      Pure standard library, no dependencies. The reference implementation:
+      the parity vectors are generated here, the benchmarks and papers run
+      here, and features land here first.
+    </p>
+
+    <h2>JavaScript</h2>
+    <p><code>npm install skaters</code></p>
+    <p>
+      Zero-dependency ES modules covering the whole library. Runs in the
+      browser (the <a href="/demos/">demos</a> are this build) and in Node;
+      parity is enforced at 105,000+ values on every test run, alongside
+      adversarial release gates shared with Python.
+    </p>
+
+    <h2>R</h2>
+    <p><code>install.packages("skaters", repos = "https://microprediction.r-universe.dev")</code></p>
+    <p>
+      Pure R, covering <code>laplace</code> end to end: transforms,
+      ensembles, the lattice projection, the calibration state, and the GPD
+      tail splice, at 96,040 parity values. Developed at
+      <a href="https://github.com/microprediction/skaters-r">microprediction/skaters-r</a>;
+      CRAN submission is planned once the surface and documentation settle.
+    </p>
+
+    <h2>Next</h2>
+    <p>
+      Julia is the next hand port. After that the plan changes shape: a
+      Rust core compiled to WebAssembly and a C ABI, so further languages
+      get bindings rather than rewrites, with the same vectors as the
+      referee throughout.
+    </p>
+
+    <p class="byline">Updated 2026-07-13. The parity harness lives in
+      <code>parity/</code> of the main repository; each port carries its
+      copy of the vectors and its own runner.</p>
+  </main>
+</body>
+</html>
