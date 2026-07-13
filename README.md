@@ -376,11 +376,12 @@ transform, ensemble, and named policy. It is verified against the Python referen
 suite that checks roughly 100,000 values to 1e-6 (`parity/`, run in the test
 suite via `tests/test_js_parity.py`).
 
-An **R port** is underway at
+The **R port** at
 [microprediction/skaters-r](https://github.com/microprediction/skaters-r)
-under the same discipline: no module ships without passing the reference
-parity vectors at 1e-6 (the core types and first transforms are green;
-`PORTING.md` there maps the rest). Continuous installs via
+covers `laplace` end to end under the same discipline: 96,040 reference
+parity values at 1e-6, including the transforms, ensembles, lattice
+projection, calibration state, and the GPD tail splice. Continuous
+installs via
 `install.packages("skaters", repos = "https://microprediction.r-universe.dev")`.
 A Julia port is planned next; the parity vectors make each new language a
 porting exercise with a built-in referee.
