@@ -219,3 +219,9 @@ no TabFM weights had touched any wide-study code path at amendment time.
 - Environment deviation from the runbook: no conda on the Studio; a uv
   python 3.11 venv with the same package set was used instead. tabfm's
   pip metadata omits absl-py and jaxtyping; both installed explicitly.
+- 2026-07-13, post-hoc analyses (exploratory, after the frozen read): a
+  repeat-bin decomposition of the MAE undercard against a constant-zero
+  predictor, and an RMSE recomputation (`benchmarks/tabfm_wide_rmse.py`)
+  using laplace's predictive mean. RMSE: TabFM 72%/28% across all repeat
+  bins; excluded from headline reporting for the kurtosis reason stated
+  in the paper.

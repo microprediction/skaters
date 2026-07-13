@@ -41,4 +41,6 @@ from the committed wide-study results.
 
 ## Deviations
 
-- (fill at run start: device, torch, first timing)
+- 2026-07-13, run start (Mac Studio): device mps, torch 2.4.1, 25s for
+  series 1 (all three arms). Chained automatically behind the post-hoc
+  RMSE pass. Noted from the progress line only.
