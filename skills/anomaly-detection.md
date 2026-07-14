@@ -76,7 +76,16 @@ near-deterministic waveform data (ECG-like periodic streams) expect the
 U-shape and over-alarming: that regime needs template matching, not
 innovation modelling. The histogram is the regime detector.
 
-Two caveats. On **grid/repeating series** (posted prices, policy rates) the
+Three caveats. On **waveform-heavy data** — ECGs, vibration traces, machine
+acoustics, anything whose normal behaviour is a repeating *shape* rather than
+a stochastic level — this is probably not the best tool: the anomaly there is
+a deformed pattern, not a surprising next value, and shape-native methods
+(matrix-profile/discord discovery, spectral distance) are built for exactly
+that. `laplace`'s seasonal candidates absorb clean periodicity, but a subtle
+waveform deformity can hide inside a well-calibrated one-step predictive.
+Reach for this skill when the stream is a level/rate/count with stochastic
+dynamics; reach for the matrix profile when it looks like an oscilloscope. On
+**grid/repeating series** (posted prices, policy rates) the
 lattice projection places near-Dirac mass on revisited values, so PITs cluster
 at the atom edges — threshold on `pit`, not `z`, and treat "off-lattice at all"
 as the event. On **price/return series** volatility clusters: a 4σ day inside

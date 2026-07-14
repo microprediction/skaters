@@ -52,6 +52,106 @@
 
     <div class="skill-copy">
       <div class="skill-copy-head">
+        <h2 id="basic-use"><code>basic-use</code></h2>
+        <button class="btn copy-btn" data-target="src-basic-use">Copy skill</button>
+      </div>
+      <p class="skill-label">The five-minute recipe: the loop, the Dist, the knobs, the free calibration state — and honest graduation paths (ice-skaters/river, sklearn, GluonTS, arch, foundation models, conformal) for when you outgrow it.</p>
+      <details>
+        <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/skills/basic-use.md">view on GitHub</a></summary>
+        <pre id="src-basic-use"><code># basic-use skill
+
+When asked to forecast a univariate stream — a metric, a rate, a spread, a
+count, anything that arrives one number at a time — start with
+`skaters.laplace` and this recipe. Zero dependencies, online, O(1) per
+observation, and every prediction is a full distribution.
+
+```
+pip install skaters
+```
+
+## The loop
+
+```python
+from skaters import laplace
+
+f = laplace(k=1)              # k = forecast horizon; k&gt;1 is multi-scale by default
+state = None
+for y in stream:
+    dists, state = f(y, state)
+    d = dists[0]              # dists[m-1] is the (m)-step-ahead predictive
+    d.mean                    # point forecast
+    d.std                     # uncertainty
+    d.quantile(0.975)         # tail quantile (any q)
+    d.logpdf(y_next)          # score a realised value on likelihood...
+    d.crps(y_next)            # ...or on CRPS
+```
+
+`state` starts as `None` and is just a picklable dict — persist it and resume
+the stream where you left off. No fitting step, no refit schedule: the model
+IS the update.
+
+Feed **what you want forecast**. Levels if you want level forecasts (the pool
+handles drift, seasonality, mean reversion, coordinates); changes if your
+question is about changes. Don't pre-standardize, don't pre-difference out of
+habit — that's the model's job, and doing it yourself hides information.
+
+## The knobs (all optional, defaults are the benchmarked configuration)
+
+- `k` — horizon. At `k&gt;1` forecasts are a multi-scale mixture (decimated
+  clocks weighted by likelihood); `scales=[1]` opts out.
+- `objective="likelihood"` — repoint the terminal leaf from CRPS to pure
+  likelihood.
+- `sticky=False` — disable the lattice projection (leave it on: it vanishes on
+  continuous data and wins big on grid/repeating series).
+- `leaf=garch_leaf` — GARCH(1,1)-t terminal leaf for price/return series (and
+  read the price caveat: a fitted GARCH-t is still the recommendation there).
+
+## Free with the state
+
+- `state["pit"][m-1]` / `state["z"][m-1]` — each arriving point scored against
+  the forecast made *for it*, as ~Uniform(0,1) and ~N(0,1) respectively.
+  Calibration monitoring, running normalization, and anomaly detection in two
+  keys (see the `anomaly-detection` skill; |z| is clamped to ±7.03, never
+  infinite).
+
+## When you outgrow laplace
+
+Genuine graduation paths, not strawmen — pick by what you're actually missing:
+
+- **You have covariates and the pipeline is streaming** —
+  [ice-skaters](https://ice-skaters.microprediction.org) ("skaters on a
+  river"): every numeric stream becomes two calibrated features — what the
+  forecaster expected and how surprising the value was — ready for
+  [river](https://riverml.xyz)'s online regressors and classifiers. This is
+  the laplace-sandwich top slice, industrialised.
+- **You have covariates and batch retraining is fine** —
+  [scikit-learn](https://scikit-learn.org) on lagged/exogenous features, with
+  laplace as the residual layer (the `laplace-sandwich` skill) so the output
+  stays a calibrated density.
+- **Many related series that should share strength** —
+  [GluonTS](https://ts.gluonts.org/) (DeepAR) or
+  [NeuralForecast](https://nixtlaverse.nixtla.io/) with a distributional head.
+  Worth the training cost when cross-series structure is real.
+- **Price/return volatility, parametric and interpretable** —
+  [arch](https://arch.readthedocs.io/) (GARCH-t and friends). On near-random-
+  walk series the conditional variance is the whole game; we benchmark against
+  it and lose there on purpose.
+- **A brand-new series with no history** — a zero-shot foundation model
+  (Chronos-Bolt, TimesFM, Moirai). Different protocol; keep a separate harness.
+- **Finite-sample coverage guarantees, specifically** — conformal
+  ([crepes](https://github.com/henrikbostrom/crepes), MAPIE). You're buying
+  marginal coverage, not a density.
+
+Whatever you graduate to, keep two habits from here: score it on held-out
+log-likelihood *and* CRPS through the same `Dist` interface (the
+`benchmark-against-laplace` skill is the harness), and run the
+`residual-review` skill on its errors — if laplace beats GARCH-t on your
+fancy model's residuals, the graduation went backwards.
+</code></pre>
+      </details>
+    </div>
+    <div class="skill-copy">
+      <div class="skill-copy-head">
         <h2 id="timesfm-study"><code>timesfm-study</code></h2>
         <button class="btn copy-btn" data-target="src-timesfm-study">Copy skill</button>
       </div>
@@ -688,7 +788,16 @@ Flat means the z-thresholds mean what they say. U-shaped means the model is
 overconfident there (heavier tails than it thinks — raise the threshold);
 hump-shaped means underconfident (alarms will be rare and late).
 
-Two caveats. On **grid/repeating series** (posted prices, policy rates) the
+Three caveats. On **waveform-heavy data** — ECGs, vibration traces, machine
+acoustics, anything whose normal behaviour is a repeating *shape* rather than
+a stochastic level — this is probably not the best tool: the anomaly there is
+a deformed pattern, not a surprising next value, and shape-native methods
+(matrix-profile/discord discovery, spectral distance) are built for exactly
+that. `laplace`'s seasonal candidates absorb clean periodicity, but a subtle
+waveform deformity can hide inside a well-calibrated one-step predictive.
+Reach for this skill when the stream is a level/rate/count with stochastic
+dynamics; reach for the matrix profile when it looks like an oscilloscope. On
+**grid/repeating series** (posted prices, policy rates) the
 lattice projection places near-Dirac mass on revisited values, so PITs cluster
 at the atom edges — threshold on `pit`, not `z`, and treat "off-lattice at all"
 as the event. On **price/return series** volatility clusters: a 4σ day inside
@@ -923,11 +1032,107 @@ schedules change; re-check before believing this paragraph.)
 </code></pre>
       </details>
     </div>
+    <div class="skill-copy">
+      <div class="skill-copy-head">
+        <h2 id="laplace-sandwich"><code>laplace-sandwich</code></h2>
+        <button class="btn copy-btn" data-target="src-laplace-sandwich">Copy skill</button>
+      </div>
+      <p class="skill-label">Improve any model without retraining it: laplace as the bread, your model as the filling. The residual layer turns a point forecaster into a calibrated density and recovers the structure it missed — measured: MAE −64%, +0.9 nats.</p>
+      <details>
+        <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/skills/laplace-sandwich.md">view on GitHub</a></summary>
+        <pre id="src-laplace-sandwich"><code># laplace-sandwich skill
+
+When someone has an existing forecasting model — XGBoost, an LSTM, ARIMA, a
+vendor black box, a spreadsheet, a human — and wants it *better calibrated or
+just better*, don't rewrite it. **Sandwich it**: `laplace` as the bread, their
+model as the filling. The bottom slice alone turns any point forecaster into a
+calibrated distributional one and quietly recovers whatever structure the
+filling missed. No retraining, no access to the model's insides required.
+
+```
+pip install skaters
+```
+
+## The bottom slice (the one that matters)
+
+Your model's forecast errors are just another univariate stream. Forecast
+them. The final predictive is laplace's residual distribution shifted by your
+model's point forecast:
+
+```python
+from skaters import laplace
+
+f = laplace(k=1)                # forecasts the RESIDUAL stream
+state = None
+pending_point = None
+
+for y in stream:
+    if pending_point is not None:
+        r = y - pending_point           # resolve yesterday's residual
+        dists, state = f(r, state)      # laplace forecasts the next one
+    point = your_model_forecast(...)    # the filling, untouched
+    if pending_point is not None:
+        predictive = dists[0].shift(point)   # &lt;-- the sandwich's output
+        # predictive.mean      improved point forecast
+        # predictive.quantile  calibrated intervals
+        # predictive.logpdf    a real density
+    pending_point = point
+```
+
+Why this improves rather than merely dresses up: laplace's candidate pool runs
+drift, seasonality, autocorrelation, coordinate, and volatility-clock models
+*on the error stream*. Any of those your model missed shows up as forecastable
+residual structure, gets forecast, and moves the sandwich's **mean** — not
+just its bands. Systematic bias becomes a drift candidate; missed seasonality
+becomes a seasonal candidate; heteroscedastic errors become a calibrated
+volatility clock instead of one frozen σ.
+
+Measured (20-period moving-average filling on a drifting, seasonal,
+vol-clocked stream, 900 held-out points): mean held-out log-likelihood
+`−1.95 → −1.02` versus the same point model with a rolling Gaussian, and
+point-forecast MAE `1.47 → 0.54` — the sandwich's mean is nearly three times
+more accurate than the filling's, because the residual layer recovered the
+seasonality the moving average couldn't see.
+
+## The top slice (optional)
+
+Models with stationarity assumptions (most ML) prefer well-behaved inputs.
+Run the raw stream through `laplace` first and feed the filling the
+calibration state instead of raw values: `state["z"][0]` is the stream
+rendered as approximately N(0,1) innovations — drift, scale, seasonality and
+coordinate already absorbed (see the *Running normalization* demo). Features
+built from z's don't go stale when the level triples or the volatility regime
+flips, so the filling retrains less and generalizes further.
+
+## The free diagnostics
+
+- The bottom slice **is** the `residual-review` skill running continuously: if
+  laplace finds nothing in your residuals, the sandwich's predictive collapses
+  to "your point + honest noise" and its mean equals your model's — that's a
+  clean bill of health, not a failure.
+- The sandwich's own `state["pit"]`/`state["z"]` (the parade) now monitor the
+  *combined* system: a drifting PIT histogram tells you the filling's regime
+  broke before the P&amp;L does.
+
+## The fixed point (honesty clause)
+
+Sandwiching `laplace` itself does nothing — we tested it: stacking a second
+layer on laplace's own residuals *loses* to plain laplace, because the
+residual stream is already unforecastable to laplace's own pool. That is the
+correct behaviour: the sandwich improves any model to the extent that model
+falls short of laplace, and leaves already-clean models alone. It follows that
+the lazy path is also open: skip the filling entirely and just use `laplace`.
+The sandwich is for when the filling exists for reasons — covariates,
+regulation, sunk cost, a colleague's feelings — and you want the calibration
+and the leftovers anyway.
+</code></pre>
+      </details>
+    </div>
   </main>
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
     (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
     <a href="http://schur.microprediction.org">schur</a>).
   </footer>

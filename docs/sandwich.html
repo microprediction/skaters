@@ -66,7 +66,8 @@
     </div>
 
     <p class="lead">
-      laplace defines a causal bijection on paths: the Rosenblatt transform
+      laplace defines a causal bijection on paths: the
+      <a href="/demos/rosenblatt.html">Rosenblatt transform</a>
       of each observation under the predictive issued for it. Feed the
       resulting z stream to any model, map its output back through the
       exact Jacobian, and the model operates on a stationarised, unit-scale
@@ -123,12 +124,9 @@
       <code>benchmarks/anomaly/RESULTS.md</code> in the repository.
     </p>
 
-    <p class="byline">Updated 2026-07-13. Reproduce:
-      <code>benchmarks/anomaly/frontend_loglik.py</code>,
-      <code>benchmarks/prophet_wide_study.py</code>,
-      <code>benchmarks/tabfm_sandwich_study.py</code>,
-      <code>benchmarks/tabfm_x100_wide.py</code>,
-      <code>benchmarks/anomaly/frontend_run.py</code>.</p>
+    <p class="byline">Every study here is reproducible from the harnesses
+      committed under <code>benchmarks/</code>, each beside the results it
+      produced.</p>
   </main>
 </body>
 </html>

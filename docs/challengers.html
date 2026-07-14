@@ -3,14 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>skaters — challengers</title>
-  <meta name="description" content="Challenger models run against laplace under committed protocols: Prophet at three scales, TabFM pre-registered, the sandwich results, and every disclosure that makes the numbers quotable." />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="skaters" />
-  <meta property="og:title" content="skaters — challengers" />
-  <meta property="og:description" content="Prophet at three scales, TabFM pre-registered, the sandwich results, and the disclosures that make the numbers quotable." />
-  <meta property="og:url" content="https://skaters.microprediction.org/challengers.html" />
-  <meta name="twitter:card" content="summary" />
+  <title>skaters &mdash; Challengers</title>
+  <meta name="description" content="Every forecaster that has stepped up against Laplace, one row each with its tape, and the featured bouts. Built for the challengers still coming." />
   <link rel="stylesheet" href="./academic.css" />
 </head>
 <body>
@@ -34,137 +28,112 @@
 
   <main>
     <h1>Challengers</h1>
-    <p class="subtitle">Models run against <code>laplace</code> under committed
-      protocols, with the statements filed before the results existed.</p>
-
-    <p class="lead">
-      Every study on this page follows the same rules: the universe is frozen
-      and committed first, the harness and scoring are committed with it, a
-      statement of intent is filed before any result is read, results land in
-      the repository next to the code that produced them, and anything that
-      went wrong is written in a deviations section rather than quietly
-      dropped. The statements live in
-      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/preregistrations">benchmarks/preregistrations</a>.
-    </p>
+    <p class="subtitle">Everyone who has stepped up, and how it went.</p>
 
     <p>
-      A framing note before the tables. The ideas in skaters, and the code
-      itself, can work in harmony with other approaches: the sandwich
-      results below show challengers improving dramatically inside
-      laplace's coordinates, and the
-      <a href="https://github.com/microprediction/skaters/blob/main/skills/laplace-sandwich.md">sandwich
-      skill</a> and the paper's sandwich section treat that as a deployment
-      path, not a defeat. A simple horserace can be misleading or
-      unhelpful in that sense. Nonetheless these pages can serve as
-      counterpoint to overly aggressive marketing, at least as regards
-      autonomous univariate distributional prediction.
+      skaters cooperates as well as it competes: sandwiched in laplace's
+      coordinates, every challenger below improves dramatically (<a
+      href="/sandwich.html">the sandwich</a>), so a bare horserace can
+      mislead. These pages exist as counterpoint to overly aggressive
+      marketing in autonomous univariate distributional prediction.
     </p>
 
-    <h2>Prophet</h2>
+    <h2>Featured bouts</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>TabFM &mdash; David v Godzilla</h3>
+        <p>A 12&thinsp;GB tabular foundation model, pre-registered, eleven
+          arms, every one behind laplace on likelihood, at one
+          ten-thousandth the footprint.
+          <a href="/challengers/tabfm.html">The bout &rarr;</a></p>
+      </div>
+      <div class="card">
+        <h3>Prophet</h3>
+        <p>Three scales, 30 to 921 series, pre-registered at the largest.
+          Raw: 4 wins in 921, and &minus;11 nats median on repeat-heavy
+          series.
+          <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-prophet-wide.md">The tape &rarr;</a></p>
+      </div>
+    </div>
+
+    <h2>The record</h2>
     <p>
-      Prophet is the challenger we have measured most thoroughly, at three
-      scales. (For the prehistory, see
-      <a href="https://medium.com/geekculture/is-facebooks-prophet-the-time-series-messiah-or-just-a-very-naughty-boy-8b71b136bc8c">the
-      2021 critique</a>; this page is the quantitative sequel on live
-      protocols.)
+      Numbers are per-series win-rates for <code>laplace</code>,
+      log-likelihood first, CRPS second. Everyone is converted to the same
+      <code>Dist</code> and scored by the same code on the same held-out
+      points. Every row links its tape. The one belt we do not hold is at
+      the bottom, stated rather than averaged away.
     </p>
-    <p>
-      <strong>Scale one: thirty series, five opponents.</strong> The
-      Rosenblatt front-end study ran Prophet with real calendar dates,
-      rolling refits, and exact change-of-variables accounting. Raw, it
-      scored 1.64 mean log-likelihood against laplace's 3.67. Sandwiched
-      (fed laplace's z stream and mapped back through the exact Jacobian) it
-      reached 3.70, the largest median lift of the five opponents, and its
-      calendar machinery added +0.03 nats over laplace alone, the largest
-      epsilon any challenger has recorded.
-    </p>
-    <p>
-      <strong>Scale two: the 226-series stratified universe.</strong> On the
-      pre-registered TabFM universe (five autocorrelation bins crossed with
-      three repeat bins, family caps), raw Prophet trails by 1.91 nats
-      median with 3 wins in 217, collapsing to &minus;9.8 on repeat-heavy
-      series, whose lattice its Gaussian head cannot express. Sandwiched, it
-      lands 0.020 nats behind laplace. The +0.03 calendar surplus from
-      scale one does not replicate here.
-    </p>
-    <p>
-      <strong>Scale three: every qualifying series.</strong>
-      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-prophet-wide.md">Pre-registered</a>
-      with a frozen 1,367-series universe, no family caps, and a frozen
-      analysis plan including a family-weighted concentration check and a
-      written success criterion. Results, per that plan:
-    </p>
-    <table>
-      <thead><tr><th></th><th>unweighted median vs laplace</th><th>family-weighted (120 families)</th><th>wins</th></tr></thead>
+<table>
+      <thead><tr><th>challenger</th><th>corner</th><th>LL</th><th>CRPS</th><th>tape</th></tr></thead>
       <tbody>
-        <tr><td>Prophet raw</td><td>&minus;0.755 nats</td><td>&minus;4.60 nats</td><td>4/921 series; 0% of families</td></tr>
-        <tr><td>Prophet sandwiched</td><td><strong>&minus;0.020 nats</strong></td><td><strong>&minus;0.025 nats</strong></td><td>8% of series; 16% of families</td></tr>
+        <tr><td>AutoARIMA (statsforecast)</td><td>classical</td><td>82%</td><td>53%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
+        <tr><td>auto.arima (real R)</td><td>classical</td><td>79%</td><td>51%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-autoarima">bout</a></td></tr>
+        <tr><td>AutoETS</td><td>classical</td><td>97%</td><td>83%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
+        <tr><td>ETS / SARIMAX (statsmodels)</td><td>classical</td><td>96% / 87%</td><td>81% / 53%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
+        <tr><td>Theta (the M3 winner, R)</td><td>classical</td><td>87%</td><td>63%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-theta">bout</a></td></tr>
+        <tr><td>ADAM (smooth, R)</td><td>state space</td><td>96%</td><td>82%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-adam">bout</a></td></tr>
+        <tr><td>BSTS (full Bayesian posterior, R)</td><td>state space</td><td>97%</td><td>80%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-bsts">bout</a></td></tr>
+        <tr><td>nnetar (neural AR, R)</td><td>neural</td><td>96%</td><td>76%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-nnetar">bout</a></td></tr>
+        <tr><td>NF-StudentT (NeuralForecast)</td><td>neural</td><td>100%</td><td>78%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
+        <tr><td>CSP (incl. adaptive)</td><td>conformal</td><td>99%</td><td>100%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
+        <tr><td>AutoARIMA + conformal / ACI</td><td>conformal</td><td>86% / 88%</td><td>31% / 29%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
+        <tr><td><strong>TimesFM 2.5, 200M (Google)</strong></td><td>foundation</td><td>100% cont.</td><td>72% cont.</td><td><a href="/timesfm.html"><strong>David v Goliath</strong></a></td></tr>
+        <tr><td>Chronos-Bolt (Amazon)</td><td>foundation</td><td>100% cont.</td><td>88% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
+        <tr><td>Moirai (Salesforce)</td><td>foundation</td><td>97% cont.</td><td>93% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
+        <tr><td>Lag-Llama</td><td>foundation</td><td>99% cont.</td><td>94% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
+        <tr><td><strong>TabFM 1.0 (Google, tabular)</strong></td><td>foundation</td><td>71&ndash;88% (11 arms)</td><td>38&ndash;60%</td><td><a href="/challengers/tabfm.html"><strong>David v Godzilla</strong></a></td></tr>
+        <tr><td>Prophet (Meta)</td><td>calendar GAM</td><td>99.6%</td><td>&mdash;</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-prophet-wide.md">study</a></td></tr>
+        <tr><td>GARCH-t, non-price series</td><td>heavy-tail SOTA</td><td>68&ndash;82%</td><td>53&ndash;54%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-garch">bout</a></td></tr>
+        <tr><td><em>GARCH-t, price/return series</em></td><td>heavy-tail SOTA</td><td colspan="2"><em>the belt is theirs; we recommend it there</em></td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
       </tbody>
     </table>
-    <p>
-      Three details make these numbers quotable. The family weighting
-      mattered: one FRED family (a job-postings panel) is 48% of the
-      uncapped universe and flattered raw Prophet's unweighted median by
-      nearly a factor of six; the frozen plan required both views. The
-      sandwich epsilon is stable from 30 series to 921: Prophet fed
-      laplace's coordinates always lands about 0.02 nats behind laplace
-      itself, our strongest evidence that little conditional structure is
-      left in the residuals. And the deviations section discloses a design
-      error in full: a selector/runner length mismatch silently reduced the
-      universe from 1,367 to 921 before any result existed.
+
+    <h2>Featured bouts</h2>
+    <div class="card-grid">
+      <a class="card" href="/timesfm.html">
+        <h3>David v Goliath &rarr;</h3>
+        <p>Laplace vs TimesFM, Google&rsquo;s 200M-parameter foundation
+          model: 69 of 69 continuous series on likelihood, a 2.26-nat median
+          gap, the sorted-gap chart, the footprint table, and where Goliath
+          actually wins (predicting zeros).</p>
+      </a>
+    </div>
+    <p style="color:var(--muted);font-size:0.92em;">
+      One bout page so far. Challengers that earn a full treatment get one;
+      the next candidates are the native-density foundation models, Moirai
+      and Lag-Llama, which came closest. Rematch conditions for TimesFM are
+      tracked in <a href="https://github.com/microprediction/skaters/issues/97">skaters#97</a>.
     </p>
 
-    <h2>TabFM</h2>
+    <h2>Send a challenger</h2>
     <p>
-      A tabular foundation model with 12&thinsp;GB of weights, evaluated
-      under a <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-09-tabfm-wide.md">pre-registered
-      eleven-arm study</a> on the 226-series universe: laplace wins the
-      likelihood race against every arm (71&ndash;88% of series), the best
-      arm trailing by 0.39 nats median. Sandwiched, its regressor converges
-      to 0.019 nats behind laplace; as a component supplying the conditional
-      mean, it subtracts value.
+      The protocol is packaged and copyable: the
+      <a href="/skills.html#benchmark-against-laplace">benchmark-against-laplace</a>
+      skill for any distributional forecaster, and the
+      <a href="/skills.html#timesfm-study">timesfm-study</a> skill for
+      foundation models specifically. Same <code>Dist</code>, same code,
+      same held-out points, both metrics, splits disclosed. Run it, and if
+      your method wins, <a
+      href="https://github.com/microprediction/skaters/issues">open an
+      issue</a> with the tape; the table takes new rows in either
+      direction.
     </p>
     <p>
-      <strong>The upset.</strong> A
-      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-tabfm-x100-wide.md">second
-      pre-registered study</a> reran TabFM's strongest configuration alone
-      on the full 921-series universe, with the selection effect disclosed
-      in advance (the arm was chosen for having won, so regression toward
-      the pack was the stated prior). It did not regress: raw, its gap
-      narrowed to 0.155 nats (0.22 family-weighted) and it won the
-      repeat-heavy stratum outright. Sandwiched, its unweighted epsilon is
-      the familiar &minus;0.020, but family-weighted it is <strong>+0.87,
-      with a +1.99-nat median win on repeat-heavy series</strong>. That is a sandwich finding, not a challenger victory: laplace
-      supplies the coordinates inside the winning combination, and the
-      number measures discrete structure laplace alone leaves unmodelled. The
-      mechanism is disclosed in the statement's read: fine binning applied
-      to 100&times; the parade z acts as a discrete density head and models
-      the atom structure that lattice-heavy series carry into z
-      coordinates. The constructive consequence is a library work item, an
-      atom-aware residual head. The paper's foundation-model section
-      carries the full tables, the strata reading, and the deployed
-      footprint comparison (12&thinsp;GB and 45&thinsp;ms per forecast on a
-      GPU, against 988&thinsp;KB and 0.3&thinsp;ms on one CPU core).
+      New bouts are pre-registered: the protocol, parameters and analysis
+      plan are committed to
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/preregistrations">benchmarks/preregistrations</a>
+      before the results are read, with everything already observed at
+      filing disclosed. The first filed statement is the TabFM bout.
     </p>
-
-    <h2>Everyone else</h2>
-    <p>
-      Twelve classical and neural distributional baselines and four
-      zero-shot foundation models are scored on the
-      <a href="/papers.html">papers page</a> under the same one-pass
-      protocols. The sandwich verdict across all of them now has two
-      regimes: on continuous series every opponent converges to laplace
-      plus or minus a few hundredths of a nat, and on repeat-heavy series
-      a discrete inner head recovers structure laplace's continuous
-      predictive misses. The residual test gave a constructive answer.
-    </p>
-
-    <p class="byline">Updated 2026-07-13. Reproduce:
-      <code>benchmarks/prophet_wide_study.py</code>,
-      <code>benchmarks/prophet_sandwich_study.py</code>,
-      <code>benchmarks/anomaly/frontend_loglik.py</code>,
-      <code>benchmarks/tabfm_wide_study.py</code>; results CSVs are
-      committed beside them.</p>
   </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="https://github.com/microprediction/precise">precise</a>,
+    <a href="https://github.com/microprediction/allocation">allocation</a>,
+    <a href="https://github.com/microprediction/humpday">humpday</a>).
+  </footer>
 </body>
 </html>

@@ -24,7 +24,7 @@ use skaters_core::tails::PDist;
 ///
 /// Wraps the core predictive (a Gaussian mixture, possibly tail-spliced).
 /// Methods and properties mirror the pure-Python `Dist`.
-#[pyclass(module = "skaters_fast", name = "Dist")]
+#[pyclass(module = "skaters_fast", name = "Dist", skip_from_py_object)]
 #[derive(Clone)]
 struct Dist {
     inner: PDist,

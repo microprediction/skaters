@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — featured bout: TabFM</title>
+  <meta name="description" content="The TabFM bout: a 12 GB tabular foundation model against laplace, pre-registered, eleven arms, one genuine upset, and the tape in full." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — featured bout: TabFM" />
+  <meta property="og:description" content="A 12 GB foundation model against laplace: pre-registered, eleven arms, one genuine upset." />
+  <meta property="og:url" content="https://skaters.microprediction.org/challengers/tabfm.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="../academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/languages.html">Languages</a>
+        <a href="/sandwich.html">Sandwich</a>
+        <a href="/challengers.html">Challengers</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>David v Godzilla: TabFM</h1>
+    <p class="subtitle">A 12&thinsp;GB tabular foundation model, met under a
+      pre-registered protocol. Eleven arms against the reference. The record, in full.</p>
+
+    <h2>The tale of the tape</h2>
+    <table>
+      <thead><tr><th></th><th>TabFM (as configured)</th><th>laplace</th></tr></thead>
+      <tbody>
+        <tr><td>model artifact</td><td>12&thinsp;GB weights</td><td>988&thinsp;KB source</td></tr>
+        <tr><td>dependencies</td><td>560&thinsp;MB (torch)</td><td>none</td></tr>
+        <tr><td>peak memory</td><td>~10&thinsp;GB</td><td>18&thinsp;KB state</td></tr>
+        <tr><td>time per forecast</td><td>45&thinsp;ms&ndash;0.5&thinsp;s (GPU)</td><td>0.3&thinsp;ms (one CPU core)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Round one: eleven arms, 226 stratified series</h2>
+    <p>
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-09-tabfm-wide.md">Pre-registered</a>:
+      universe, arms, and scoring frozen and committed before any result
+      existed. Eleven ways of using TabFM (lag depths, four binning
+      schemes, horizon variants, a residual-density regressor), so the
+      verdict bounds the adaptation rather than one adapter. laplace won
+      the per-series likelihood race against every arm, 71&ndash;88% of
+      series, the strongest configuration trailing by 0.39 nats median.
+      The strata told the story: near parity on strongly mean-reverting
+      continuous series (a tabular regression problem, TabFM's home game),
+      collapse on repeat-heavy series (2&ndash;4 nats; no concept of an
+      atom), steady deficit on near-random-walk series where volatility
+      tracking is the job.
+    </p>
+
+    <h2>The verdict</h2>
+    <p>
+      On density forecasting across the universe, laplace by a wide
+      margin, at one ten-thousandth the footprint. On point forecasts,
+      TabFM is genuinely decent (it takes the MAE undercard on continuous
+      series by hairline shading). What TabFM contributes in cooperation
+      with laplace is a different subject with its own numbers: see
+      <a href="/sandwich.html">the sandwich</a>.
+    </p>
+
+    <p class="byline">All numbers from committed studies:
+      <code>benchmarks/tabfm_wide_study.py</code>, results CSVs beside
+      them, statements in <code>benchmarks/preregistrations/</code>.</p>
+  </main>
+</body>
+</html>
