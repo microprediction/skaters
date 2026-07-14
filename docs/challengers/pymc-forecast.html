@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — featured bout: PYMC-Forecast</title>
+  <meta name="description" content="The PYMC-Forecast bout: PyMC Labs' Bayesian toolkit benchmarked the day after release. Four pre-registered hypotheses, a positive sandwich epsilon, and the first pooling arm." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — featured bout: PYMC-Forecast" />
+  <meta property="og:description" content="PyMC Labs' Bayesian toolkit against laplace, benchmarked the day after release: the first challenger to finish ahead after sandwiching." />
+  <meta property="og:url" content="https://skaters.microprediction.org/challengers/pymc-forecast.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="../academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/languages.html">Languages</a>
+        <a href="/sandwich.html">Sandwich</a>
+        <a href="/challengers.html">Challengers</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>The day-one bout: PYMC-Forecast</h1>
+    <p class="subtitle">PyMC Labs released a Bayesian forecasting toolkit
+      on 2026-07-13. This statement was filed the next morning. Four
+      pre-registered hypotheses, including the first challenger arm ever
+      given cross-series information.</p>
+
+    <h2>Why a Bayesian challenger is different</h2>
+    <p>
+      <a href="https://github.com/pymc-labs/pymc_forecast">PYMC-Forecast</a>
+      is batch-refit, posterior-predictive, and lets the user choose the
+      generative model and its priors. That makes it the sharpest test yet
+      of the <a href="/sandwich.html">sandwich</a> claim, because the z
+      stream hands a Bayesian model its two favourite conditions. The
+      marginal is N(0,1) by construction, so priors centred at no
+      structure and unit scale are exactly right rather than guesswork.
+      And z is nearly stationary, so the cost of batch refits, the
+      method's structural weakness in a prequential race, mostly
+      vanishes. The shared model in every arm: a Student-t regression on
+      8 lagged values, mean-field ADVI, 500 posterior draws, every
+      predictive density the exact posterior-draw mixture.
+    </p>
+
+    <h2>The four hypotheses, as filed</h2>
+    <table>
+      <thead><tr><th>hypothesis</th><th>result on 226 series</th><th>verdict</th></tr></thead>
+      <tbody>
+        <tr><td>H1: raw model vs laplace</td><td>laplace wins 82%, +0.45 nats median (p = 5e-23)</td><td>the usual story</td></tr>
+        <tr><td>H2: does the sandwich lift it?</td><td>sandwiched beats raw on 86%, +0.63 nats median (p = 3e-30)</td><td>yes, again</td></tr>
+        <tr><td>H3: convergence to laplace</td><td>median absolute gap collapses 0.62 &rarr; 0.05 nats; sandwiched wins 65%, +0.04 median (p = 4e-06)</td><td><strong>converged, epsilon positive</strong></td></tr>
+        <tr><td>H4: does one pooled fit beat per-series fits?</td><td>pooling loses on 72% (p = 2e-11); wins the repeat-heavy stratum by +2.1 nats median</td><td>no, except where series share structure</td></tr>
+      </tbody>
+    </table>
+
+    <h2>The positive epsilon</h2>
+    <p>
+      Previous sandwiched challengers converged to laplace minus a hair,
+      except the discrete TabFM head, whose gain was confined to
+      repeat-heavy series. This one finished ahead across the whole
+      universe: 65% of series, +0.04 nats median, under the
+      pre-registered convergence hypothesis. The gain is not
+      spread evenly. It concentrates on repeat-heavy series, +2.1 nats
+      median on the near-martingale repeat stratum, exactly where the
+      discrete TabFM head found structure a week earlier. Three
+      independent detectors have now found predictable structure in the
+      z stream of repeat-heavy series, and it remains a standing library
+      work item. On clean continuous strata laplace still edges the
+      sandwich slightly.
+    </p>
+
+    <h2>Pooling, the first of its kind</h2>
+    <p>
+      The parade reduces every series to the same coordinate system,
+      which makes thousands of heterogeneous series exchangeable and
+      partial pooling well-posed. The hier arm exploited that: one joint
+      hierarchical fit across all 226 series' z streams, against an
+      identical model fit per series. Same window, same freeze, only the
+      priors differ, so the contrast isolates pooling exactly. Verdict:
+      the shrinkage tax beats the borrowed strength on 72% of series,
+      but pooling wins 79% of the repeat-heavy stratum with a +2.1-nat
+      median. Cross-series information helps precisely where series
+      share an exploitable signature, and nowhere else.
+    </p>
+
+    <h2>Staleness, priced</h2>
+    <p>
+      The quiet result: a single ADVI fit on pre-test data, frozen with
+      no refits through all 150 test steps, ties laplace overall (wins
+      54% of series, median gap 0.005 nats). In raw coordinates batch
+      models pay heavily for going stale between refits; in z
+      coordinates there is almost no drift left to track. The sandwich
+      is what makes batch Bayesian machinery usable in an online race.
+    </p>
+
+    <h2>The verdict</h2>
+    <p>
+      Raw, PYMC-Forecast joins the record like every challenger before
+      it. Sandwiched, it is the first to finish ahead, and its
+      hierarchical machinery asked a question no univariate method can:
+      what do these series know about each other? The answer, on this
+      universe, is measured in nats and concentrated in one stratum.
+      Cooperation beat competition, one day after the package existed.
+    </p>
+
+    <p class="byline">All numbers from committed studies:
+      <code>benchmarks/pymc_forecast_sandwich_study.py</code> and
+      <code>benchmarks/pymc_forecast_analysis.py</code>, results CSV
+      beside them, statement in
+      <code>benchmarks/preregistrations/2026-07-14-pymc-forecast-sandwich.md</code>.</p>
+  </main>
+</body>
+</html>

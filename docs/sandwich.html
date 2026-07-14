@@ -49,7 +49,7 @@
       <rect x="52" y="88" width="616" height="18" rx="6" fill="#7fae63" stroke="#5d8a44" stroke-width="1"/>
       <text x="360" y="101" text-anchor="middle" font-size="11" font-family="Menlo,Consolas,monospace" fill="#233812">lettuce: a near-i.i.d. N(0,1) stream, drift and volatility removed</text>
       <rect x="60" y="110" width="600" height="44" rx="8" fill="#c96f5e" stroke="#a04f3f" stroke-width="1.5"/>
-      <text x="360" y="137" text-anchor="middle" font-size="17" font-family="Menlo,Consolas,monospace" fill="#fff">any model: Prophet &#183; ETS &#183; AutoARIMA &#183; GARCH &#183; TabFM</text>
+      <text x="360" y="137" text-anchor="middle" font-size="16" font-family="Menlo,Consolas,monospace" fill="#fff">any model: Prophet &#183; ETS &#183; AutoARIMA &#183; GARCH &#183; TabFM &#183; PyMC</text>
       <rect x="52" y="158" width="616" height="18" rx="6" fill="#f0d264" stroke="#c9a83b" stroke-width="1"/>
       <text x="360" y="171" text-anchor="middle" font-size="11" font-family="Menlo,Consolas,monospace" fill="#4d3f0e">cheese: its z-space density, whatever shape it likes</text>
       <path d="M60,176 L660,176 L660,190 Q660,214 590,214 L130,214 Q60,214 60,190 Z" fill="url(#bread)" stroke="#b98d43" stroke-width="1.5"/>
@@ -88,6 +88,7 @@
         <tr><td>Prophet</td><td>921 series, pre-registered</td><td>&minus;0.76 (&minus;4.6 family-weighted)</td><td>&minus;0.02</td></tr>
         <tr><td>TabFM (regressor)</td><td>226 series</td><td>&minus;0.75</td><td>&minus;0.02</td></tr>
         <tr><td>TabFM (x100 classifier)</td><td>921 series, pre-registered</td><td>&minus;0.15</td><td><strong>+0.87 family-weighted; +1.99 on repeat-heavy series</strong></td></tr>
+        <tr><td>PYMC-Forecast (Student-t lag regression, ADVI)</td><td>226 series, pre-registered</td><td>&minus;0.45</td><td><strong>+0.04; +2.1 on repeat-heavy series</strong></td></tr>
       </tbody>
     </table>
     <p>
@@ -95,9 +96,26 @@
       (FRED-30 rows are means relative to laplace's 3.674). The pattern:
       raw models trail by whole nats; sandwiched, they converge to laplace
       plus or minus a small epsilon, and the epsilon measures conditional
-      structure laplace missed. The one large positive epsilon is the
-      discrete TabFM head on repeat-heavy series, which found real
-      structure and became a library work item.
+      structure laplace missed. The large positive epsilons sit on
+      repeat-heavy series, first found by the discrete TabFM head and
+      confirmed by the PYMC-Forecast bout; that structure is a standing
+      library work item.
+    </p>
+    <p>
+      The PYMC-Forecast row is the first sandwiched challenger whose
+      positive epsilon spans the whole universe rather than one stratum:
+      ahead of laplace on 65% of series, +0.04 nats median, filed as its
+      pre-registered convergence hypothesis. The z stream also suits
+      Bayesian machinery unusually well. Its marginal is N(0,1) by
+      construction, so priors centred at no structure and unit scale are
+      exactly right rather than guesswork, and a single pre-test ADVI fit
+      frozen through all 150 test steps still ties laplace to the third
+      decimal: in these coordinates, batch-refit staleness costs almost
+      nothing. One pooled hierarchical fit across all 226 series lost to
+      the same model fit per series on 72% of them, with the gains
+      concentrated on the repeat-heavy stratum (+2.1 nats median); the
+      full tape is on the
+      <a href="/challengers/pymc-forecast.html">bout page</a>.
     </p>
 
     <h2>Detectors</h2>
