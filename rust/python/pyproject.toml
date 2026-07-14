@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "skaters-fast"
+version = "0.1.0"
+description = "Opt-in accelerated backend for skaters: a PyO3 skin over the parity-gated Rust core."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "Peter Cotton", email = "peter.cotton@microprediction.com" }]
+keywords = ["time series", "forecasting", "online", "distributional", "rust", "pyo3"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://skaters.microprediction.org/"
+Source = "https://github.com/microprediction/skaters"
+
+[tool.maturin]
+# The compiled module is imported as `skaters_fast`. abi3 (from the pyo3
+# "abi3-py39" feature) means one wheel per platform serves all of CPython >= 3.9.
+module-name = "skaters_fast"

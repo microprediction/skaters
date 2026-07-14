@@ -1,0 +1,22 @@
+[package]
+name = "skaters-fast"
+version = "0.1.0"
+edition = "2021"
+# pyo3 0.29 requires Rust 1.83. This binding is built by maturin on stable and
+# is not part of skaters-core's MSRV promise (the workspace default build stays
+# scoped to the core, which holds at 1.74).
+rust-version = "1.83"
+description = "Opt-in accelerated backend for the skaters online forecasting core (PyO3 skin over skaters-core)."
+license = "MIT"
+
+[lib]
+name = "skaters_fast"
+crate-type = ["cdylib"]
+
+[dependencies]
+skaters-core = { path = ".." }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[dependencies.pyo3]
+version = "0.29"
+features = ["abi3-py39", "extension-module"]

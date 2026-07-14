@@ -1,0 +1,29 @@
+[workspace]
+members = ["python"]
+# `cargo test`/`cargo build` at the workspace root stay scoped to the core so
+# the release gate is unchanged. The PyO3 member is a cdylib built by maturin.
+default-members = ["."]
+
+[package]
+name = "skaters-core"
+version = "0.1.0"
+edition = "2021"
+# MSRV. Conservative: the deps (pyo3 0.22 -> 1.63, serde_json 1 -> 1.56, edition
+# 2021 -> 1.56) all admit older toolchains, but only stable 1.96 is available in
+# this environment to verify against, so we pin the lowest value we are
+# confident compiles rather than the newest.
+rust-version = "1.74"
+description = "Rust port of the skaters online distributional forecasting core, parity-gated against the Python reference."
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+libm = "0.2"
+
+[[bin]]
+name = "bench"
+path = "src/bin/bench.rs"
+
+[profile.release]
+debug = false

@@ -44,3 +44,22 @@ from the committed wide-study results.
 - 2026-07-13, run start (Mac Studio): device mps, torch 2.4.1, 25s for
   series 1 (all three arms). Chained automatically behind the post-hoc
   RMSE pass. Noted from the progress line only.
+
+## Addendum: Prophet at wide-study scale (filed 2026-07-13, before results)
+
+Same exploratory framing: does Prophet's FRED-30 sandwich result (30/30
+fronted wins, the largest median lift of the classical opponents) hold on
+the frozen 226-series universe, and does its calendar machinery add
+anything beyond laplace at this scale? Harness
+`benchmarks/prophet_sandwich_study.py`, reusing the front-end study's
+rolling-refit Prophet, Jacobian, and clamps unchanged. Output
+`benchmarks/results_prophet_sandwich.csv`.
+
+## Second addendum: Prophet, really wide (filed 2026-07-13, before results)
+
+Same arms and scoring on every qualifying non-price series rather than a
+stratified sample: 1,367 series pass the wide study's screens with no
+per-cell or per-family cap; strata and family labels are recorded so
+concentration is analyzed, not prevented. Universe frozen at
+`prophet_wide_universe.txt` and committed with this addendum before any
+result exists. Harness `benchmarks/prophet_wide_study.py`.

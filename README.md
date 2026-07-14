@@ -6,7 +6,7 @@ One univariate time-series model to rule them all? For non-price economic series
 
 <p align="center">
   <a href="https://skaters.microprediction.org/"><img src="https://img.shields.io/badge/docs%20%26%20live%20demos-skaters.microprediction.org-4a3aff?style=for-the-badge" alt="Documentation and live demos"></a>
-  <a href="#javascript--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript-1a8c4a?style=for-the-badge" alt="Python and JavaScript"></a>
+  <a href="#javascript-r--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript%20%7C%20R-1a8c4a?style=for-the-badge" alt="Python, JavaScript and R"></a>
 </p>
 
 Laplace beats (almost) everything.
@@ -369,12 +369,22 @@ def my_transform():
     return forward, inverse_k
 ```
 
-## JavaScript & the browser
+## JavaScript, R & the browser
 
 The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
 transform, ensemble, and named policy. It is verified against the Python reference by a parity
 suite that checks roughly 100,000 values to 1e-6 (`parity/`, run in the test
 suite via `tests/test_js_parity.py`).
+
+The **R port** at
+[microprediction/skaters-r](https://github.com/microprediction/skaters-r)
+covers `laplace` end to end under the same discipline: 96,040 reference
+parity values at 1e-6, including the transforms, ensembles, lattice
+projection, calibration state, and the GPD tail splice. Continuous
+installs via
+`install.packages("skaters", repos = "https://microprediction.r-universe.dev")`.
+A Julia port is planned next; the parity vectors make each new language a
+porting exercise with a built-in referee.
 
 ```html
 <script type="module">

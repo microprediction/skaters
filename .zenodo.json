@@ -1,0 +1,22 @@
+{
+    "title": "skaters: online distributional time-series forecasting by conjugation",
+    "creators": [
+        {
+            "name": "Cotton, Peter",
+            "orcid": "0000-0003-1832-2924"
+        }
+    ],
+    "license": "MIT",
+    "upload_type": "software",
+    "keywords": [
+        "time series",
+        "probabilistic forecasting",
+        "online learning",
+        "proper scoring rules",
+        "calibration",
+        "extreme value theory",
+        "Python",
+        "JavaScript",
+        "R"
+    ]
+}

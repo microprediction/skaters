@@ -40,10 +40,12 @@ function with no exposed tuning parameters, \code{laplace}, which leads the
 per-series held-out log-likelihood race against classical, neural, and
 foundation-model baselines on \proglang{FRED} series; on asset prices a
 \pkg{GARCH}-$t$ model remains better, a split we report rather than average
-away. The library is written twice, in pure \proglang{Python}
-(\code{pip install skaters}) and in zero-dependency \proglang{JavaScript}
-(\code{npm install skaters}) agreeing to $10^{-6}$, so models run
-unchanged in a browser.
+away. Run in \code{laplace}'s coordinates and mapped back exactly (the
+sandwich), existing models improve dramatically without retraining. The library is implemented in pure \proglang{Python}
+(\code{pip install skaters}), zero-dependency \proglang{JavaScript}
+(\code{npm install skaters}), \proglang{R}, and a portable \proglang{Rust}
+core, held to $10^{-6}$ agreement by a shared parity suite, so models run
+unchanged on a server or in a browser.
 }
 
 \begin{document}
@@ -1147,6 +1149,165 @@ one short univariate stream is outside its design regime, and domain-level
 fine-tuning across many series remains untested here; the zero-shot result is
 the headline because zero-shot is the intended use.}
 
+\subsection{Against a tabular foundation model, pre-registered}
+\label{sec:tabfm}
+
+Tabular foundation models are a second pretrained family with a claim on
+this problem: express forecasting as regression on lag features and let a
+large prior over tabular functions do the rest. We evaluated \pkg{TabFM}
+1.0.0 \citep{tabfm2026} under a pre-registered protocol: the statement,
+universe, arms, and scoring were committed before any result existed
+(\code{benchmarks/preregistrations/2026-07-09-tabfm-wide.md}). The
+universe is 226 non-price change-series, stratified over five lag-1
+autocorrelation bins crossed with three repeat-fraction bins, with at most
+two series per FRED family per cell. Eleven arms sweep lag depth, four
+binning schemes for a classifier-based density, ensemble and horizon
+variants, and a residual-based density from the regressor, so the
+comparison bounds the adaptation, not one adapter.
+
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+arm & \code{laplace} LL wins & CRPS wins & median LL gap \\
+\hline
+blr2    & 88\% & 51\% & $+0.94$ \\
+blr8    & 86\% & 50\% & $+0.87$ \\
+clfew   & 88\% & 38\% & $+0.79$ \\
+clf32   & 84\% & 54\% & $+0.75$ \\
+regres  & 88\% & 39\% & $+0.75$ \\
+clf16   & 82\% & 50\% & $+0.72$ \\
+clf8    & 82\% & 52\% & $+0.69$ \\
+clf2g   & 79\% & 43\% & $+0.58$ \\
+clf8h5  & 83\% & 60\% & $+0.57$ \\
+clf8h20 & 83\% & 48\% & $+0.51$ \\
+clfx100 & 71\% & 52\% & $+0.39$ \\
+\hline
+\end{tabular}
+\end{center}
+
+\code{laplace} wins the per-series likelihood race against every arm; the
+strongest configuration (fine \code{x100} binning) still trails by 0.39
+nats at the median. The strata locate the gap. On continuous, strongly
+mean-reverting series TabFM is near parity (gaps of about 0.1 nats):
+there the problem reduces to a conditional-mean mapping from lag
+features, a tabular regression. On repeat-heavy series it trails by 2 to
+4 nats: it has no concept of an atom, and a post-hoc decomposition of the
+point-forecast undercard shows it cannot execute ``predict no change''
+even where that is optimal (its MAE runs 21\% above a constant-zero
+predictor on those series, while \code{laplace}'s lattice-projected
+median sits within 0.1\% of it). CRPS is a wash throughout.
+
+Point forecasts are TabFM's better half. It takes the MAE undercard
+64--36, though the decomposition shows the margin is hairline shading on
+near-martingale series where every sensible point forecast sits within
+one percent of zero. We do not report a squared-error undercard: excess
+kurtosis in this universe reaches 845, so RMSE verdicts are decided by a
+handful of outlier days per series and elicit noise rather than skill.
+
+The deployed footprints differ by four orders of magnitude, measured on
+the machine that ran the study (Apple silicon; TabFM on the GPU,
+\code{laplace} on one CPU core):
+
+\begin{center}
+\begin{tabular}{lcc}
+\hline
+ & \pkg{TabFM} (as configured) & \code{laplace} \\
+\hline
+model artifact      & 12\,GB weights            & 988\,KB source (148\,KB JS) \\
+dependencies        & 560\,MB env (torch)       & none \\
+peak process memory & ${\sim}$10\,GB            & interpreter + 18\,KB state \\
+time per forecast   & 45\,ms (regressor arm)    & 0.3\,ms \\
+                    & 0.5\,s (classifier arms)  & \\
+\hline
+\end{tabular}
+\end{center}
+
+Per forecast the regressor arm costs roughly 150x \code{laplace}'s CPU
+tick while using an accelerator, and the density-bearing classifier arms
+cost roughly 1,600x; a CPU-only TabFM run is a further ${\sim}$2.5x.
+
+The reading we take is constructive: as configured (256-row context, four
+ensemble members) the tabular route produces serviceable points and weak
+densities, and its parity on mean-reverting continuous series suggests a
+role as a \emph{body} inside the conjugation, contributing a conditional
+mean while the surrounding machinery supplies the lattice handling, the
+volatility clock, and the tails. The footprint table bounds what that
+would buy: the mean would have to be worth its four orders of magnitude.
+
+\subsection{The laplace sandwich} \label{sec:sandwich}
+
+\code{laplace} defines a causal bijection on paths: the Rosenblatt
+transform $z_t = \Phi^{-1}(F_t(y_t))$, where $F_t$ is the predictive cdf
+issued for $y_t$. Any forecaster can therefore be run in the transformed
+coordinates and mapped back exactly,
+$\log f_Y(y_t) = \log f_Z(z_t) + \log f_t(y_t) - \log\varphi(z_t)$,
+with no approximation anywhere in the accounting. We call running an
+opponent between the transform and its inverse the \emph{sandwich}. Under
+calibration the z stream is near-i.i.d.\ standard normal, so the sandwich
+hands the inner model a stationarised, unit-scale stream; whatever the
+inner model then finds is, by construction, structure \code{laplace}
+missed.
+
+Sandwiching lifted every opponent we tried. On thirty FRED series with
+rolling refits (five opponents, exact Jacobian, symmetric clamps):
+
+\begin{center}
+\begin{tabular}{lcccc}
+\hline
+opponent & raw & sandwiched & median lift & wins \\
+\hline
+ETS               & 1.642 & 3.680 & $+0.79$ & 30/30 \\
+AutoARIMA         & 1.646 & 3.719 & $+0.76$ & 30/30 \\
+GARCH(1,1)        & 1.732 & 3.703 & $+0.77$ & 30/30 \\
+Prophet           & 1.636 & 3.702 & $+0.85$ & 30/30 \\
+EWMA-Gauss (control) & 2.243 & 3.795 & $+0.51$ & 29/30 \\
+\emph{laplace alone} & & \emph{3.674} & & \\
+\hline
+\end{tabular}
+\end{center}
+
+Every sandwiched opponent converges to \code{laplace} plus a small
+epsilon, and the epsilon is the interesting number: it measures
+conditional structure in the residual coordinates. AutoARIMA adds
+$+0.045$ nats over \code{laplace} alone and Prophet $+0.03$ (its
+calendar machinery sees weekday and yearly structure the integer-lag
+seasonal block cannot represent); the control head reproduces
+\code{laplace}'s own score, confirming the Jacobian accounting.
+
+The sandwich scales. On the 226-series pre-registered universe of
+Section~\ref{sec:tabfm}, sandwiched TabFM moves from $0.75$ nats behind
+\code{laplace} to $0.019$ behind (a $0.73$ lift; its one positive
+stratum is repeat-heavy series, $+0.25$, where the z coordinates
+linearize the lattice it cannot handle raw). Prophet, rerun at the same
+scale and then on every qualifying non-price series (921 scored of a
+frozen 1,367, pre-registered analysis plan), tells the same story more
+sharply: raw it trails by $0.76$ nats median unweighted and $4.6$
+family-weighted (0\% of 120 families positive; repeat-heavy series run
+at $-11$, their lattice inexpressible to its Gaussian head), while
+sandwiched it lands $0.020$ behind unweighted and $0.025$
+family-weighted, an epsilon indistinguishable from TabFM's and stable
+from 30 series to the full universe. Its FRED-30 calendar surplus of
+$+0.03$ does not replicate beyond that first small sample.
+
+Two readings follow. Practically, the sandwich is a deployment path: an
+existing model, however trained, can be improved without retraining it,
+by feeding it z and mapping its output back. Scientifically, it is a
+residual test, and a pre-registered rerun of TabFM's strongest
+configuration on the full universe sharpened the verdict into two
+regimes. On continuous series the bound is tight: after four classical
+opponents, a calendar model, and a tabular foundation model, no
+challenger recovers more than a few hundredths of a nat. On
+repeat-heavy series the story inverts: fine binning applied to $100
+\times z$ acts as a \emph{discrete} density head, models the atom
+structure the z coordinates inherit, and the sandwiched combination
+outscores \code{laplace} alone by $1.99$ nats median there ($+0.87$
+family-weighted across the whole universe). This is a sandwich finding
+rather than a challenger victory, since \code{laplace} supplies the
+coordinates inside the winning combination. The residual test therefore returns a constructive answer: the
+structure \code{laplace} leaves on the table is discrete, concentrated
+on lattice-heavy series, and an atom-aware residual head is the
+corresponding work item.
+
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
 
@@ -1276,11 +1437,19 @@ prediction} routed each stream
 into derived residual streams (the so-called \emph{z-streams}) that were
 themselves predicted distributionally and composed back, ``transforms all the way
 down'' avant la lettre; \pkg{skaters} distils that platform mechanism into a
-single online, dependency-free abstraction. The library is implemented twice,
-in pure \proglang{Python} and in zero-dependency \proglang{JavaScript}, and a
-parity suite checks roughly $100{,}000$ probe values to $10^{-6}$ on every
-run, so results are reproducible across both runtimes and in the browser via
-\pkg{Pyodide} \citep{pyodide2021}.
+single online, dependency-free abstraction. The library is implemented four
+times. Pure \proglang{Python} is the reference; zero-dependency
+\proglang{JavaScript} and a \proglang{Rust} core live in the same
+repository and are gated by the same test suite, so a numerics change
+cannot merge without its mirrors; an \proglang{R} port
+(\code{microprediction/skaters-r}) covers \code{laplace} end to end
+against a pinned copy of the same vectors. The parity suite checks
+roughly $100{,}000$ probe values to $10^{-6}$ per implementation, so
+results are reproducible across runtimes and in the browser via
+\pkg{Pyodide} \citep{pyodide2021}. The Rust core uses portable
+mathematics (\pkg{libm}), producing identical bits on x86, ARM, and
+WebAssembly, and steps \code{laplace} at roughly $14$ microseconds per
+observation, twenty times the pure-\proglang{Python} rate.
 
 The benchmark of Section~\ref{sec:experiments} is a single parallel harness
 (\code{benchmarks/study.py}, invoked as \code{study.py sota}) that scores every

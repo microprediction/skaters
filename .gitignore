@@ -243,3 +243,6 @@ benchmarks/overnight_horserace.log
 papers/arxiv/*.aux
 papers/arxiv/*.out
 papers/arxiv/*.pdf
+
+# rust core build artifacts
+rust/target/
