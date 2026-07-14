@@ -1308,6 +1308,55 @@ structure \code{laplace} leaves on the table is discrete, concentrated
 on lattice-heavy series, and an atom-aware residual head is the
 corresponding work item.
 
+The sharpest sandwich test to date is \pkg{pymc-forecast}
+\citep{pymcforecast2026}, a Bayesian forecasting toolkit released by
+PyMC Labs on 2026-07-13; the bout statement was filed the following
+morning
+(\code{benchmarks/preregistrations/2026-07-14-pymc-forecast-sandwich.md})
+on the frozen 226-series universe of Section~\ref{sec:tabfm}. A Bayesian
+challenger is a distinctive test because the $z$ coordinates hand it its
+two preferred conditions: the marginal is $\mathcal N(0,1)$ by
+construction, so priors centred at ``no structure, unit scale'' are
+exact rather than guessed, and $z$ is nearly stationary, so the cost of
+batch refits (the method's structural weakness in a prequential race)
+largely vanishes. Every arm shares one model, a Student-$t$ regression
+on eight lagged values fit by mean-field ADVI, and every predictive
+density is the exact posterior-draw mixture. Four hypotheses were
+pre-registered; two-sided exact sign tests on per-series log-likelihood:
+
+\begin{center}
+\begin{tabular}{llc}
+\hline
+hypothesis & result (226 series) & $p$ \\
+\hline
+raw model vs \code{laplace} & \code{laplace} wins 82\%, $+0.45$ nats median & $5\!\times\!10^{-23}$ \\
+sandwich lift & sandwiched beats raw on 86\%, $+0.63$ median & $3\!\times\!10^{-30}$ \\
+convergence & sandwiched beats \code{laplace} on 65\%, $+0.04$ median & $4\!\times\!10^{-6}$ \\
+pooling & one pooled fit loses to per-series fits on 72\% & $2\!\times\!10^{-11}$ \\
+\hline
+\end{tabular}
+\end{center}
+
+Three readings. First, the convergence prediction held with a positive
+sign: the median absolute per-series gap to \code{laplace} collapses
+from $0.62$ nats raw to $0.05$ sandwiched, and the residual epsilon is
+$+0.04$, positive across the whole universe rather than confined to one
+stratum. The gain still concentrates on repeat-heavy series ($+2.1$
+nats median on the near-martingale repeat stratum), the same place the
+discrete TabFM head found structure, making this the third independent
+detector of exploitable structure in the $z$ stream of lattice-valued
+series. Second, staleness is cheap in these coordinates: a single
+pre-test ADVI fit, frozen with no refits through all 150 test steps,
+ties \code{laplace} overall (54\% of series, median gap $0.005$ nats).
+Third, the pooling arm, the first challenger given cross-series
+information (one hierarchical fit across all 226 series' $z$ streams
+against the identical model fit per series, so the contrast isolates
+the priors), loses overall: the shrinkage tax beats the borrowed
+strength except on the repeat-heavy stratum, where pooling wins 79\% of
+series by $+2.1$ nats median. Cross-series information helps exactly
+where series share an exploitable signature, and nowhere else on this
+universe.
+
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}
 
