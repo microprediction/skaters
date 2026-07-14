@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — tiki-taka</title>
+  <meta name="description" content="The laplace algorithm as tiki-taka: pass across to an easier problem, keep progressing toward goal. Pick your language and your team." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — tiki-taka" />
+  <meta property="og:description" content="The laplace algorithm as tiki-taka: pass across to an easier problem, keep progressing toward goal." />
+  <meta property="og:url" content="https://skaters.microprediction.org/tiki-taka.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .pitch-wrap { max-width: 760px; margin: 18px auto; }
+    .lang-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; }
+    .lang-row label { font-size: 0.85rem; color: var(--muted); }
+    .lang-row select { font-size: 0.95rem; padding: 3px 6px; }
+    #t-comm { max-width: 760px; min-height: 1.5em; margin: 12px auto 0; padding: 10px 18px;
+              border-radius: 8px; background: #14241a; color: #f3faf4; text-align: center;
+              font-weight: 600; font-size: 1.02rem; line-height: 1.35; }
+    #t-link { text-align: center; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/languages.html">Languages</a>
+        <a href="/sandwich.html">Sandwich</a>
+        <a href="/challengers.html">Challengers</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/skills.html">Skills</a>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Tiki-taka</h1>
+    <p class="subtitle" id="t-sub"></p>
+
+    <div class="lang-row">
+      <label for="lang">Choose your language and team:</label>
+      <select id="lang"></select>
+    </div>
+
+    <div class="pitch-wrap">
+      <svg viewBox="-56 0 772 132" role="img" aria-label="Four sparklines: the same series in each problem type, getting simpler from left (trend, season, stochastic volatility) to right (i.i.d.).">
+        <rect x="7"   y="14" width="150" height="104" rx="6" fill="#13251a"/>
+        <polyline id="sA" fill="none" stroke="#ff6a4d" stroke-width="1.5" points=""/>
+        <rect x="172" y="14" width="150" height="104" rx="6" fill="#13251a"/>
+        <polyline id="sB" fill="none" stroke="#ff9a3d" stroke-width="1.5" points=""/>
+        <rect x="337" y="14" width="150" height="104" rx="6" fill="#13251a"/>
+        <polyline id="sC" fill="none" stroke="#ffd24a" stroke-width="1.5" points=""/>
+        <rect x="502" y="14" width="150" height="104" rx="6" fill="#13251a"/>
+        <polyline id="sD" fill="none" stroke="#cfe9d6" stroke-width="1.5" points=""/>
+      </svg>
+      <p class="subtitle" id="t-legcap" style="text-align:center;font-size:0.82rem;margin:2px 0 10px;"></p>
+    </div>
+
+    <div class="pitch-wrap">
+      <svg viewBox="-120 -44 836 564" role="img" id="pitch"
+           aria-label="A football pitch. The attacking goal is top-left (the original problem, where the answer is scored); the halfway line, centre circle and the team's own goal are shown lower down. Four problem bands run across, hardest on the left to easiest (i.i.d.) on the right, with defenders packed near the centre. The team switches the ball across to the easiest band one problem at a time, then back one at a time to score in the original left goal.">
+        <defs>
+          <path id="lane" fill="none"
+            d="M82,405 L247,360 L412,315 L577,268 L412,218 L247,172 L95,128 L95,48" />
+          <marker id="arw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#bfe3c6"/></marker>
+          <marker id="arwY" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffd24a"/></marker>
+        </defs>
+        <rect x="-120" y="-44" width="836" height="564" fill="#2f7d42"/>
+        <rect x="0"   y="0" width="165" height="476" fill="#286f3c"/>
+        <rect x="165" y="0" width="165" height="476" fill="#2e7b43"/>
+        <rect x="330" y="0" width="165" height="476" fill="#34894a"/>
+        <rect x="495" y="0" width="165" height="476" fill="#3b9552"/>
+        <rect x="16" y="16" width="628" height="424" fill="none" stroke="#eaffee" stroke-width="2"/>
+        <!-- halfway line and centre circle -->
+        <line x1="16" y1="228" x2="644" y2="228" stroke="#bfe3c6" stroke-width="1.2" opacity="0.38"/>
+        <circle cx="330" cy="228" r="52" fill="none" stroke="#bfe3c6" stroke-width="1.2" opacity="0.38"/>
+        <circle cx="330" cy="228" r="2.2" fill="#bfe3c6" opacity="0.5"/>
+        <!-- attacking goal (original space) with net, posts, spot and arc -->
+        <rect x="16" y="16" width="210" height="120" fill="none" stroke="#eaffee" stroke-width="2"/>
+        <rect x="48" y="16" width="96" height="52" fill="none" stroke="#eaffee" stroke-width="2"/>
+        <rect x="48" y="0" width="96" height="16" fill="#1f5c30" stroke="#eaffee" stroke-width="1.6"/>
+        <g stroke="#cfe9d6" stroke-width="0.6" opacity="0.7">
+          <line x1="60" y1="0" x2="60" y2="16"/><line x1="72" y1="0" x2="72" y2="16"/><line x1="84" y1="0" x2="84" y2="16"/><line x1="96" y1="0" x2="96" y2="16"/><line x1="108" y1="0" x2="108" y2="16"/><line x1="120" y1="0" x2="120" y2="16"/><line x1="132" y1="0" x2="132" y2="16"/>
+          <line x1="48" y1="5" x2="144" y2="5"/><line x1="48" y1="11" x2="144" y2="11"/>
+        </g>
+        <circle cx="48" cy="16" r="3" fill="#eaffee"/><circle cx="144" cy="16" r="3" fill="#eaffee"/>
+        <circle cx="96" cy="108" r="2.2" fill="#eaffee"/>
+        <path d="M70,136 A 42 42 0 0 0 122,136" fill="none" stroke="#eaffee" stroke-width="1.6"/>
+        <line x1="165" y1="16" x2="165" y2="440" stroke="#bfe3c6" stroke-width="1.1" stroke-dasharray="5 6" opacity="0.65"/>
+        <line x1="330" y1="16" x2="330" y2="440" stroke="#bfe3c6" stroke-width="1.1" stroke-dasharray="5 6" opacity="0.65"/>
+        <line x1="495" y1="16" x2="495" y2="440" stroke="#bfe3c6" stroke-width="1.1" stroke-dasharray="5 6" opacity="0.65"/>
+        <g font-size="9.5" font-family="Menlo,Consolas,monospace" fill="#dff2e2" text-anchor="middle">
+          <text x="82"  y="432">trend·season·vol</text>
+          <text x="247" y="432">season·vol</text>
+          <text x="412" y="432">vol</text>
+          <text x="577" y="432">i.i.d.</text>
+        </g>
+        <path d="M636,415 L636,150" fill="none" stroke="#bfe3c6" stroke-width="1" opacity="0.55" marker-end="url(#arw)"/>
+        <g stroke="#ffd24a" stroke-width="1.4" stroke-dasharray="3 4" opacity="0.6" marker-end="url(#arwY)">
+          <line x1="93"  y1="402" x2="236" y2="363"/>
+          <line x1="258" y1="357" x2="401" y2="318"/>
+          <line x1="423" y1="312" x2="566" y2="271"/>
+          <line x1="566" y1="265" x2="423" y2="221"/>
+          <line x1="401" y1="215" x2="258" y2="175"/>
+          <line x1="236" y1="169" x2="106" y2="131"/>
+          <line x1="95"  y1="117" x2="95"  y2="60"/>
+        </g>
+        <!-- defenders: densest in the hard original space (left), thinning to the open easy band (right) -->
+        <g fill="#25356b" stroke="#141f45" stroke-width="1">
+          <circle cx="135" cy="300" r="9"/><circle cx="150" cy="220" r="9"/><circle cx="120" cy="350" r="9"/><circle cx="60" cy="240" r="9"/>
+          <circle cx="210" cy="290" r="9"/><circle cx="300" cy="235" r="9"/><circle cx="255" cy="320" r="9"/>
+          <circle cx="400" cy="290" r="9"/><circle cx="365" cy="240" r="9"/>
+        </g>
+        <g font-size="10.5" font-family="Menlo,Consolas,monospace" text-anchor="middle">
+          <circle id="c0" cx="82"  cy="405" r="10" stroke="#0d2a15" stroke-width="1.4"/><text id="p0" x="82"  y="389" fill="#eaffee"></text>
+          <circle id="c1" cx="247" cy="360" r="10" stroke="#0d2a15" stroke-width="1.4"/><text id="p1" x="247" y="344" fill="#eaffee"></text>
+          <circle id="c2" cx="412" cy="315" r="10" stroke="#0d2a15" stroke-width="1.4"/><text id="p2" x="412" y="299" fill="#eaffee"></text>
+          <circle id="c3" cx="577" cy="268" r="10" stroke="#0d2a15" stroke-width="1.4"/><text id="p3" x="577" y="252" fill="#eaffee"></text>
+          <circle id="c4" cx="412" cy="218" r="10" stroke="#0d2a15" stroke-width="1.4"/><text id="p4" x="412" y="202" fill="#eaffee"></text>
+          <circle id="c5" cx="247" cy="172" r="10" stroke="#0d2a15" stroke-width="1.4"/><text id="p5" x="247" y="156" fill="#eaffee"></text>
+          <circle id="c6" cx="95"  cy="128" r="10" stroke="#0d2a15" stroke-width="1.4"/><text id="p6" x="120" y="120" fill="#eaffee" text-anchor="start"></text>
+        </g>
+        <circle r="7" fill="#fff" stroke="#111" stroke-width="1.3">
+          <animateMotion dur="28s" repeatCount="indefinite" rotate="0"
+            keyPoints="0;0;0.1561;0.1561;0.3122;0.3122;0.4688;0.4688;0.6262;0.6262;0.7826;0.7826;0.9270;0.9270;1;1"
+            keyTimes="0;0.023;0.101;0.121;0.218;0.238;0.335;0.355;0.452;0.472;0.569;0.589;0.702;0.722;0.78;1" calcMode="linear">
+            <mpath href="#lane"/>
+          </animateMotion>
+          <animate attributeName="opacity" dur="28s" repeatCount="indefinite"
+            values="0;1;1;1;0" keyTimes="0;0.02;0.975;0.99;1"/>
+        </circle>
+      </svg>
+    </div>
+
+    <p id="t-comm" aria-live="polite"></p>
+    <p id="t-link"></p>
+  </main>
+
+  <script>
+    // lines[] narrate the pass sequence; {0}..{6} are filled with this team's players.
+    const L = {
+      en:{name:"English · England", color:"#ffffff", sub:"The laplace algorithm as tiki-taka: pass across to an easier problem, keep progressing toward goal.", link:"The algorithm", cap:"the same series, made simpler from left to right",
+          players:["Moore","Gerrard","Walker","Foden","Rice","Kane","Bellingham"],
+          lines:["{0} has it deep in the original space — trend, season and volatility.",
+                 "{0} strips out the trend. {1} receives it in season·vol.",
+                 "{1} peels off the seasonal swing — {2} takes it, pure volatility now.",
+                 "{2} standardises the volatility. {3} collects it clean out wide: i.i.d.",
+                 "{3}, in acres of space, turns it back — {4} restores the volatility.",
+                 "{4} rebuilds the seasonal pattern for {5}.",
+                 "{5} adds the trend back on — {6} arrives in the original coordinates.",
+                 "{6} finishes where it all started, a calibrated forecast. GOOALLLLLLLLLLLL!"]},
+      es:{name:"Español · España", color:"#d81e2c", sub:"El algoritmo laplace como tiki-taka: pasa a un problema más fácil y sigue avanzando hacia la portería.", link:"El algoritmo", cap:"la misma serie, más simple de izquierda a derecha",
+          players:["Piqué","Busquets","Alba","Pedri","Xavi","Iniesta","Villa"],
+          lines:["{0} la tiene en el espacio original: tendencia, estacionalidad y volatilidad.",
+                 "{0} elimina la tendencia. {1} recibe en estacionalidad·volatilidad.",
+                 "{1} quita la estacionalidad — {2} la toma, pura volatilidad.",
+                 "{2} estandariza la volatilidad. {3} la recibe limpia en la banda: i.i.d.",
+                 "{3}, con espacio, la devuelve — {4} restaura la volatilidad.",
+                 "{4} reconstruye la estacionalidad para {5}.",
+                 "{5} vuelve a sumar la tendencia — {6} llega al espacio original.",
+                 "{6} define donde todo empezó, un pronóstico calibrado. ¡GOOOOOOOOOOOOL!"]},
+      fr:{name:"Français · France", color:"#0b5bb0", sub:"L'algorithme laplace en tiki-taka : passe vers un problème plus facile et progresse vers le but.", link:"L'algorithme", cap:"la même série, plus simple de gauche à droite",
+          players:["Blanc","Kanté","Hernández","Zidane","Pogba","Griezmann","Mbappé"],
+          lines:["{0} l'a dans l'espace d'origine : tendance, saison et volatilité.",
+                 "{0} retire la tendance. {1} reçoit en saison·volatilité.",
+                 "{1} enlève la saison — {2} la prend, pure volatilité.",
+                 "{2} standardise la volatilité. {3} la reçoit nette sur l'aile : i.i.d.",
+                 "{3}, à son aise, la renvoie — {4} restaure la volatilité.",
+                 "{4} reconstruit la saison pour {5}.",
+                 "{5} rajoute la tendance — {6} arrive dans l'espace d'origine.",
+                 "{6} conclut là où tout a commencé, une prévision calibrée. BUUUUUUUUUUUT !"]},
+      it:{name:"Italiano · Italia", color:"#1a76d2", sub:"L'algoritmo laplace come tiki-taka: passa a un problema più facile e avanza verso la porta.", link:"L'algoritmo", cap:"la stessa serie, più semplice da sinistra a destra",
+          players:["Cannavaro","Pirlo","Maldini","Verratti","Totti","Baggio","Del Piero"],
+          lines:["{0} ce l'ha nello spazio originale: trend, stagione e volatilità.",
+                 "{0} toglie il trend. {1} riceve in stagione·volatilità.",
+                 "{1} elimina la stagione — {2} la prende, pura volatilità.",
+                 "{2} standardizza la volatilità. {3} la riceve pulita sull'esterno: i.i.d.",
+                 "{3}, in tutto quello spazio, la rigioca indietro — {4} ripristina la volatilità.",
+                 "{4} ricostruisce la stagione per {5}.",
+                 "{5} rimette il trend — {6} arriva nello spazio originale.",
+                 "{6} conclude dove tutto è iniziato, una previsione calibrata. GOOOOOOOOOOOL!"]},
+      de:{name:"Deutsch · Deutschland", color:"#eaeaea", sub:"Der laplace-Algorithmus als Tiki-Taka: zu einem leichteren Problem passen und Richtung Tor vorrücken.", link:"Der Algorithmus", cap:"dieselbe Reihe, nach rechts einfacher",
+          players:["Beckenbauer","Kroos","Lahm","Özil","Matthäus","Müller","Klose"],
+          lines:["{0} hat ihn tief im Originalraum: Trend, Saison und Volatilität.",
+                 "{0} entfernt den Trend. {1} übernimmt in Saison·Volatilität.",
+                 "{1} nimmt die Saison heraus — {2} bekommt reine Volatilität.",
+                 "{2} standardisiert die Volatilität. {3} erhält sie sauber außen: i.i.d.",
+                 "{3} im freien Raum spielt zurück — {4} stellt die Volatilität wieder her.",
+                 "{4} baut die Saison für {5} wieder auf.",
+                 "{5} fügt den Trend hinzu — {6} kommt im Originalraum an.",
+                 "{6} vollendet, wo alles begann, eine kalibrierte Prognose. TOOOOOOOOOOOR!"]},
+      pt:{name:"Português · Brasil", color:"#ffd21e", sub:"O algoritmo laplace como tiki-taka: passe para um problema mais fácil e progrida rumo ao gol.", link:"O algoritmo", cap:"a mesma série, mais simples da esquerda para a direita",
+          players:["Lúcio","Gilberto","Marcelo","Rivaldo","Kaká","Ronaldinho","Ronaldo"],
+          lines:["{0} tem a bola no espaço original: tendência, sazonalidade e volatilidade.",
+                 "{0} remove a tendência. {1} recebe em sazonalidade·volatilidade.",
+                 "{1} tira a sazonalidade — {2} pega, pura volatilidade.",
+                 "{2} padroniza a volatilidade. {3} recebe limpa pela ponta: i.i.d.",
+                 "{3}, com espaço, devolve — {4} restaura a volatilidade.",
+                 "{4} reconstrói a sazonalidade para {5}.",
+                 "{5} recoloca a tendência — {6} chega ao espaço original.",
+                 "{6} finaliza onde tudo começou, uma previsão calibrada. GOOOOOOOOOOOL!"]},
+      nl:{name:"Nederlands · Nederland", color:"#f47a1f", sub:"Het laplace-algoritme als tiki-taka: speel naar een makkelijker probleem en ga richting doel.", link:"Het algoritme", cap:"dezelfde reeks, naar rechts eenvoudiger",
+          players:["Koeman","Rijkaard","Krol","Cruyff","Neeskens","Bergkamp","Van Basten"],
+          lines:["{0} heeft hem diep in de oorspronkelijke ruimte: trend, seizoen en volatiliteit.",
+                 "{0} haalt de trend eraf. {1} ontvangt in seizoen·volatiliteit.",
+                 "{1} pelt het seizoen weg — {2} neemt het, pure volatiliteit.",
+                 "{2} standaardiseert de volatiliteit. {3} krijgt het schoon aan de zijkant: i.i.d.",
+                 "{3}, in de vrije ruimte, speelt terug — {4} herstelt de volatiliteit.",
+                 "{4} bouwt het seizoen weer op voor {5}.",
+                 "{5} voegt de trend toe — {6} komt in de oorspronkelijke ruimte.",
+                 "{6} maakt het af waar het begon, een gekalibreerde voorspelling. GOOOOOOOOAL!"]},
+    };
+    function lcg(seed){let x=seed>>>0;return()=>{x=(1664525*x+1013904223)>>>0;return x/4294967296;};}
+    function gauss(r){let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+    function poly(vals,b){const n=vals.length,lo=Math.min(...vals),hi=Math.max(...vals),sp=(hi-lo)||1;
+      return vals.map((val,i)=>((b.x+6+(i/(n-1))*(b.w-12)).toFixed(1))+","+((b.y+b.h-6-((val-lo)/sp)*(b.h-12)).toFixed(1))).join(" ");}
+    (function(){
+      const N=64,r=lcg(20260714),A=[],B=[],C=[],D=[];
+      for(let t=0;t<N;t++){
+        const trend=0.10*t, season=2.6*Math.sin(2*Math.PI*t/9);
+        const vol=0.30+1.10*Math.pow(Math.sin(Math.PI*t/16),2), eps=vol*gauss(r);
+        A.push(trend+season+eps);  // trend + season + vol
+        B.push(season+eps);        // season + vol (trend gone)
+        C.push(eps);               // vol (season gone)
+        D.push(eps/vol);           // i.i.d.
+      }
+      document.getElementById("sA").setAttribute("points",poly(A,{x:7,y:14,w:150,h:104}));
+      document.getElementById("sB").setAttribute("points",poly(B,{x:172,y:14,w:150,h:104}));
+      document.getElementById("sC").setAttribute("points",poly(C,{x:337,y:14,w:150,h:104}));
+      document.getElementById("sD").setAttribute("points",poly(D,{x:502,y:14,w:150,h:104}));
+    })();
+
+    const sel = document.getElementById("lang");
+    for (const k of ["en","es","fr","it","de","pt","nl"]) {
+      const o = document.createElement("option"); o.value = k; o.textContent = L[k].name; sel.appendChild(o);
+    }
+    let COMM = [];
+    function render(k){
+      const d = L[k];
+      document.documentElement.lang = k;
+      document.getElementById("t-sub").textContent = d.sub;
+      document.getElementById("t-legcap").textContent = d.cap;
+      document.getElementById("t-link").innerHTML = '<a href="/guide.html">' + d.link + ' &rarr;</a>';
+      for (let i = 0; i < 7; i++) {
+        document.getElementById("p"+i).textContent = d.players[i];
+        document.getElementById("c"+i).setAttribute("fill", d.color);
+      }
+      COMM = d.lines.map(s => s.replace(/\{(\d)\}/g, (m, i) => d.players[+i]));
+    }
+
+    // Commentary synced to the 7s ball loop: each threshold is when the ball
+    // reaches the next player (aligned to the animateMotion keyTimes dwells).
+    const DUR = 28000, THRESH = [0, 0.101, 0.218, 0.335, 0.452, 0.569, 0.702, 0.78];
+    const commEl = document.getElementById("t-comm");
+    let t0 = performance.now(), lastIdx = -1;
+    function tick(now){
+      const phase = ((now - t0) % DUR) / DUR;
+      let idx = 0;
+      for (let i = 0; i < THRESH.length; i++) if (phase >= THRESH[i]) idx = i;
+      if (idx !== lastIdx){ lastIdx = idx; commEl.textContent = COMM[idx] || ""; }
+      requestAnimationFrame(tick);
+    }
+
+    sel.addEventListener("change", () => { render(sel.value); lastIdx = -1; });
+    render("en");
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
