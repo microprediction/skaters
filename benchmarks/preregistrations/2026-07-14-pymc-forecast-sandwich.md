@@ -141,4 +141,6 @@ arm): series, method, mean floored logpdf, n, stratum.
 
 ## Deviations
 
-(recorded here as they occur, before results are read)
+- 2026-07-14, run start (Apple M4, CPU): series 1 through all per-series
+  arms in 26s, projecting roughly 100 minutes for the per-series pass.
+  Noted from the progress line only.
