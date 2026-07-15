@@ -64,19 +64,42 @@
       tracking is the job.
     </p>
 
+    <h2>Round two: the strongest arm, on the full universe</h2>
+    <p>
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-tabfm-x100-wide.md">Pre-registered</a>
+      again, one arm this time: <code>clfx100</code>, the strongest of the
+      eleven (a per-observation density head that bins 100&times; the parade
+      z, not a lag variant), taken to every qualifying non-price series (921
+      scored of a frozen universe) with the analysis plan fixed before any
+      result was read.
+    </p>
+    <p>
+      Raw, TabFM still trails: median &minus;0.155 nats, laplace ahead on
+      76% of series, &minus;0.22 family-weighted. The selection effect the
+      plan anticipated showed up, the 226-series 0.39-nat gap regressing to
+      0.15. One stratum broke the other way. On repeat-heavy series raw
+      <code>clfx100</code> beats laplace outright (+0.35 median, n=181),
+      exactly the lattice its discrete head can express and laplace's
+      continuous leaf cannot.
+    </p>
+
     <h2>The verdict</h2>
     <p>
-      On density forecasting across the universe, laplace by a wide
+      On density forecasting as a standalone challenger, laplace by a wide
       margin, at one ten-thousandth the footprint. On point forecasts,
       TabFM is genuinely decent (it takes the MAE undercard on continuous
-      series by hairline shading). What TabFM contributes in cooperation
-      with laplace is a different subject with its own numbers: see
-      <a href="/sandwich.html">the sandwich</a>.
+      series by hairline shading). The one genuine upset is that repeat-heavy
+      stratum, where the discrete head expresses a lattice laplace's
+      continuous leaf cannot. That same structure, recovered inside laplace's
+      coordinates rather than against them, is a sandwich finding rather than
+      a challenger victory, and it became a library work item. The
+      cooperation numbers in full: <a href="/sandwich.html">the sandwich</a>.
     </p>
 
     <p class="byline">All numbers from committed studies:
-      <code>benchmarks/tabfm_wide_study.py</code>, results CSVs beside
-      them, statements in <code>benchmarks/preregistrations/</code>.</p>
+      <code>benchmarks/tabfm_wide_study.py</code> and
+      <code>benchmarks/tabfm_x100_wide.py</code>, results CSVs beside them,
+      statements in <code>benchmarks/preregistrations/</code>.</p>
   </main>
 </body>
 </html>
