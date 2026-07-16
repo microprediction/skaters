@@ -105,3 +105,71 @@ def markov_mix_skater():
         return [Dist.combine([d_star, d_lap], [w, 1.0 - w])], state
 
     return f
+
+
+class _Shifted:
+    """Exact mean-shift proxy for any Dist-like predictive (incl. SplicedDist)."""
+
+    def __init__(self, base, delta):
+        self.base = base
+        self.delta = delta
+
+    def logpdf(self, y):
+        return self.base.logpdf(y - self.delta)
+
+    def crps(self, y):
+        return self.base.crps(y - self.delta)
+
+    def cdf(self, y):
+        return self.base.cdf(y - self.delta)
+
+    @property
+    def mean(self):
+        return self.base.mean + self.delta
+
+    @property
+    def std(self):
+        return self.base.std
+
+
+def markov_nudge_skater(eta=0.02, decay=0.999, cap=0.5):
+    """laplace, with its predictive mean cautiously nudged by markov features.
+
+    markov runs as a shadow emitting features per tick: the gap between its
+    conditional mean and laplace's, and its regime state. A normalized-LMS
+    regression with tiny learning rate, geometric shrinkage toward zero, and
+    a nudge cap of `cap` laplace standard deviations learns how much of the
+    gap to trust. Coefficients start at zero: on series where markov carries
+    no signal the coupling stays asleep and laplace is untouched.
+    """
+    from skaters.api import laplace
+
+    def f(y, state):
+        if state is None:
+            state = {"fc": MarkovForecaster(), "lap": laplace(1),
+                     "lp_state": None, "theta": [0.0, 0.0], "pend": None}
+        # learn from the arriving y against the previously issued prediction.
+        # Features are standardized by laplace's own scale, so theta is
+        # dimensionless; the +1.0 in the normalizer makes the update genuinely
+        # cautious when the models agree (features near zero).
+        if state["pend"] is not None:
+            m_l, sd_l, z = state["pend"]
+            err_z = (y - m_l) / sd_l - min(cap, max(-cap,
+                     state["theta"][0] * z[0] + state["theta"][1] * z[1]))
+            nz = z[0] * z[0] + z[1] * z[1] + 1.0
+            for i in (0, 1):
+                t = decay * state["theta"][i] + eta * err_z * z[i] / nz
+                state["theta"][i] = max(-1.0, min(1.0, t))
+        # advance both models
+        state["fc"].update(y)
+        pr = state["fc"]._predict()
+        dists, state["lp_state"] = state["lap"](y, state["lp_state"])
+        d = dists[0]
+        m_l, sd_l = d.mean, max(d.std, 1e-9)
+        gap = max(-3.0, min(3.0, (pr["mu"] - m_l) / sd_l))
+        z = (gap, max(-3.0, min(3.0, (state["fc"].inflation - 1.0) * gap)))
+        nudge_z = min(cap, max(-cap, state["theta"][0] * z[0] + state["theta"][1] * z[1]))
+        state["pend"] = (m_l, sd_l, z)
+        return [_Shifted(d, nudge_z * sd_l)], state
+
+    return f
