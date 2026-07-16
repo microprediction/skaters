@@ -19,6 +19,9 @@ worse point-MAE on change-series); package defaults for CSP, with the
 paper-exact and pool-weight-0.7 variants shown. Rows live in the shared arm
 CSVs under `../laplace-vs-csp/`.
 
+**Versions.** `NNS` 13.0 vs `csp-forecaster` 0.1.4, harness at commit
+`39624f8`. July 15–16, 2026.
+
 ## Result
 
 **NNS-R win-rate** over CSP (CRPS / LL; positive median = CSP's median CRPS

@@ -33,11 +33,12 @@ OPPS = [s for s in os.environ.get("STUDY_OPPS", "laplace,CSP").split(",") if s]
 RESULTS = os.path.join(_HERE, "laplace-vs-csp", f"results_{ARM.replace('-', '_')}.csv")
 
 
-def _covered(opp_name, methods):
+def _covered(opp_name, methods, opp_methods=None):
     """Is this opponent already fully present in a series' scored methods?"""
     if opp_name == "CSP":
         return any(m.startswith("CSPr-") for m in methods)
-    return opp_name in methods
+    need = (opp_methods or {}).get(opp_name) or [opp_name]
+    return all(m in methods for m in need)
 
 
 def score_one(payload):
@@ -67,8 +68,18 @@ def main():
                 if row:
                     done.setdefault(row[0], set()).add(row[1])
     new = not os.path.exists(RESULTS)
+    try:
+        import subprocess
+        from skaters import __version__ as _v
+        _sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                              capture_output=True, text=True, cwd=_BENCH).stdout.strip()
+        print(f"[{ARM}] skaters {_v} @ {_sha}", flush=True)
+    except Exception:  # noqa: BLE001 — stamping is best-effort
+        pass
     print(f"[{ARM}] m={CFG['m']} test={CFG['test']} burn={BURN} opps={OPPS} "
           f"max_qualify={MAX_QUALIFY} resume={len(done)} -> {RESULTS}", flush=True)
+    import opponents as opp_mod                     # BENCH_CSP_M already set
+    opp_methods = {o.name: o.methods for o in opp_mod.ALL}
     t0 = time.time(); n_sub = n_seen = n_fin = 0
     with open(RESULTS, "a", newline="") as fh, \
             ProcessPoolExecutor(max_workers=WORKERS) as pool:
@@ -80,7 +91,8 @@ def main():
             n_seen += 1
             if n_seen > MAX_QUALIFY:
                 break
-            todo = [o for o in OPPS if not _covered(o, done.get(sid, set()))]
+            todo = [o for o in OPPS
+                    if not _covered(o, done.get(sid, set()), opp_methods)]
             if not todo:
                 continue
             futs.append(pool.submit(score_one, (sid, ch, todo)))

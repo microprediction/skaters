@@ -128,3 +128,20 @@ canvas.plot { width: 100%; height: auto; background: var(--panel); border: 1px s
 .legend .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 5px; }
 .metric { font-variant-numeric: tabular-nums; }
 .status { font-size: 0.9rem; color: var(--muted); }
+
+/* --- nav dropdown sub-menus ------------------------------------------------ */
+header.site-header nav .menu { position: relative; }
+header.site-header nav .menu > .menu-label {
+  color: #fff; opacity: 0.85; font-size: 0.95rem; cursor: default;
+}
+header.site-header nav .menu:hover > .menu-label,
+header.site-header nav .menu:focus-within > .menu-label { opacity: 1; }
+header.site-header nav .menu .drop {
+  display: none; position: absolute; left: 0; top: 100%; z-index: 50;
+  min-width: 10em; padding: 6px 0;
+  background: var(--header-bg); border: 1px solid var(--header-bg-dark);
+  border-radius: 0 0 6px 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+}
+header.site-header nav .menu:hover .drop,
+header.site-header nav .menu:focus-within .drop { display: block; }
+header.site-header nav .menu .drop a { display: block; padding: 4px 14px; }

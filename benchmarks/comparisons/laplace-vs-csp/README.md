@@ -49,6 +49,10 @@ PYTHONPATH=src python benchmarks/comparisons/csp_convergence.py
 PYTHONPATH=src python benchmarks/comparisons/laplace_weight_probe.py
 ```
 
+**Versions.** Scored against `skaters` 0.13.0; the `laplace` rows at commit
+`f960009` (the population including `seasonal_anchor`), opponent rows
+`csp-forecaster` 0.1.4. July 15–16, 2026.
+
 ## Results
 
 `laplace` **win-rate** per arm (CRPS / LL; N series). `laplace` here is the

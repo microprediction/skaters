@@ -505,7 +505,7 @@ qgrid <- function(point, lower, upper, levels) {
 # rather than taxing every R@* invocation).
 SKIP <- strsplit(Sys.getenv("BENCH_R_SKIP", ""), ",")[[1]]
 ONLY <- strsplit(Sys.getenv("BENCH_R_ONLY", ""), ",")[[1]]
-OPTIN_METHODS <- c("NNS-R", "NNS-R-auto", "TBATS-R")
+OPTIN_METHODS <- c("NNS-R", "NNS-R-auto", "TBATS-R", "TBATS-R-ms")
 skip <- function(nm) nm %in% SKIP ||
   (length(ONLY) > 0 && !(nm %in% ONLY)) ||
   (length(ONLY) == 0 && nm %in% OPTIN_METHODS)
@@ -621,21 +621,56 @@ if (have_bsts && !skip("bsts-R")) {
   }
 }
 
-if (have_forecast && !skip("TBATS-R")) {
+if (have_forecast && (!skip("TBATS-R") || !skip("TBATS-R-ms"))) {
   # TBATS (De Livera-Hyndman-Snyder): Box-Cox + trend + trig seasonality +
   # ARMA errors. The arm's period via ts(frequency=); model reused between
-  # refits (tbats(model=) refilters without re-estimating). Quantile fan so
-  # a non-unit Box-Cox lambda's asymmetric intervals are scored as shaped.
+  # refits. tbats(model=) intermittently emits corrupt filtered states on
+  # shifting windows (forecast means hundreds of sigma out), so every reused
+  # forecast is sanity-checked against the window scale and an insane one
+  # forces a fresh fit; a step is skipped only if the fresh fit is insane too.
+  # Quantile fan so a non-unit Box-Cox lambda's asymmetric intervals are
+  # scored as shaped.
+  tb_fc <- function(m) tryCatch(forecast(m, h = 1, level = LEVELS),
+                                error = function(e) NULL)
+  tb_sane <- function(f, sw) {
+    if (is.null(f)) return(FALSE)
+    mu <- as.numeric(f$mean)[1]
+    wid <- as.numeric(f$upper[1, ncol(f$upper)]) - as.numeric(f$lower[1, 1])
+    is.finite(mu) && is.finite(wid) && abs(mu) <= 10 * sw && wid <= 30 * sw
+  }
+  tb_run <- function(nm, mk) {
+    gfit <- NULL
+    for (t in start:(n - 1)) {
+      win <- y[max(1L, t - fitwin + 1L):t]
+      if (length(win) < 60) next
+      sw <- max(sd(win), 1e-12)
+      f <- NULL; m <- NULL
+      if (!is.null(gfit) && ((t - start) %% refit != 0L)) {
+        m <- tryCatch(tbats(mk(win), model = gfit, use.parallel = FALSE),
+                      error = function(e) NULL)
+        if (!is.null(m)) { f <- tb_fc(m); if (!tb_sane(f, sw)) { m <- NULL; f <- NULL } }
+      }
+      if (is.null(m)) {
+        m <- tryCatch(tbats(mk(win), use.parallel = FALSE), error = function(e) NULL)
+        if (!is.null(m)) { f <- tb_fc(m); if (!tb_sane(f, sw)) { m <- NULL; f <- NULL } }
+      }
+      if (is.null(m)) { gfit <- NULL; next }
+      gfit <- m
+      emitQ(nm, t, qgrid(as.numeric(f$mean)[1],
+                         as.numeric(f$lower[1, ]), as.numeric(f$upper[1, ]),
+                         LEVELS))
+    }
+  }
   m_env <- suppressWarnings(as.integer(Sys.getenv("BENCH_CSP_M", "")))
   sfreq <- if (!is.na(m_env) && m_env > 1) m_env else 1L
-  as_ts <- function(win) if (sfreq > 1) ts(win, frequency = sfreq) else win
-  run_reuse("TBATS-R",
-    function(win) tbats(as_ts(win), use.parallel = FALSE),
-    function(win, fit) tbats(as_ts(win), model = fit, use.parallel = FALSE),
-    function(m) { f <- forecast(m, h = 1, level = LEVELS)
-                  list(q = qgrid(as.numeric(f$mean)[1],
-                                 as.numeric(f$lower[1, ]), as.numeric(f$upper[1, ]),
-                                 LEVELS)) })
+  if (!skip("TBATS-R"))
+    tb_run("TBATS-R", function(win) if (sfreq > 1) ts(win, frequency = sfreq) else win)
+  # Multi-seasonal variant: TBATS's trigonometric representation is BUILT for
+  # several periods at once (the msts path); BENCH_TBATS_MS="24,168" supplies
+  # them (hour-of-day AND hour-of-week on hourly data).
+  ms <- suppressWarnings(as.numeric(strsplit(Sys.getenv("BENCH_TBATS_MS", ""), ",")[[1]]))
+  if (!skip("TBATS-R-ms") && length(ms) >= 2 && all(is.finite(ms)))
+    tb_run("TBATS-R-ms", function(win) msts(win, seasonal.periods = ms))
 }
 
 have_nns <- requireNamespace("NNS", quietly = TRUE)
@@ -801,7 +836,21 @@ def _tbats_predict(ch, start, refit=None):
             os.environ["BENCH_R_ONLY"] = prev
 
 
+def _tbats_ms_predict(ch, start, refit=None):
+    prev = os.environ.get("BENCH_R_ONLY")
+    os.environ["BENCH_R_ONLY"] = "TBATS-R-ms"
+    try:
+        return _r_predict(ch, start, refit=25)
+    finally:
+        if prev is None:
+            os.environ.pop("BENCH_R_ONLY", None)
+        else:
+            os.environ["BENCH_R_ONLY"] = prev
+
+
 TBATS = ([Opponent("TBATS-R", _tbats_predict,
+                   max_series=int(os.environ.get("BENCH_TBATS_MAX", 250))),
+          Opponent("TBATS-R-ms", _tbats_ms_predict,
                    max_series=int(os.environ.get("BENCH_TBATS_MAX", 250)))]
          if _RSCRIPT else [])
 

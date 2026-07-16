@@ -25,6 +25,9 @@ Rscript -e 'install.packages("NNS")'
 STUDY_OPPS=NNS-R PYTHONPATH=src python benchmarks/comparisons/csp_arm_study.py m4-hourly
 ```
 
+**Versions.** `skaters` 0.13.0 (`laplace` at commit `f960009`, with
+`seasonal_anchor`); `NNS` 13.0. July 15–16, 2026.
+
 ## Result
 
 `laplace` **win-rate** (CRPS / LL):
