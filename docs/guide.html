@@ -94,8 +94,36 @@
         <tr><td><code>garch(ω, α, β)</code></td><td>$y'_t = y_t / \hat\sigma_t$</td><td>Volatility clustering</td></tr>
         <tr><td><code>seasonal_difference(s)</code></td><td>$y'_t = y_t - y_{t-s}$</td><td>Periodicity</td></tr>
         <tr><td><code>yeo_johnson(λ)</code></td><td>signed Box–Cox coordinate</td><td>Learn the coordinate (log / root / linear)</td></tr>
+        <tr><td><code>markov_drift(η, λ)</code></td><td>$y'_t = y_t - g_t\,\hat\mu^{M}_t$</td><td>Regime response (machine-generated; opt-in)</td></tr>
       </tbody>
     </table>
+
+    <p><code>markov_drift</code> is opt-in and composes like any other
+    transform. Standalone, or as an extra candidate beside the standard
+    population (the benchmarked form, +61% one-step log-likelihood wins over
+    plain <code>laplace</code> on the FRED daily universe, worst series
+    &minus;0.012 nats):</p>
+
+    <pre><code># standalone: markov signal wrapping the standard leaf
+from skaters.conjugate import conjugate
+from skaters.leaf import leaf
+from skaters.markov import markov_drift
+
+f = conjugate(leaf(k=1), markov_drift(), k=1)
+
+# beside laplace's population (see benchmarks/markov_forecaster.py):
+from skaters.api import _build_candidates, _objective_leaf
+from skaters.sticky import sticky
+from skaters.tails import gpdtails
+from skaters.terminal import terminal_leaf_ensemble
+
+candidates, depths, _ = _build_candidates(1)
+candidates.append(conjugate(leaf(k=1), markov_drift(), k=1))
+depths.append(2)
+f = terminal_leaf_ensemble(candidates, k=1, leaf_fn=_objective_leaf("crps", 0.03),
+                           learning_rate=0.8, complexity_penalty=0.005,
+                           depths=depths, max_components=20, forget=0.99)
+f = gpdtails(sticky(f, k=1), k=1)</code></pre>
 
     <h2>Conjugation</h2>
     <p>
