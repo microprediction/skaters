@@ -46,8 +46,15 @@ def _ours(method, factory):
     return Opponent(method, predict)
 
 
+def _markov_factories():
+    from markov_forecaster import markov_skater, markov_mix_skater
+    return markov_skater, markov_mix_skater
+
+
 OURS = [
     _ours("laplace", lambda: laplace(1)),
+    _ours("markov", lambda: _markov_factories()[0]()),
+    _ours("markov-mix", lambda: _markov_factories()[1]()),
     _ours("laplace-ll", lambda: laplace(1, objective="likelihood")),
     _ours("laplace-nostick", lambda: laplace(1, sticky=False)),
     _ours("scalemix-leaf", lambda: scale_mixture_leaf(1)),
