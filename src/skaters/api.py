@@ -248,10 +248,19 @@ def _build_candidates(k: int, leaf_fn=leaf):
 # The named forecaster
 # ---------------------------------------------------------------------------
 
-def _laplace_single_scale(k, objective, sticky, leaf, scale_alpha):
+def _laplace_single_scale(k, objective, sticky, leaf, scale_alpha,
+                          extra_candidates=None):
     """One laplace instance on one clock: the likelihood-weighted trunk with a
-    terminal leaf, plus the lattice projection."""
+    terminal leaf, plus the lattice projection.
+
+    ``extra_candidates``: optional list of ``(factory, depth)`` where
+    ``factory(k)`` returns a Dist-emitting skater; each joins the candidate
+    population on equal terms (uniform prior, likelihood-weighted like the
+    rest)."""
     candidates, depths, _ = _build_candidates(k)
+    for fac, d in (extra_candidates or []):
+        candidates.append(fac(k))
+        depths.append(d)
     f = terminal_leaf_ensemble(
         candidates, k=k,
         leaf_fn=leaf if leaf is not None else _objective_leaf(objective, scale_alpha),
@@ -271,7 +280,7 @@ def _laplace_single_scale(k, objective, sticky, leaf, scale_alpha):
 
 def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
             scales: list[int] | None = None, scale_alpha: float = 0.03,
-            tails: str = "gpd"):
+            tails: str = "gpd", extra_candidates=None):
     """The general forecaster.
 
     A likelihood-weighted Bayesian ensemble over the full candidate population
@@ -325,7 +334,8 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
     N(0,1)); ``None`` until horizon m has matured. See :mod:`skaters.parade`.
     """
     assert tails in ("gpd", "gaussian")
-    f = multiscale(lambda kk: _laplace_single_scale(kk, objective, sticky, leaf, scale_alpha),
+    f = multiscale(lambda kk: _laplace_single_scale(kk, objective, sticky, leaf,
+                                                    scale_alpha, extra_candidates),
                    k=k, scales=scales)
     if tails == "gpd":
         f = _gpdtails(f, k=k)     # conditional tail fit: body -> region -> tail
