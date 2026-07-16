@@ -29,6 +29,15 @@ PYTHONPATH=src python benchmarks/study.py <preset> summarize
 The sections below describe each preset's opponents and the published numbers.
 (The older per-study entry points are being folded into `study.py`.)
 
+**The corpus** is defined in one place, `corpus.py`, as named arms enumerated by
+fixed rules (never hand-picked tickers): `daily` (FRED daily universe by
+popularity; business-day observations, so the week is m=5), `weekly` (FRED
+weekly tag, non-price, full history, m=52), `monthly` (same, m=12 — the annual
+cycle), and `m4-hourly` (the M4 competition's 414 hourly series, the strongly
+seasonal turf). Frequency is verified per series from the cached dates, not
+trusted from the tag, and every arm forecasts the one-step change. When a study
+says which data it ran on, the answer is an arm name.
+
 Everything is judged by **held-out predictive log-likelihood** (higher is
 better). Coverage is deliberately not a criterion: a method can hit nominal
 coverage with a terrible density.
@@ -80,12 +89,19 @@ own accuracy-vs-speed curve rather than one point.
 ### CSP — Conformal Seasonal Pools (arXiv:2605.03789)
 
 A training-free seasonal-pool sampler: mixes same-season empirical draws with
-signed residual draws around a seasonal-naive forecast. Pure numpy (zero deps),
-so it always loads. Like the fitted conformal foil we KDE-smooth its sample pool
-into a `Dist` and score it on **both** log-likelihood and CRPS — a CRPS-tuned
-method doesn't get to duck the density test here. `CSP-adaptive` rescales the
-pool by recent 90 % hit-rate (the paper's adaptive variant). Season period is
-weekly by default on daily FRED (`BENCH_CSP_M=7`).
+signed residual draws around a seasonal-naive forecast. We run the **author's
+reference package** ([valeman/csp-forecaster](https://github.com/valeman/csp-forecaster),
+numpy-only; absent it drops out) and sweep twelve configurations around its
+recommended defaults per corpus arm (`BENCH_CSP_M` recenters the season period;
+daily FRED is business-day, so the week is m=5). Like the fitted conformal foil
+we KDE-smooth its one-step sample pool into a `Dist` and score it on **both**
+log-likelihood and CRPS — a CRPS-tuned method doesn't get to duck the density
+test here. On seasonal data it earns its keep; on economic change-series it
+has nothing to add. The bout's post-mortem isolated the mechanism — a hedged
+seasonal location, now the `seasonal_anchor` transform in `laplace`'s default
+population — which cut CSP's M4-Hourly CRPS edge from 91 % of series to 79 %
+and levelled the log-likelihood, at unmeasurable cost elsewhere. Details and
+the four-arm tables: `comparisons/laplace-vs-csp/`.
 
 ## Headline: vs eight distributional baselines (`study.py sota`)
 

@@ -1,5 +1,7 @@
-# transient run outputs — the READMEs are the committed artifact, not the raw CSVs
+# The per-series result CSVs ARE committed: they are the tape behind every
+# README table and the radar, they let any machine resume a study via git, and
+# at ~1 MB a bout they are cheap. Run one machine at a time against them.
+# (The raw FRED cache in benchmarks/data stays out of git: size + terms.)
 _shared*.csv
-*/results.csv
 *.log
 __pycache__/

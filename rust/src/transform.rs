@@ -21,6 +21,7 @@ pub enum Transform {
     Holt(Holt),
     Garch(Garch),
     Seasonal(Seasonal),
+    SeasonalAnchor(SeasonalAnchor),
     Power(Power),
     YeoJohnson(YeoJohnson),
     Ar(Ar),
@@ -40,6 +41,7 @@ impl Transform {
             Transform::Holt(t) => t.forward(y),
             Transform::Garch(t) => t.forward(y),
             Transform::Seasonal(t) => t.forward(y),
+            Transform::SeasonalAnchor(t) => t.forward(y),
             Transform::Power(t) => t.forward(y),
             Transform::YeoJohnson(t) => t.forward(y),
             Transform::Ar(t) => t.forward(y),
@@ -59,6 +61,7 @@ impl Transform {
             Transform::Holt(t) => t.inverse_k(dists),
             Transform::Garch(t) => t.inverse_k(dists),
             Transform::Seasonal(t) => t.inverse_k(dists),
+            Transform::SeasonalAnchor(t) => t.inverse_k(dists),
             Transform::Power(t) => t.inverse_k(dists),
             Transform::YeoJohnson(t) => t.inverse_k(dists),
             Transform::Ar(t) => t.inverse_k(dists),
@@ -680,6 +683,113 @@ impl Seasonal {
                 ));
             } else {
                 result.push(dists[h].shift(anchor_mean));
+            }
+        }
+        result
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// seasonal anchor: hedged seasonal location (phase-EMA blended with naive)
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SeasonalAnchor {
+    pub period: usize,
+    pub alpha: f64,
+    pub weight: f64,
+    pub ema: Vec<Option<f64>>,
+    pub buffer: Vec<f64>,
+    pub n: usize,
+    pub init: bool,
+}
+
+pub fn seasonal_anchor(period: usize, alpha: f64, weight: f64) -> Transform {
+    assert!(period >= 1);
+    assert!(0.0 < alpha && alpha < 1.0);
+    assert!((0.0..=1.0).contains(&weight));
+    Transform::SeasonalAnchor(SeasonalAnchor {
+        period,
+        alpha,
+        weight,
+        ema: vec![None; period],
+        buffer: Vec::new(),
+        n: 0,
+        init: false,
+    })
+}
+
+impl SeasonalAnchor {
+    fn anchor_of(&self, ema: Option<f64>, snaive: f64) -> f64 {
+        match ema {
+            Some(e) => self.weight * e + (1.0 - self.weight) * snaive,
+            None => snaive,
+        }
+    }
+
+    fn forward(&mut self, y: f64) -> f64 {
+        if !self.init {
+            self.init = true;
+            self.buffer = vec![y];
+            self.n = 1;
+            return 0.0;
+        }
+        let p = self.n % self.period;
+        let snaive = if self.buffer.len() >= self.period {
+            self.buffer[self.buffer.len() - self.period]
+        } else {
+            *self.buffer.last().unwrap()
+        };
+        let y_prime = y - self.anchor_of(self.ema[p], snaive);
+        self.ema[p] = Some(match self.ema[p] {
+            Some(e) => e + self.alpha * (y - e),
+            None => y,
+        });
+        self.buffer.push(y);
+        if self.buffer.len() > 2 * self.period {
+            self.buffer.remove(0);
+        }
+        self.n += 1;
+        y_prime
+    }
+
+    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+        let buf = &self.buffer;
+        let period = self.period;
+        let mut recovered_means: Vec<f64> = Vec::new();
+        let mut recovered_vars: Vec<f64> = Vec::new();
+        let mut result = Vec::with_capacity(dists.len());
+        for h in 0..dists.len() {
+            let p = (self.n + h) % period;
+            let (snaive, snaive_var);
+            if h < period {
+                let buf_idx = buf.len() as i64 - period as i64 + h as i64;
+                snaive = if buf_idx >= 0 && (buf_idx as usize) < buf.len() {
+                    buf[buf_idx as usize]
+                } else {
+                    *buf.last().unwrap_or(&0.0)
+                };
+                snaive_var = 0.0;
+            } else {
+                let lag_idx = h - period;
+                snaive = recovered_means[lag_idx];
+                snaive_var = recovered_vars[lag_idx];
+            }
+            let a_mean = self.anchor_of(self.ema[p], snaive);
+            let a_var = (1.0 - self.weight) * (1.0 - self.weight) * snaive_var;
+            recovered_means.push(dists[h].mean() + a_mean);
+            recovered_vars.push(dists[h].var() + a_var);
+            if a_var > 0.0 {
+                result.push(Dist::new(
+                    dists[h]
+                        .components
+                        .iter()
+                        .map(|&(w, m, s)| (w, m + a_mean, (s * s + a_var).sqrt()))
+                        .collect(),
+                ));
+            } else {
+                result.push(dists[h].shift(a_mean));
             }
         }
         result

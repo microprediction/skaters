@@ -2,8 +2,12 @@
 
 Head-to-head slices of the *same* `sota` study (one FRED loader, one `Dist`
 scorer, one rolling one-step protocol — see `../README.md`), each isolated to
-**laplace vs. a single opponent** so the story is legible: what is X, why does it
-matter, and does `laplace` beat it on held-out **log-likelihood** and **CRPS**.
+**laplace vs. a single opponent** so the story is legible: what is X, why does
+it matter, and how the two compare on held-out **log-likelihood** and
+**CRPS**. The point of the exercise is to find the corners — the types of
+series and regimes where another method outperforms `laplace` — and to state
+them plainly when found (seasonal hourly data, soft daily cycles, the
+price/return universe so far), rather than to average them away.
 
 Each subfolder is one matchup:
 
@@ -15,7 +19,10 @@ Each subfolder is one matchup:
 | `laplace-vs-nnetar/` | `nnetar-R@*` | a nonlinear (neural AR) opponent with no clean Python twin |
 | `laplace-vs-garch/` | `GARCH-t`, `GARCH-t-R@*` | heavy-tail volatility SOTA (its home turf is price/returns) |
 | `laplace-vs-bsts/` | `bsts-R@*` | Bayesian structural time series — full posterior predictive |
-| `laplace-vs-csp/` | `CSP`, `CSP-adaptive` | training-free Conformal Seasonal Pools (arXiv:2605.03789) |
+| `laplace-vs-csp/` | `CSPr-*` (official `csp-forecaster`, 12 configs) | training-free Conformal Seasonal Pools (arXiv:2605.03789), across four corpus arms incl. its seasonal home turf |
+| `laplace-vs-nns/` | `NNS-R`, `NNS-R-auto` | Viole's NNS.ARMA — same-phase component forecasting, the seasonal-pool family's prior art |
+| `nns-vs-csp/` | `NNS-R` vs `CSPr-*` | third-party bout: the prior art vs the seasonal-pool paper, laplace not in the ring |
+| `laplace-vs-tbats/` | `TBATS-R`, `TBATS-R-ms` | the classical multi-seasonal state space; owns the soft-cycle corner of M4-Hourly |
 
 ## Reproduce a matchup
 

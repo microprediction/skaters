@@ -10,7 +10,8 @@ use crate::skater::{
 use crate::tails::{gpdtails, GpdTails, PDist};
 use crate::transform::{
     ar, ar_default, difference, drift, ema_transform, fractional_difference, garch_default,
-    holt_linear, ou_transform, power_transform, seasonal_difference, standardize, theta,
+    holt_linear, ou_transform, power_transform, seasonal_anchor, seasonal_difference,
+    standardize, theta,
     yeo_johnson, Transform,
 };
 use serde::{Deserialize, Serialize};
@@ -100,6 +101,17 @@ pub fn build_candidates(k: usize) -> (Vec<Sk>, Vec<f64>) {
             &mut candidates,
             &mut depths,
             conjugate(leaf(k), seasonal_difference(period), k),
+            1.0,
+        );
+    }
+
+    // Depth 1: hedged seasonal anchor (phase-EMA blended 50/50 with the
+    // seasonal-naive; mirrors api.py)
+    for period in [7, 12, 24] {
+        push(
+            &mut candidates,
+            &mut depths,
+            conjugate(leaf(k), seasonal_anchor(period, 0.2, 0.5), k),
             1.0,
         );
     }

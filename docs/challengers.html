@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>skaters &mdash; Challengers</title>
-  <meta name="description" content="Every forecaster that has stepped up against Laplace, one row each with its tape, and the featured bouts. Built for the challengers still coming." />
+  <title>skaters &mdash; Challenges</title>
+  <meta name="description" content="One tiny, fast, online model against heavy machinery on their respective home turf. Every comparison with its tape, and the corners where other methods win." />
   <link rel="stylesheet" href="./academic.css" />
 </head>
 <body>
@@ -15,30 +15,57 @@
         <a href="/">Home</a>
         <a href="/demos/">Demos</a>
         <a href="/guide.html">Guide</a>
-        <a href="/languages.html">Languages</a>
-        <a href="/sandwich.html">Sandwich</a>
-        <a href="/challengers.html">Challengers</a>
-        <a href="/faq.html">FAQ</a>
-        <a href="/papers.html">Papers</a>
-        <a href="/skills.html">Skills</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Challenges</a>
+            <a href="/sandwich.html">Sandwich</a>
+            <a href="/papers.html">Papers</a>
+          </span>
+        </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
   </header>
 
   <main>
-    <h1>Challengers</h1>
-    <p class="subtitle">Everyone who has stepped up, and how it went.</p>
+    <h1>Challenges</h1>
+    <p class="subtitle">One tiny, fast, online model against heavy machinery,
+      on their respective home turf. That is hard.</p>
+
+    <h2>Should you use something else?</h2>
+    <p>
+      Quite possibly. laplace is one small, fast, online forecaster; the
+      methods below range from classical workhorses to 200M-parameter
+      foundation models, and several do their best work on particular
+      ground: GARCH on price and return series, Viole's NNS on strongly
+      seasonal data, TBATS where a soft daily cycle wants smoothing. The
+      record below marks each of those corners where we found them, in its
+      own row rather than averaged away. What laplace is for,
+      and what it deliberately is not, is set out on the
+      <a href="/scope.html">scope page</a>.
+    </p>
 
     <p>
-      skaters cooperates as well as it competes: sandwiched in laplace's
-      coordinates, every challenger below improves dramatically (<a
-      href="/sandwich.html">the sandwich</a>), so a bare horserace can
-      mislead. These pages exist as counterpoint to overly aggressive
-      marketing in autonomous univariate distributional prediction.
+      skaters also cooperates as well as it competes: sandwiched in
+      laplace's coordinates, every challenger below improves dramatically
+      (<a href="/sandwich.html">the sandwich</a>), so a bare horserace can
+      mislead. These pages look for the types of series and regimes where
+      each method does its best work.
     </p>
 
     <h2>Featured bouts</h2>
+    <p>
+      The above caveats notwithstanding, Laplace does seem to outperform as
+      a practical generalist model: fast, light, and with no dependencies.
+    </p>
     <div class="card-grid">
       <div class="card">
         <h3>TimesFM &mdash; David v Goliath</h3>
@@ -49,35 +76,488 @@
       </div>
       <div class="card">
         <h3>TabFM &mdash; David v Godzilla</h3>
-        <p>A 12&thinsp;GB tabular foundation model, pre-registered, eleven
-          arms, every one behind laplace on likelihood, at one
-          ten-thousandth the footprint.
+        <p>TabFM is impressively competitive with laplace given its
+          generality: a 12&thinsp;GB tabular foundation model,
+          pre-registered across eleven arms, meeting a specialist at one
+          ten-thousandth its footprint.
           <a href="/challengers/tabfm.html">The bout &rarr;</a></p>
       </div>
       <div class="card">
         <h3>Prophet</h3>
-        <p>Three scales, 30 to 921 series, pre-registered at the largest.
-          Raw: 4 wins in 921, and &minus;11 nats median on repeat-heavy
-          series.
+        <p>Prophet is now safe to use! See
+          <a href="https://prophet.microprediction.org">prophet.microprediction.org</a>.
+          Raw it won 4 of 921 pre-registered series; sandwiched, the story
+          changes.
           <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-prophet-wide.md">The tape &rarr;</a></p>
       </div>
       <div class="card">
         <h3>PYMC-Forecast &mdash; the day-one bout</h3>
-        <p>PyMC Labs' toolkit, benchmarked the day after its release. Raw
-          it trails like everyone; sandwiched it finishes ahead across the
-          whole universe, +0.04 nats median on 65% of series. The pooling
-          arm is the first with cross-series information.
+        <p>PyMC is new but already great out of the box. Sandwiched it
+          finishes ahead across the whole universe, +0.04 nats median on
+          65% of series; the pooling arm is the first with cross-series
+          information.
           <a href="/challengers/pymc-forecast.html">The bout &rarr;</a></p>
       </div>
     </div>
+
+
+    <h2>Strengths by regime</h2>
+    <p>
+      Five regimes, one score each: how often a challenger beats
+      <code>laplace</code> per series, ties split, scaled so a 50/50 draw is
+      1.0. The dashed ring is <code>laplace</code> itself; outside the ring
+      the challenger is winning that regime, inside it is losing. Soft
+      vs hard waveforms are the two halves of M4-Hourly (noisy daily cycles
+      vs nearly deterministic ones; see the
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
+      Pick up to four challengers.
+    </p>
+    <div class="panel" id="radar-panel">
+      <div class="controls">
+        <div class="control" style="max-width:100%">
+          <label>Challengers (up to 4)</label>
+          <div id="radar-models" style="display:flex;flex-wrap:wrap;gap:2px 14px;max-width:760px"></div>
+        </div>
+        <div class="control">
+          <label>Metric</label>
+          <span>
+            <label><input type="radio" name="radar-metric" value="ll" checked /> Log-likelihood</label>
+            &nbsp;
+            <label><input type="radio" name="radar-metric" value="crps" /> CRPS</label>
+          </span>
+        </div>
+      </div>
+      <canvas id="radar" class="plot" width="640" height="480" tabindex="0"
+              aria-label="Radar chart: challenger strength relative to laplace by regime"></canvas>
+      <div class="legend" id="radar-legend"></div>
+      <div id="radar-tip" style="position:absolute;display:none;background:#fff;border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:0.85rem;box-shadow:0 2px 8px rgba(0,0,0,0.12);pointer-events:none"></div>
+      <table id="radar-table">
+        <thead><tr id="radar-table-head"><th>regime</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <script src="/js/challenges-radar-data.js"></script>
+    <script>
+    (function () {
+      var data = CHALLENGES_RADAR;
+      var canvas = document.getElementById("radar");
+      var ctx = canvas.getContext("2d");
+      var box = document.getElementById("radar-models");
+      var tip = document.getElementById("radar-tip");
+      var panel = document.getElementById("radar-panel");
+      var legend = document.getElementById("radar-legend");
+      var thead = document.getElementById("radar-table-head");
+      var tbody = document.querySelector("#radar-table tbody");
+      var SLOTS = ["#2a78d6", "#1baf7a", "#eda100", "#008300"];  // fixed order
+      var FILLS = ["rgba(42,120,214,0.10)", "rgba(27,175,122,0.10)",
+                   "rgba(237,161,0,0.10)", "rgba(0,131,0,0.10)"];
+      var REF = "#5a5a5a", INK = "#1a1a1a", MUTED = "#5a5a5a";
+      var MAXV = 2.0, MAXSEL = 4;
+      var slotOf = {};                 // model name -> slot index (stable while selected)
+      var vertsBy = {};                // model name -> screen vertices
+      var focusIdx = -1;
+
+      Object.keys(data.models).forEach(function (name) {
+        var lab = document.createElement("label");
+        lab.style.fontWeight = "400";
+        var cb = document.createElement("input");
+        cb.type = "checkbox"; cb.value = name;
+        if (name === "Prophet") cb.checked = true;
+        cb.addEventListener("change", onToggle);
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(" " + name));
+        box.appendChild(lab);
+      });
+
+      function selected() {
+        return Array.prototype.slice.call(
+          box.querySelectorAll("input:checked")).map(function (c) { return c.value; });
+      }
+      function metric() {
+        return document.querySelector("input[name=radar-metric]:checked").value;
+      }
+      function onToggle(e) {
+        var sel = selected();
+        if (e.target.checked) {
+          if (sel.length > MAXSEL) { e.target.checked = false; return; }
+          var used = sel.map(function (n) { return slotOf[n]; });
+          for (var s = 0; s < MAXSEL; s++) {
+            if (used.indexOf(s) < 0) { slotOf[e.target.value] = s; break; }
+          }
+        } else {
+          delete slotOf[e.target.value];   // others keep their colors
+        }
+        draw();
+      }
+      slotOf["Prophet"] = 0;
+
+      function draw() {
+        var dpr = window.devicePixelRatio || 1;
+        var cssW = canvas.clientWidth || 640, cssH = Math.round(cssW * 0.75);
+        canvas.width = cssW * dpr; canvas.height = cssH * dpr;
+        canvas.style.height = cssH + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, cssW, cssH);
+        var cx = cssW / 2, cy = cssH / 2 + 8;
+        var R = Math.min(cssW, cssH) / 2 - 56;
+        var K = data.axes.length;
+        function pt(i, v) {
+          var a = -Math.PI / 2 + i * 2 * Math.PI / K;
+          var r = R * Math.min(v, MAXV) / MAXV;
+          return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+        }
+        [0.5, 1.0, 1.5, 2.0].forEach(function (v) {
+          ctx.beginPath();
+          for (var i = 0; i <= K; i++) {
+            var p = pt(i % K, v);
+            i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+          }
+          if (v === 1.0) { ctx.strokeStyle = REF; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6; }
+          else { ctx.strokeStyle = "#e2e2e2"; ctx.setLineDash([]); ctx.lineWidth = 1; }
+          ctx.stroke(); ctx.setLineDash([]);
+        });
+        ctx.fillStyle = INK; ctx.font = "13px -apple-system, sans-serif";
+        for (var i = 0; i < K; i++) {
+          var pe = pt(i, MAXV);
+          ctx.strokeStyle = "#e2e2e2"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pe[0], pe[1]); ctx.stroke();
+          var pl = pt(i, MAXV * 1.14);
+          ctx.textAlign = Math.abs(pl[0] - cx) < 10 ? "center" : (pl[0] > cx ? "left" : "right");
+          ctx.fillText(data.axes[i], pl[0], pl[1] + 4);
+        }
+        ctx.fillStyle = MUTED; ctx.font = "11px -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        var pref = pt(0, 1.0);
+        ctx.fillText("laplace = 1", pref[0] + 6, pref[1] - 6);
+
+        var sel = selected();
+        vertsBy = {};
+        sel.forEach(function (name) {
+          var slot = slotOf[name] || 0;
+          var vals = data.models[name][metric()];
+          var verts = [];
+          ctx.beginPath();
+          var started = false;
+          for (var i = 0; i < K; i++) {
+            if (vals[i] == null) { verts.push(null); continue; }
+            var p = pt(i, vals[i]);
+            verts.push(p);
+            started ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+            started = true;
+          }
+          ctx.closePath();
+          ctx.fillStyle = FILLS[slot]; ctx.fill();
+          ctx.strokeStyle = SLOTS[slot]; ctx.lineWidth = 2; ctx.stroke();
+          for (var i = 0; i < K; i++) {
+            if (!verts[i]) continue;
+            var p = verts[i];
+            ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, 2 * Math.PI);
+            ctx.fillStyle = SLOTS[slot]; ctx.fill();
+            ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+            if (sel.length === 1) {
+              ctx.fillStyle = INK; ctx.font = "600 12px -apple-system, sans-serif";
+              ctx.textAlign = p[0] >= cx ? "left" : "right";
+              var dx = p[0] >= cx ? 8 : -8;
+              ctx.fillText(vals[i].toFixed(2), p[0] + dx, p[1] + (p[1] < cy ? -6 : 14));
+            }
+            if (i === focusIdx) {
+              ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 2 * Math.PI);
+              ctx.strokeStyle = SLOTS[slot]; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+          }
+          vertsBy[name] = verts;
+        });
+        drawLegend(sel);
+        fillTable(sel);
+      }
+
+      function drawLegend(sel) {
+        legend.textContent = "";
+        sel.forEach(function (name) {
+          var span = document.createElement("span");
+          var sw = document.createElement("span");
+          sw.className = "swatch";
+          sw.style.background = SLOTS[slotOf[name] || 0];
+          span.appendChild(sw);
+          span.appendChild(document.createTextNode(name));
+          legend.appendChild(span);
+        });
+        var ref = document.createElement("span");
+        var sw = document.createElement("span");
+        sw.className = "swatch";
+        sw.style.cssText = "background:none;border-top:2px dashed #5a5a5a;height:0;margin-top:7px";
+        ref.appendChild(sw);
+        ref.appendChild(document.createTextNode("laplace (= 1.0)"));
+        legend.appendChild(ref);
+      }
+
+      function fillTable(sel) {
+        thead.textContent = "";
+        var th0 = document.createElement("th"); th0.textContent = "regime";
+        thead.appendChild(th0);
+        sel.forEach(function (name) {
+          var th = document.createElement("th");
+          th.className = "num"; th.textContent = name;
+          thead.appendChild(th);
+        });
+        tbody.textContent = "";
+        data.axes.forEach(function (ax, i) {
+          var tr = document.createElement("tr");
+          var td0 = document.createElement("td"); td0.textContent = ax;
+          tr.appendChild(td0);
+          sel.forEach(function (name) {
+            var v = data.models[name][metric()][i];
+            var n = data.models[name].n[i];
+            var td = document.createElement("td");
+            td.className = "num";
+            td.textContent = v == null ? "not run" : v.toFixed(2) + " (N=" + n + ")";
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      function showTip(i, clientX, clientY) {
+        var sel = selected();
+        tip.textContent = "";
+        var head = document.createElement("div");
+        head.style.fontWeight = "600";
+        head.textContent = data.axes[i];
+        tip.appendChild(head);
+        var any = false;
+        sel.forEach(function (name) {
+          var m = data.models[name];
+          var v = m[metric()][i];
+          if (v == null) return;
+          any = true;
+          var row = document.createElement("div");
+          var key = document.createElement("span");
+          key.style.cssText = "display:inline-block;width:12px;border-top:2px solid " +
+            SLOTS[slotOf[name] || 0] + ";vertical-align:middle;margin-right:5px";
+          row.appendChild(key);
+          row.appendChild(document.createTextNode(
+            v.toFixed(2) + "x - " + name + " beats laplace " +
+            Math.round(v * 50) + "% of " + m.n[i] + " series"));
+          tip.appendChild(row);
+        });
+        if (!any) { tip.style.display = "none"; return; }
+        var pr = panel.getBoundingClientRect();
+        tip.style.display = "block";
+        tip.style.left = (clientX - pr.left + 14) + "px";
+        tip.style.top = (clientY - pr.top - 10) + "px";
+      }
+
+      canvas.addEventListener("pointermove", function (e) {
+        var r = canvas.getBoundingClientRect();
+        var x = e.clientX - r.left, y = e.clientY - r.top;
+        var best = -1, bd = 24 * 24;
+        Object.keys(vertsBy).forEach(function (name) {
+          vertsBy[name].forEach(function (p, i) {
+            if (!p) return;
+            var d = (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y);
+            if (d < bd) { bd = d; best = i; }
+          });
+        });
+        if (best >= 0) showTip(best, e.clientX, e.clientY);
+        else tip.style.display = "none";
+      });
+      canvas.addEventListener("pointerleave", function () { tip.style.display = "none"; });
+      canvas.addEventListener("keydown", function (e) {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        var K = data.axes.length;
+        focusIdx = ((focusIdx + (e.key === "ArrowRight" ? 1 : -1)) % K + K) % K;
+        draw();
+        var r = canvas.getBoundingClientRect();
+        showTip(focusIdx, r.left + canvas.clientWidth / 2, r.top + 40);
+      });
+      canvas.addEventListener("blur", function () { focusIdx = -1; tip.style.display = "none"; draw(); });
+
+      document.querySelectorAll("input[name=radar-metric]").forEach(function (r) {
+        r.addEventListener("change", draw);
+      });
+      window.addEventListener("resize", draw);
+      panel.style.position = "relative";
+      draw();
+    })();
+    </script>
+    <script>
+    (function () {
+      var data = CHALLENGES_RADAR;
+      var canvas = document.getElementById("radar");
+      var ctx = canvas.getContext("2d");
+      var sel = document.getElementById("radar-model");
+      var tip = document.getElementById("radar-tip");
+      var panel = document.getElementById("radar-panel");
+      var legendName = document.getElementById("radar-legend-model");
+      var tbody = document.querySelector("#radar-table tbody");
+      var ACCENT = "#4a3aff", REF = "#5a5a5a", INK = "#1a1a1a", MUTED = "#5a5a5a";
+      var MAXV = 2.0;
+      var verts = [];        // screen positions of the current vertices
+      var focusIdx = -1;
+
+      Object.keys(data.models).forEach(function (name) {
+        var o = document.createElement("option");
+        o.value = name; o.textContent = name;
+        sel.appendChild(o);
+      });
+
+      function metric() {
+        return document.querySelector("input[name=radar-metric]:checked").value;
+      }
+      function model() { return sel.value; }
+
+      function draw() {
+        var dpr = window.devicePixelRatio || 1;
+        var cssW = canvas.clientWidth || 640, cssH = Math.round(cssW * 0.75);
+        canvas.width = cssW * dpr; canvas.height = cssH * dpr;
+        canvas.style.height = cssH + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, cssW, cssH);
+        var cx = cssW / 2, cy = cssH / 2 + 8;
+        var R = Math.min(cssW, cssH) / 2 - 56;
+        var K = data.axes.length;
+        function pt(i, v) {
+          var a = -Math.PI / 2 + i * 2 * Math.PI / K;
+          var r = R * Math.min(v, MAXV) / MAXV;
+          return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+        }
+        // rings (recessive); the 1.0 ring is the laplace reference
+        [0.5, 1.0, 1.5, 2.0].forEach(function (v) {
+          ctx.beginPath();
+          for (var i = 0; i <= K; i++) {
+            var p = pt(i % K, v);
+            i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+          }
+          if (v === 1.0) { ctx.strokeStyle = REF; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6; }
+          else { ctx.strokeStyle = "#e2e2e2"; ctx.setLineDash([]); ctx.lineWidth = 1; }
+          ctx.stroke(); ctx.setLineDash([]);
+        });
+        // spokes + axis labels
+        ctx.fillStyle = INK; ctx.font = "13px -apple-system, sans-serif";
+        for (var i = 0; i < K; i++) {
+          var pe = pt(i, MAXV);
+          ctx.strokeStyle = "#e2e2e2"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pe[0], pe[1]); ctx.stroke();
+          var pl = pt(i, MAXV * 1.14);
+          ctx.textAlign = Math.abs(pl[0] - cx) < 10 ? "center" : (pl[0] > cx ? "left" : "right");
+          ctx.fillText(data.axes[i], pl[0], pl[1] + 4);
+        }
+        // scale label on the reference ring
+        ctx.fillStyle = MUTED; ctx.font = "11px -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        var pref = pt(0, 1.0);
+        ctx.fillText("laplace = 1", pref[0] + 6, pref[1] - 6);
+        // model polygon
+        var vals = data.models[model()][metric()];
+        verts = [];
+        ctx.beginPath();
+        var started = false;
+        for (var i = 0; i < K; i++) {
+          if (vals[i] == null) { verts.push(null); continue; }
+          var p = pt(i, vals[i]);
+          verts.push(p);
+          started ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
+          started = true;
+        }
+        ctx.closePath();
+        ctx.fillStyle = "rgba(74,58,255,0.12)"; ctx.fill();
+        ctx.strokeStyle = ACCENT; ctx.lineWidth = 2; ctx.stroke();
+        // vertices + direct value labels
+        for (var i = 0; i < K; i++) {
+          if (!verts[i]) continue;
+          var p = verts[i];
+          ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, 2 * Math.PI);
+          ctx.fillStyle = ACCENT; ctx.fill();
+          ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+          ctx.fillStyle = INK; ctx.font = "600 12px -apple-system, sans-serif";
+          ctx.textAlign = p[0] >= cx ? "left" : "right";
+          var dx = p[0] >= cx ? 8 : -8;
+          ctx.fillText(vals[i].toFixed(2), p[0] + dx, p[1] + (p[1] < cy ? -6 : 14));
+          if (i === focusIdx) {
+            ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 2 * Math.PI);
+            ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.5; ctx.stroke();
+          }
+        }
+        legendName.textContent = model();
+        fillTable();
+      }
+
+      function fillTable() {
+        var m = data.models[model()];
+        tbody.textContent = "";
+        data.axes.forEach(function (ax, i) {
+          var tr = document.createElement("tr");
+          [ax,
+           m.crps[i] == null ? "not run" : m.crps[i].toFixed(2),
+           m.ll[i] == null ? "not run" : m.ll[i].toFixed(2),
+           m.n[i] || ""].forEach(function (v, j) {
+            var td = document.createElement("td");
+            if (j) td.className = "num";
+            td.textContent = v;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      function showTip(i, clientX, clientY) {
+        var m = data.models[model()];
+        var v = m[metric()][i];
+        if (v == null) { tip.style.display = "none"; return; }
+        var pct = Math.round(v * 50);
+        tip.textContent = data.axes[i] + ": beats laplace on " + pct +
+          "% of " + m.n[i] + " series (" +
+          (metric() === "crps" ? "CRPS" : "log-likelihood") + "), ratio " + v.toFixed(2);
+        var pr = panel.getBoundingClientRect();
+        tip.style.display = "block";
+        tip.style.left = (clientX - pr.left + 14) + "px";
+        tip.style.top = (clientY - pr.top - 10) + "px";
+      }
+
+      canvas.addEventListener("pointermove", function (e) {
+        var r = canvas.getBoundingClientRect();
+        var x = e.clientX - r.left, y = e.clientY - r.top;
+        var best = -1, bd = 24 * 24;
+        verts.forEach(function (p, i) {
+          if (!p) return;
+          var d = (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y);
+          if (d < bd) { bd = d; best = i; }
+        });
+        if (best >= 0) showTip(best, e.clientX, e.clientY);
+        else tip.style.display = "none";
+      });
+      canvas.addEventListener("pointerleave", function () { tip.style.display = "none"; });
+      canvas.addEventListener("keydown", function (e) {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        var K = data.axes.length;
+        focusIdx = ((focusIdx + (e.key === "ArrowRight" ? 1 : -1)) % K + K) % K;
+        draw();
+        var p = verts[focusIdx];
+        if (p) {
+          var r = canvas.getBoundingClientRect();
+          showTip(focusIdx, r.left + p[0], r.top + p[1]);
+        }
+      });
+      canvas.addEventListener("blur", function () { focusIdx = -1; tip.style.display = "none"; draw(); });
+
+      sel.addEventListener("change", draw);
+      document.querySelectorAll("input[name=radar-metric]").forEach(function (r) {
+        r.addEventListener("change", draw);
+      });
+      window.addEventListener("resize", draw);
+      panel.style.position = "relative";
+      draw();
+    })();
+    </script>
 
     <h2>The record</h2>
     <p>
       Numbers are per-series win-rates for <code>laplace</code>,
       log-likelihood first, CRPS second. Everyone is converted to the same
       <code>Dist</code> and scored by the same code on the same held-out
-      points. Every row links its tape. The one belt we do not hold is at
-      the bottom, stated rather than averaged away.
+      points. Every row links its tape.
     </p>
 <table>
       <thead><tr><th>challenger</th><th>corner</th><th>LL</th><th>CRPS</th><th>tape</th></tr></thead>
@@ -87,12 +567,15 @@
         <tr><td>AutoETS</td><td>classical</td><td>97%</td><td>83%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
         <tr><td>ETS / SARIMAX (statsmodels)</td><td>classical</td><td>96% / 87%</td><td>81% / 53%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
         <tr><td>Theta (the M3 winner, R)</td><td>classical</td><td>87%</td><td>63%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-theta">bout</a></td></tr>
+        <tr><td>TBATS (forecast, R)</td><td>classical</td><td>96%</td><td>89%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">bout</a></td></tr>
+        <tr><td><em>TBATS, soft-cycle hourly series</em></td><td>classical</td><td colspan="2"><em>its corner; smooth trigonometric seasonality earns it there</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">bout</a></td></tr>
         <tr><td>ADAM (smooth, R)</td><td>state space</td><td>96%</td><td>82%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-adam">bout</a></td></tr>
         <tr><td>BSTS (full Bayesian posterior, R)</td><td>state space</td><td>97%</td><td>80%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-bsts">bout</a></td></tr>
         <tr><td><strong>PYMC-Forecast 0.0.1 (PyMC Labs)</strong></td><td>Bayesian</td><td>82%</td><td>&mdash;</td><td><a href="/challengers/pymc-forecast.html"><strong>the day-one bout</strong></a></td></tr>
         <tr><td>nnetar (neural AR, R)</td><td>neural</td><td>96%</td><td>76%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-nnetar">bout</a></td></tr>
         <tr><td>NF-StudentT (NeuralForecast)</td><td>neural</td><td>100%</td><td>78%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
-        <tr><td>CSP (incl. adaptive)</td><td>conformal</td><td>99%</td><td>100%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
+        <tr><td>CSP (official <code>csp-forecaster</code>, 12 configs)</td><td>conformal</td><td>98&ndash;99%</td><td>98&ndash;99%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
+        <tr><td><em>CSP, strongly-seasonal series (M4-Hourly)</em></td><td>conformal</td><td colspan="2"><em>the belt is theirs; seasonal pooling earns it there</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
         <tr><td>AutoARIMA + conformal / ACI</td><td>conformal</td><td>86% / 88%</td><td>31% / 29%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
         <tr><td><strong>TimesFM 2.5, 200M (Google)</strong></td><td>foundation</td><td>100% cont.</td><td>72% cont.</td><td><a href="/timesfm.html"><strong>David v Goliath</strong></a></td></tr>
         <tr><td>Chronos-Bolt (Amazon)</td><td>foundation</td><td>100% cont.</td><td>88% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>

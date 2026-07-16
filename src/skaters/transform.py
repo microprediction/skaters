@@ -591,6 +591,171 @@ def seasonal_difference(period: int = 12):
 
 
 # ---------------------------------------------------------------------------
+# Seasonal anchor: hedged seasonal location (phase-EMA blended with naive)
+# ---------------------------------------------------------------------------
+
+def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
+    """Residual from a hedged seasonal anchor.
+
+    Forward:   y'_t = y_t - a_t,  a_t = weight * phaseEMA_{p(t)} + (1-weight) * y_{t-s}
+    Inverse:   shift each horizon's Dist by its anchor; for h >= s the naive
+               component is a value recovered earlier in the same call and its
+               variance is convolved in (as in ``seasonal_difference``).
+
+    The phase-EMA is a recency-weighted mean of same-phase values (memory
+    ~1/alpha cycles); the seasonal-naive is the single value one period ago.
+    The naive alone adapts instantly but is one noisy draw; the phase-EMA
+    averages the noise but lags level shifts. The blend beats either alone on
+    seasonal series. ``weight=0`` recovers ``seasonal_difference``.
+
+    Forecasting from same-phase component series follows Viole's NNS package
+    (``NNS.ARMA``, CRAN, since 2017).
+    """
+    assert period >= 1
+    assert 0 < alpha < 1
+    assert 0.0 <= weight <= 1.0
+
+    def _anchor(ema, snaive):
+        return (weight * ema + (1.0 - weight) * snaive) if ema is not None else snaive
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            return 0.0, {"ema": [None] * period, "buffer": [y], "n": 1}
+        buf = state["buffer"]
+        p = state["n"] % period
+        snaive = buf[-period] if len(buf) >= period else buf[-1]
+        y_prime = y - _anchor(state["ema"][p], snaive)
+        e = state["ema"][p]
+        state["ema"][p] = y if e is None else e + alpha * (y - e)
+        buf.append(y)
+        if len(buf) > 2 * period:
+            buf.pop(0)
+        state["n"] += 1
+        return y_prime, state
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        buf = state["buffer"]
+        recovered_means: list[float] = []
+        recovered_vars: list[float] = []
+        out = []
+        for h in range(len(dists)):
+            p = (state["n"] + h) % period
+            lag_idx = h - period
+            if lag_idx < 0:
+                buf_idx = len(buf) - period + h
+                snaive = buf[buf_idx] if 0 <= buf_idx < len(buf) else buf[-1]
+                snaive_var = 0.0
+            else:
+                snaive = recovered_means[lag_idx]
+                snaive_var = recovered_vars[lag_idx]
+            a_mean = _anchor(state["ema"][p], snaive)
+            a_var = ((1.0 - weight) ** 2) * snaive_var
+            recovered_means.append(dists[h].mean + a_mean)
+            recovered_vars.append(dists[h].var + a_var)
+            if a_var > 0.0:
+                out.append(Dist([(w, m + a_mean, math.sqrt(s * s + a_var))
+                                 for w, m, s in dists[h].components]))
+            else:
+                out.append(dists[h].shift(a_mean))
+        return out
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# Seasonal scale: phase-indexed running standardization
+# ---------------------------------------------------------------------------
+
+def seasonal_scale(period: int, alpha: float = 0.05, center: bool = False,
+                   eps: float = 1e-8):
+    """Phase-indexed running standardization (seasonal heteroskedasticity).
+
+    Forward:   y'_t = (y_t - mu_{p(t)}) / sigma_{p(t)},   p(t) = t mod period
+    Inverse:   affine by the stats of the phase being *forecast*: dists[h] is
+               the (h+1)-step-ahead predictive, so its phase is
+               (n + h) mod period where n counts observations seen.
+
+    Each phase keeps its own EWMA mean and variance, so predictive width (and
+    with ``center=True`` location) is conditioned on the phase of the cycle —
+    the seasonal volatility that ``seasonal_difference`` alone cannot express
+    (its residual scale is phase-averaged). ``center=False`` divides by the
+    phase sigma without subtracting the phase mean; use it composed OVER
+    ``seasonal_difference(period)``, where location is already handled.
+
+    A phase's variance is shrunk toward the global EWMA variance by visit
+    count, w = visits / (visits + 3), so thin phases (few observed cycles)
+    degrade gracefully to plain ``standardize`` instead of trusting a noisy
+    per-phase estimate. ``alpha`` is the per-phase EWMA rate — memory is
+    ~1/alpha *visits*, i.e. cycles; the global stats use ``alpha / period``
+    so both remember the same span of raw observations.
+    """
+    assert period >= 1
+    assert 0 < alpha < 1
+    a_g = alpha / period
+    K0 = 3.0                                     # shrinkage prior strength (visits)
+
+    def _vg(state):
+        """Bias-corrected global variance: the EWMA runs at the slow rate
+        a_g = alpha/period, so from a zero start it is badly low for the first
+        ~1/a_g observations; dividing by 1-(1-a_g)^updates removes that bias
+        exactly (after one update it equals the one-sample estimate)."""
+        updates = state["n"] - 1
+        if updates <= 0:
+            return 0.0
+        return state["var_g"] / (1.0 - (1.0 - a_g) ** updates)
+
+    def _phase_stats(state, p):
+        """Shrunk (mu, sigma) for phase p under the current state.
+
+        Variance shrinks toward the global in LOG space (geometric blend):
+        additive blending would let the global variance dominate quiet phases
+        whenever the phase spread is large — at a 50x scale ratio, 0.3 %
+        additive weight on the global still doubles the quiet phase's sigma.
+        """
+        w = state["vis"][p] / (state["vis"][p] + K0)
+        vp = max(state["var"][p], eps * eps)
+        vg = max(_vg(state), eps * eps)
+        var_eff = math.exp(w * math.log(vp) + (1.0 - w) * math.log(vg))
+        mu_eff = (w * state["mu"][p] + (1.0 - w) * state["mu_g"]) if center else 0.0
+        return mu_eff, math.sqrt(var_eff)
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            return 0.0, {"mu_g": y, "var_g": 0.0,
+                         "mu": [0.0] * period, "var": [0.0] * period,
+                         "vis": [0] * period, "n": 1}
+        p = state["n"] % period
+        # Center against the PRIOR mean but scale by the UPDATED variance,
+        # exactly as standardize does (prior-mean centering avoids systematic
+        # overconfidence; updated variance avoids the cold-start divide-by-zero).
+        mu_eff, _ = _phase_stats(state, p)
+        dg = y - state["mu_g"]
+        state["mu_g"] += a_g * dg
+        state["var_g"] = (1 - a_g) * state["var_g"] + a_g * dg * dg
+        if state["vis"][p] == 0:            # first visit seeds from global stats
+            state["mu"][p] = y
+            state["var"][p] = _vg(state)
+        else:
+            dp = y - state["mu"][p]
+            state["mu"][p] += alpha * dp
+            state["var"][p] = (1 - alpha) * state["var"][p] + alpha * dp * dp
+        state["vis"][p] += 1
+        state["n"] += 1
+        _, sigma = _phase_stats(state, p)
+        y_prime = (y - mu_eff) / sigma
+        return y_prime, state
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        out = []
+        for h in range(len(dists)):
+            mu_eff, sigma = _phase_stats(state, (state["n"] + h) % period)
+            out.append(dists[h].affine(sigma, mu_eff))
+        return out
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
 # Signed power transform (works on any real value)
 # ---------------------------------------------------------------------------
 
