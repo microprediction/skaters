@@ -147,7 +147,15 @@ def markov_nudge_skater(eta=0.02, decay=0.999, cap=0.5):
     def f(y, state):
         if state is None:
             state = {"fc": MarkovForecaster(), "lap": laplace(1),
-                     "lp_state": None, "theta": [0.0, 0.0], "pend": None}
+                     "lp_state": None, "theta": [0.0, 0.0], "pend": None,
+                     "recent": [], "prev": None}
+        # lattice guard: on repeating/discrete series the lattice projection is
+        # exact and any mean shift is catastrophic; the nudge sleeps there.
+        state["recent"].append(1.0 if state["prev"] is not None and y == state["prev"] else 0.0)
+        state["prev"] = y
+        if len(state["recent"]) > 200:
+            state["recent"].pop(0)
+        lattice_like = (sum(state["recent"]) / max(1, len(state["recent"]))) > 0.10
         # learn from the arriving y against the previously issued prediction.
         # Features are standardized by laplace's own scale, so theta is
         # dimensionless; the +1.0 in the normalizer makes the update genuinely
@@ -169,7 +177,75 @@ def markov_nudge_skater(eta=0.02, decay=0.999, cap=0.5):
         gap = max(-3.0, min(3.0, (pr["mu"] - m_l) / sd_l))
         z = (gap, max(-3.0, min(3.0, (state["fc"].inflation - 1.0) * gap)))
         nudge_z = min(cap, max(-cap, state["theta"][0] * z[0] + state["theta"][1] * z[1]))
+        if lattice_like:
+            nudge_z = 0.0
         state["pend"] = (m_l, sd_l, z)
         return [_Shifted(d, nudge_z * sd_l)], state
 
+    return f
+
+
+def markov_nudge_pre_skater(sticky=True, tails=True, eta=0.02, decay=0.999, cap=0.5):
+    """The nudge applied where it belongs: on the smooth pre-lattice trunk.
+
+    Pipeline: candidate trunk -> cautious markov nudge (mean shift on plain
+    Dists, exact) -> lattice projection (re-snaps around the nudged mean) ->
+    GPD tails. `sticky=False`/`tails=False` give the ablation arms so the
+    nudge effect can be isolated from the projection.
+    """
+    from skaters.api import _build_candidates, _objective_leaf
+    from skaters.sticky import sticky as _project
+    from skaters.tails import gpdtails
+    from skaters.terminal import terminal_leaf_ensemble
+
+    def build_trunk():
+        candidates, depths, _ = _build_candidates(1)
+        return terminal_leaf_ensemble(
+            candidates, k=1, leaf_fn=_objective_leaf("crps", 0.03),
+            learning_rate=0.8, complexity_penalty=0.005, depths=depths,
+            max_components=20, forget=0.99)
+
+    def nudged(trunk):
+        def f(y, state):
+            if state is None:
+                state = {"ts": None, "fc": MarkovForecaster(),
+                         "theta": [0.0, 0.0], "pend": None,
+                         "recent": [], "prev": None}
+            # lattice guard: where exact repeats dominate, the projection's
+            # atoms carry the score and any trunk perturbation is pure harm;
+            # the nudge sleeps and the pipeline reduces to plain laplace.
+            state["recent"].append(
+                1.0 if state["prev"] is not None and y == state["prev"] else 0.0)
+            state["prev"] = y
+            if len(state["recent"]) > 200:
+                state["recent"].pop(0)
+            asleep = (sum(state["recent"]) / max(1, len(state["recent"]))) > 0.10
+            if state["pend"] is not None:
+                m_l, sd_l, z = state["pend"]
+                err_z = (y - m_l) / sd_l - min(cap, max(-cap,
+                         state["theta"][0] * z[0] + state["theta"][1] * z[1]))
+                nz = z[0] * z[0] + z[1] * z[1] + 1.0
+                for i in (0, 1):
+                    t = decay * state["theta"][i] + eta * err_z * z[i] / nz
+                    state["theta"][i] = max(-1.0, min(1.0, t))
+            state["fc"].update(y)
+            pr = state["fc"]._predict()
+            dists, state["ts"] = trunk(y, state["ts"])
+            d = dists[0]
+            m_l, sd_l = d.mean, max(d.std, 1e-9)
+            gap = max(-3.0, min(3.0, (pr["mu"] - m_l) / sd_l))
+            z = (gap, max(-3.0, min(3.0, (state["fc"].inflation - 1.0) * gap)))
+            nudge_z = min(cap, max(-cap,
+                          state["theta"][0] * z[0] + state["theta"][1] * z[1]))
+            if asleep:
+                nudge_z = 0.0
+            state["pend"] = (m_l, sd_l, z)
+            return [d.shift(nudge_z * sd_l)], state
+        return f
+
+    f = nudged(build_trunk())
+    if sticky:
+        f = _project(f, k=1)
+    if tails:
+        f = gpdtails(f, k=1)
     return f
