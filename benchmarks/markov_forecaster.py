@@ -23,11 +23,8 @@ import math
 
 from skaters.dist import Dist
 
-_MARKOV_SOURCE = open(__file__.replace("markov_forecaster.py",
-                                     "markov_artifact.py")).read()
-_ns: dict = {}
-exec(compile(_MARKOV_SOURCE, "<star>", "exec"), _ns)  # noqa: S102
-MarkovForecaster = _ns["Forecaster"]
+from skaters.markov import Forecaster as MarkovForecaster  # noqa: E402
+from skaters.markov import markov_drift as _src_markov_drift  # noqa: E402
 
 
 def _chi2_quantile(nu: float, p: float) -> float:
@@ -249,3 +246,28 @@ def markov_nudge_pre_skater(sticky=True, tails=True, eta=0.02, decay=0.999, cap=
     if tails:
         f = gpdtails(f, k=1)
     return f
+
+
+markov_drift = _src_markov_drift
+
+
+def laplace_star_skater():
+    """laplace's single-scale stack with one extra candidate: the markov_drift
+    transform conjugated over the standard leaf. No API changes; the frozen
+    laplace signature is untouched — this is population growth by the
+    sanctioned mechanism (a new transform), composed in benchmark space."""
+    from skaters.api import _build_candidates, _objective_leaf
+    from skaters.conjugate import conjugate
+    from skaters.leaf import leaf
+    from skaters.sticky import sticky as _project
+    from skaters.tails import gpdtails
+    from skaters.terminal import terminal_leaf_ensemble
+
+    candidates, depths, _ = _build_candidates(1)
+    candidates.append(conjugate(leaf(k=1), markov_drift(), k=1))
+    depths.append(2)
+    f = terminal_leaf_ensemble(candidates, k=1,
+                               leaf_fn=_objective_leaf("crps", 0.03),
+                               learning_rate=0.8, complexity_penalty=0.005,
+                               depths=depths, max_components=20, forget=0.99)
+    return gpdtails(_project(f, k=1), k=1)
