@@ -664,6 +664,9 @@ heavy-tail / volatility-clustering state of the art. And four conformal opponent
 \citealp{gibbs2021adaptive}), plus conformal seasonal pools (CSP,
 \citealp{manokhin2026csp}) in a fixed and a coverage-adaptive form, each
 KDE-smoothed into a density so it is scored on likelihood as well as CRPS.
+The same-phase construction these seasonal pools draw on --- forecasting from
+each phase's own component series --- appears earlier in the \pkg{NNS} package
+\citep{viole2026nns}.
 
 The protocol is a \emph{fair rolling one-step-ahead}: each baseline is fit on an
 expanding or rolling window with periodic refit, and every method, ours and

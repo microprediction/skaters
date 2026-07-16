@@ -51,3 +51,20 @@ STUDY_OPPS=NNS-R PYTHONPATH=src python benchmarks/comparisons/csp_arm_study.py m
   same same-phase location idea inside the ensemble, with likelihood
   weighting deciding per series whether it applies, and the density race
   (LL 75–98 %) is not close on any arm.
+
+## Footnotes: two NNS-derived candidates that lose (skaters#113)
+
+Both tried against current laplace across all four arms; tape in
+`benchmarks/nns_ideas.py`, registered as `laplace-pm` / `laplace-pt`.
+
+- **Partial-moment terminal leaf** (`pm_leaf`): lower/upper partial second
+  moments fitted to a two-piece normal, replacing the CRPS leaf. Loses
+  everywhere (CRPS win 1–2 %, median LL cost up to −0.39 nats on monthly):
+  whatever the skew buys, displacing the CRPS-fitted scale-mixture leaf costs
+  more — the same lesson the phase-aware leaf taught. If the idea has value
+  it is as an asymmetric scale inside the champion leaf, not a replacement.
+- **Per-phase Holt trend** (`phase_trend_anchor`): per-phase level + trend,
+  hedged with the seasonal-naive. Net harmful (CRPS win 4–25 %, LL medians
+  +0.0000): per-phase trend estimates are noise at these history depths, and
+  the candidates leak enough weight to tax CRPS without a compensating win
+  even on monthly NSA series.

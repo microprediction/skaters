@@ -132,6 +132,42 @@ def _laplace_pe():
 LAPLACE_PE = [_ours("laplace-pe", _laplace_pe)]
 
 
+# ---- NNS-derived experiments (skaters#113) --------------------------------------
+# laplace-pm: laplace with the partial-moment (two-piece normal) terminal leaf.
+# laplace-pt: laplace + per-phase Holt anchor candidates (trend per phase).
+def _laplace_pm():
+    from skaters.api import laplace
+    from nns_ideas import pm_leaf
+    return laplace(1, leaf=pm_leaf)
+
+
+def _laplace_pt():
+    from skaters.api import _build_candidates, _objective_leaf
+    from skaters.terminal import terminal_leaf_ensemble
+    from skaters.conjugate import conjugate
+    from skaters.leaf import leaf as _plain_leaf
+    from skaters.sticky import sticky
+    from skaters.tails import gpdtails
+    from skaters.parade import parade
+    from nns_ideas import phase_trend_anchor
+    k = 1
+    cands, depths, _ = _build_candidates(k)
+    periods = {7, 12, 24}
+    m = os.environ.get("BENCH_CSP_M")
+    if m and int(m) > 1:
+        periods.add(int(m))
+    for p in sorted(periods):
+        cands.append(conjugate(_plain_leaf(k=k), phase_trend_anchor(p), k=k))
+        depths.append(1)
+    f = terminal_leaf_ensemble(cands, k=k, leaf_fn=_objective_leaf("crps", 0.03),
+                               learning_rate=0.8, complexity_penalty=0.005,
+                               depths=depths, max_components=20, forget=0.99)
+    return parade(gpdtails(sticky(f, k=k), k=k), k=k)
+
+
+NNS_IDEAS = [_ours("laplace-pm", _laplace_pm), _ours("laplace-pt", _laplace_pt)]
+
+
 # ---- terminal-stage variants: transfer distributional knowledge inside ---------
 # The stock terminal collapses the candidate mixture to its mean; these conform
 # a richer object (studentized residual / PIT of the full mixture) so candidate
@@ -469,10 +505,10 @@ qgrid <- function(point, lower, upper, levels) {
 # rather than taxing every R@* invocation).
 SKIP <- strsplit(Sys.getenv("BENCH_R_SKIP", ""), ",")[[1]]
 ONLY <- strsplit(Sys.getenv("BENCH_R_ONLY", ""), ",")[[1]]
-NNS_METHODS <- c("NNS-R", "NNS-R-auto")
+OPTIN_METHODS <- c("NNS-R", "NNS-R-auto", "TBATS-R")
 skip <- function(nm) nm %in% SKIP ||
   (length(ONLY) > 0 && !(nm %in% ONLY)) ||
-  (length(ONLY) == 0 && nm %in% NNS_METHODS)
+  (length(ONLY) == 0 && nm %in% OPTIN_METHODS)
 
 have_forecast <- requireNamespace("forecast", quietly = TRUE)
 have_smooth   <- requireNamespace("smooth",   quietly = TRUE)
@@ -583,6 +619,23 @@ if (have_bsts && !skip("bsts-R")) {
     }, error = function(e) NULL)
     if (!is.null(r)) emitQ("bsts-R", t, r)
   }
+}
+
+if (have_forecast && !skip("TBATS-R")) {
+  # TBATS (De Livera-Hyndman-Snyder): Box-Cox + trend + trig seasonality +
+  # ARMA errors. The arm's period via ts(frequency=); model reused between
+  # refits (tbats(model=) refilters without re-estimating). Quantile fan so
+  # a non-unit Box-Cox lambda's asymmetric intervals are scored as shaped.
+  m_env <- suppressWarnings(as.integer(Sys.getenv("BENCH_CSP_M", "")))
+  sfreq <- if (!is.na(m_env) && m_env > 1) m_env else 1L
+  as_ts <- function(win) if (sfreq > 1) ts(win, frequency = sfreq) else win
+  run_reuse("TBATS-R",
+    function(win) tbats(as_ts(win), use.parallel = FALSE),
+    function(win, fit) tbats(as_ts(win), model = fit, use.parallel = FALSE),
+    function(m) { f <- forecast(m, h = 1, level = LEVELS)
+                  list(q = qgrid(as.numeric(f$mean)[1],
+                                 as.numeric(f$lower[1, ]), as.numeric(f$upper[1, ]),
+                                 LEVELS)) })
 }
 
 have_nns <- requireNamespace("NNS", quietly = TRUE)
@@ -736,6 +789,23 @@ NNSR = ([Opponent("NNS-R", _nns_predict,
         if _RSCRIPT else [])
 
 
+def _tbats_predict(ch, start, refit=None):
+    prev = os.environ.get("BENCH_R_ONLY")
+    os.environ["BENCH_R_ONLY"] = "TBATS-R"
+    try:
+        return _r_predict(ch, start, refit=25)
+    finally:
+        if prev is None:
+            os.environ.pop("BENCH_R_ONLY", None)
+        else:
+            os.environ["BENCH_R_ONLY"] = prev
+
+
+TBATS = ([Opponent("TBATS-R", _tbats_predict,
+                   max_series=int(os.environ.get("BENCH_TBATS_MAX", 250)))]
+         if _RSCRIPT else [])
+
+
 # ---- CSP: Conformal Seasonal Pools (Manokhin, arXiv:2605.03789) ----------------
 # The AUTHOR'S reference package (pip install git+https://github.com/valeman/
 # csp-forecaster.git): ConformalSeasonalPool fit on a rolling window, one-step
@@ -809,8 +879,9 @@ CSP = ([Opponent("CSP", _csp_ref_predict, methods=[v[0] for v in _CSP_VARIANTS])
 
 
 # ---- registry & named opponent sets -------------------------------------------
-ALL = (OURS + LAPLACE_SS + LAPLACE_PE + TERMINAL_VARIANTS + CONFORMAL_NAIVE
-       + STATSFORECAST + GARCH + STATSMODELS + NF + PROPHET + R + NNSR + CSP)
+ALL = (OURS + LAPLACE_SS + LAPLACE_PE + NNS_IDEAS + TERMINAL_VARIANTS
+       + CONFORMAL_NAIVE + STATSFORECAST + GARCH + STATSMODELS + NF + PROPHET
+       + R + NNSR + TBATS + CSP)
 REGISTRY = {op.name: op for op in ALL}
 
 SETS = {

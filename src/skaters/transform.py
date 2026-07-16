@@ -607,6 +607,9 @@ def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
     The naive alone adapts instantly but is one noisy draw; the phase-EMA
     averages the noise but lags level shifts. The blend beats either alone on
     seasonal series. ``weight=0`` recovers ``seasonal_difference``.
+
+    Forecasting from same-phase component series follows Viole's NNS package
+    (``NNS.ARMA``, CRAN, since 2017).
     """
     assert period >= 1
     assert 0 < alpha < 1
