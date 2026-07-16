@@ -1,5 +1,7 @@
 # transient run outputs — the READMEs are the committed artifact, not the raw CSVs
 _shared*.csv
 */results.csv
+*/results_*.csv
+*/csp-convergence.csv
 *.log
 __pycache__/
