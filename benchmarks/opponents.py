@@ -59,8 +59,7 @@ OURS = [
     _ours("markov-nudge", lambda: _markov_factories()[2]()),
     _ours("markov-nudge-pre", lambda: __import__("markov_forecaster").markov_nudge_pre_skater()),
     _ours("markov-nudge-pre-nostick", lambda: __import__("markov_forecaster").markov_nudge_pre_skater(sticky=False)),
-    _ours("laplace+markov", lambda: laplace(
-        1, extra_candidates=[(lambda k: _markov_factories()[0](), 2)])),
+    _ours("laplace*markov", lambda: __import__("markov_forecaster").laplace_star_skater()),
     _ours("laplace-ll", lambda: laplace(1, objective="likelihood")),
     _ours("laplace-nostick", lambda: laplace(1, sticky=False)),
     _ours("scalemix-leaf", lambda: scale_mixture_leaf(1)),
