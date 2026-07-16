@@ -38,8 +38,8 @@ population including `seasonal_anchor`); `forecast` package TBATS. July 16,
 Third-party rounds on the same series: on monthly, TBATS beats CSP's defaults
 78 / 69 % (median CRPS −10.7 %) and NNS 69 / 59 % — the strongest third-party
 method on the yearly cycle. On M4-Hourly the hour-of-week variant does not
-help: paired against single-period TBATS, `TBATS-R-ms` wins only ~40 % of
-series (median +1.2 % CRPS) — 750-step windows hold barely four weekly
+help: paired against single-period TBATS, `TBATS-R-ms` wins 41 % of series
+(median +1.5 % CRPS; N=414) — 750-step windows hold barely four weekly
 cycles, too few for the 168-period harmonics.
 
 ## The two regimes of M4-Hourly
