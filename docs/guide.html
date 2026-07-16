@@ -79,6 +79,16 @@
       $\ell_t$, leaving simpler residuals $\varepsilon_t = y_t - \ell_t$, and the prediction is
       whatever the leaf&apos;s estimate becomes when run back through the inverse.
     </p>
+    <p>
+      Notation: hatted quantities are online estimates using information up to
+      $y_{t-1}$ (the pre-update state as $y_t$ arrives). In <code>drift</code>,
+      $\hat\mu_t$ is the smoothed mean <em>increment</em> (the drift estimate,
+      shrunk toward zero by $\lambda$); in <code>standardize</code>, $\hat\mu_t$
+      and $\hat\sigma_t$ are a running mean and scale of the series itself; in
+      <code>markov_drift</code>, $\hat\mu^{M}_t$ is the one-step conditional mean
+      of the embedded regime forecaster and $g_t \in [-\tfrac12, \tfrac12]$ its
+      learned gate.
+    </p>
 
     <h3>Transforms</h3>
     <table>
