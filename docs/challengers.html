@@ -76,8 +76,8 @@
       Numbers are per-series win-rates for <code>laplace</code>,
       log-likelihood first, CRPS second. Everyone is converted to the same
       <code>Dist</code> and scored by the same code on the same held-out
-      points. Every row links its tape. The one belt we do not hold is at
-      the bottom, stated rather than averaged away.
+      points. Every row links its tape. The belts we do not hold are
+      stated in their own rows rather than averaged away.
     </p>
 <table>
       <thead><tr><th>challenger</th><th>corner</th><th>LL</th><th>CRPS</th><th>tape</th></tr></thead>
@@ -92,7 +92,8 @@
         <tr><td><strong>PYMC-Forecast 0.0.1 (PyMC Labs)</strong></td><td>Bayesian</td><td>82%</td><td>&mdash;</td><td><a href="/challengers/pymc-forecast.html"><strong>the day-one bout</strong></a></td></tr>
         <tr><td>nnetar (neural AR, R)</td><td>neural</td><td>96%</td><td>76%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-nnetar">bout</a></td></tr>
         <tr><td>NF-StudentT (NeuralForecast)</td><td>neural</td><td>100%</td><td>78%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
-        <tr><td>CSP (incl. adaptive)</td><td>conformal</td><td>99%</td><td>100%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
+        <tr><td>CSP (official <code>csp-forecaster</code>, 12 configs)</td><td>conformal</td><td>98&ndash;99%</td><td>98&ndash;99%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
+        <tr><td><em>CSP, strongly-seasonal series (M4-Hourly)</em></td><td>conformal</td><td colspan="2"><em>the belt is theirs; seasonal pooling earns it there</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
         <tr><td>AutoARIMA + conformal / ACI</td><td>conformal</td><td>86% / 88%</td><td>31% / 29%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks">study</a></td></tr>
         <tr><td><strong>TimesFM 2.5, 200M (Google)</strong></td><td>foundation</td><td>100% cont.</td><td>72% cont.</td><td><a href="/timesfm.html"><strong>David v Goliath</strong></a></td></tr>
         <tr><td>Chronos-Bolt (Amazon)</td><td>foundation</td><td>100% cont.</td><td>88% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>

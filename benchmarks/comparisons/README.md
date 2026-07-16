@@ -15,7 +15,9 @@ Each subfolder is one matchup:
 | `laplace-vs-nnetar/` | `nnetar-R@*` | a nonlinear (neural AR) opponent with no clean Python twin |
 | `laplace-vs-garch/` | `GARCH-t`, `GARCH-t-R@*` | heavy-tail volatility SOTA (its home turf is price/returns) |
 | `laplace-vs-bsts/` | `bsts-R@*` | Bayesian structural time series — full posterior predictive |
-| `laplace-vs-csp/` | `CSP`, `CSP-adaptive` | training-free Conformal Seasonal Pools (arXiv:2605.03789) |
+| `laplace-vs-csp/` | `CSPr-*` (official `csp-forecaster`, 12 configs) | training-free Conformal Seasonal Pools (arXiv:2605.03789), across four corpus arms incl. its seasonal home turf |
+| `laplace-vs-nns/` | `NNS-R`, `NNS-R-auto` | Viole's NNS.ARMA — same-phase component forecasting, the seasonal-pool family's prior art |
+| `nns-vs-csp/` | `NNS-R` vs `CSPr-*` | third-party bout: the prior art vs the seasonal-pool paper, laplace not in the ring |
 
 ## Reproduce a matchup
 
