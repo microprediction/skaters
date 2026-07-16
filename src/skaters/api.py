@@ -24,7 +24,7 @@ from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, ou_transform,
     garch, power_transform, drift, holt_linear, ar, theta,
-    seasonal_difference, yeo_johnson,
+    seasonal_difference, seasonal_anchor, yeo_johnson,
 )
 from skaters.terminal import terminal_leaf_ensemble
 from skaters.multiscale import multiscale
@@ -111,6 +111,15 @@ def _build_candidates(k: int, leaf_fn=leaf):
     # Depth 1: Seasonal differencing (common periods)
     for period in [7, 12, 24]:
         candidates.append(conjugate(leaf_fn(k=k), seasonal_difference(period), k=k))
+        depths.append(1)
+
+    # Depth 1: Hedged seasonal anchor — phase-EMA blended 50/50 with the
+    # seasonal-naive. The naive adapts instantly but is one noisy draw; the
+    # phase-EMA averages same-phase noise but lags shifts; the hedge beats
+    # either alone on genuinely seasonal series (median −8% CRPS on M4-Hourly)
+    # at unmeasurable cost elsewhere (see comparisons/laplace-vs-csp/).
+    for period in [7, 12, 24]:
+        candidates.append(conjugate(leaf_fn(k=k), seasonal_anchor(period), k=k))
         depths.append(1)
 
     # Depth 2: Seasonal differencing + EMA

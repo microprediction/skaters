@@ -365,6 +365,65 @@ export function seasonalDifference(period = 12) {
 }
 
 // ---------------------------------------------------------------------------
+// Seasonal anchor: hedged seasonal location (phase-EMA blended with naive)
+// ---------------------------------------------------------------------------
+
+export function seasonalAnchor(period, alpha = 0.2, weight = 0.5) {
+  const anchorOf = (ema, snaive) =>
+    ema !== null ? weight * ema + (1.0 - weight) * snaive : snaive;
+
+  function forward(y, state) {
+    if (state === null || state === undefined) {
+      return [0.0, { ema: new Array(period).fill(null), buffer: [y], n: 1 }];
+    }
+    const buf = state.buffer;
+    const p = state.n % period;
+    const snaive = buf.length >= period ? buf[buf.length - period] : buf[buf.length - 1];
+    const yPrime = y - anchorOf(state.ema[p], snaive);
+    const e = state.ema[p];
+    state.ema[p] = e === null ? y : e + alpha * (y - e);
+    buf.push(y);
+    if (buf.length > 2 * period) buf.shift();
+    state.n += 1;
+    return [yPrime, state];
+  }
+
+  function inverseK(dists, state) {
+    const buf = state.buffer;
+    const recoveredMeans = [];
+    const recoveredVars = [];
+    const result = [];
+    for (let h = 0; h < dists.length; h++) {
+      const p = (state.n + h) % period;
+      const lagIdx = h - period;
+      let snaive, snaiveVar;
+      if (lagIdx < 0) {
+        const bufIdx = buf.length - period + h;
+        snaive = bufIdx >= 0 && bufIdx < buf.length ? buf[bufIdx] : buf[buf.length - 1];
+        snaiveVar = 0.0;
+      } else {
+        snaive = recoveredMeans[lagIdx];
+        snaiveVar = recoveredVars[lagIdx];
+      }
+      const aMean = anchorOf(state.ema[p], snaive);
+      const aVar = (1.0 - weight) * (1.0 - weight) * snaiveVar;
+      recoveredMeans.push(dists[h].mean + aMean);
+      recoveredVars.push(dists[h].var + aVar);
+      if (aVar > 0.0) {
+        const comps = dists[h].components.map(
+          ([w, m, s]) => [w, m + aMean, Math.sqrt(s * s + aVar)]
+        );
+        result.push(new Dist(comps));
+      } else {
+        result.push(dists[h].shift(aMean));
+      }
+    }
+    return result;
+  }
+  return { forward, inverseK };
+}
+
+// ---------------------------------------------------------------------------
 // Signed power transform
 // ---------------------------------------------------------------------------
 

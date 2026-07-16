@@ -12,7 +12,8 @@ import { parade } from "./parade.mjs";
 import { gpdtails } from "./tails.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, drift,
-  holtLinear, ar, theta, seasonalDifference, garch, powerTransform, yeoJohnson,
+  holtLinear, ar, theta, seasonalDifference, seasonalAnchor, garch, powerTransform,
+  yeoJohnson,
 } from "./transform.mjs";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,10 @@ export function buildCandidates(k) {
 
   // Depth 1: Seasonal differencing
   for (const period of [7, 12, 24]) push(conjugate(leaf(k), seasonalDifference(period), k), 1, "seasonal");
+
+  // Depth 1: Hedged seasonal anchor — phase-EMA blended 50/50 with the
+  // seasonal-naive (mirrors api.py; see comparisons/laplace-vs-csp/).
+  for (const period of [7, 12, 24]) push(conjugate(leaf(k), seasonalAnchor(period), k), 1, "seasonal anchor");
 
   // Depth 2: Seasonal differencing + EMA
   for (const period of [7, 12, 24]) {
