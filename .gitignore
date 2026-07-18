@@ -246,3 +246,12 @@ papers/arxiv/*.pdf
 
 # rust core build artifacts
 rust/target/
+
+# FRED cache brought in as a symlink or a local dir (never commit the data)
+benchmarks/data
+data-fred-cache/
+.DS_Store
+# dated raw study tapes (local run outputs; the diagrams/READMEs are the artifact)
+benchmarks/results_large_*.csv
+benchmarks/results_sota_*.csv
+benchmarks/out_of_scope.csv
