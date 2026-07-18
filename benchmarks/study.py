@@ -45,13 +45,28 @@ def _median(v):
     return s[m // 2] if m % 2 else 0.5 * (s[m // 2 - 1] + s[m // 2])
 
 
-def _in_scope(changes):
-    if MAX_EXCURSION <= 0 or not changes:
-        return True
-    mad = _median([abs(c - _median(changes)) for c in changes])
-    if mad <= 0.0:
-        return False
-    return (max(abs(c) for c in changes) / mad) <= MAX_EXCURSION
+def _scope_tag(changes):
+    """Legitimacy tag for an autonomous distributional forecast: '' if in scope,
+    else the reason it is out of scope (see README, "Out-of-scope series").
+    Judging these is philosophically impossible, not a flaw of any forecaster:
+    the series simply never offered a scale to be judged against."""
+    if not changes:
+        return "empty"
+    v0 = changes[0]; lead = 0
+    for c in changes:
+        if c == v0:
+            lead += 1
+        else:
+            break
+    if lead >= max(100, 0.5 * len(changes)):
+        return "leading-flat"          # starts with a long constant run (many zeros, etc.)
+    if MAX_EXCURSION > 0:
+        mad = _median([abs(c - _median(changes)) for c in changes])
+        if mad <= 0.0:
+            return "no-variation"      # (near-)constant throughout
+        if (max(abs(c) for c in changes) / mad) > MAX_EXCURSION:
+            return "excursion"         # a single move dwarfing the series' own scale
+    return ""
 
 # preset -> (opponent set, n_candidates, max_qualify, window_mode, test, refit, csv)
 # conformal-scale reuses results_large.csv — the canonical 10,822-series sweep —
@@ -106,6 +121,7 @@ def iter_qualified(cfg):
                     if (fred_universe.asset_class(m.get("title", "")) in _PRICE) == _only]
 
     n_qual = fetched = 0
+    tagged = []                        # (sid, tag) for out-of-scope series
     for i, meta in enumerate(universe):
         sid = meta["id"]
         miss = not os.path.exists(os.path.join(fred._CACHE, f"{sid}.csv"))
@@ -115,14 +131,29 @@ def iter_qualified(cfg):
         if not levels:
             continue
         changes = fred._to_changes(levels)
-        if len(changes) >= MIN_CHANGES and _in_scope(changes):
-            n_qual += 1
-            yield sid, meta["title"]
+        if len(changes) < MIN_CHANGES:
+            continue
+        tag = _scope_tag(changes)
+        if tag:
+            tagged.append((sid, tag))
+            continue
+        n_qual += 1
+        yield sid, meta["title"]
         if (i + 1) % 200 == 0:
             print(f"  scanned {i+1}/{len(universe)}  qualified={n_qual}  fetched={fetched}",
                   flush=True)
         if n_qual >= cfg["max_qualify"]:
             break
+    # Tag the illegitimate series explicitly rather than dropping them silently.
+    if tagged:
+        man = os.path.join(_HERE, "out_of_scope.csv")
+        with open(man, "w") as fh:
+            fh.write("series,tag\n")
+            for sid, tag in tagged:
+                fh.write(f"{sid},{tag}\n")
+        from collections import Counter
+        by = Counter(t for _, t in tagged)
+        print(f"tagged out-of-scope: {len(tagged)} series {dict(by)} -> {man}", flush=True)
     print(f"scan complete: qualified {n_qual} (fetched {fetched} new)", flush=True)
 
 

@@ -254,3 +254,4 @@ data-fred-cache/
 # dated raw study tapes (local run outputs; the diagrams/READMEs are the artifact)
 benchmarks/results_large_*.csv
 benchmarks/results_sota_*.csv
+benchmarks/out_of_scope.csv
