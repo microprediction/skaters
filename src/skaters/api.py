@@ -18,7 +18,9 @@ Ornstein--Uhlenbeck group.
 """
 
 from __future__ import annotations
+import math
 from functools import partial
+from skaters.dist import _gaussian_pdf, _gaussian_cdf
 from skaters.leaf import leaf, scale_mixture_leaf, crps_leaf
 from skaters.conjugate import conjugate
 from skaters.transform import (
@@ -254,6 +256,99 @@ def _build_candidates(k: int, leaf_fn=leaf):
 
 
 # ---------------------------------------------------------------------------
+# Diffuse floor: an always-on heavy-tailed escape hatch on an ABSOLUTE scale.
+# ---------------------------------------------------------------------------
+# The leaf's scale dictionary is relative to the running sigma, so on a
+# near-constant run sigma -> 0 and every mixture component collapses with it;
+# a later jump then meets a near-zero-variance predictive and the log-score
+# detonates. Splicing a tiny-weight (eps) heavy tail on an ABSOLUTE, ratcheting
+# scale W bounds that: a catastrophic point costs ~tens of nats, not 1e20+,
+# while normal points are unchanged to ~eps. It cannot predict the FIRST jump on
+# an all-constant series (nothing can), only bound the damage once any scale has
+# been seen (W ratchets up with max|y|); prior_scale seeds W for the cold start.
+#
+# This is a PRODUCTION safety net, not a scoring trick. In a study it would be
+# unfair to let it rescue laplace's log-score unless every opponent got the same
+# floor, so benchmarks instead ELIMINATE out-of-scope series (see benchmarks/
+# README, "Out-of-scope series"): asking any model to predict when only one
+# value has ever been realized is meaningless, not a contest anyone can win.
+_DIFFUSE_DECADES = 3   # wide Gaussians at W, 10W, 100W approximate a heavy tail
+
+
+class _FloorDist:
+    """A base predictive with a total-weight-eps heavy tail mixed in for density
+    evaluation only. The tail is `_DIFFUSE_DECADES` Gaussians at W, 10W, 100W
+    centered at the base mean; it bounds ``logpdf`` (and shows in ``cdf``) so a
+    collapsed predictive meeting a jump can no longer detonate the log-score.
+    The point forecast, interval, and CRPS are the base's unchanged: the floor
+    is a log-score safety net, not a wider stated band. Type-agnostic so it wraps
+    a plain ``Dist`` or a ``SplicedDist`` alike."""
+    __slots__ = ("base", "eps", "comps")
+
+    def __init__(self, base, W, eps):
+        self.base = base
+        self.eps = eps
+        m0 = base.mean
+        per = eps / _DIFFUSE_DECADES
+        self.comps = [(per, m0, W * (10.0 ** j)) for j in range(_DIFFUSE_DECADES)]
+
+    @property
+    def mean(self):
+        return self.base.mean
+
+    @property
+    def std(self):
+        return self.base.std
+
+    def quantile(self, p):
+        return self.base.quantile(p)     # eps-mass tail is beyond any practical p
+
+    def crps(self, y):
+        return self.base.crps(y)
+
+    def cdf(self, y):
+        c = (1.0 - self.eps) * self.base.cdf(y)
+        for w, m, s in self.comps:
+            c += w * _gaussian_cdf(y, m, s)
+        return c
+
+    def logpdf(self, y):
+        terms = [math.log(1.0 - self.eps) + self.base.logpdf(y)]
+        for w, m, s in self.comps:
+            p = _gaussian_pdf(y, m, s)
+            if p > 0.0:
+                terms.append(math.log(w) + math.log(p))
+        hi = max(terms)
+        return hi + math.log(sum(math.exp(t - hi) for t in terms))
+
+
+def _add_diffuse(d, W, eps):
+    """Wrap d with the heavy-tailed floor on absolute scale W. No-op when W or
+    eps is non-positive (e.g. no scale seen yet and no prior_scale set)."""
+    if W <= 0.0 or eps <= 0.0:
+        return d
+    return _FloorDist(d, W, eps)
+
+
+def _with_diffuse(f, prior_scale, eps):
+    """Wrap a skater so every issued predictive carries the diffuse floor, with W
+    ratcheting on the largest |y| seen (never collapsing) and floored at
+    prior_scale for the cold start."""
+    def g(y, state):
+        st = state if state is not None else {}
+        inner = st.get("inner")
+        scale = st.get("scale", 0.0)
+        ay = abs(y)
+        if ay > scale:
+            scale = ay
+        dists, inner2 = f(y, inner)
+        W = prior_scale if prior_scale > scale else scale
+        out = [_add_diffuse(d, W, eps) for d in dists]
+        return out, {"inner": inner2, "scale": scale}
+    return g
+
+
+# ---------------------------------------------------------------------------
 # The named forecaster
 # ---------------------------------------------------------------------------
 
@@ -280,7 +375,7 @@ def _laplace_single_scale(k, objective, sticky, leaf, scale_alpha):
 
 def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
             scales: list[int] | None = None, scale_alpha: float = 0.03,
-            tails: str = "gpd"):
+            tails: str = "gpd", diffuse: float = 1e-12, prior_scale: float = 0.0):
     """The general forecaster.
 
     A likelihood-weighted Bayesian ensemble over the full candidate population
@@ -325,6 +420,17 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
             stated 1e-3 alarm rate approximately comes true — see
             ``benchmarks/anomaly/RESULTS.md`` sections 5-6). ``"gaussian"``
             disables the splice. Costs ~5% runtime.
+        diffuse: weight of an always-on heavy-tailed *floor* on the issued
+            predictive (default ``1e-12``; ``0`` disables). It bounds the
+            log-score when the predictive scale collapses on a near-constant run
+            and a jump arrives (otherwise ~1e20+); at ``1e-12`` normal series
+            shift by ~1e-3 nats and a collapse is capped near −35 instead of
+            detonating. A production safety net only: studies eliminate
+            out-of-scope series rather than rely on it (they would have to floor
+            every model alike to compare fairly).
+        prior_scale: cold-start width for the diffuse floor before any move is
+            seen (default ``0``: the floor activates once ``max|y| > 0``, since
+            an all-constant history offers no scale to anchor a width on).
 
     The returned state also carries calibration diagnostics, resolved online
     against the predictions previously made for each arriving point:
@@ -338,7 +444,9 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
                    k=k, scales=scales)
     if tails == "gpd":
         f = _gpdtails(f, k=k)     # conditional tail fit: body -> region -> tail
-    f = _parade(f, k=k)           # PIT/z read against the (spliced) predictive
+    if diffuse > 0.0:
+        f = _with_diffuse(f, prior_scale, diffuse)  # absolute heavy-tailed floor
+    f = _parade(f, k=k)           # PIT/z read against the (floored, spliced) predictive
     f.__name__ = f"laplace(k={k})"
     return f
 
