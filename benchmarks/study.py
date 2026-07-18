@@ -33,6 +33,25 @@ MIN_CHANGES = int(os.environ.get("STUDY_MIN_CHANGES", 500))   # relax (e.g. 200)
 MAX_CHANGES = int(os.environ.get("STUDY_MAX_CHANGES", 6000))   # never stall on a giant series
 WORKERS = int(os.environ.get("STUDY_WORKERS", min(16, (os.cpu_count() or 4))))
 CACHED_ONLY = os.environ.get("STUDY_CACHED_ONLY") == "1"
+# Out-of-scope screen (see README, "Out-of-scope series"): a single move that
+# dwarfs the series' own typical variation carries no scale information an
+# autonomous forecaster could use. Excludes the mostly-constant (MAD==0) and
+# calm-then-jump classes in one rule. Set STUDY_MAX_EXCURSION=0 to disable.
+MAX_EXCURSION = float(os.environ.get("STUDY_MAX_EXCURSION", 1000))
+
+
+def _median(v):
+    s = sorted(v); m = len(s)
+    return s[m // 2] if m % 2 else 0.5 * (s[m // 2 - 1] + s[m // 2])
+
+
+def _in_scope(changes):
+    if MAX_EXCURSION <= 0 or not changes:
+        return True
+    mad = _median([abs(c - _median(changes)) for c in changes])
+    if mad <= 0.0:
+        return False
+    return (max(abs(c) for c in changes) / mad) <= MAX_EXCURSION
 
 # preset -> (opponent set, n_candidates, max_qualify, window_mode, test, refit, csv)
 # conformal-scale reuses results_large.csv — the canonical 10,822-series sweep —
@@ -51,6 +70,7 @@ def _cfg(preset):
     c["n_candidates"] = int(os.environ.get("STUDY_N_CANDIDATES", c["n_candidates"]))
     c["max_qualify"] = int(os.environ.get("STUDY_MAX_QUALIFY", c["max_qualify"]))
     c["test"] = int(os.environ.get("STUDY_TEST", c["test"]))   # scored window; relax to 200 for low-freq
+    c["window"] = os.environ.get("STUDY_WINDOW", c["window"])  # "burn" (all points) or "lastN" (cap to test)
     c["results"] = os.environ.get("STUDY_RESULTS", os.path.join(_HERE, c["csv"]))
     return c
 
@@ -94,7 +114,8 @@ def iter_qualified(cfg):
             fetched += 1; time.sleep(0.5)
         if not levels:
             continue
-        if len(fred._to_changes(levels)) >= MIN_CHANGES:
+        changes = fred._to_changes(levels)
+        if len(changes) >= MIN_CHANGES and _in_scope(changes):
             n_qual += 1
             yield sid, meta["title"]
         if (i + 1) % 200 == 0:
