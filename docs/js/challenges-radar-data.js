@@ -57,7 +57,7 @@ const CHALLENGES_RADAR = {
     "TBATS": {
       "crps": [
         0.222,
-        0.147,
+        0.14,
         0.758,
         1.567,
         0.103
@@ -71,7 +71,7 @@ const CHALLENGES_RADAR = {
       ],
       "n": [
         500,
-        232,
+        257,
         244,
         180,
         234
@@ -103,21 +103,21 @@ const CHALLENGES_RADAR = {
     "dantzig": {
       "crps": [
         0.554,
-        0.724,
+        0.729,
         0.772,
         0.244,
         0.316
       ],
       "ll": [
         0.12,
-        0.272,
+        0.286,
         0.176,
         0.211,
         0.299
       ],
       "n": [
         500,
-        250,
+        273,
         250,
         180,
         234
@@ -125,299 +125,184 @@ const CHALLENGES_RADAR = {
     },
     "AutoARIMA": {
       "crps": [
-        0.984,
-        null,
-        null,
+        0.626,
+        0.484,
+        0.982,
         null,
         null
       ],
       "ll": [
-        0.448,
-        null,
-        null,
+        0.248,
+        0.168,
+        0.242,
         null,
         null
       ],
       "n": [
         500,
-        0,
-        0,
+        250,
+        165,
         0,
         0
       ]
     },
     "AutoETS": {
       "crps": [
-        0.628,
-        null,
-        null,
+        0.456,
+        0.24,
+        0.691,
         null,
         null
       ],
       "ll": [
-        0.152,
-        null,
-        null,
+        0.1,
+        0.064,
+        0.145,
         null,
         null
       ],
       "n": [
         500,
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    "NF-StudentT": {
-      "crps": [
-        0.44,
-        null,
-        null,
-        null,
-        null
-      ],
-      "ll": [
-        0.0,
-        null,
-        null,
-        null,
-        null
-      ],
-      "n": [
-        500,
-        0,
-        0,
+        250,
+        165,
         0,
         0
       ]
     },
     "auto.arima (R)": {
       "crps": [
-        0.975,
-        null,
-        null,
+        1.238,
+        0.5,
+        1.079,
         null,
         null
       ],
       "ll": [
-        0.417,
-        null,
-        null,
+        0.429,
+        0.16,
+        0.255,
         null,
         null
       ],
       "n": [
-        120,
-        0,
-        0,
+        42,
+        250,
+        165,
         0,
         0
       ]
     },
     "Theta (R)": {
       "crps": [
-        0.717,
-        null,
-        null,
+        1.69,
+        0.284,
+        0.606,
         null,
         null
       ],
       "ll": [
-        0.267,
-        null,
-        null,
+        0.571,
+        0.056,
+        0.109,
         null,
         null
       ],
       "n": [
-        120,
-        0,
-        0,
+        42,
+        250,
+        165,
         0,
         0
       ]
     },
     "ADAM (R)": {
       "crps": [
-        0.367,
-        null,
-        null,
+        0.81,
+        0.224,
+        0.491,
         null,
         null
       ],
       "ll": [
-        0.083,
-        null,
-        null,
+        0.095,
+        0.08,
+        0.024,
         null,
         null
       ],
       "n": [
-        120,
-        0,
-        0,
+        42,
+        250,
+        165,
         0,
         0
       ]
     },
     "nnetar (R)": {
       "crps": [
-        0.475,
-        null,
-        null,
+        0.905,
+        0.664,
+        0.606,
         null,
         null
       ],
       "ll": [
-        0.083,
-        null,
-        null,
+        0.238,
+        0.2,
+        0.036,
         null,
         null
       ],
       "n": [
-        120,
-        0,
-        0,
+        42,
+        250,
+        165,
         0,
         0
       ]
     },
     "GARCH-t": {
       "crps": [
-        0.472,
-        null,
-        null,
+        1.182,
+        0.948,
+        1.042,
         null,
         null
       ],
       "ll": [
-        0.416,
-        null,
-        null,
+        0.828,
+        0.744,
+        0.824,
         null,
         null
       ],
       "n": [
         500,
-        0,
-        0,
+        250,
+        165,
         0,
         0
       ]
     },
     "BSTS (R)": {
       "crps": [
-        0.395,
         null,
-        null,
-        null,
-        null
-      ],
-      "ll": [
-        0.05,
-        null,
-        null,
-        null,
-        null
-      ],
-      "n": [
-        119,
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    "TimesFM": {
-      "crps": [
-        0.85,
-        null,
-        null,
+        0.161,
+        0.558,
         null,
         null
       ],
       "ll": [
-        0.5,
         null,
-        null,
-        null,
-        null
-      ],
-      "n": [
-        120,
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    "Chronos-Bolt": {
-      "crps": [
-        0.667,
-        null,
-        null,
-        null,
-        null
-      ],
-      "ll": [
-        0.483,
-        null,
-        null,
+        0.056,
+        0.012,
         null,
         null
       ],
       "n": [
-        120,
         0,
-        0,
-        0,
-        0
-      ]
-    },
-    "Moirai": {
-      "crps": [
-        0.117,
-        null,
-        null,
-        null,
-        null
-      ],
-      "ll": [
-        0.033,
-        null,
-        null,
-        null,
-        null
-      ],
-      "n": [
-        120,
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    "Lag-Llama": {
-      "crps": [
-        0.7,
-        null,
-        null,
-        null,
-        null
-      ],
-      "ll": [
-        0.667,
-        null,
-        null,
-        null,
-        null
-      ],
-      "n": [
-        120,
-        0,
-        0,
+        249,
+        165,
         0,
         0
       ]
