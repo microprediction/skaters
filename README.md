@@ -15,6 +15,14 @@ Laplace beats (almost) everything.
   <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 894 non-price FRED series: laplace has both the highest held-out log-likelihood and the highest forecasts-per-second, alone in the top-right, while AutoARIMA, AutoETS, SARIMAX, GARCH-t, conformal and NeuralForecast trade accuracy for far more compute." width="680">
 </p>
 
+And it beats them regime by regime — everywhere except price.
+
+<p align="center">
+  <img src="docs/assets/radar.png" alt="Radar chart of per-regime win-rate against laplace on log-likelihood: CSP, nnetar and GARCH-t all sit inside the dashed laplace ring across the economic, weekly, yearly and waveform regimes; only GARCH-t breaks outside the ring, on the price/returns axis, where it beats laplace about 1.8x." width="560">
+</p>
+
+<p align="center"><sub>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split, <code>laplace</code> = the dashed ring). Outside the ring the challenger wins that regime; inside, <code>laplace</code> does. Only GARCH-t breaks out, and only on price/returns. <a href="https://skaters.microprediction.org/challengers.html">Explore it interactively →</a></sub></p>
+
 
 Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
 
