@@ -103,12 +103,13 @@
 
     <figure class="hero-figure">
       <img src="./assets/radar.svg" alt="Radar chart of per-regime win-rate against laplace on
-        log-likelihood: CSP, Theta, nnetar and GARCH-t sit inside the dashed laplace ring across
-        the economic, weekly, yearly and waveform regimes; only GARCH-t breaks outside it, on the
-        price/returns axis." />
+        log-likelihood for CSP, Theta, nnetar and GARCH-t. All sit inside the dashed laplace ring
+        except GARCH-t, which breaks out on the price/returns axis, and CSP, which edges past on the
+        hard waveforms." />
       <figcaption>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split;
-        <code>laplace</code> is the dashed ring). Outside the ring the challenger wins that regime,
-        inside it loses — only GARCH-t breaks out, and only on price/returns.
+        <code>laplace</code> is the dashed ring). Outside the ring the challenger wins that regime.
+        GARCH-t breaks out on price/returns; CSP edges past on the hard, repeating waveforms, where
+        it is handed the period and <code>laplace</code> is not.
         <a href="/challengers.html">Explore it interactively →</a></figcaption>
     </figure>
 
