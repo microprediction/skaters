@@ -350,26 +350,26 @@ const CHALLENGES_RADAR = {
     "TabFM (clf8)": {
       "crps": [
         0.827,
-        null,
-        null,
-        null,
-        null,
+        0.954,
+        0.897,
+        1.3,
+        0.667,
         null
       ],
       "ll": [
         0.354,
-        null,
-        null,
-        null,
-        null,
+        0.565,
+        0.179,
+        0.989,
+        0.444,
         null
       ],
       "n": [
         226,
-        0,
-        0,
-        0,
-        0,
+        262,
+        369,
+        180,
+        234,
         0
       ]
     },
