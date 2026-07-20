@@ -117,7 +117,8 @@
       quantile. Because the model has already absorbed the trend, the
       volatility clock, the seasonality, and the coordinate, what remains is
       (roughly) pure N(0,1) innovation — <em>running normalization</em>. That
-      residue is also an anomaly detector: anything with |z| &gt; 4 earned it.
+      residue is also a calibrated surprise signal; turning it into a streaming anomaly
+      detector is <a href="https://timemachines.microprediction.org/">timemachines</a>.
     </p>
     <p>
       Pick the multiplicative or jumps regime for the full effect. The bars are

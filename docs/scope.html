@@ -67,18 +67,18 @@
       that has better things to spend attention on.
     </p>
     <p>
-      <strong>Anomaly detection falls out for free.</strong> Because every
+      <strong>A calibrated surprise signal falls out for free.</strong> Because every
       prediction is a density, every arriving point gets a probability integral
       transform against the forecast that was made <em>for it</em>: the state
       carries <code>state["pit"]</code> (roughly Uniform when the stream is
       behaving) and <code>state["z"]</code> (roughly N(0,1)) at every horizon
-      1..k, resolved online with no extra compute. A |z| of five is an anomaly
-      by construction — scored against a model that has already adapted to the
-      stream's drift, volatility clock, seasonality, and coordinate, which is
-      precisely what separates an anomaly from a regime the model should have
-      learned. Multi-horizon agreement (the same point surprising at h = 1, 5,
-      and 20) separates one-off spikes from genuine breaks. See the
-      <a href="/skills.html#anomaly-detection">anomaly-detection skill</a>.
+      1..k, resolved online with no extra compute — scored against a model that
+      has already adapted to the stream's drift, volatility clock, seasonality,
+      and coordinate, which is precisely what separates a genuine surprise from a
+      regime the model should have learned. Turning that signal into streaming
+      anomaly detection with honest false-alarm rates is its own project,
+      <a href="https://timemachines.microprediction.org/">timemachines</a>,
+      built on skaters.
     </p>
 
     <h2>The objections it is not refuted by</h2>

@@ -103,9 +103,11 @@ f = laplace(k=1, sticky=False)            # no lattice projection
 forecasts previously made *for it*: `state["pit"][m-1]` is its probability
 integral transform under the m-step-ahead predictive issued m steps ago
 (roughly Uniform(0,1) when calibrated) and `state["z"][m-1]` the same through
-the standard-normal quantile (roughly N(0,1) — so `abs(z) > 4` is an anomaly
-detector with no extra compute; z is clamped to ±7.03, never infinite). See
-the [anomaly-detection skill](https://skaters.microprediction.org/skills.html#anomaly-detection).
+the standard-normal quantile (roughly N(0,1); z is clamped to ±7.03, never
+infinite). That calibrated-surprise signal is the null model streaming anomaly
+detection is built on, and that work lives in its own project:
+[**timemachines**](https://timemachines.microprediction.org/) — calibrated
+online anomaly detection with honest false-alarm rates, built on skaters.
 
 **Tails that keep their stated rates (v0.13.0).** Every predictive carries censored-ML
 generalized-Pareto tails beyond the body's ~2% region (the *conditional tail
