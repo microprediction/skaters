@@ -1,6 +1,6 @@
 # skaters ([demo](https://skaters.microprediction.org/demos/playground.html),[docs](https://skaters.microprediction.org/))
 
-A light, accurate, autonomous distributional forecaster for non-price economic series in particular. Watch *Laplace* [here](https://skaters.microprediction.org/demos/playground.html).
+A light, accurate, autonomous distributional forecaster for non-price economic series in particular. Watch [here](https://skaters.microprediction.org/demos/playground.html).
 
 
 
