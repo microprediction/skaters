@@ -105,13 +105,15 @@
 
     <h2>Strengths by regime</h2>
     <p>
-      Five regimes, one score each: how often a challenger beats
-      <code>laplace</code> per series, ties split, scaled so a 50/50 draw is
-      1.0. The dashed ring is <code>laplace</code> itself; outside the ring
-      the challenger is winning that regime, inside it is losing. Soft
+      Five regimes plus a price/returns axis, one score each: how often a
+      challenger beats <code>laplace</code> per series, ties split, scaled so a
+      50/50 draw is 1.0. The dashed ring is <code>laplace</code> itself; outside
+      the ring the challenger is winning that regime, inside it is losing. Soft
       vs hard waveforms are the two halves of M4-Hourly (noisy daily cycles
       vs nearly deterministic ones; see the
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
+      Price/returns is the one axis <code>laplace</code> is not built for, and
+      <code>GARCH-t</code> wins it decisively (~1.8x on 2500 return series).
       Pick up to four challengers.
     </p>
     <div class="panel" id="radar-panel">
@@ -154,7 +156,8 @@
       var FILLS = ["rgba(42,120,214,0.10)", "rgba(27,175,122,0.10)",
                    "rgba(237,161,0,0.10)", "rgba(0,131,0,0.10)"];
       var REF = "#5a5a5a", INK = "#1a1a1a", MUTED = "#5a5a5a";
-      var MAXV = 2.0, MAXSEL = 4;
+      var MAXSEL = 4;
+      var DEFAULTS = ["CSP", "Theta (R)", "nnetar (R)", "GARCH-t"];  // checked on load
       var slotOf = {};                 // model name -> slot index (stable while selected)
       var vertsBy = {};                // model name -> screen vertices
       var focusIdx = -1;
@@ -164,7 +167,7 @@
         lab.style.fontWeight = "400";
         var cb = document.createElement("input");
         cb.type = "checkbox"; cb.value = name;
-        if (name === "Prophet") cb.checked = true;
+        if (DEFAULTS.indexOf(name) >= 0) cb.checked = true;
         cb.addEventListener("change", onToggle);
         lab.appendChild(cb);
         lab.appendChild(document.createTextNode(" " + name));
@@ -178,7 +181,10 @@
       function metric() {
         return document.querySelector("input[name=radar-metric]:checked").value;
       }
-      var selOrder = ["Prophet"];        // selection order, for drop-oldest
+      // Log-likelihood ratios spread wider than CRPS, so give it a tighter
+      // outer ring (1.5x laplace) to keep the polygons readable.
+      function maxv() { return metric() === "ll" ? 1.5 : 2.0; }
+      var selOrder = DEFAULTS.slice();   // selection order, for drop-oldest
       function uncheckByName(nm) {
         var inputs = box.querySelectorAll("input[type=checkbox]");
         for (var j = 0; j < inputs.length; j++) {
@@ -206,7 +212,7 @@
         }
         draw();
       }
-      slotOf["Prophet"] = 0;
+      DEFAULTS.forEach(function (nm, i) { slotOf[nm] = i; });
 
       function draw() {
         var dpr = window.devicePixelRatio || 1;
@@ -218,12 +224,15 @@
         var cx = cssW / 2, cy = cssH / 2 + 8;
         var R = Math.min(cssW, cssH) / 2 - 56;
         var K = data.axes.length;
+        var MAXV = maxv();
+        var rings = [];
+        for (var rv = 0.5; rv <= MAXV + 1e-9; rv += 0.5) rings.push(rv);
         function pt(i, v) {
           var a = -Math.PI / 2 + i * 2 * Math.PI / K;
           var r = R * Math.min(v, MAXV) / MAXV;
           return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
         }
-        [0.5, 1.0, 1.5, 2.0].forEach(function (v) {
+        rings.forEach(function (v) {
           ctx.beginPath();
           for (var i = 0; i <= K; i++) {
             var p = pt(i % K, v);
@@ -390,176 +399,6 @@
       });
       canvas.addEventListener("blur", function () { focusIdx = -1; tip.style.display = "none"; draw(); });
 
-      document.querySelectorAll("input[name=radar-metric]").forEach(function (r) {
-        r.addEventListener("change", draw);
-      });
-      window.addEventListener("resize", draw);
-      panel.style.position = "relative";
-      draw();
-    })();
-    </script>
-    <script>
-    (function () {
-      var data = CHALLENGES_RADAR;
-      var canvas = document.getElementById("radar");
-      var ctx = canvas.getContext("2d");
-      var sel = document.getElementById("radar-model");
-      var tip = document.getElementById("radar-tip");
-      var panel = document.getElementById("radar-panel");
-      var legendName = document.getElementById("radar-legend-model");
-      var tbody = document.querySelector("#radar-table tbody");
-      var ACCENT = "#4a3aff", REF = "#5a5a5a", INK = "#1a1a1a", MUTED = "#5a5a5a";
-      var MAXV = 2.0;
-      var verts = [];        // screen positions of the current vertices
-      var focusIdx = -1;
-
-      Object.keys(data.models).forEach(function (name) {
-        var o = document.createElement("option");
-        o.value = name; o.textContent = name;
-        sel.appendChild(o);
-      });
-
-      function metric() {
-        return document.querySelector("input[name=radar-metric]:checked").value;
-      }
-      function model() { return sel.value; }
-
-      function draw() {
-        var dpr = window.devicePixelRatio || 1;
-        var cssW = canvas.clientWidth || 640, cssH = Math.round(cssW * 0.75);
-        canvas.width = cssW * dpr; canvas.height = cssH * dpr;
-        canvas.style.height = cssH + "px";
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, cssW, cssH);
-        var cx = cssW / 2, cy = cssH / 2 + 8;
-        var R = Math.min(cssW, cssH) / 2 - 56;
-        var K = data.axes.length;
-        function pt(i, v) {
-          var a = -Math.PI / 2 + i * 2 * Math.PI / K;
-          var r = R * Math.min(v, MAXV) / MAXV;
-          return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-        }
-        // rings (recessive); the 1.0 ring is the laplace reference
-        [0.5, 1.0, 1.5, 2.0].forEach(function (v) {
-          ctx.beginPath();
-          for (var i = 0; i <= K; i++) {
-            var p = pt(i % K, v);
-            i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
-          }
-          if (v === 1.0) { ctx.strokeStyle = REF; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6; }
-          else { ctx.strokeStyle = "#e2e2e2"; ctx.setLineDash([]); ctx.lineWidth = 1; }
-          ctx.stroke(); ctx.setLineDash([]);
-        });
-        // spokes + axis labels
-        ctx.fillStyle = INK; ctx.font = "13px -apple-system, sans-serif";
-        for (var i = 0; i < K; i++) {
-          var pe = pt(i, MAXV);
-          ctx.strokeStyle = "#e2e2e2"; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pe[0], pe[1]); ctx.stroke();
-          var pl = pt(i, MAXV * 1.14);
-          ctx.textAlign = Math.abs(pl[0] - cx) < 10 ? "center" : (pl[0] > cx ? "left" : "right");
-          ctx.fillText(data.axes[i], pl[0], pl[1] + 4);
-        }
-        // scale label on the reference ring
-        ctx.fillStyle = MUTED; ctx.font = "11px -apple-system, sans-serif";
-        ctx.textAlign = "left";
-        var pref = pt(0, 1.0);
-        ctx.fillText("laplace = 1", pref[0] + 6, pref[1] - 6);
-        // model polygon
-        var vals = data.models[model()][metric()];
-        verts = [];
-        ctx.beginPath();
-        var started = false;
-        for (var i = 0; i < K; i++) {
-          if (vals[i] == null) { verts.push(null); continue; }
-          var p = pt(i, vals[i]);
-          verts.push(p);
-          started ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
-          started = true;
-        }
-        ctx.closePath();
-        ctx.fillStyle = "rgba(74,58,255,0.12)"; ctx.fill();
-        ctx.strokeStyle = ACCENT; ctx.lineWidth = 2; ctx.stroke();
-        // vertices + direct value labels
-        for (var i = 0; i < K; i++) {
-          if (!verts[i]) continue;
-          var p = verts[i];
-          ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, 2 * Math.PI);
-          ctx.fillStyle = ACCENT; ctx.fill();
-          ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
-          ctx.fillStyle = INK; ctx.font = "600 12px -apple-system, sans-serif";
-          ctx.textAlign = p[0] >= cx ? "left" : "right";
-          var dx = p[0] >= cx ? 8 : -8;
-          ctx.fillText(vals[i].toFixed(2), p[0] + dx, p[1] + (p[1] < cy ? -6 : 14));
-          if (i === focusIdx) {
-            ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 2 * Math.PI);
-            ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.5; ctx.stroke();
-          }
-        }
-        legendName.textContent = model();
-        fillTable();
-      }
-
-      function fillTable() {
-        var m = data.models[model()];
-        tbody.textContent = "";
-        data.axes.forEach(function (ax, i) {
-          var tr = document.createElement("tr");
-          [ax,
-           m.crps[i] == null ? "not run" : m.crps[i].toFixed(2),
-           m.ll[i] == null ? "not run" : m.ll[i].toFixed(2),
-           m.n[i] || ""].forEach(function (v, j) {
-            var td = document.createElement("td");
-            if (j) td.className = "num";
-            td.textContent = v;
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        });
-      }
-
-      function showTip(i, clientX, clientY) {
-        var m = data.models[model()];
-        var v = m[metric()][i];
-        if (v == null) { tip.style.display = "none"; return; }
-        var pct = Math.round(v * 50);
-        tip.textContent = data.axes[i] + ": beats laplace on " + pct +
-          "% of " + m.n[i] + " series (" +
-          (metric() === "crps" ? "CRPS" : "log-likelihood") + "), ratio " + v.toFixed(2);
-        var pr = panel.getBoundingClientRect();
-        tip.style.display = "block";
-        tip.style.left = (clientX - pr.left + 14) + "px";
-        tip.style.top = (clientY - pr.top - 10) + "px";
-      }
-
-      canvas.addEventListener("pointermove", function (e) {
-        var r = canvas.getBoundingClientRect();
-        var x = e.clientX - r.left, y = e.clientY - r.top;
-        var best = -1, bd = 24 * 24;
-        verts.forEach(function (p, i) {
-          if (!p) return;
-          var d = (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y);
-          if (d < bd) { bd = d; best = i; }
-        });
-        if (best >= 0) showTip(best, e.clientX, e.clientY);
-        else tip.style.display = "none";
-      });
-      canvas.addEventListener("pointerleave", function () { tip.style.display = "none"; });
-      canvas.addEventListener("keydown", function (e) {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        var K = data.axes.length;
-        focusIdx = ((focusIdx + (e.key === "ArrowRight" ? 1 : -1)) % K + K) % K;
-        draw();
-        var p = verts[focusIdx];
-        if (p) {
-          var r = canvas.getBoundingClientRect();
-          showTip(focusIdx, r.left + p[0], r.top + p[1]);
-        }
-      });
-      canvas.addEventListener("blur", function () { focusIdx = -1; tip.style.display = "none"; draw(); });
-
-      sel.addEventListener("change", draw);
       document.querySelectorAll("input[name=radar-metric]").forEach(function (r) {
         r.addEventListener("change", draw);
       });
