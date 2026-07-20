@@ -6,7 +6,7 @@ A light, accurate, autonomous distributional forecaster for non-price economic s
 
 <p align="center">
   <a href="https://skaters.microprediction.org/"><img src="https://img.shields.io/badge/docs%20%26%20live%20demos-skaters.microprediction.org-4a3aff?style=for-the-badge" alt="Documentation and live demos"></a>
-  <a href="#javascript-r--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript%20%7C%20R-1a8c4a?style=for-the-badge" alt="Python, JavaScript and R"></a>
+  <a href="#javascript-r-julia-rust--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JS%20%7C%20R%20%7C%20Julia%20%7C%20Rust-1a8c4a?style=for-the-badge" alt="Python, JavaScript, R, Julia and Rust"></a>
 </p>
 
 Laplace beats (almost) everything.
@@ -24,7 +24,7 @@ And it beats them regime by regime — everywhere except price.
 <p align="center"><sub>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split, <code>laplace</code> = the dashed ring). Outside the ring the challenger wins that regime; inside, <code>laplace</code> does. Only GARCH-t breaks out, and only on price/returns. <a href="https://skaters.microprediction.org/challengers.html">Explore it interactively →</a></sub></p>
 
 
-Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
 
 **Not for price/return series:** 
 We recommend GARCH-t there instead. 
@@ -377,7 +377,7 @@ def my_transform():
     return forward, inverse_k
 ```
 
-## JavaScript, R & the browser
+## JavaScript, R, Julia, Rust & the browser
 
 The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
 transform, ensemble, and named policy. It is verified against the Python reference by a parity
@@ -391,8 +391,12 @@ parity values at 1e-6, including the transforms, ensembles, lattice
 projection, calibration state, and the GPD tail splice. Continuous
 installs via
 `install.packages("skaters", repos = "https://microprediction.r-universe.dev")`.
-A Julia port is planned next; the parity vectors make each new language a
-porting exercise with a built-in referee.
+
+The **Julia port** ([microprediction/Skaters.jl](https://github.com/microprediction/Skaters.jl))
+and a portable **Rust core** (`rust/`, the fast native backend, with Python
+bindings in `rust/python/`) complete five parity-locked implementations. The
+shared parity vectors make each new language a porting exercise with a built-in
+referee.
 
 ```html
 <script type="module">

@@ -23,12 +23,12 @@ DATA = os.path.join(_ROOT, "docs", "js", "challenges-radar-data.js")
 
 METRIC = "ll"                       # study headline; matches the site default
 RMAX = 2.0                          # radial cap (GARCH-t's price win reaches ~1.8)
-# Three well-separated challengers, each with a visible lobe: CSP and nnetar win
-# the waveform regimes, GARCH-t hugs the ring on economic/cycles and stars on
-# price. (Theta from the page default sits near the origin here and reads as an
-# invisible line, so it is left to the interactive page.)
-MODELS = ["CSP", "nnetar (R)", "GARCH-t"]
-COLORS = ["#2a78d6", "#eda100", "#008300"]
+# The interactive radar's default four challengers, in the site's slot colours,
+# so the README/homepage figure matches challengers.html exactly: CSP and nnetar
+# win the waveform regimes, GARCH-t stars on price, Theta (R) sits inside the
+# ring (laplace beats it almost everywhere).
+MODELS = ["CSP", "Theta (R)", "nnetar (R)", "GARCH-t"]
+COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#008300"]
 
 
 def load():

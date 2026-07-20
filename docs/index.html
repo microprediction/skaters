@@ -79,8 +79,9 @@
     </p>
 
     <p>
-      Every implementation runs over a portable Rust core, checked against the reference to
-      1e-6, so a model fit on a server resumes unchanged in the browser.
+      Each language is an independent, parity-locked port, checked against the reference to
+      1e-6 (Python also has a Rust backend for speed). A fitted model serialises to JSON, so
+      one fit on a server resumes unchanged in the browser.
       <a href="/languages.html">The languages →</a>
     </p>
 
@@ -98,6 +99,17 @@
         sits alone in the top-right — best likelihood, fastest — while the classical, neural, and
         foundation-model baselines trade accuracy for orders of magnitude more compute.
         <a href="/papers.html">The benchmarks →</a></figcaption>
+    </figure>
+
+    <figure class="hero-figure">
+      <img src="./assets/radar.svg" alt="Radar chart of per-regime win-rate against laplace on
+        log-likelihood: CSP, Theta, nnetar and GARCH-t sit inside the dashed laplace ring across
+        the economic, weekly, yearly and waveform regimes; only GARCH-t breaks outside it, on the
+        price/returns axis." />
+      <figcaption>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split;
+        <code>laplace</code> is the dashed ring). Outside the ring the challenger wins that regime,
+        inside it loses — only GARCH-t breaks out, and only on price/returns.
+        <a href="/challengers.html">Explore it interactively →</a></figcaption>
     </figure>
 
     <p>
