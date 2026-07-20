@@ -15,13 +15,15 @@ Laplace beats (almost) everything.
   <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 894 non-price FRED series: laplace has both the highest held-out log-likelihood and the highest forecasts-per-second, alone in the top-right, while AutoARIMA, AutoETS, SARIMAX, GARCH-t, conformal and NeuralForecast trade accuracy for far more compute." width="680">
 </p>
 
-And it beats them regime by regime — everywhere except price.
+And it beats them across nearly every regime, giving ground only on price/returns (to GARCH-t) and, narrowly, on the hard, repeating waveforms (to CSP[^csp]).
+
+[^csp]: On the hard-waveform arm (near-deterministic, repeating cycles) CSP is handed the seasonal period, while `laplace` is not and must infer structure generically. Its edge there reflects that head start, not a like-for-like loss.
 
 <p align="center">
-  <img src="docs/assets/radar.png" alt="Radar chart of per-regime win-rate against laplace on log-likelihood: CSP, nnetar and GARCH-t all sit inside the dashed laplace ring across the economic, weekly, yearly and waveform regimes; only GARCH-t breaks outside the ring, on the price/returns axis, where it beats laplace about 1.8x." width="560">
+  <img src="docs/assets/radar.png" alt="Radar chart of per-regime win-rate against laplace on log-likelihood for CSP, Theta, nnetar and GARCH-t. All sit inside the dashed laplace ring except GARCH-t, which breaks out on the price/returns axis, and CSP, which edges past on the hard waveforms." width="560">
 </p>
 
-<p align="center"><sub>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split, <code>laplace</code> = the dashed ring). Outside the ring the challenger wins that regime; inside, <code>laplace</code> does. Only GARCH-t breaks out, and only on price/returns. <a href="https://skaters.microprediction.org/challengers.html">Explore it interactively →</a></sub></p>
+<p align="center"><sub>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split, <code>laplace</code> = the dashed ring). Outside the ring the challenger wins that regime; inside, <code>laplace</code> does. GARCH-t breaks out on price/returns; CSP edges past on the hard, repeating waveforms, where it is handed the period and <code>laplace</code> is not. <a href="https://skaters.microprediction.org/challengers.html">Explore it interactively →</a></sub></p>
 
 
 Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
