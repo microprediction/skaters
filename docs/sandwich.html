@@ -127,6 +127,21 @@
       full tape is on the
       <a href="/challengers/pymc-forecast.html">bout page</a>.
     </p>
+    <p>
+      That convergence is not a daily-universe artifact. The same frozen
+      z-space fit, carried onto the seasonal and waveform arms, pulls
+      <em>ahead</em> of plain laplace rather than merely tying it: it wins 55%
+      of the weekly series, 64% of the monthly, and 84% of the M4-Hourly
+      waveforms, a small median lift (+0.009, +0.017, +0.063 nats) that grows
+      with periodic structure and peaks on the near-deterministic hard
+      waveforms. Those residual streams still carry conditional structure the
+      lag regression reads back, most of all where the signal is a repeating
+      shape (see <code>benchmarks/pymc_arms_study.py</code>). Standalone on the
+      raw series it stays a genuine underdog, losing to laplace on four of five
+      regimes (the challengers
+      <a href="/challengers.html">radar</a>); the lift is the sandwich, not the
+      model.
+    </p>
 
     <h2>Detectors</h2>
     <table>
