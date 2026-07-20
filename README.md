@@ -1,6 +1,6 @@
 # skaters ([demo](https://skaters.microprediction.org/demos/playground.html),[docs](https://skaters.microprediction.org/))
 
-One univariate time-series model to rule them all? For non-price economic series, near enough and you can watch *Laplace* [here](https://skaters.microprediction.org/demos/playground.html).
+A light, accurate, autonomous distributional forecaster for non-price economic series in particular. Watch *Laplace* [here](https://skaters.microprediction.org/demos/playground.html).
 
 
 
