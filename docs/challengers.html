@@ -13,6 +13,12 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Direct comparisons</a>
+            <a href="/sandwich.html">Collaborative use</a>
+          </span>
+        </span>
         <a href="/demos/">Demos</a>
         <a href="/guide.html">Guide</a>
         <a href="/papers.html">Papers</a>
@@ -23,12 +29,6 @@
             <a href="/heritage.html">Heritage</a>
             <a href="/faq.html">FAQ</a>
             <a href="/skills.html">Skills</a>
-          </span>
-        </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
-          <span class="drop">
-            <a href="/challengers.html">Challenges</a>
-            <a href="/sandwich.html">Sandwich</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -178,16 +178,31 @@
       function metric() {
         return document.querySelector("input[name=radar-metric]:checked").value;
       }
+      var selOrder = ["Prophet"];        // selection order, for drop-oldest
+      function uncheckByName(nm) {
+        var inputs = box.querySelectorAll("input[type=checkbox]");
+        for (var j = 0; j < inputs.length; j++) {
+          if (inputs[j].value === nm) { inputs[j].checked = false; break; }
+        }
+      }
       function onToggle(e) {
-        var sel = selected();
+        var name = e.target.value;
         if (e.target.checked) {
-          if (sel.length > MAXSEL) { e.target.checked = false; return; }
-          var used = sel.map(function (n) { return slotOf[n]; });
+          selOrder.push(name);
+          // Drop the oldest so picking a new challenger never needs unclicking one first.
+          while (selOrder.length > MAXSEL) {
+            var old = selOrder.shift();
+            uncheckByName(old);
+            delete slotOf[old];
+          }
+          var used = selected().map(function (n) { return slotOf[n]; });
           for (var s = 0; s < MAXSEL; s++) {
-            if (used.indexOf(s) < 0) { slotOf[e.target.value] = s; break; }
+            if (used.indexOf(s) < 0) { slotOf[name] = s; break; }
           }
         } else {
-          delete slotOf[e.target.value];   // others keep their colors
+          var i = selOrder.indexOf(name);
+          if (i >= 0) selOrder.splice(i, 1);
+          delete slotOf[name];             // others keep their colors
         }
         draw();
       }
