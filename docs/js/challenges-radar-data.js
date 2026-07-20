@@ -398,6 +398,32 @@ const CHALLENGES_RADAR = {
         0,
         0
       ]
+    },
+    "PyMC-Forecast": {
+      "crps": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "ll": [
+        0.381,
+        1.082,
+        0.837,
+        0.278,
+        0.248,
+        null
+      ],
+      "n": [
+        226,
+        830,
+        516,
+        180,
+        234,
+        0
+      ]
     }
   }
 };
