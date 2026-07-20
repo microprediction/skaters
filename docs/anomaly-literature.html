@@ -47,6 +47,13 @@
     <p class="subtitle">Organized around one question: who can promise a false-alarm rate
       on a drifting stream?</p>
 
+    <p class="lead" style="border-left:3px solid var(--accent,#4a3aff);padding-left:12px">
+      The detector this map is about lives in its own project,
+      <a href="https://timemachines.microprediction.org/"><strong>timemachines</strong></a>
+      (calibrated online anomaly detection, built on skaters). Start there for the method,
+      its measured false-alarm rates, and benchmarks. The map below is kept as reference.
+    </p>
+
     <p class="lead">
       Streaming anomaly detection is two jobs wearing one name. <strong>Job 1 — where is the
       anomaly</strong> — is subsequence search and ranking, and it is well occupied. <strong>Job 2
@@ -238,23 +245,18 @@
         calibration-aware evaluation found anywhere is inside the W1-ACAS paper itself.</li>
     </ul>
 
-    <h2>Where skaters sits</h2>
+    <h2>Where this sits</h2>
     <p>
-      The library's claim is upstream of every line above: <code>laplace</code> is an online
-      forecaster whose parade state exposes PIT/z residuals — manufacturing, on a drifting
+      skaters' contribution is upstream of every line above: <code>laplace</code> is an online
+      forecaster whose parade state exposes PIT/z residuals, manufacturing, on a drifting
       seasonal stream, the near-i.i.d. uniforms that conformal, online-FDR, and e-process
-      machinery all assume and none can create. The <a
-      href="https://github.com/microprediction/skaters/blob/main/benchmarks/anomaly/RESULTS.md">full-archive
-      studies</a> locate the value precisely: the front-end lifts distributional alarm heads
-      (DSPOT 2–5&times;), does nothing for similarity-search heads (they carry their own
-      normalizer) — and the calibration panel (empirical false-alarm rate vs nominal &alpha;,
-      prequentially, on the benchmarks' own certified-clean data) first <em>failed</em> the
-      library's Gaussian tails at 1e-3, then, as of v0.13.0, passes them: censored-ML GPD tails
-      are spliced into every predictive (SPOT's theorem, native to the surprise stream), the
-      stated alarm rate comes true within the genuine-anomaly base rate, and the 99.9% interval
-      is empirically 99.85% (Gaussian read: 99.13%). See the
-      <a href="/robustness.html">coverage study</a> — the 90% interval that is actually 90%,
-      now extended to the tail.
+      machinery all assume and none can create. The detector built on that signal, with its
+      measured false-alarm rates and its lifts to third-party heads (DSPOT, RRCF), is
+      <a href="https://timemachines.microprediction.org/"><strong>timemachines</strong></a> —
+      that is where the alarm logic and the full-archive studies live. (skaters keeps the tail
+      story that makes the surprise stream honest: censored-ML GPD tails are spliced into every
+      predictive from v0.13.0, so the 99.9% interval is empirically 99.85%; see the
+      <a href="/robustness.html">coverage study</a> and <a href="/tails.html">the tail essay</a>.)
     </p>
 
     <p class="byline">Assembled 2026-07-09 from a verified forward-citation sweep (25/25 claims

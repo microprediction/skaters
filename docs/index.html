@@ -86,10 +86,13 @@
     </p>
 
     <p>
-      Anomaly detection comes with the state. Each point is scored against the forecast
-      issued for it, so <code>state["z"]</code> is a normalized surprise and a threshold on
-      it is a calibrated detector at no extra cost.
+      A calibrated surprise signal comes with the state: each point is scored against the
+      forecast issued for it, so <code>state["z"]</code> is a normalized residual and
+      <code>state["pit"]</code> its probability integral transform.
       <a href="/demos/normalization.html">See it live →</a>
+      Turning that signal into streaming anomaly detection with honest false-alarm rates is
+      its own project, <a href="https://timemachines.microprediction.org/">timemachines</a>,
+      built on skaters.
     </p>
 
     <figure class="hero-figure">
