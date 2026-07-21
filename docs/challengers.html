@@ -115,7 +115,7 @@
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
       Price/returns is the one axis <code>laplace</code> is not built for, and
       <code>GARCH-t</code> wins it decisively (~1.8x on 2500 return series).
-      Pick up to four challengers. Entries marked <em>(sandwiched)</em> are drawn
+      Pick up to six challengers. Entries marked <em>(sandwiched)</em> are drawn
       <strong>dashed</strong>: those models run inside <code>laplace</code>'s own
       coordinates and beat it by construction, so they are collaboration, not a
       head-to-head win (see <a href="/sandwich.html">collaborative use</a>).
@@ -123,7 +123,7 @@
     <div class="panel" id="radar-panel">
       <div class="controls">
         <div class="control" style="max-width:100%">
-          <label>Challengers (up to 4)</label>
+          <label>Challengers (up to 6)</label>
           <div id="radar-models" style="display:flex;flex-wrap:wrap;gap:2px 14px;max-width:760px"></div>
         </div>
         <div class="control">
@@ -156,12 +156,15 @@
       var legend = document.getElementById("radar-legend");
       var thead = document.getElementById("radar-table-head");
       var tbody = document.querySelector("#radar-table tbody");
-      var SLOTS = ["#2a78d6", "#1baf7a", "#eda100", "#008300"];  // fixed order
-      var FILLS = ["rgba(42,120,214,0.10)", "rgba(27,175,122,0.10)",
-                   "rgba(237,161,0,0.10)", "rgba(0,131,0,0.10)"];
+      var SLOTS = ["#2a78d6", "#008300", "#eda100", "#8e44ad",
+                   "#d6392a", "#1baf7a"];  // fixed order, 6 slots
+      var FILLS = ["rgba(42,120,214,0.10)", "rgba(0,131,0,0.10)",
+                   "rgba(237,161,0,0.10)", "rgba(142,68,173,0.10)",
+                   "rgba(214,57,42,0.10)", "rgba(27,175,122,0.10)"];
       var REF = "#5a5a5a", INK = "#1a1a1a", MUTED = "#5a5a5a";
-      var MAXSEL = 4;
-      var DEFAULTS = ["CSP", "Theta (R)", "nnetar (R)", "GARCH-t"];  // checked on load
+      var MAXSEL = 6;
+      // checked on load; PyMC-Forecast (sandwiched) is dashed (a collaboration)
+      var DEFAULTS = ["CSP", "GARCH-t", "TabFM (clf8)", "PyMC-Forecast (sandwiched)"];
       var slotOf = {};                 // model name -> slot index (stable while selected)
       var vertsBy = {};                // model name -> screen vertices
       var focusIdx = -1;
