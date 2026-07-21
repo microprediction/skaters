@@ -12,7 +12,7 @@ A light, accurate, autonomous distributional forecaster for non-price economic s
 Laplace beats (almost) everything.
 
 <p align="center">
-  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 697 non-price FRED series: laplace sits top-right, fastest and tied for the best held-out log-likelihood; only the PyMC-laplace sandwich edges it on accuracy, at about ten times the compute, while AutoARIMA, AutoETS, SARIMAX and GARCH-t trade accuracy for speed." width="680">
+  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 1,902 non-price FRED series: laplace sits top-right, fastest and tied for the best held-out log-likelihood; only the PyMC-laplace sandwich edges it on accuracy, at about ten times the compute, while AutoARIMA, AutoETS, SARIMAX and GARCH-t trade accuracy for speed." width="680">
 </p>
 
 And it beats them across nearly every regime, giving ground only on price/returns (to GARCH-t) and, narrowly, on the hard, repeating waveforms (to CSP[^csp]).

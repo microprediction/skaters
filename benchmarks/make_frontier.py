@@ -43,7 +43,11 @@ cont = [s for s in rows if "laplace" in rows[s] and "GARCH-t" in rows[s]
 
 
 def mean_ll(method):
-    v = [rows[s][method] for s in cont if method in rows[s]]
+    # Floor per-series LL at -20 (the studies' convention): a few degenerate
+    # series drive some baselines (GARCH-t, AutoARIMA) to a variance-collapse
+    # -1e3 that would otherwise dominate the mean. -20 nats caps the blow-up
+    # without touching normal scores (laplace/sandwich never come near it).
+    v = [max(rows[s][method], -20.0) for s in cont if method in rows[s]]
     return sum(v) / len(v) if v else None
 
 
