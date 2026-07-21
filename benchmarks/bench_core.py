@@ -28,9 +28,18 @@ Z90 = 1.6448536269514722                     # 90% two-sided z
 # ---- the single scorer ------------------------------------------------------
 
 def score_dist(d, y):
-    """(logpdf, crps) of a Dist at realized y; -inf logpdf floored to -20."""
+    """(logpdf, crps) of a Dist at realized y; logpdf floored to -20.
+
+    The floor is a bound on the loss, not a repair of -inf alone: a collapsed
+    scale can put the realization at z ~ 1e18 and return a FINITE logpdf like
+    -1e36, which single-handedly poisons a study mean while an outright -inf
+    would have been floored. Every method funnels through here, so the bound
+    is the same for all of them.
+    """
     lp = d.logpdf(y)
-    return (lp if math.isfinite(lp) else -20.0), d.crps(y)
+    if not (lp >= -20.0):        # catches -inf, NaN, and absurd finite values
+        lp = -20.0
+    return lp, d.crps(y)
 
 
 def roll_dist_scores(factory, changes, start=BURN):
