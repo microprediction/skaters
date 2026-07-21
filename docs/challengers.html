@@ -42,6 +42,52 @@
       on their respective home turf. As Malcolm Fraser once said, life wasn&rsquo;t
       meant to be easy.</p>
 
+    <h2>Strengths by regime</h2>
+    <p>
+      Five regimes plus a price/returns axis, one score each: how often a
+      challenger beats <code>laplace</code> per series, ties split, scaled so a
+      50/50 draw is 1.0. The dashed ring is <code>laplace</code> itself; outside
+      the ring the challenger is winning that regime, inside it is losing. Soft
+      vs hard waveforms are the two halves of M4-Hourly (noisy daily cycles
+      vs nearly deterministic ones; see the
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
+      Price/returns is the one axis <code>laplace</code> is not built for, and
+      <code>GARCH-t</code> wins it decisively (~1.8x on 2500 return series).
+      Pick up to six challengers &mdash; <code>GARCH-t</code>, Prophet, the
+      foundation models and more. Entries marked <em>(sandwiched)</em> are drawn
+      <strong>dashed</strong>: those models run inside <code>laplace</code>'s own
+      coordinates and beat it by construction, so they are collaboration, not a
+      head-to-head win (see <a href="/sandwich.html">collaborative use</a>). The
+      default view includes the <strong>PyMC&ndash;laplace sandwich</strong>,
+      which finishes ahead across the whole universe when run this way &mdash;
+      the clearest case of cooperation beating competition.
+    </p>
+    <div class="panel" id="radar-panel">
+      <div class="controls">
+        <div class="control" style="max-width:100%">
+          <label>Challengers (up to 6)</label>
+          <div id="radar-models" style="display:flex;flex-wrap:wrap;gap:2px 14px;max-width:760px"></div>
+        </div>
+        <div class="control">
+          <label>Metric</label>
+          <span>
+            <label><input type="radio" name="radar-metric" value="ll" checked /> Log-likelihood</label>
+            &nbsp;
+            <label><input type="radio" name="radar-metric" value="crps" /> CRPS</label>
+          </span>
+        </div>
+      </div>
+      <canvas id="radar" class="plot" width="640" height="480" tabindex="0"
+              aria-label="Radar chart: challenger strength relative to laplace by regime"></canvas>
+      <div class="legend" id="radar-legend"></div>
+      <div id="radar-tip" style="position:absolute;display:none;background:#fff;border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:0.85rem;box-shadow:0 2px 8px rgba(0,0,0,0.12);pointer-events:none"></div>
+      <table id="radar-table">
+        <thead><tr id="radar-table-head"><th>regime</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <script src="/js/challenges-radar-data.js"></script>
+
     <h2>Should you use something else?</h2>
     <p>
       Quite possibly. laplace is one small, fast, online forecaster; the
@@ -56,12 +102,20 @@
       up in the <a href="/papers.html">papers</a>.
     </p>
 
+    <h2>Should you use laplace <em>with</em> something else?</h2>
     <p>
-      skaters also cooperates as well as it competes: sandwiched in
-      laplace's coordinates, every challenger below improves dramatically
-      (<a href="/sandwich.html">the sandwich</a>), so a bare horserace can
-      mislead. These pages look for the types of series and regimes where
-      each method does its best work.
+      Very possibly &mdash; and it is the more interesting question. skaters
+      cooperates as well as it competes: sandwiched in laplace's coordinates a
+      challenger keeps its own strengths but inherits laplace's calibration and
+      manufactured stationarity, and usually improves dramatically
+      (<a href="/sandwich.html">the sandwich</a>). <strong>PyMC</strong>, new but
+      already strong, finishes ahead across the whole universe once sandwiched
+      (+0.04 nats median on 65% of series) &mdash; it is the dashed entry in the
+      star map above. <strong>Prophet</strong>, which wins only 4 of 921
+      pre-registered series raw, changes character entirely in these
+      coordinates. So a bare horserace can mislead: these pages look for the
+      series and regimes where each method does its best work, alone or
+      sandwiched.
     </p>
 
     <h2>Featured bouts</h2>
@@ -104,47 +158,6 @@
     </div>
 
 
-    <h2>Strengths by regime</h2>
-    <p>
-      Five regimes plus a price/returns axis, one score each: how often a
-      challenger beats <code>laplace</code> per series, ties split, scaled so a
-      50/50 draw is 1.0. The dashed ring is <code>laplace</code> itself; outside
-      the ring the challenger is winning that regime, inside it is losing. Soft
-      vs hard waveforms are the two halves of M4-Hourly (noisy daily cycles
-      vs nearly deterministic ones; see the
-      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
-      Price/returns is the one axis <code>laplace</code> is not built for, and
-      <code>GARCH-t</code> wins it decisively (~1.8x on 2500 return series).
-      Pick up to six challengers. Entries marked <em>(sandwiched)</em> are drawn
-      <strong>dashed</strong>: those models run inside <code>laplace</code>'s own
-      coordinates and beat it by construction, so they are collaboration, not a
-      head-to-head win (see <a href="/sandwich.html">collaborative use</a>).
-    </p>
-    <div class="panel" id="radar-panel">
-      <div class="controls">
-        <div class="control" style="max-width:100%">
-          <label>Challengers (up to 6)</label>
-          <div id="radar-models" style="display:flex;flex-wrap:wrap;gap:2px 14px;max-width:760px"></div>
-        </div>
-        <div class="control">
-          <label>Metric</label>
-          <span>
-            <label><input type="radio" name="radar-metric" value="ll" checked /> Log-likelihood</label>
-            &nbsp;
-            <label><input type="radio" name="radar-metric" value="crps" /> CRPS</label>
-          </span>
-        </div>
-      </div>
-      <canvas id="radar" class="plot" width="640" height="480" tabindex="0"
-              aria-label="Radar chart: challenger strength relative to laplace by regime"></canvas>
-      <div class="legend" id="radar-legend"></div>
-      <div id="radar-tip" style="position:absolute;display:none;background:#fff;border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:0.85rem;box-shadow:0 2px 8px rgba(0,0,0,0.12);pointer-events:none"></div>
-      <table id="radar-table">
-        <thead><tr id="radar-table-head"><th>regime</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <script src="/js/challenges-radar-data.js"></script>
     <script>
     (function () {
       var data = CHALLENGES_RADAR;
