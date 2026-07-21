@@ -115,7 +115,10 @@
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
       Price/returns is the one axis <code>laplace</code> is not built for, and
       <code>GARCH-t</code> wins it decisively (~1.8x on 2500 return series).
-      Pick up to four challengers.
+      Pick up to four challengers. Entries marked <em>(sandwiched)</em> are drawn
+      <strong>dashed</strong>: those models run inside <code>laplace</code>'s own
+      coordinates and beat it by construction, so they are collaboration, not a
+      head-to-head win (see <a href="/sandwich.html">collaborative use</a>).
     </p>
     <div class="panel" id="radar-panel">
       <div class="controls">
@@ -274,7 +277,13 @@
           }
           ctx.closePath();
           ctx.fillStyle = FILLS[slot]; ctx.fill();
-          ctx.strokeStyle = SLOTS[slot]; ctx.lineWidth = 2; ctx.stroke();
+          // "(sandwiched)" models run inside laplace's coordinates (collaboration,
+          // they beat laplace by construction), so draw them dashed to distinguish
+          // them from the head-to-head challengers.
+          ctx.strokeStyle = SLOTS[slot]; ctx.lineWidth = 2;
+          if (name.indexOf("(sandwiched)") >= 0) ctx.setLineDash([7, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
           for (var i = 0; i < K; i++) {
             if (!verts[i]) continue;
             var p = verts[i];
@@ -301,12 +310,23 @@
       function drawLegend(sel) {
         legend.textContent = "";
         sel.forEach(function (name) {
+          var vals = data.models[name][metric()];
+          var hasData = vals.some(function (v) { return v != null; });
+          var collab = name.indexOf("(sandwiched)") >= 0;
+          var col = SLOTS[slotOf[name] || 0];
           var span = document.createElement("span");
           var sw = document.createElement("span");
           sw.className = "swatch";
-          sw.style.background = SLOTS[slotOf[name] || 0];
+          // dashed swatch for a collaboration (sandwiched) model, matching the chart
+          if (collab) sw.style.cssText = "background:none;border:1.5px dashed " +
+            col + ";height:9px;margin-top:2px";
+          else sw.style.background = col;
           span.appendChild(sw);
-          span.appendChild(document.createTextNode(name));
+          // a model with no data for the active metric would otherwise vanish
+          // from the chart; say so instead of drawing nothing
+          var tag = hasData ? "" : " (no " + (metric() === "ll" ? "LL" : "CRPS") + ")";
+          if (!hasData) span.style.opacity = "0.5";
+          span.appendChild(document.createTextNode(name + tag));
           legend.appendChild(span);
         });
         var ref = document.createElement("span");
