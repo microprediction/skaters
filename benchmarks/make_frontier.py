@@ -17,19 +17,19 @@ import matplotlib.pyplot as plt
 from study import _rfrac
 
 WINDOW = 300  # one-step forecasts per series
-RESULTS = os.environ.get("STUDY_RESULTS", "benchmarks/results_frontier_sota_pymc.csv")
+RESULTS = os.environ.get("STUDY_RESULTS", "benchmarks/results_frontier_big_aug.csv")
 
 # Measured single-core runtime (ms/series at TEST=300) — universe-independent.
 SPEED_MS = {
     "laplace": 196, "GARCH-t": 226, "AutoETS": 275, "ETS-sm": 300,
-    "SARIMAX": 1178, "AutoARIMA": 863, "AutoARIMA+ACI": 900,
-    "AutoARIMA+conformal": 900, "NF-StudentT": 1897,
+    "SARIMAX": 1178, "AutoARIMA": 863,
     # laplace (196) + one ADVI fit on its residual z-stream (~1.8s), measured
     # single-core at TEST=300 (benchmarks/pymc_frontier_solo.py).
     "PyMC-sandwich": 2000,
+    # AutoARIMA+conformal / +ACI omitted: their split-conformal density collapses
+    # to near-zero (mean LL ~ -96) on a handful of series, off the chart.
 }
-DISPLAY = {"NF-StudentT": "NeuralForecast-t", "ETS-sm": "ETS",
-           "PyMC-sandwich": "PyMC-laplace sandwich"}
+DISPLAY = {"ETS-sm": "ETS", "PyMC-sandwich": "PyMC-laplace sandwich"}
 
 rows = {}
 with open(RESULTS) as fh:
@@ -38,7 +38,8 @@ with open(RESULTS) as fh:
         if lp in ("", "nan"):
             continue
         rows.setdefault(r["series"], {})[r["method"]] = float(lp)
-cont = [s for s in rows if "laplace" in rows[s] and _rfrac(s) < 0.05]
+cont = [s for s in rows if "laplace" in rows[s] and "GARCH-t" in rows[s]
+        and _rfrac(s) < 0.05]                       # common baseline universe
 
 
 def mean_ll(method):
