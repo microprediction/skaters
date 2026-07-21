@@ -140,7 +140,7 @@
       raw series it stays a genuine underdog, losing to laplace on four of five
       regimes (the challengers
       <a href="/challengers.html">radar</a>); the lift is the sandwich, not the
-      model.
+      model.<sup id="fnref-toolkits"><a href="#fn-toolkits" style="text-decoration:none">1</a></sup>
     </p>
 
     <h2>Detectors</h2>
@@ -165,6 +165,16 @@
       source: the <a href="/challengers.html">challengers page</a>, the
       paper's sandwich section, and
       <code>benchmarks/anomaly/RESULTS.md</code> in the repository.
+    </p>
+
+    <p id="fn-toolkits" style="color: var(--muted); font-size: 14px;">
+      <sup>1</sup> Both are flexible toolkits, not single models: skaters composes
+      transforms, leaves, and ensembles, while PyMC-Forecast lets you specify
+      arbitrary probabilistic models subject to Bayesian updating. These initial
+      benchmarks use only each package's <em>default</em> settings for both. Submissions
+      of other models and combinations are very welcome; open a
+      <a href="https://github.com/microprediction/skaters/pulls">pull request</a> or
+      an <a href="https://github.com/microprediction/skaters/issues">issue</a>.
     </p>
 
     <p class="byline">Every study here is reproducible from the harnesses
