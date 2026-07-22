@@ -13,7 +13,7 @@ daily:price,flowstate,4096,0.6865,0.5525
 daily:price,laplace,50176,0.9163,0.5169
 m4-hourly:econ,Chronos,15360,0.8335,0.4979
 m4-hourly:econ,Sundial,15360,0.5030,0.5251
-m4-hourly:econ,TiRex,15168,0.7577,0.4848
+m4-hourly:econ,TiRex,15360,0.7576,0.4844
 m4-hourly:econ,TimesFM,15360,0.8237,0.5141
 m4-hourly:econ,flowstate,15360,0.6726,0.5071
 m4-hourly:econ,laplace,26496,0.8918,0.4965
