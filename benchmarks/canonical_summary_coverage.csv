@@ -4,7 +4,7 @@ daily:econ,Chronos&lap,7616,0.9153,0.5534
 daily:econ,Chronos@lap,13504,0.9111,0.5022
 daily:econ,Sundial,17408,0.6255,0.5159
 daily:econ,TiRex,15552,0.8351,0.5272
-daily:econ,TiRex&lap,7488,0.9157,0.5550
+daily:econ,TiRex&lap,7616,0.9153,0.5533
 daily:econ,TiRex@lap,11968,0.9178,0.5181
 daily:econ,TimesFM,15552,0.8250,0.5100
 daily:econ,TimesFM&lap,7616,0.9148,0.5570
@@ -16,7 +16,7 @@ daily:price,Chronos&lap,2624,0.9341,0.5339
 daily:price,Chronos@lap,4416,0.9201,0.5299
 daily:price,Sundial,5184,0.6258,0.5316
 daily:price,TiRex,4928,0.8409,0.5217
-daily:price,TiRex&lap,2432,0.9334,0.5378
+daily:price,TiRex&lap,2624,0.9341,0.5358
 daily:price,TiRex@lap,4160,0.9255,0.5322
 daily:price,TimesFM,4928,0.8149,0.5286
 daily:price,TimesFM&lap,2624,0.9329,0.5415
@@ -28,7 +28,7 @@ m4-hourly:econ,Chronos&lap,10240,0.9164,0.5117
 m4-hourly:econ,Chronos@lap,17920,0.9140,0.4998
 m4-hourly:econ,Sundial,22656,0.5080,0.5275
 m4-hourly:econ,TiRex,20480,0.7448,0.4858
-m4-hourly:econ,TiRex&lap,9664,0.9147,0.5144
+m4-hourly:econ,TiRex&lap,10240,0.9149,0.5121
 m4-hourly:econ,TiRex@lap,16000,0.8874,0.4703
 m4-hourly:econ,TimesFM,20480,0.8151,0.5156
 m4-hourly:econ,TimesFM&lap,10240,0.9178,0.5164
@@ -40,7 +40,7 @@ monthly:econ,Chronos&lap,9728,0.9242,0.5064
 monthly:econ,Chronos@lap,16896,0.9060,0.4985
 monthly:econ,Sundial,22656,0.5631,0.5121
 monthly:econ,TiRex,20480,0.8043,0.4960
-monthly:econ,TiRex&lap,9344,0.9192,0.5043
+monthly:econ,TiRex&lap,9728,0.9211,0.5053
 monthly:econ,TiRex@lap,15232,0.9050,0.4921
 monthly:econ,TimesFM,20480,0.8031,0.5038
 monthly:econ,TimesFM&lap,9728,0.9235,0.5066
@@ -52,7 +52,7 @@ weekly:econ,Chronos&lap,10176,0.9036,0.4815
 weekly:econ,Chronos@lap,17856,0.8911,0.4980
 weekly:econ,Sundial,22592,0.6192,0.4867
 weekly:econ,TiRex,20480,0.7944,0.5038
-weekly:econ,TiRex&lap,9920,0.9009,0.4808
+weekly:econ,TiRex&lap,10176,0.9006,0.4822
 weekly:econ,TiRex@lap,16064,0.8895,0.4876
 weekly:econ,TimesFM,20480,0.8116,0.4987
 weekly:econ,TimesFM&lap,10176,0.9028,0.4826
