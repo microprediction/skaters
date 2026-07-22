@@ -29,7 +29,8 @@ export WEEK_MODELS WEEK_CORPORA WEEK_CTX WEEK_TEST WEEK_DEVICE WEEK_PAR WEEK_DAY
 
 rm -f benchmarks/preds/STOP
 echo "[launch] roster=$WEEK_MODELS device=$WEEK_DEVICE par=$WEEK_PAR days=$WEEK_DAYS"
-caffeinate -i -w $$ &                    # keep the Mac awake while this shell lives
 nohup .venv-sota/bin/python benchmarks/week_study.py \
       > benchmarks/_week.log 2>&1 &
-echo "[launch] week_study pid $! ; log: benchmarks/_week.log"
+PID=$!
+nohup caffeinate -i -w $PID > /dev/null 2>&1 &   # sleep assertion held until the DRIVER exits
+echo "[launch] week_study pid $PID ; log: benchmarks/_week.log"

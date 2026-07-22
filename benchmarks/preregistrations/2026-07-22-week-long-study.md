@@ -195,3 +195,15 @@ summaries are committed.
 Attribution (research use): "Built with PriorLabs-TabPFN"; TiRex under the NXAI
 Community License (materials developed at NXAI); flowstate ibm-research research
 checkpoint (arXiv:2508.05287), research-use only.
+
+## Amendment (2026-07-22, evening, before any peeking at deep-corpus results)
+
+The corpus caches were built with `CORPUS_LIMIT=4000` per arm; at the observed
+pace every arm saturates the cache in ~2 days, well inside the 7-day window.
+Amendment: enlarge the FRED arms in place to `CORPUS_LIMIT=10000` via
+`enlarge_corpus_cache.py`, which is APPEND-ONLY (existing file order preserved,
+only unseen sids appended, atomic replace), so already-scored cells and the
+cap-prefix semantics are untouched. Enumeration rules, filters, protocol, and
+roster are unchanged; m4-hourly is a fixed competition file and is not
+enlarged. `watchdog_week.sh` (cron, every 20 min + @reboot) relaunches the
+driver after a crash or power cut and stands down at the original 7-day end.
