@@ -24,6 +24,7 @@ CANONICAL = """  <header class="site-header">
           <span class="drop">
             <a href="/challengers.html">Direct comparisons</a>
             <a href="/sandwich.html">Collaborative use</a>
+            <a href="/sidecar.html">Foundation models</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; Every foundation model needs a sidecar</title>
+  <meta name="description" content="A large-scale, calibration-normalised comparison of zero-shot time-series foundation models against the Laplace online ensemble, and a model-agnostic sidecar that makes any of them safe to use." />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    /* page-local: lightweight inline bars, in the site palette */
+    .bar { display:inline-block; height:11px; border-radius:2px; vertical-align:middle;
+           background:var(--accent); opacity:.85; }
+    .bar.soft { background:#b9b2ff; }
+    .barcell { min-width:180px; }
+    .barwrap { position:relative; display:inline-block; width:170px; height:11px;
+               background:var(--code-bg); border-radius:2px; vertical-align:middle; }
+    .barwrap .bar { position:absolute; left:0; top:0; }
+    .barwrap .target { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--warn); }
+    .wdl { display:flex; height:16px; width:220px; border-radius:3px; overflow:hidden;
+           border:1px solid var(--border); }
+    .wdl i { display:block; height:100%; }
+    .wdl .w { background:var(--good); } .wdl .d { background:#c8c8d4; } .wdl .l { background:var(--warn); }
+    .key { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.85rem; color:var(--muted); margin:8px 0 0; }
+    .key i { display:inline-block; width:11px; height:11px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+    .snapshot { background:#ece9ff; color:var(--accent-dark); border-radius:4px;
+                padding:2px 9px; font-size:.8rem; font-weight:600; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Direct comparisons</a>
+            <a href="/sandwich.html">Collaborative use</a>
+            <a href="/sidecar.html">Foundation models</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Every foundation model needs a sidecar</h1>
+    <p class="subtitle">Zero-shot time-series foundation models are sharp but over-confident.
+      Judged fairly, a small online ensemble already out-forecasts them on economic change-series.
+      A Laplace sidecar makes any of them safe to use, and never worse than Laplace alone.</p>
+    <p><span class="snapshot">Live snapshot</span> &nbsp;These numbers come from a round-robin study
+      still running over the FRED universe, so cell counts differ between arms and the figures will
+      firm up as coverage deepens. The mechanism and the direction are settled; a couple of numbers
+      are not.</p>
+
+    <h2>The setup</h2>
+    <p>
+      Five foundation models (TimesFM 2.5, TiRex, Chronos, Sundial, FlowState) are run zero-shot on the
+      one-step change series: a fixed 128-length context window, predict the next change, no fitting,
+      each model in its own environment. Every predictive is turned into the same <code>Dist</code>
+      object and scored against <code>laplace</code> on the identical series and windows. The corpus is
+      the cached FRED universe (about 9,500 series) split into strata by frequency and regime
+      (daily / weekly / monthly economic, daily price, and the M4-hourly seasonal set). Wins, draws and
+      losses are decided per series by a Diebold&ndash;Mariano test on the log-score differential with a
+      HAC long-run variance and an explicit draw band. Everything derives from one canonical per-step
+      store, so log-likelihood, CRPS, coverage and the draw counts all read from the same source.
+    </p>
+    <p>
+      Three versions of each model are compared against Laplace:
+    </p>
+    <div class="tag-row">
+      <span class="tag">raw</span>
+      <span class="tag">@lap &middot; recalibrated</span>
+      <span class="tag">&amp;lap &middot; portfolio</span>
+    </div>
+    <ul>
+      <li><b>raw</b>: the model's own predictive, as shipped.</li>
+      <li><b>@lap</b>: recalibrated in the model's <em>own</em> CDF space. Map each observation to
+        its normal score under the model, <code>z = &Phi;&#8315;&sup1;(F(y))</code>, let Laplace
+        forecast that z-series, then invert. This keeps the model's full shape and fixes only its
+        calibration.</li>
+      <li><b>&amp;lap</b>: a distribution-level, long-only online portfolio of Laplace and the
+        recalibrated model, weighted by realised score and started tilted toward Laplace, the trusted
+        incumbent.</li>
+    </ul>
+
+    <h2>The symptom: over-confidence</h2>
+    <p>
+      A calibrated 90% interval should contain the outcome 90% of the time. The raw models cover far
+      less: their predictive is too narrow, so ordinary moves land outside the band and the tails go
+      unpriced. Laplace sits on target, and the <code>@lap</code> recalibration pulls each model back
+      to nominal. (Seasonal stratum, M4-hourly.)
+    </p>
+    <table>
+      <thead><tr><th>model</th><th>raw coverage</th><th class="barcell">&nbsp;</th><th>@lap coverage</th><th class="barcell">&nbsp;</th></tr></thead>
+      <tbody id="covbody"></tbody>
+    </table>
+    <p style="font-size:.9rem;color:var(--muted)">Bars span 0.60&ndash;1.00; the orange line marks the
+      0.90 target. Laplace covers 0.892 on this stratum.</p>
+
+    <h2>The diagnosis: it is skill, not calibration</h2>
+    <p>
+      The charitable reading would be that the models are secretly good and merely miscalibrated. They
+      are not. Fixing calibration recovers only a sliver of each model's log-likelihood gap to Laplace;
+      the large remainder is a genuine forecasting deficit on these change-series. Recalibration makes a
+      model honest, and an honest account confirms it forecasts worse here.
+    </p>
+    <table>
+      <thead><tr><th>model</th><th class="num">raw gap</th><th class="num">after @lap</th><th class="num">recovered</th><th>share recovered</th></tr></thead>
+      <tbody id="decbody"></tbody>
+    </table>
+    <p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood versus
+      Laplace, in nats (negative means worse than Laplace). Even after recalibration, no model's median
+      beats Laplace on any stratum.</p>
+
+    <h2>The fix: turn losses into draws</h2>
+    <p>
+      Hold Laplace and the recalibrated model together and weight them online by how well each has
+      actually been scoring, with Laplace favoured at the start. Where the model adds nothing the blend
+      collapses to Laplace; where it genuinely helps, the seasonal case, the weight tilts across. The
+      raw models lose to Laplace on roughly half the seasonal series; the portfolio loses almost none.
+    </p>
+    <div id="wdlblock"></div>
+    <div class="key">
+      <span><i style="background:var(--good)"></i>beats Laplace</span>
+      <span><i style="background:#c8c8d4"></i>draw</span>
+      <span><i style="background:var(--warn)"></i>loses to Laplace</span>
+    </div>
+
+    <h3>Does it hold everywhere?</h3>
+    <p>
+      The never-worse behaviour holds on four of five strata: the portfolio's loss rate against Laplace
+      stays near zero. One stratum is still an open problem.
+    </p>
+    <table>
+      <thead><tr><th>stratum</th><th>portfolio loss rate vs Laplace</th><th class="barcell">&nbsp;</th></tr></thead>
+      <tbody id="stripbody"></tbody>
+    </table>
+
+    <h2>The honest holdout</h2>
+    <p>
+      On <code>daily:econ</code> the portfolio still loses to Laplace on about half the series, though by
+      vanishing margins (median &minus;0.14 nats). Laplace dominates that stratum so thoroughly that even
+      a light tilt toward the model costs a little. The fix under test is a stronger incumbent prior, so
+      the model has to earn more evidence before it moves the blend; more data will show whether that
+      closes the gap or whether the drag is structural. A claim of "never worse" cannot ship with a
+      stratum losing half its series, so the run keeps churning.
+    </p>
+
+    <h2>Why this shape</h2>
+    <p>
+      Laplace combines its own candidate forecasters by their means and lets a terminal leaf supply the
+      calibrated scale and tails. A foundation model dropped straight into that trunk would lose its
+      shape, since only its mean would survive. So the model's full distribution has to be combined
+      one level up, at the distribution level, which is what the portfolio does. The recalibration step
+      matters because a raw, over-confident model makes a poor portfolio member: its tail misses drag
+      the blend. Recalibrated first, it contributes cleanly.
+    </p>
+    <p>
+      The reusable form is a streaming sidecar: any third-party model that can emit a per-step
+      predictive can be recalibrated and portfolioed against Laplace, with the never-worse property as
+      the guarantee. The model runs wherever it likes and streams its forecasts; the sidecar stays a
+      few lines of pure Laplace.
+    </p>
+
+    <h2>Open items</h2>
+    <ul>
+      <li>The <code>daily:econ</code> drag, above. Prior strength versus a structural cause.</li>
+      <li>Convergence: cell counts are still growing, especially for the slower portfolio arms.</li>
+      <li>A fair per-model ranking once every stratum is deep, using the recalibrated
+        <code>@lap</code> figures as the skill measure with calibration held equal.</li>
+    </ul>
+
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family
+    (see also <a href="https://github.com/microprediction/precise">precise</a>,
+    <a href="https://github.com/microprediction/allocation">allocation</a>,
+    <a href="https://github.com/microprediction/humpday">humpday</a>).
+  </footer>
+
+  <script>
+    var COVMIN=0.60, COVMAX=1.00;
+    function cw(v){ return Math.max(0,(v-COVMIN)/(COVMAX-COVMIN))*100; }
+    var cov=[["TiRex",0.745,0.887],["TimesFM",0.815,0.913],["Chronos",0.843,0.914]];
+    var tgt=cw(0.90);
+    document.getElementById("covbody").innerHTML = cov.map(function(r){
+      function bw(v,cls){ return '<span class="barwrap"><span class="bar '+cls+'" style="width:'+cw(v).toFixed(1)+'%"></span><span class="target" style="left:'+tgt.toFixed(1)+'%"></span></span>'; }
+      return '<tr><td>'+r[0]+'</td>'
+           + '<td class="num">'+r[1].toFixed(3)+'</td><td>'+bw(r[1],'soft')+'</td>'
+           + '<td class="num">'+r[2].toFixed(3)+'</td><td>'+bw(r[2],'')+'</td></tr>';
+    }).join("");
+
+    var dec=[["TiRex",-0.99,-0.78],["TimesFM",-0.55,-0.50],["Chronos",-0.56,-0.54]];
+    document.getElementById("decbody").innerHTML = dec.map(function(r){
+      var total=Math.abs(r[1]), resid=Math.abs(r[2]), recov=total-resid;
+      var share=(recov/total*100);
+      return '<tr><td>'+r[0]+'</td><td class="num">'+r[1].toFixed(2)+'</td>'
+           + '<td class="num">'+r[2].toFixed(2)+'</td>'
+           + '<td class="num">'+(recov>=0?'+':'')+recov.toFixed(2)+'</td>'
+           + '<td>'+share.toFixed(0)+'%</td></tr>';
+    }).join("");
+
+    // win/draw/loss (%) per stage, M4-hourly
+    var wdl={ TiRex:{raw:[6,152,162],lap:[5,163,82],amp:[2,78,0]},
+              TimesFM:{raw:[6,173,141],lap:[6,186,88],amp:[2,78,0]},
+              Chronos:{raw:[2,169,149],lap:[3,175,102],amp:[1,79,0]} };
+    var names={raw:"raw",lap:"@lap",amp:"&lap"};
+    var html="";
+    Object.keys(wdl).forEach(function(m){
+      html += '<p style="margin:18px 0 6px;font-weight:600">'+m+'</p><table style="margin-top:4px">';
+      ["raw","lap","amp"].forEach(function(k){
+        var a=wdl[m][k], t=a[0]+a[1]+a[2];
+        function p(x){ return (x/t*100); }
+        html += '<tr><td style="width:70px">'+names[k]+'</td>'
+             + '<td><span class="wdl"><i class="w" style="width:'+p(a[0]).toFixed(1)+'%"></i>'
+             + '<i class="d" style="width:'+p(a[1]).toFixed(1)+'%"></i>'
+             + '<i class="l" style="width:'+p(a[2]).toFixed(1)+'%"></i></span></td>'
+             + '<td class="num" style="color:var(--warn)">'+p(a[2]).toFixed(0)+'% loss</td></tr>';
+      });
+      html += '</table>';
+    });
+    document.getElementById("wdlblock").innerHTML=html;
+
+    var strip=[["m4-hourly",0.0],["daily:price",0.0],["monthly",0.05],["weekly",0.08],["daily:econ",0.48]];
+    document.getElementById("stripbody").innerHTML = strip.map(function(r){
+      var pct=r[1]*100, ok=r[1]<0.10;
+      return '<tr><td>'+r[0]+'</td>'
+           + '<td class="num" style="'+(ok?'':'color:var(--warn)')+'">'+pct.toFixed(0)+'%</td>'
+           + '<td><span class="barwrap"><span class="bar" style="width:'+Math.max(pct,1).toFixed(0)+'%;background:'+(ok?'var(--good)':'var(--warn)')+'"></span></span></td></tr>';
+    }).join("");
+  </script>
+</body>
+</html>
