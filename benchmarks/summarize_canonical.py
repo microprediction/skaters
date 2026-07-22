@@ -1,16 +1,25 @@
 """Derive the small, committable summaries from the canonical per-step store.
 
-Reads every benchmarks/preds/*.csv (the large, gitignored, regenerable per-step
-store) and writes two small CSVs that ARE committed and that the charts read:
+A mean of log-likelihood or CRPS ACROSS heterogeneous series is not an estimate
+of anything: a few near-constant series (where laplace's lattice scores many
+nats) dominate it, and raw-unit CRPS is swamped by a few huge-magnitude series.
+So this reports only PAIRED or SCALE-FREE aggregates, all relative to laplace on
+the series both cover:
 
-  canonical_summary_scores.csv   study, method, mean_ll, mean_crps, n_series, n_steps
-  canonical_summary_dm.csv       study, model, vs, win, draw, loss, n
+  canonical_summary_vs_laplace.csv
+      study, model, n_series, win, draw, loss,          # DM win/draw/loss (per series)
+      med_dLL, q25_dLL, q75_dLL,                         # per-series ΔLL = model - laplace
+      med_crps_ratio                                     # per-series CRPS_model / CRPS_laplace
 
-`study` is the corpus/stratum tag (daily/weekly/monthly/m4-hourly). The DM table
-is per-series Diebold-Mariano (HAC SE, draw band) of each model against laplace
-on the series both cover, split by stratum: the honest win/draw/loss replacement
-for argmax win-rates. Everything derives from the one store, so this is cheap to
-re-run as rounds accrue and the star maps converge.
+  canonical_summary_coverage.csv
+      study, method, n_steps, cov_central90, cal_median  # calibration from stored quantiles
+
+`study` is the stratum tag (frequency:regime). Win/draw/loss is per-series
+Diebold-Mariano (HAC SE, draw band). ΔLL is differenced per series so each
+series' intrinsic difficulty cancels; the MEDIAN (not mean) is reported so no
+single series dominates. CRPS is a per-series ratio (scale-free). Coverage is
+pooled over steps (each step a Bernoulli), the one honest absolute number.
+Everything derives from the one store, cheap to re-run as rounds accrue.
 """
 from __future__ import annotations
 import collections
@@ -25,23 +34,31 @@ import predictions as P
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PREDS = os.path.join(_HERE, "preds")
 BASELINE = "laplace"
+_COLS = ("y", "q05", "q50", "q95", "logpdf", "crps")
 
 
 def load_all():
-    """{(study, series, method): {'logpdf':arr, 'crps':arr}} across all shard files,
-    rows kept in file (step) order so per-series arrays align across methods."""
-    store = collections.defaultdict(lambda: {"logpdf": [], "crps": []})
-    for path in sorted(glob.glob(os.path.join(PREDS, "*.csv"))):
+    """{(study, series, method): {col: arr}} across all shard files, rows kept in
+    file (step) order so per-series arrays align across methods."""
+    store = collections.defaultdict(lambda: {c: [] for c in _COLS})
+    for path in sorted(glob.glob(os.path.join(PREDS, "*__*.csv"))):
         with open(path) as fh:
             for r in csv.DictReader(fh):
                 k = (r["study"], r["series"], r["method"])
-                for c in ("logpdf", "crps"):
+                for c in _COLS:
                     v = r.get(c, "")
                     store[k][c].append(float(v) if v not in ("", "nan") else np.nan)
     for d in store.values():
         for c in d:
             d[c] = np.asarray(d[c], float)
     return store
+
+
+def _series_mean(a, floor=None):
+    a = np.asarray(a, float)
+    if floor is not None:
+        a = np.maximum(a, floor)
+    return float(np.nanmean(a)) if np.isfinite(a).any() else np.nan
 
 
 def main():
@@ -52,48 +69,65 @@ def main():
     studies = sorted({s for (s, _, _) in store})
     methods = sorted({m for (_, _, m) in store})
 
-    # ---- per (study, method) mean scores ----
-    with open(os.path.join(_HERE, "canonical_summary_scores.csv"), "w", newline="") as fh:
+    # ---- paired, scale-free comparison of each model vs laplace ----
+    with open(os.path.join(_HERE, "canonical_summary_vs_laplace.csv"), "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["study", "method", "mean_ll", "mean_crps", "n_series", "n_steps"])
+        w.writerow(["study", "model", "n_series", "win", "draw", "loss",
+                    "med_dLL", "q25_dLL", "q75_dLL", "med_crps_ratio"])
         for study in studies:
-            for m in methods:
-                lls, crps, nser, nstep = [], [], 0, 0
-                for (st, s, mm), d in store.items():
-                    if st != study or mm != m:
-                        continue
-                    lp = np.maximum(d["logpdf"], -20.0)
-                    if np.isfinite(lp).any():
-                        lls.append(float(np.nanmean(lp)))
-                        crps.append(float(np.nanmean(d["crps"])))
-                        nser += 1
-                        nstep += int(np.isfinite(d["logpdf"]).sum())
-                if nser:
-                    w.writerow([study, m, f"{np.mean(lls):.6f}", f"{np.mean(crps):.6f}",
-                                nser, nstep])
-
-    # ---- per (study, model) DM win/draw/loss vs laplace ----
-    with open(os.path.join(_HERE, "canonical_summary_dm.csv"), "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["study", "model", "vs", "win", "draw", "loss", "n"])
-        for study in studies:
-            series_by = collections.defaultdict(set)
+            by = collections.defaultdict(set)
             for (st, s, m) in store:
                 if st == study:
-                    series_by[m].add(s)
-            base = series_by.get(BASELINE, set())
+                    by[m].add(s)
+            base = by.get(BASELINE, set())
             for m in methods:
                 if m == BASELINE:
                     continue
-                common = base & series_by.get(m, set())
+                common = sorted(base & by.get(m, set()))
+                if not common:
+                    continue
                 rec = {"win": 0, "draw": 0, "loss": 0}
+                dlls, ratios = [], []
                 for s in common:
-                    v, *_ = P.dm_contest(store[(study, s, m)]["logpdf"],
-                                         store[(study, s, BASELINE)]["logpdf"])
+                    dm = store[(study, s, m)]
+                    bl = store[(study, s, BASELINE)]
+                    v, *_ = P.dm_contest(dm["logpdf"], bl["logpdf"])
                     rec["win" if v == "A" else "loss" if v == "B" else "draw"] += 1
-                if common:
-                    w.writerow([study, m, BASELINE, rec["win"], rec["draw"],
-                                rec["loss"], len(common)])
+                    dlls.append(_series_mean(dm["logpdf"], -20.0)
+                                - _series_mean(bl["logpdf"], -20.0))
+                    cb = _series_mean(bl["crps"])
+                    cm = _series_mean(dm["crps"])
+                    if cb and np.isfinite(cb) and cb > 0 and np.isfinite(cm):
+                        ratios.append(cm / cb)
+                dlls = np.asarray(dlls, float)
+                w.writerow([study, m, len(common), rec["win"], rec["draw"], rec["loss"],
+                            f"{np.nanmedian(dlls):.4f}",
+                            f"{np.nanpercentile(dlls, 25):.4f}",
+                            f"{np.nanpercentile(dlls, 75):.4f}",
+                            f"{np.nanmedian(ratios):.4f}" if ratios else ""])
+
+    # ---- calibration: interval coverage from the stored quantiles ----
+    with open(os.path.join(_HERE, "canonical_summary_coverage.csv"), "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["study", "method", "n_steps", "cov_central90", "cal_median"])
+        for study in studies:
+            for m in methods:
+                ys, q05s, q50s, q95s = [], [], [], []
+                for (st, s, mm), d in store.items():
+                    if st == study and mm == m:
+                        ys.append(d["y"]); q05s.append(d["q05"])
+                        q50s.append(d["q50"]); q95s.append(d["q95"])
+                if not ys:
+                    continue
+                y = np.concatenate(ys); q05 = np.concatenate(q05s)
+                q50 = np.concatenate(q50s); q95 = np.concatenate(q95s)
+                ok = np.isfinite(y) & np.isfinite(q05) & np.isfinite(q95) & np.isfinite(q50)
+                n = int(ok.sum())
+                if not n:
+                    continue
+                cov = float(np.mean((y[ok] >= q05[ok]) & (y[ok] <= q95[ok])))
+                cal = float(np.mean(y[ok] <= q50[ok]))
+                w.writerow([study, m, n, f"{cov:.4f}", f"{cal:.4f}"])
 
     print(f"[summarize] {len(store)} (study,series,method) cells; "
           f"studies={studies}; methods={methods}", flush=True)

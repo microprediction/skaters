@@ -114,8 +114,8 @@ def commit_summaries(rnd):
     env["PYTHONPATH"] = f"{os.path.join(_ROOT, 'src')}:{_HERE}"
     subprocess.run([py, os.path.join(_HERE, "summarize_canonical.py")],
                    env=env, cwd=_ROOT)
-    subprocess.run(["git", "add", "benchmarks/canonical_summary_scores.csv",
-                    "benchmarks/canonical_summary_dm.csv"], cwd=_ROOT)
+    subprocess.run(["git", "add", "benchmarks/canonical_summary_vs_laplace.csv",
+                    "benchmarks/canonical_summary_coverage.csv"], cwd=_ROOT)
     subprocess.run(["git", "commit", "-q", "-m",
                     f"week-study: derived summaries after round {rnd}"], cwd=_ROOT)
 
