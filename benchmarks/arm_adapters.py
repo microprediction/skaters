@@ -29,6 +29,7 @@ import numpy as np
 
 import foundation_study as fs           # sample_dist, quantile_dist, CTX, TEST, laplace
 from skaters.api import laplace
+from skaters.dist import Dist
 from predictions import _norm_ppf as _nppf
 
 
@@ -270,6 +271,59 @@ def pit_sandwich(fm_fn):
     return run
 
 
+# ------------------------------------------------------------------ never-worse portfolio
+# laplace's trunk combines candidates by their MEANS only (the leaf re-supplies
+# scale), so an FM added there would lose its shape again. To keep the FM's full
+# distribution AND make laplace strictly-not-worse, combine at the DISTRIBUTION
+# level: a long-only online portfolio of {plain laplace, PIT-recalibrated FM},
+# weights updated by each component's realized log-score (geometric forgetting).
+# Because plain laplace is always a component, the portfolio converges to it
+# wherever the FM adds nothing, and tilts toward the FM where it helps.
+def mix_dists(dists, w):
+    """Weighted-CDF mixture of arbitrary Dists (works for SplicedDist too, which
+    exposes cdf/quantile but not .components), rebuilt as a quantile_dist on the
+    standard grid. F_mix(y) = sum_i w_i F_i(y); invert per level by bisection."""
+    lo = min(d.quantile(0.001) for d in dists)
+    hi = max(d.quantile(0.999) for d in dists)
+    if not (hi > lo):
+        hi = lo + 1e-9
+    qs = []
+    for p in _PITLEVELS:
+        a, b = lo, hi
+        for _ in range(40):
+            mid = 0.5 * (a + b)
+            if sum(wi * d.cdf(mid) for wi, d in zip(w, dists)) < p:
+                a = mid
+            else:
+                b = mid
+        qs.append(0.5 * (a + b))
+    return fs.quantile_dist(_PITLEVELS, list(np.maximum.accumulate(qs)))
+
+
+def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8):
+    """Arm = distribution-level long-only log-score portfolio of laplace and the
+    PIT-recalibrated FM. Never worse than plain laplace in the limit."""
+    pit = pit_sandwich(fm_fn)
+
+    def run(ch):
+        lap = laplace_dists(ch)
+        rec = pit(ch)
+        if rec is None or len(lap) != len(rec):
+            return None
+        y = ch[len(ch) - TEST:]
+        lw = [0.0, 0.0]; out = []
+        for i in range(len(lap)):
+            m = max(lw); w = [math.exp(x - m) for x in lw]; tot = sum(w)
+            w = [x / tot for x in w]
+            out.append(mix_dists([lap[i], rec[i]], w))       # predict y[i] from y[<i]
+            for j, d in enumerate((lap[i], rec[i])):          # then learn from y[i]
+                lp = d.logpdf(float(y[i]))
+                lp = 20.0 if lp > 20.0 else (-20.0 if not (lp >= -20.0) else lp)
+                lw[j] = forget * lw[j] + eta * lp
+        return out
+    return run
+
+
 # Foundation registry (Chronos / TimesFM reused from foundation_study). The
 # "+lap" arms are the laplace-calibrated sandwiches of the sharp quantile models.
 REGISTRY = {
@@ -291,4 +345,8 @@ REGISTRY = {
     "TimesFM@lap": pit_sandwich(fs.timesfm_dists),
     "TiRex@lap":   pit_sandwich(tirex_dists),
     "Chronos@lap": pit_sandwich(fs.chronos_dists),
+    # never-worse portfolio: laplace + PIT-recalibrated FM, online log-score blend
+    "TimesFM&lap": portfolio_sandwich(fs.timesfm_dists),
+    "TiRex&lap":   portfolio_sandwich(tirex_dists),
+    "Chronos&lap": portfolio_sandwich(fs.chronos_dists),
 }

@@ -75,6 +75,10 @@ MODELS = {
     "TimesFM@lap": (".venv-timesfm",   "C", {}),
     "TiRex@lap":   (".venv-tirex",     "C", {}),
     "Chronos@lap": (".venv-chronos",   "C", {}),
+    # never-worse portfolio: laplace + PIT-recalibrated FM (distribution-level):
+    "TimesFM&lap": (".venv-timesfm",   "C", {}),
+    "TiRex&lap":   (".venv-tirex",     "C", {}),
+    "Chronos&lap": (".venv-chronos",   "C", {}),
 }
 
 
