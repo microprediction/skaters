@@ -177,7 +177,7 @@
         <text x="66" y="40" font-size="11" fill="#1a8c4a">Laplace = 0 nats</text>
         <!-- raw -> @lap arrows -->
         <g stroke="#8f84ff" stroke-width="1.8">
-          <line x1="167.7" y1="312.6" x2="467.1" y2="259.3" marker-end="url(#ah)"/>
+          <line x1="167.7" y1="312.6" x2="468.9" y2="261.2" marker-end="url(#ah)"/>
           <line x1="324.6" y1="194.8" x2="525.1" y2="182.4" marker-end="url(#ah)"/>
           <line x1="387.3" y1="197.7" x2="527.4" y2="192.9" marker-end="url(#ah)"/>
         </g>
@@ -194,7 +194,7 @@
         </g>
         <!-- @lap points (filled) -->
         <g fill="#4a3aff" stroke="#fff" stroke-width="2">
-          <circle cx="478.9" cy="257.2" r="5.5"><title>TiRex@lap: coverage 0.887, −0.78 nats</title></circle>
+          <circle cx="480.7" cy="259.2" r="5.5"><title>TiRex@lap: coverage 0.888, −0.79 nats</title></circle>
           <circle cx="537.1" cy="181.7" r="5.5"><title>TimesFM@lap: coverage 0.913, −0.50 nats</title></circle>
           <circle cx="539.4" cy="192.5" r="5.5"><title>Chronos@lap: coverage 0.914, −0.54 nats</title></circle>
         </g>
@@ -238,7 +238,7 @@
       actually been scoring, with Laplace favoured at the start. Where the model adds nothing the blend
       collapses to Laplace; where it genuinely helps, the seasonal case, the weight tilts across. The
       raw models lose to Laplace on roughly half the seasonal series; the portfolio loses almost none
-      and beats Laplace outright on one series in ten.
+      and beats Laplace outright on one series in eight.
     </p>
     <div id="wdlblock"></div>
     <div class="key">
@@ -281,7 +281,7 @@
     <p>
       The reusable form is a streaming sidecar: any third-party model that can emit a per-step
       predictive can be wrapped and portfolioed against Laplace. Never-worse is the design target;
-      three of five strata sit at or under a 6% loss rate, with weekly at 11% and daily economic
+      three of five strata sit at or under a 7% loss rate, with weekly at 11% and daily economic
       the holdout. The model runs wherever it likes and streams its
       forecasts; the sidecar stays a few lines of pure Laplace.
     </p>
@@ -307,7 +307,7 @@
   <script>
     var COVMIN=0.60, COVMAX=1.00;
     function cw(v){ return Math.max(0,(v-COVMIN)/(COVMAX-COVMIN))*100; }
-    var cov=[["TiRex",0.745,0.887],["TimesFM",0.815,0.913],["Chronos",0.843,0.914]];
+    var cov=[["TiRex",0.745,0.888],["TimesFM",0.815,0.913],["Chronos",0.843,0.914]];
     var tgt=cw(0.90);
     document.getElementById("covbody").innerHTML = cov.map(function(r){
       function bw(v,cls){ return '<span class="barwrap"><span class="bar '+cls+'" style="width:'+cw(v).toFixed(1)+'%"></span><span class="target" style="left:'+tgt.toFixed(1)+'%"></span></span>'; }
@@ -316,7 +316,7 @@
            + '<td class="num">'+r[2].toFixed(3)+'</td><td>'+bw(r[2],'')+'</td></tr>';
     }).join("");
 
-    var dec=[["TiRex",-0.99,-0.78],["TimesFM",-0.55,-0.50],["Chronos",-0.56,-0.54]];
+    var dec=[["TiRex",-0.99,-0.79],["TimesFM",-0.55,-0.50],["Chronos",-0.56,-0.54]];
     document.getElementById("decbody").innerHTML = dec.map(function(r){
       var total=Math.abs(r[1]), resid=Math.abs(r[2]), recov=total-resid;
       var share=(recov/total*100);
@@ -327,9 +327,9 @@
     }).join("");
 
     // win/draw/loss (%) per stage, M4-hourly
-    var wdl={ TiRex:{raw:[6,152,162],lap:[5,163,82],amp:[25,214,1]},
-              TimesFM:{raw:[6,173,141],lap:[6,186,88],amp:[27,213,0]},
-              Chronos:{raw:[2,169,149],lap:[3,175,102],amp:[24,216,0]} };
+    var wdl={ TiRex:{raw:[6,152,162],lap:[8,177,95],amp:[37,242,1]},
+              TimesFM:{raw:[6,173,141],lap:[6,186,88],amp:[40,240,0]},
+              Chronos:{raw:[2,169,149],lap:[3,175,102],amp:[34,245,1]} };
     var names={raw:"raw",lap:"@lap",amp:"&lap"};
     var html="";
     Object.keys(wdl).forEach(function(m){
@@ -347,7 +347,7 @@
     });
     document.getElementById("wdlblock").innerHTML=html;
 
-    var strip=[["m4-hourly",0.001],["daily:price",0.031],["monthly",0.063],["weekly",0.113],["daily:econ",0.360]];
+    var strip=[["m4-hourly",0.002],["daily:price",0.029],["monthly",0.073],["weekly",0.108],["daily:econ",0.357]];
     document.getElementById("stripbody").innerHTML = strip.map(function(r){
       var pct=r[1]*100, ok=r[1]<0.10;
       return '<tr><td>'+r[0]+'</td>'
