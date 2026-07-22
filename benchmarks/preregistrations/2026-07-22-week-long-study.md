@@ -72,10 +72,30 @@ arms on a ~3k sample, to characterize horizon decay and the multi-scale default.
 - H5: a covariance-aware **blend gives a small but real lift** where selection
   did not — the open question worth the week.
 
-## Orchestration
+## Orchestration — round-robin across strata (anytime-broad, converging)
 
-- Driver cycles the tiers in priority order (A, then B, then C, then horizons),
-  each a **resumable** append-mode run keyed on (series, method) done-sets.
+The key scheduling rule: **breadth-first, not depth-first.** Do not finish one
+model or one regime before starting the next. Instead wrap around the strata so
+every checkpoint holds the whole picture at growing resolution.
+
+- Partition the universe into **strata** = (regime x frequency x family) cells,
+  which are exactly the radar axes and the frontier's regions.
+- The driver runs in **ROUNDS**. Each round draws a small EQUAL sample of
+  not-yet-covered series from EVERY stratum and scores the affordable models on
+  it, appending to the canonical store. It fills the **thinnest cells first**, so
+  coverage stays uniform across strata and models.
+- After round 1 every (stratum x model) cell has a few points: broad but noisy.
+  Each round deepens every cell uniformly, so the derived estimates (win/draw/
+  loss rates, mean LL, each radar axis) **converge** rather than appearing one
+  region at a time.
+- **Every K rounds, regenerate and commit** the derived summaries plus the
+  frontier and the radar (win/draw/loss). The committed charts visibly sharpen
+  through the week — the star maps start noisy and settle. Anytime property: the
+  run is useful and broad if stopped at any moment.
+- Slow arms (TabFM, Orbit, GAS, TiRex, flowstate) take a smaller per-round
+  sample per stratum, so they converge slower but never leave a stratum empty.
+- **Resumable:** per-cell coverage in the canonical store IS the state; a restart
+  resumes the round-robin wherever coverage is thinnest. No round redoes work.
 - **7-day caffeinate.** Everything survives kill/restart.
 - Tier C arms run in their own venvs and emit the same canonical predictions;
   a merge step unifies them (no shared environment, `Dist`/scores are the wire).
