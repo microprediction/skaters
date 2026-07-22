@@ -19,6 +19,7 @@ materials developed at NXAI under the NXAI Community License; flowstate uses the
 ibm-research research checkpoint (arXiv:2508.05287), research-use only.
 """
 from __future__ import annotations
+import math
 import os
 import sys
 
@@ -28,6 +29,11 @@ import numpy as np
 
 import foundation_study as fs           # sample_dist, quantile_dist, CTX, TEST, laplace
 from skaters.api import laplace
+from predictions import _norm_ppf as _nppf
+
+
+def _ncdf(z):
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
 CTX, TEST = fs.CTX, fs.TEST
 LEVELS9 = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -221,6 +227,49 @@ def _resid_sandwich(fm_fn):
     return run
 
 
+# ------------------------------------------------------------------ PIT recalibration sandwich
+# Keep the FM's FULL predictive (scale and shape), fix only its calibration.
+# Transform the observation through the FM's own CDF into normal-score space,
+#   z_t = Phi^{-1}(F_t(y_t)),
+# which is iid N(0,1) exactly when the FM is calibrated. Let laplace predict that
+# z-series (its home turf) -> predictive G_t for z_t. Invert back through the FM
+# CDF: the recalibrated p-quantile of y is F_t^{-1}(Phi(G_t^{-1}(p))). If the FM
+# is calibrated, laplace learns z~N(0,1) and this passes the FM through unchanged;
+# where the FM is over-confident, laplace's wider z-predictive widens it; when the
+# miscalibration waxes and wanes, laplace's online scale tracks it. This is the
+# "take their CDF, predict in the middle, go back" sandwich.
+_PITLEVELS = [0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5,
+              0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99]
+
+
+def pit_sandwich(fm_fn):
+    """Arm = laplace recalibration of the FM in its own PIT/normal-score space."""
+    def run(ch):
+        target = TEST
+        old = fs.TEST
+        try:
+            fs.TEST = target + _RESID_WARM
+            fmx = fm_fn(ch)
+        finally:
+            fs.TEST = old
+        if fmx is None or len(fmx) < target + _RESID_WARM:
+            return None
+        ext = len(ch) - (target + _RESID_WARM)
+        f = laplace(1); st = None; pend = None; out = []
+        for i, fd in enumerate(fmx):
+            yt = ch[ext + i]
+            if pend is not None and i >= _RESID_WARM:
+                G = pend
+                yq = [fd.quantile(min(max(_ncdf(G.quantile(p)), 1e-6), 1 - 1e-6))
+                      for p in _PITLEVELS]
+                yq = list(np.maximum.accumulate(yq))     # numerical monotonicity
+                out.append(fs.quantile_dist(_PITLEVELS, yq))
+            u = min(max(fd.cdf(yt), 1e-6), 1 - 1e-6)
+            d, st = f(_nppf(u), st); pend = d[0]
+        return out
+    return run
+
+
 # Foundation registry (Chronos / TimesFM reused from foundation_study). The
 # "+lap" arms are the laplace-calibrated sandwiches of the sharp quantile models.
 REGISTRY = {
@@ -238,4 +287,8 @@ REGISTRY = {
     "TimesFM~lap": _resid_sandwich(fs.timesfm_dists),
     "TiRex~lap":   _resid_sandwich(tirex_dists),
     "Chronos~lap": _resid_sandwich(fs.chronos_dists),
+    # PIT recalibration: laplace predicts in the FM's own CDF space, then inverts
+    "TimesFM@lap": pit_sandwich(fs.timesfm_dists),
+    "TiRex@lap":   pit_sandwich(tirex_dists),
+    "Chronos@lap": pit_sandwich(fs.chronos_dists),
 }

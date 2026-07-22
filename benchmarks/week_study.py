@@ -71,6 +71,10 @@ MODELS = {
     "TimesFM~lap": (".venv-timesfm",   "C", {}),
     "TiRex~lap":   (".venv-tirex",     "C", {}),
     "Chronos~lap": (".venv-chronos",   "C", {}),
+    # PIT recalibration (keep FM shape, fix calibration in z-space):
+    "TimesFM@lap": (".venv-timesfm",   "C", {}),
+    "TiRex@lap":   (".venv-tirex",     "C", {}),
+    "Chronos@lap": (".venv-chronos",   "C", {}),
 }
 
 
