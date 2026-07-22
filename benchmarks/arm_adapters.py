@@ -300,10 +300,19 @@ def mix_dists(dists, w):
     return fs.quantile_dist(_PITLEVELS, list(np.maximum.accumulate(qs)))
 
 
-def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8):
+_LAP_PRIOR = float(os.environ.get("PORT_LAP_PRIOR", "2.0"))
+
+
+def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None):
     """Arm = distribution-level long-only log-score portfolio of laplace and the
-    PIT-recalibrated FM. Never worse than plain laplace in the limit."""
+    PIT-recalibrated FM. laplace is the trusted incumbent: the weights start
+    tilted to it (``lap_prior`` log-units) so the FM must EARN weight through
+    realized log-score before it shifts the blend. This removes the finite-window
+    drag on strata where laplace dominates (e.g. daily:econ) while still letting
+    a genuinely-better FM take over fast (seasonal). Never worse than plain
+    laplace in the limit; near-never-worse in the window with the prior."""
     pit = pit_sandwich(fm_fn)
+    prior = _LAP_PRIOR if lap_prior is None else lap_prior
 
     def run(ch):
         lap = laplace_dists(ch)
@@ -311,7 +320,7 @@ def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8):
         if rec is None or len(lap) != len(rec):
             return None
         y = ch[len(ch) - TEST:]
-        lw = [0.0, 0.0]; out = []
+        lw = [prior, 0.0]; out = []
         for i in range(len(lap)):
             m = max(lw); w = [math.exp(x - m) for x in lw]; tot = sum(w)
             w = [x / tot for x in w]
