@@ -164,8 +164,15 @@ from skaters.leaf import leaf
 from skaters.transform import ou_transform, yeo_johnson
 
 f = conjugate(leaf(k=10), ou_transform(kappa=0.1), k=10)                       # linear (spreads)
-f = conjugate(conjugate(leaf(k=10), ou_transform(0.1), k=10), yeo_johnson(0.5), k=10)  # positive (vol/rates)
+f = conjugate(conjugate(leaf(k=10), ou_transform(0.1), k=10), yeo_johnson(0.5, exact=True), k=10)  # positive (vol/rates)
 ```
+
+`exact=True` maps the predictive back through the exact change of variables
+instead of the component-wise delta method, which cannot carry the skew of the
+coordinate change. The difference grows with horizon: at `h=10` on strictly
+positive FRED levels it is worth a median +0.015 to +0.018 nats of held-out
+log-likelihood (72–78% of series), and at `h=1` the two agree. The candidate
+pool keeps the default (its one-step spreads are where they agree).
 
 `laplace(k>1)` already carries an OU group in its pool, so the general forecaster
 picks up reversion automatically at multi-step horizons. The OU-on-a-coordinate
@@ -230,9 +237,9 @@ Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inve
 | `standardize(`$\alpha$`)` | $y'_t = (y_t - \hat\mu_t) / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D + \hat\mu_t$ | Remove scale |
 | `garch(`$\omega, \alpha, \beta$`)` | $y'_t = y_t / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D$ | Volatility clustering |
 | `seasonal_difference(`$s$`)` | $y'_t = y_t - y_{t-s}$ | Shift by lagged value | Periodicity |
-| `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method | Tail compression |
+| `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method (`exact=True` for the pushforward) | Tail compression |
 | `theta(`$\alpha$`)` | $y'_t = y_t - \text{SES}_t$ | Shift by smoothed level + drift | Theta method (M3 winner) |
-| `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Component-wise delta method | Coordinate learning (log/root/linear) |
+| `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Delta method (`exact=True` for the pushforward) | Coordinate learning (log/root/linear) |
 | `ou_transform(`$\kappa$`)` | Deviation from running mean, OU speed $\kappa$ | Exact OU moments (scale + shift) | Mean reversion |
 
 ## Conjugation

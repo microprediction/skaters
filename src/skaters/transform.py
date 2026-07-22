@@ -759,7 +759,29 @@ def seasonal_scale(period: int, alpha: float = 0.05, center: bool = False,
 # Signed power transform (works on any real value)
 # ---------------------------------------------------------------------------
 
-def power_transform(p: float = 0.5):
+def _exact_inverse_k(inv_fn):
+    """Build an inverse_k that emits the exact pushforward.
+
+    The table window adapts to each predictive: [m - 10s, m + 10s] over the
+    mixture. A fixed window fails in level coordinates (positive levels live
+    at z ~ 2 sqrt(y) under lambda = 0.5, far from any static range) and
+    everything beyond a table extrapolates with the wrong curvature.
+    """
+    from skaters.pushforward import PushforwardDist, table_from_map
+
+    def inverse_k(dists: list, state: dict) -> list:
+        out = []
+        for d in dists:
+            lo = min(m - 10.0 * s for _, m, s in d.components)
+            hi = max(m + 10.0 * s for _, m, s in d.components)
+            ys, zs = table_from_map(inv_fn, lo, hi)
+            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
+        return out
+
+    return inverse_k
+
+
+def power_transform(p: float = 0.5, exact: bool = False):
     """Signed power transform: compresses large values, handles negatives.
 
     Forward:   y'_t = sign(y_t) * |y_t|^p
@@ -768,15 +790,20 @@ def power_transform(p: float = 0.5):
     For 0 < p < 1, this compresses the tails (like log) but works on
     all reals — no explosion on negatives.
 
-    The inverse is nonlinear, so we linearize around the Dist mean
-    for each component: if y' ~ N(mu, sigma^2) in transformed space,
-    the inverse is approximately:
+    By default the inverse linearizes around each component's mean
+    (delta method):
         mean_orig = sign(mu) * |mu|^(1/p)
-        std_orig  = sigma * (1/p) * |mu|^(1/p - 1)   (delta method)
+        std_orig  = sigma * (1/p) * |mu|^(1/p - 1)
+
+    ``exact=True`` emits the exact pushforward instead (see
+    :mod:`skaters.pushforward` and :func:`yeo_johnson` for when the delta
+    method's missing skew becomes material).
 
     Args:
         p: power in (0, 1). Smaller = more compression.
            p=0.5 is the signed square root.
+        exact: emit :class:`PushforwardDist` (exact change of variables)
+            instead of delta-method component mapping.
     """
     assert 0 < p < 1
     inv_p = 1.0 / p
@@ -807,10 +834,10 @@ def power_transform(p: float = 0.5):
             result.append(Dist(components))
         return result
 
-    return forward, inverse_k
+    return forward, (_exact_inverse_k(_inv) if exact else inverse_k)
 
 
-def yeo_johnson(lmbda: float = 0.0):
+def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
     """Yeo-Johnson coordinate transform — the signed Box-Cox family.
 
     A one-parameter family that picks the *coordinate in which the series is
@@ -824,8 +851,18 @@ def yeo_johnson(lmbda: float = 0.0):
         y >= 0:  ((y+1)**L - 1) / L            (L != 0);   log(y+1)      (L == 0)
         y <  0:  -(((-y+1)**(2-L) - 1)/(2-L))  (L != 2);  -log(-y+1)     (L == 2)
 
-    The inverse is nonlinear, so each Dist component is mapped by the exact
-    inverse on the mean and the delta method on the std (deriv = d inv / dy').
+    By default each Dist component is mapped by the exact inverse on the mean
+    and the delta method on the std (deriv = d inv / dy'). The delta method
+    cannot carry the skew of the coordinate change (the mapped mixture is
+    location-symmetric about the mapped median) and its error grows with the
+    predictive spread, hence with horizon. ``exact=True`` emits the exact
+    pushforward (:class:`skaters.pushforward.PushforwardDist`) instead: on
+    120 strictly positive FRED level series under the standalone composition
+    from the README (leaf under OU under Yeo-Johnson, k=10), exact beats
+    delta by a median +0.018 nats at h=10 (72% of series) at lmbda=0, and
+    +0.015 (78%) at lmbda=0.5, with h=1 a wash. Inside the candidate pool the
+    trunk consumes means, one-step likelihoods and warm-up mixtures, all at
+    small spreads where the two agree, so the pool keeps the default.
 
     Fit the *family* the NFL-safe way: put a coarse grid of lmbda in the
     candidate pool (see :func:`skaters.api._build_candidates`) and let the
@@ -834,6 +871,9 @@ def yeo_johnson(lmbda: float = 0.0):
     Args:
         lmbda: the transform parameter. 0 = log1p (multiplicative / non-negative),
             1 = identity, 0.5 = signed-sqrt-ish compression.
+        exact: emit :class:`PushforwardDist` (exact change of variables)
+            instead of delta-method component mapping. Prefer it for
+            standalone conjugation at multi-step horizons.
     """
     L = float(lmbda)
 
@@ -881,7 +921,7 @@ def yeo_johnson(lmbda: float = 0.0):
             result.append(Dist(comps))
         return result
 
-    return forward, inverse_k
+    return forward, (_exact_inverse_k(_inv) if exact else inverse_k)
 
 
 # ---------------------------------------------------------------------------
