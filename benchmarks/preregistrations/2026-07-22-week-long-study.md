@@ -124,8 +124,20 @@ Novel distributional mechanisms (Tier C, own env, stratified sample):
 Refresh existing (upgrade, not new entries): **TimesFM 2.5** (now a quantile
 head, so LL/CRPS-scoreable) and **Chronos-2**.
 
-Skip: Time-MoE, IBM TTM/Granite, UniTS, base VisionTS — point-only, no density;
-Moirai-MoE / Moirai-2.0 — CC-BY-NC (non-commercial); TimeGPT — closed API.
+From the HF Hub direct search (2026-07-22), two more genuinely probabilistic,
+tiny, fresh architectures:
+- **TiRex** (NX-AI, 35M, xLSTM) — point + quantiles, univariate zero-shot.
+  License: NXAI *community* (not plain Apache; verify like TabPFN).
+- **flowstate** (IBM, ~18M, SSM + functional-basis decoder) — 9-quantile output,
+  zero-shot. Apache-2.0 but *research-use only* (commercial -> Granite).
+
+Skip: Time-MoE, IBM TTM/Granite, UniTS, base VisionTS, MOMENT — point-only or
+representation, no density; Moirai-MoE / Moirai-2.0 — non-commercial license;
+Kronos — probabilistic (MIT) but financial OHLCV-specific, not general univariate
+(keep for a dedicated price study); TimeGPT — closed API.
+
+License note: TabPFN-TS, TiRex, and flowstate are NOT plain-permissive — decide
+per model whether the terms are acceptable before shipping any result publicly.
 
 Priority for the week: the Tier-A cheap adds first (immediate, real new angle in
 UCM), then the CPU-light novel ones (Sundial, TabPFN-TS), then Toto / DeepAR /
