@@ -153,13 +153,89 @@ def tabpfn_dists(ch):
         print(f"  tabpfn failed: {e}", flush=True); return None
 
 
-# Foundation registry (Chronos / TimesFM reused from foundation_study).
+# ------------------------------------------------------------------ calibration sandwich
+# The coverage table showed the foundation models are sharp but OVER-CONFIDENT
+# (90% intervals cover ~0.66-0.86), while laplace is well-calibrated (~0.90). So
+# recalibrate the model with laplace by averaging their predictive QUANTILE
+# functions per step (Vincentization): this widens the over-tight model intervals
+# toward laplace's calibrated spread while keeping the model's center/shape where
+# it is sharper (seasonal). Both sub-predictives are computed on the identical
+# window in the model's own venv (laplace is pure-skaters). The combined Dist is
+# rebuilt from the averaged quantiles via the same quantile_dist helper.
+_VLEVELS = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98]
+
+
+def vincentize(dists_a, dists_b):
+    """Per-step quantile-averaged combination of two per-step Dist lists."""
+    if dists_a is None or dists_b is None:
+        return None
+    out = []
+    for da, db in zip(dists_a, dists_b):
+        qa = np.array([da.quantile(p) for p in _VLEVELS])
+        qb = np.array([db.quantile(p) for p in _VLEVELS])
+        out.append(fs.quantile_dist(_VLEVELS, 0.5 * (qa + qb)))
+    return out
+
+
+def _sandwich(fm_fn):
+    """Arm = quantile-average of a foundation model with laplace, same window."""
+    def run(ch):
+        return vincentize(fm_fn(ch), laplace_dists(ch))
+    return run
+
+
+# ------------------------------------------------------------------ adaptive residual sandwich
+# The static blend borrows laplace's AVERAGE width; it can't track calibration
+# that waxes and wanes. This instead uses the FM only for LOCATION and lets
+# laplace model the residual (y - FM_median) online: laplace's scale adapts to
+# volatility clustering and its GPD tails are calibrated, so the interval width
+# breathes with the conditional uncertainty. The FM is run over an extended
+# window (target + warmup) so laplace has residual history and the scored steps
+# still align exactly with every other arm's last TEST steps.
+_RESID_WARM = int(os.environ.get("FM_RESID_WARM", "128"))
+
+
+def _resid_sandwich(fm_fn):
+    """Arm = FM location + laplace on the FM residual stream (adaptive scale)."""
+    def run(ch):
+        target = TEST                       # stable scored-window length
+        old = fs.TEST
+        try:
+            fs.TEST = target + _RESID_WARM  # FM forecasts the extended window
+            fmx = fm_fn(ch)
+        finally:
+            fs.TEST = old
+        if fmx is None or len(fmx) < target + _RESID_WARM:
+            return None
+        locs = [d.quantile(0.5) for d in fmx]
+        ext = len(ch) - (target + _RESID_WARM)
+        resid = [ch[ext + i] - locs[i] for i in range(len(locs))]
+        f = laplace(1); st = None; pend = None; out = []
+        for i, rt in enumerate(resid):
+            if pend is not None and i >= _RESID_WARM:
+                base = pend[0]; loc = locs[i]
+                out.append(fs.quantile_dist(_VLEVELS,
+                                            [loc + base.quantile(p) for p in _VLEVELS]))
+            d, st = f(rt, st); pend = d
+        return out
+    return run
+
+
+# Foundation registry (Chronos / TimesFM reused from foundation_study). The
+# "+lap" arms are the laplace-calibrated sandwiches of the sharp quantile models.
 REGISTRY = {
-    "laplace":   laplace_dists,
-    "Sundial":   sundial_dists,
-    "TiRex":     tirex_dists,
-    "flowstate": flowstate_dists,
-    "TabPFN":    tabpfn_dists,
-    "Chronos":   fs.chronos_dists,
-    "TimesFM":   fs.timesfm_dists,
+    "laplace":     laplace_dists,
+    "Sundial":     sundial_dists,
+    "TiRex":       tirex_dists,
+    "flowstate":   flowstate_dists,
+    "TabPFN":      tabpfn_dists,
+    "Chronos":     fs.chronos_dists,
+    "TimesFM":     fs.timesfm_dists,
+    "TimesFM+lap": _sandwich(fs.timesfm_dists),
+    "TiRex+lap":   _sandwich(tirex_dists),
+    "Chronos+lap": _sandwich(fs.chronos_dists),
+    # adaptive: FM location + laplace conditional scale/tails on the residual
+    "TimesFM~lap": _resid_sandwich(fs.timesfm_dists),
+    "TiRex~lap":   _resid_sandwich(tirex_dists),
+    "Chronos~lap": _resid_sandwich(fs.chronos_dists),
 }

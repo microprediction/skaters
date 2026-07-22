@@ -56,13 +56,21 @@ _BASE_ENV = {"CUDA_VISIBLE_DEVICES": "", "PYTORCH_ENABLE_MPS_FALLBACK": "1",
 # ---- models: name -> (venv, tier, extra_env). Tier A = fast/big batch. ----------
 # TabPFN is included only when TABPFN_TOKEN is set (one-time license acceptance).
 MODELS = {
-    "laplace":   (".venv-sota",      "A", {}),
-    "Sundial":   (".venv-sundial",   "C", {}),
-    "TiRex":     (".venv-tirex",     "C", {}),
-    "flowstate": (".venv-flowstate", "C", {}),
-    "Chronos":   (".venv-chronos",   "C", {}),
-    "TimesFM":   (".venv-timesfm",   "C", {}),
-    "TabPFN":    (".venv-tabpfn",    "C", {}),
+    "laplace":     (".venv-sota",      "A", {}),
+    "Sundial":     (".venv-sundial",   "C", {}),
+    "TiRex":       (".venv-tirex",     "C", {}),
+    "flowstate":   (".venv-flowstate", "C", {}),
+    "Chronos":     (".venv-chronos",   "C", {}),
+    "TimesFM":     (".venv-timesfm",   "C", {}),
+    "TabPFN":      (".venv-tabpfn",    "C", {}),
+    # laplace-calibrated sandwiches (quantile-averaged with laplace, own venv):
+    "TimesFM+lap": (".venv-timesfm",   "C", {}),
+    "TiRex+lap":   (".venv-tirex",     "C", {}),
+    "Chronos+lap": (".venv-chronos",   "C", {}),
+    # adaptive residual sandwiches (FM location + laplace conditional scale):
+    "TimesFM~lap": (".venv-timesfm",   "C", {}),
+    "TiRex~lap":   (".venv-tirex",     "C", {}),
+    "Chronos~lap": (".venv-chronos",   "C", {}),
 }
 
 
