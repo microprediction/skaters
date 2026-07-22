@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters &mdash; Every foundation model needs a sidecar</title>
-  <meta name="description" content="A large-scale, calibration-normalised comparison of zero-shot time-series foundation models against the Laplace online ensemble, and a model-agnostic sidecar that makes any of them safe to use." />
+  <meta name="description" content="A large-scale, coverage-matched comparison of zero-shot time-series foundation models against the Laplace online ensemble, and a model-agnostic sidecar that makes any of them safe to use." />
   <link rel="stylesheet" href="./academic.css" />
   <style>
     /* page-local: lightweight inline bars, in the site palette */
@@ -96,25 +96,27 @@
     </p>
     <div class="tag-row">
       <span class="tag">raw</span>
-      <span class="tag">@lap &middot; recalibrated</span>
+      <span class="tag">@lap &middot; laplace-driven</span>
       <span class="tag">&amp;lap &middot; portfolio</span>
     </div>
     <ul>
       <li><b>raw</b>: the model's own predictive, as shipped.</li>
-      <li><b>@lap</b>: recalibrated in the model's <em>own</em> CDF space. Map each observation to
+      <li><b>@lap</b>: Laplace forecasting the model's normal scores. Map each observation to
         its normal score under the model, <code>z = &Phi;&#8315;&sup1;(F(y))</code>, let Laplace
-        forecast that z-series, then invert. This keeps the model's full shape and fixes only its
-        calibration.</li>
+        forecast that z-series online, then invert. The model's full shape is kept, and Laplace
+        supplies the location and scale of the z-series step by step, which fixes coverage and also
+        tracks error dynamics the model missed. That is more than a recalibration map, so this arm
+        flatters the model.</li>
       <li><b>&amp;lap</b>: a distribution-level, long-only online portfolio of Laplace and the
-        recalibrated model, weighted by realised score and started tilted toward Laplace, the trusted
-        incumbent.</li>
+        model's <code>@lap</code> wrap, weighted by realised score and started tilted toward Laplace,
+        the trusted incumbent.</li>
     </ul>
 
     <h2>The symptom: over-confidence</h2>
     <p>
       A calibrated 90% interval should contain the outcome 90% of the time. The raw models cover far
       less: their predictive is too narrow, so ordinary moves land outside the band and the tails go
-      unpriced. Laplace sits on target, and the <code>@lap</code> recalibration pulls each model back
+      unpriced. Laplace sits on target, and the <code>@lap</code> wrap pulls each model back
       to nominal. (Seasonal stratum, M4-hourly.)
     </p>
     <table>
@@ -124,24 +126,26 @@
     <p style="font-size:.9rem;color:var(--muted)">Bars span 0.60&ndash;1.00; the orange line marks the
       0.90 target. Laplace covers 0.892 on this stratum.</p>
 
-    <h2>The diagnosis: it is skill, not calibration</h2>
+    <h2>The diagnosis: the gap is skill</h2>
     <p>
-      The charitable reading would be that the models are secretly good and merely miscalibrated. They
-      are not. Fixing calibration recovers only a sliver of each model's log-likelihood gap to Laplace;
-      the large remainder is a genuine forecasting deficit on these change-series. Recalibration fixes
-      the coverage, and the recalibrated model still scores worse here.
+      The charitable reading would be that the models are secretly good and merely miscalibrated.
+      You can't just fix this by Platt scaling or conformal leveling. The <code>@lap</code> column
+      bounds the charitable reading from above, and generously: Laplace driving the z-series fixes
+      coverage and also tracks error dynamics the model missed, so it recovers more than any static
+      remap could. Even with that help, only a sliver of each model's log-likelihood gap to Laplace
+      closes; the large remainder is a forecasting deficit on these change-series.
     </p>
     <table>
       <thead><tr><th>model</th><th class="num">raw gap</th><th class="num">after @lap</th><th class="num">recovered</th><th>share recovered</th></tr></thead>
       <tbody id="decbody"></tbody>
     </table>
     <p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood versus
-      Laplace, in nats (negative means worse than Laplace). Even after recalibration, no model's median
+      Laplace, in nats (negative means worse than Laplace). Even laplace-driven, no model's median
       beats Laplace on any stratum.</p>
 
     <h2>The fix: turn losses into draws</h2>
     <p>
-      Hold Laplace and the recalibrated model together and weight them online by how well each has
+      Hold Laplace and the <code>@lap</code> wrap together and weight them online by how well each has
       actually been scoring, with Laplace favoured at the start. Where the model adds nothing the blend
       collapses to Laplace; where it genuinely helps, the seasonal case, the weight tilts across. The
       raw models lose to Laplace on roughly half the seasonal series; the portfolio loses almost none.
@@ -178,13 +182,13 @@
       Laplace combines its own candidate forecasters by their means and lets a terminal leaf supply the
       calibrated scale and tails. A foundation model dropped straight into that trunk would lose its
       shape, since only its mean would survive. So the model's full distribution has to be combined
-      one level up, at the distribution level, which is what the portfolio does. The recalibration step
+      one level up, at the distribution level, which is what the portfolio does. The normal-score step
       matters because a raw, over-confident model makes a poor portfolio member: its tail misses drag
-      the blend. Recalibrated first, it contributes cleanly.
+      the blend. Wrapped first, it contributes cleanly.
     </p>
     <p>
       The reusable form is a streaming sidecar: any third-party model that can emit a per-step
-      predictive can be recalibrated and portfolioed against Laplace, with the never-worse property as
+      predictive can be wrapped and portfolioed against Laplace, with the never-worse property as
       the guarantee. The model runs wherever it likes and streams its forecasts; the sidecar stays a
       few lines of pure Laplace.
     </p>
@@ -193,8 +197,8 @@
     <ul>
       <li>The <code>daily:econ</code> drag, above. Prior strength versus a structural cause.</li>
       <li>Convergence: cell counts are still growing, especially for the slower portfolio arms.</li>
-      <li>A fair per-model ranking once every stratum is deep, using the recalibrated
-        <code>@lap</code> figures as the skill measure with calibration held equal.</li>
+      <li>A fair per-model ranking once every stratum is deep, using the
+        <code>@lap</code> figures as the skill measure, with coverage held equal.</li>
     </ul>
 
   </main>
