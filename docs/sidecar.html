@@ -144,6 +144,94 @@
       Laplace, in nats (negative means worse than Laplace). Even laplace-driven, no model's median
       beats Laplace on any stratum.</p>
 
+    <p>The <a href="https://conformalprediction.net/demos/13-coverage-score-plane.html">coverage-score
+      plane</a> at conformalprediction.net makes the geometry explicit: a remap slides a model
+      sideways toward nominal coverage, and only a better conditional model climbs. The
+      <code>@lap</code> arms slide far and climb little (the small lift is Laplace's z-forecasting);
+      the vertical distance that remains is the information gap.</p>
+
+    <figure style="margin:18px 0 6px;">
+      <svg viewBox="0 0 640 380" style="width:100%;max-width:660px;height:auto;display:block;"
+           role="img" aria-label="Coverage-score plane: coverage across, median delta log-likelihood up.
+           Arrows from each raw model to its @lap wrap run nearly sideways to the 0.90 coverage line,
+           far below Laplace at zero. The remaining vertical distance is the information gap.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+                  orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#8f84ff"/></marker>
+          <marker id="gh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+                  orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#1a1a1a"/></marker>
+        </defs>
+        <!-- gridlines -->
+        <g stroke="#e2e2e2" stroke-width="1">
+          <line x1="60" y1="114.3" x2="620" y2="114.3"/><line x1="60" y1="181.7" x2="620" y2="181.7"/>
+          <line x1="60" y1="249.1" x2="620" y2="249.1"/><line x1="60" y1="316.5" x2="620" y2="316.5"/>
+        </g>
+        <!-- axes -->
+        <line x1="60" y1="20" x2="60" y2="330" stroke="#c9c9c9"/>
+        <line x1="60" y1="330" x2="620" y2="330" stroke="#c9c9c9"/>
+        <!-- 0.90 nominal coverage -->
+        <line x1="508" y1="20" x2="508" y2="330" stroke="#c2410c" stroke-dasharray="4 4" opacity=".6"/>
+        <text x="508" y="13" text-anchor="middle" font-size="11" fill="#c2410c">0.90 nominal</text>
+        <!-- laplace baseline -->
+        <line x1="60" y1="47" x2="620" y2="47" stroke="#1a8c4a" stroke-dasharray="5 4" opacity=".7"/>
+        <text x="66" y="40" font-size="11" fill="#1a8c4a">Laplace = 0 nats</text>
+        <!-- raw -> @lap arrows -->
+        <g stroke="#8f84ff" stroke-width="1.8">
+          <line x1="167.7" y1="312.6" x2="467.1" y2="259.3" marker-end="url(#ah)"/>
+          <line x1="324.6" y1="194.8" x2="525.1" y2="182.4" marker-end="url(#ah)"/>
+          <line x1="387.3" y1="197.7" x2="527.4" y2="192.9" marker-end="url(#ah)"/>
+        </g>
+        <!-- information gap -->
+        <line x1="590" y1="53" x2="590" y2="186" stroke="#1a1a1a" stroke-width="1.4"
+              marker-start="url(#gh)" marker-end="url(#gh)"/>
+        <text transform="rotate(-90 606 119)" x="606" y="119" text-anchor="middle" font-size="12"
+              font-weight="600" fill="#1a1a1a">the information gap</text>
+        <!-- raw points (open) -->
+        <g fill="#fff" stroke="#4a3aff" stroke-width="2">
+          <circle cx="160.8" cy="313.8" r="5"><title>TiRex raw: coverage 0.745, −0.99 nats</title></circle>
+          <circle cx="317.6" cy="195.2" r="5"><title>TimesFM raw: coverage 0.815, −0.55 nats</title></circle>
+          <circle cx="380.3" cy="197.9" r="5"><title>Chronos raw: coverage 0.843, −0.56 nats</title></circle>
+        </g>
+        <!-- @lap points (filled) -->
+        <g fill="#4a3aff" stroke="#fff" stroke-width="2">
+          <circle cx="478.9" cy="257.2" r="5.5"><title>TiRex@lap: coverage 0.887, −0.78 nats</title></circle>
+          <circle cx="537.1" cy="181.7" r="5.5"><title>TimesFM@lap: coverage 0.913, −0.50 nats</title></circle>
+          <circle cx="539.4" cy="192.5" r="5.5"><title>Chronos@lap: coverage 0.914, −0.54 nats</title></circle>
+        </g>
+        <!-- laplace point -->
+        <circle cx="490.1" cy="47" r="6" fill="#1a8c4a" stroke="#fff" stroke-width="2">
+          <title>laplace: coverage 0.892, 0 nats (baseline)</title></circle>
+        <!-- model labels -->
+        <g font-size="11.5" fill="#5a5a5a">
+          <text x="150.8" y="317.5" text-anchor="end">TiRex</text>
+          <text x="307.6" y="199" text-anchor="end">TimesFM</text>
+          <text x="380.3" y="215" text-anchor="middle">Chronos</text>
+        </g>
+        <!-- ticks -->
+        <g font-size="11" fill="#5a5a5a" text-anchor="middle">
+          <text x="60" y="346">0.70</text><text x="172" y="346">0.75</text><text x="284" y="346">0.80</text>
+          <text x="396" y="346">0.85</text><text x="508" y="346">0.90</text><text x="620" y="346">0.95</text>
+        </g>
+        <g font-size="11" fill="#5a5a5a" text-anchor="end">
+          <text x="52" y="51">0</text><text x="52" y="118">−0.25</text><text x="52" y="185">−0.50</text>
+          <text x="52" y="253">−0.75</text><text x="52" y="320">−1.00</text>
+        </g>
+        <!-- axis titles -->
+        <text x="340" y="372" text-anchor="middle" font-size="12" fill="#5a5a5a">central-90% coverage</text>
+        <text transform="rotate(-90 16 188)" x="16" y="188" text-anchor="middle" font-size="12"
+              fill="#5a5a5a">median &#916; log-likelihood (nats)</text>
+      </svg>
+      <div class="key" style="margin-top:6px">
+        <span><i style="background:#fff;border:2px solid var(--accent)"></i>raw</span>
+        <span><i style="background:var(--accent)"></i>@lap</span>
+        <span><i style="background:var(--good)"></i>Laplace baseline</span>
+      </div>
+      <figcaption style="font-size:.9rem;color:var(--muted);margin-top:8px;">
+        The coverage-score plane, M4-hourly stratum. Each arrow is one model, raw to
+        <code>@lap</code>: a long slide toward nominal coverage, a short climb in score.
+      </figcaption>
+    </figure>
+
     <h2>The fix: turn losses into draws</h2>
     <p>
       Hold Laplace and the <code>@lap</code> wrap together and weight them online by how well each has
