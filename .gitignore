@@ -239,6 +239,12 @@ benchmarks/nonprice_study.log
 benchmarks/results_overnight.csv
 benchmarks/overnight_horserace.log
 
+# week-long study: the per-step canonical store + corpus cache + logs are large
+# and regenerable, so ignore them. The small derived summaries
+# (benchmarks/canonical_summary_*.csv) ARE committed — they are the chart source
+# (the lost-run lesson: never gitignore chart source data).
+benchmarks/preds/
+
 # arXiv staging: tarball is the artifact, intermediates are not
 papers/arxiv/*.aux
 papers/arxiv/*.out

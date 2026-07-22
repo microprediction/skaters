@@ -162,3 +162,36 @@ per model whether the terms are acceptable before shipping any result publicly.
 Priority for the week: the Tier-A cheap adds first (immediate, real new angle in
 UCM), then the CPU-light novel ones (Sundial, TabPFN-TS), then Toto / DeepAR /
 Orbit / GAS as env setup allows.
+
+## Implementation (added 2026-07-22, after building)
+
+Files:
+- `predictions.py` — the one canonical per-step store + `dm_contest` (HAC-SE draw
+  band), `mean_scores`, `pairwise_record`.
+- `arm_adapters.py` — zero-shot adapter per arm (`laplace`, `Sundial`, `TiRex`,
+  `flowstate`, `TabPFN`, `Chronos`, `TimesFM`), each -> a list of per-step
+  `Dist`s, reusing foundation_study's `sample_dist`/`quantile_dist` so scoring is
+  identical and comparable. Each runs in its own venv.
+- `run_arm.py` — canonical runner: scores methods on a corpus arm, writes the
+  per-step schema, resumable by (series, method). Tags each series' stratum
+  `study = "{arm}:{regime}"` (regime = price|econ from the title).
+- `build_corpus_cache.py` — pre-materializes each arm to an offline
+  `preds/_corpus_<arm>.jsonl` so the week loop never re-enumerates or touches FRED.
+- `week_study.py` — the breadth-first round-robin driver (grows every
+  model x corpus cell each round; bounded parallel; commits summaries every K
+  rounds; 7-day bound; STOP-file and duration exit; resumable).
+- `summarize_canonical.py` — derives `canonical_summary_scores.csv` and
+  `canonical_summary_dm.csv` (committed; the chart source).
+- `launch_week_study.sh` — caffeinate + nohup launcher.
+
+Protocol: zero-shot, fixed context CTX=128, rolling one-step test window TEST=64,
+uniform across arms; laplace re-scored on the identical window is the baseline.
+Roster at launch: laplace + Sundial + TiRex + flowstate + Chronos + TimesFM;
+TabPFN joins when `TABPFN_TOKEN` is set (one-time license acceptance). DeepAR
+(GluonTS) is trainable not zero-shot -> deferred; GAS/Orbit/Toto deferred on
+install friction. The per-step store (`preds/`) is gitignored; the derived
+summaries are committed.
+
+Attribution (research use): "Built with PriorLabs-TabPFN"; TiRex under the NXAI
+Community License (materials developed at NXAI); flowstate ibm-research research
+checkpoint (arXiv:2508.05287), research-use only.

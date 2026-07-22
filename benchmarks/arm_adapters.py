@@ -1,0 +1,165 @@
+"""Zero-shot arm adapters for the week-long study, one registry.
+
+Each adapter takes a one-step *change* series `ch` and returns a list of TEST
+per-step predictive `Dist`s over the rolling one-step test window (the last
+`fs.TEST` observations, each forecast from a `fs.CTX`-long context ending just
+before it), or None if the model is unavailable. Every model's predictive is
+turned into the SAME `Dist` (samples -> Gaussian KDE, quantiles -> smoothed
+mixture) by reusing foundation_study's helpers, so scores are comparable and
+nothing is reimplemented. The canonical runner (run_arm.py) walks these into the
+per-step predictions.py schema.
+
+Protocol matches foundation_study.py exactly (fixed context window, batched
+inference, zero-shot), so laplace re-scored on the identical window is an
+apples-to-apples baseline. Each arm runs in its OWN venv (deps conflict); the
+registry entry is imported lazily so a venv missing a package still loads.
+
+Attribution (research use): TabPFN "Built with PriorLabs-TabPFN"; TiRex includes
+materials developed at NXAI under the NXAI Community License; flowstate uses the
+ibm-research research checkpoint (arXiv:2508.05287), research-use only.
+"""
+from __future__ import annotations
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import numpy as np
+
+import foundation_study as fs           # sample_dist, quantile_dist, CTX, TEST, laplace
+from skaters.api import laplace
+
+CTX, TEST = fs.CTX, fs.TEST
+LEVELS9 = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+DEVICE = os.environ.get("FM_DEVICE", "cpu")
+
+
+# ------------------------------------------------------------------ laplace baseline
+def laplace_dists(ch, h=1):
+    """Per-step laplace predictive over the test window (the h-step forecast made
+    h observations earlier). Mirrors foundation_study.laplace_scores but returns
+    the Dist objects so the canonical store records laplace per step too."""
+    f = laplace(h); st = None; queue = []; out = []
+    start = len(ch) - TEST
+    for i, yv in enumerate(ch):
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
+
+# ------------------------------------------------------------------ foundation arms
+_sundial = None
+def sundial_dists(ch):
+    """Sundial (thuml, flow-matching generative head): sample paths -> KDE Dist."""
+    global _sundial
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM
+        if _sundial is None:
+            _sundial = AutoModelForCausalLM.from_pretrained(
+                "thuml/sundial-base-128m", trust_remote_code=True).to(DEVICE).eval()
+        ctx = fs._ctx_batch(ch).to(DEVICE)                 # [TEST, CTX]
+        n_samples = int(os.environ.get("FM_SAMPLES", 30))
+        with torch.no_grad():
+            out = _sundial.generate(ctx, num_samples=n_samples, max_new_tokens=1)
+        s = out[:, :, 0].float().cpu().numpy()             # [TEST, n_samples]
+        return [fs.sample_dist(s[i]) for i in range(len(s))]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  sundial failed: {e}", flush=True); return None
+
+
+_tirex = None
+def tirex_dists(ch):
+    """TiRex (NX-AI, 35M xLSTM): 9-quantile head -> smoothed-mixture Dist. CPU
+    backend='torch' (no CUDA kernel on this box)."""
+    global _tirex
+    try:
+        import torch
+        from tirex import load_model
+        if _tirex is None:
+            _tirex = load_model("NX-AI/TiRex", device=DEVICE, backend="torch")
+        ctx = fs._ctx_batch(ch)                            # [TEST, CTX]
+        q, _mean = _tirex.forecast(context=ctx, prediction_length=1,
+                                   output_type="numpy")     # q: [TEST, 1, 9]
+        q = np.asarray(q)[:, 0, :]
+        return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  tirex failed: {e}", flush=True); return None
+
+
+_flowstate = None
+def flowstate_dists(ch):
+    """flowstate (IBM research checkpoint, SSM + functional-basis decoder):
+    9-quantile output -> smoothed-mixture Dist."""
+    global _flowstate
+    try:
+        import torch
+        from tsfm_public.models.flowstate import FlowStateForPrediction
+        if _flowstate is None:
+            _flowstate = FlowStateForPrediction.from_pretrained(
+                "ibm-research/flowstate", revision="r1.1").to(DEVICE).eval()
+        ctx = fs._ctx_batch(ch).to(DEVICE).unsqueeze(-1)   # [TEST, CTX, 1]
+        with torch.no_grad():
+            out = _flowstate(past_values=ctx, prediction_length=1)
+        q = out.quantile_outputs.float().cpu().numpy()     # [TEST, 9, 1, 1]
+        q = q[:, :, 0, 0]                                  # [TEST, 9]
+        return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  flowstate failed: {e}", flush=True); return None
+
+
+_tabpfn = None
+def tabpfn_dists(ch):
+    """TabPFN-TS (Prior Labs, in-context Bayesian): 9-quantile head -> Dist.
+    Needs TABPFN_TOKEN (one-time license acceptance) for LOCAL weights; runs
+    offline thereafter. Built with PriorLabs-TabPFN."""
+    global _tabpfn
+    try:
+        import pandas as pd
+        from tabpfn_time_series import (TabPFNTSPipeline, TabPFNMode,
+                                        TimeSeriesDataFrame)
+        from tabpfn_time_series.features import RunningIndexFeature
+        if _tabpfn is None:
+            _tabpfn = TabPFNTSPipeline(tabpfn_mode=TabPFNMode.LOCAL,
+                                       temporal_features=[RunningIndexFeature()])
+        n = len(ch); start = n - TEST
+        base = pd.Timestamp("2000-01-01")
+        crows, frows = [], []
+        for k, t in enumerate(range(start, n)):
+            win = ch[t - CTX:t]
+            ts = pd.date_range(base, periods=CTX, freq="D")
+            crows.extend((f"w{k}", ts[j], float(win[j])) for j in range(CTX))
+            frows.append((f"w{k}", ts[-1] + pd.Timedelta(days=1), float("nan")))
+        cdf = TimeSeriesDataFrame(pd.DataFrame(
+            crows, columns=["item_id", "timestamp", "target"]
+        ).set_index(["item_id", "timestamp"]))
+        fdf = TimeSeriesDataFrame(pd.DataFrame(
+            frows, columns=["item_id", "timestamp", "target"]
+        ).set_index(["item_id", "timestamp"]))
+        pred = _tabpfn.predict(cdf, fdf, quantiles=LEVELS9)
+        qcols = [c for c in pred.columns if str(c).replace(".", "").isdigit()
+                 or c in LEVELS9]
+        out = [None] * TEST
+        for k in range(TEST):
+            row = pred.loc[f"w{k}"]
+            vals = [float(row[c].iloc[0]) for c in LEVELS9]
+            out[k] = fs.quantile_dist(LEVELS9, vals)
+        return out
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  tabpfn failed: {e}", flush=True); return None
+
+
+# Foundation registry (Chronos / TimesFM reused from foundation_study).
+REGISTRY = {
+    "laplace":   laplace_dists,
+    "Sundial":   sundial_dists,
+    "TiRex":     tirex_dists,
+    "flowstate": flowstate_dists,
+    "TabPFN":    tabpfn_dists,
+    "Chronos":   fs.chronos_dists,
+    "TimesFM":   fs.timesfm_dists,
+}
