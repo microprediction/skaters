@@ -92,3 +92,41 @@ arms on a ~3k sample, to characterize horizon decay and the multi-scale default.
 - The meta-feature → verdict map (the arm-selection prior, honestly evaluated).
 - A verdict on H5 (does blending pay where selecting did not).
 - Rebuilt frontier and radar off the single loader, showing win/draw/loss.
+
+## Candidate models to add (researched 2026-07-22)
+
+Screened for open-source + genuinely probabilistic (scoreable on LL and CRPS,
+not point-only) + a modeling angle we lack. Each needs a small adapter emitting
+the canonical `predictions.py` schema, run in its own env (deps conflict).
+
+Cheap adds (Tier A, `.venv-sota`, near-free):
+- **UnobservedComponents** (statsmodels, BSD) — structural state-space, analytic
+  Gaussian predictive density. Best value; a decomposable model we don't have.
+- **EGARCH + GJR/TGARCH** (arch) — volatility asymmetry/leverage, one-line
+  variants of the GARCH-t we already run (price series only).
+- **AutoCES + AutoTheta** (statsforecast) — Theta won M3; CRPS-scoreable, trivial.
+
+Novel distributional mechanisms (Tier C, own env, stratified sample):
+- **Sundial** (thuml, Apache-2.0, 128M) — flow-matching generative head; the
+  freshest architecture, CPU-light. Highest-novelty include.
+- **GAS / score-driven** (`gasmodel`, R, via the R bridge) — time-varying-parameter
+  densities (t/Gamma/Poisson…), nests GARCH. Most novel paradigm. (Python
+  `pyflux` is dead; use R.)
+- **Toto** (Datadog, Apache-2.0) — Student-T mixture head, largest corpus;
+  flash-attn build friction, GPU for the big checkpoints.
+- **TabPFN-TS** (Prior Labs, 11M, CPU, no training) — in-context Bayesian
+  predictive; distinct synthetic prior. VERIFY the Prior Labs license first.
+- **DeepAR** (GluonTS, Apache-2.0) — autoregressive deep-probabilistic (StudentT);
+  fills the AR-deep gap vs our windowed NeuralForecast-t.
+- **Orbit** DLT/LGT (Apache-2.0) — Bayesian structural ETS; heaviest install
+  (CmdStan compile).
+
+Refresh existing (upgrade, not new entries): **TimesFM 2.5** (now a quantile
+head, so LL/CRPS-scoreable) and **Chronos-2**.
+
+Skip: Time-MoE, IBM TTM/Granite, UniTS, base VisionTS — point-only, no density;
+Moirai-MoE / Moirai-2.0 — CC-BY-NC (non-commercial); TimeGPT — closed API.
+
+Priority for the week: the Tier-A cheap adds first (immediate, real new angle in
+UCM), then the CPU-light novel ones (Sundial, TabPFN-TS), then Toto / DeepAR /
+Orbit / GAS as env setup allows.
