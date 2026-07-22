@@ -59,9 +59,7 @@
   <main>
     <h1>Every foundation model needs a sidecar</h1>
     <p class="subtitle">Want to race foundational time-series models? Go for it, but add the
-      Laplace sidecar. Judged fairly, a small online ensemble already out-forecasts them on
-      economic change-series; the sidecar makes any of them safe to use generally, and rarely worse
-      than Laplace alone.</p>
+      Laplace sidecar.</p>
 
     <figure style="margin:22px 0 26px;text-align:center;">
       <img src="./assets/sidecar.jpeg"
@@ -73,6 +71,9 @@
         The foundation model drives; Laplace rides in the sidecar, keeping it on the road.
       </figcaption>
     </figure>
+
+    <p>Judged fairly, a small online ensemble already out-forecasts them on economic change-series;
+      the sidecar makes any of them safe to use generally, and rarely worse than Laplace alone.</p>
 
     <p><span class="snapshot">Live snapshot</span> &nbsp;These numbers come from a round-robin study
       still running over the FRED universe, so cell counts differ between arms and the figures will
@@ -148,7 +149,8 @@
       Hold Laplace and the <code>@lap</code> wrap together and weight them online by how well each has
       actually been scoring, with Laplace favoured at the start. Where the model adds nothing the blend
       collapses to Laplace; where it genuinely helps, the seasonal case, the weight tilts across. The
-      raw models lose to Laplace on roughly half the seasonal series; the portfolio loses almost none.
+      raw models lose to Laplace on roughly half the seasonal series; the portfolio loses almost none
+      and beats Laplace outright on one series in ten.
     </p>
     <div id="wdlblock"></div>
     <div class="key">
@@ -159,8 +161,9 @@
 
     <h3>Does it hold everywhere?</h3>
     <p>
-      The never-worse behaviour holds on four of five strata: the portfolio's loss rate against Laplace
-      stays near zero. One stratum is still an open problem.
+      Mostly. The portfolio's loss rate against Laplace is near zero on the seasonal stratum, in
+      single digits on prices and monthly, 11% on weekly, and 36% on daily economic. Outside
+      <code>daily:econ</code> the losing margins are a few hundredths of a nat.
     </p>
     <table>
       <thead><tr><th>stratum</th><th>portfolio loss rate vs Laplace</th><th class="barcell">&nbsp;</th></tr></thead>
@@ -169,12 +172,13 @@
 
     <h2>The holdout stratum</h2>
     <p>
-      On <code>daily:econ</code> the portfolio still loses to Laplace on about half the series, though by
-      vanishing margins (median &minus;0.14 nats). Laplace dominates that stratum so thoroughly that even
+      On <code>daily:econ</code> the portfolio still loses to Laplace on about a third of the series
+      (48% earlier in the run, 36% as cells deepen), though by small margins (median &minus;0.10
+      nats). Laplace dominates that stratum so thoroughly that even
       a light tilt toward the model costs a little. The fix under test is a stronger incumbent prior, so
       the model has to earn more evidence before it moves the blend; more data will show whether that
       closes the gap or whether the drag is structural. A claim of "never worse" cannot ship with a
-      stratum losing half its series, so the run keeps churning.
+      stratum losing a third of its series, so the run keeps churning.
     </p>
 
     <h2>Why this shape</h2>
@@ -188,8 +192,9 @@
     </p>
     <p>
       The reusable form is a streaming sidecar: any third-party model that can emit a per-step
-      predictive can be wrapped and portfolioed against Laplace. Never-worse is the design target,
-      and four of five strata already meet it. The model runs wherever it likes and streams its
+      predictive can be wrapped and portfolioed against Laplace. Never-worse is the design target;
+      three of five strata sit at or under a 6% loss rate, with weekly at 11% and daily economic
+      the holdout. The model runs wherever it likes and streams its
       forecasts; the sidecar stays a few lines of pure Laplace.
     </p>
 
@@ -234,9 +239,9 @@
     }).join("");
 
     // win/draw/loss (%) per stage, M4-hourly
-    var wdl={ TiRex:{raw:[6,152,162],lap:[5,163,82],amp:[2,78,0]},
-              TimesFM:{raw:[6,173,141],lap:[6,186,88],amp:[2,78,0]},
-              Chronos:{raw:[2,169,149],lap:[3,175,102],amp:[1,79,0]} };
+    var wdl={ TiRex:{raw:[6,152,162],lap:[5,163,82],amp:[25,214,1]},
+              TimesFM:{raw:[6,173,141],lap:[6,186,88],amp:[27,213,0]},
+              Chronos:{raw:[2,169,149],lap:[3,175,102],amp:[24,216,0]} };
     var names={raw:"raw",lap:"@lap",amp:"&lap"};
     var html="";
     Object.keys(wdl).forEach(function(m){
@@ -254,7 +259,7 @@
     });
     document.getElementById("wdlblock").innerHTML=html;
 
-    var strip=[["m4-hourly",0.0],["daily:price",0.0],["monthly",0.05],["weekly",0.08],["daily:econ",0.48]];
+    var strip=[["m4-hourly",0.001],["daily:price",0.031],["monthly",0.063],["weekly",0.113],["daily:econ",0.360]];
     document.getElementById("stripbody").innerHTML = strip.map(function(r){
       var pct=r[1]*100, ok=r[1]<0.10;
       return '<tr><td>'+r[0]+'</td>'
