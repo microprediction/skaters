@@ -113,6 +113,7 @@ NAV = """      <nav>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
@@ -298,7 +299,8 @@ def combined_section(model, vs, cov):
       </tbody>
     </table>
     <p style="font-size:.9rem;color:var(--muted)">Central-90% coverage (0.90 target) and
-      the fraction of series where the arm loses to Laplace by a Diebold&ndash;Mariano test.</p>"""
+      the fraction of series where the arm loses to Laplace by a
+      <a href="/draws.html">Diebold&ndash;Mariano test</a>.</p>"""
 
 
 def links_row(model):
@@ -382,7 +384,8 @@ def build_page(slug, model, vs, cov):
 
     <h2>Standalone</h2>
     <p>The model's own predictive, run zero-shot, scored per series against Laplace by a
-      Diebold&ndash;Mariano test on the log-score differential.</p>
+      one-step-ahead (k=1) <a href="/draws.html">Diebold&ndash;Mariano test</a> on the
+      log-score differential.</p>
     <table>
       <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
       <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>

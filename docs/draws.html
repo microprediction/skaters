@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; Draws</title>
+  <meta name="description" content="What a draw means in the skaters comparisons: a per-series Diebold-Mariano test on the one-step log-score differential, with a HAC standard error and an explicit indistinguishability band." />
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Draws</h1>
+    <p class="subtitle">A draw is a statistical tie, not a claim that two forecasters
+      are equal.</p>
+
+    <p>Every head-to-head on this site reports wins, draws and losses. A win or loss is
+      only declared when the difference in forecast quality is large enough to stand out
+      from the noise. Everything else is a draw. This page defines that test.</p>
+
+    <h2>The test</h2>
+    <p>For a single series, take the two forecasters' per-step log-scores and difference
+      them, step by step:</p>
+    <p style="text-align:center"><code>d&#8348; = log&nbsp;p&#7375;(y&#8348;) &minus; log&nbsp;p&#7387;(y&#8348;)</code></p>
+    <p>The mean <code>d&#772;</code> is how much better A scores than B on that series, in
+      nats per step. A <a href="https://en.wikipedia.org/wiki/Diebold%E2%80%93Mariano_test">Diebold&ndash;Mariano
+      test</a> asks whether <code>d&#772;</code> is far enough from zero to be real. The
+      verdict is</p>
+    <ul>
+      <li><b>win</b> for A if <code>d&#772; &gt; 1.96&nbsp;&middot;&nbsp;SE</code>,</li>
+      <li><b>loss</b> for A if <code>d&#772; &lt; &minus;1.96&nbsp;&middot;&nbsp;SE</code>,</li>
+      <li><b>draw</b> otherwise, when <code>|d&#772;| &le; 1.96&nbsp;&middot;&nbsp;SE</code>.</li>
+    </ul>
+    <p>The band <code>&plusmn;1.96&nbsp;SE</code> is the 95% confidence interval for the mean
+      differential. A draw is the case where that interval straddles zero: the average
+      log-score gap is smaller than its own sampling error, so neither forecaster is
+      distinguishable from the other on this series.</p>
+
+    <h2>The standard error</h2>
+    <p>Log-score differentials are serially correlated: a series in a hard patch scores
+      poorly for both forecasters several steps in a row. Treating steps as independent
+      would understate the uncertainty and manufacture significant wins. The standard error
+      uses a HAC (Newey&ndash;West) long-run variance with a Bartlett kernel and a lag of
+      <code>round(n<sup>1/3</sup>)</code>, which widens the band to account for that
+      autocorrelation. Per-step log-scores are floored at &minus;20 nats so a single
+      catastrophic tail miss cannot dominate the mean. Series with fewer than eight scored
+      steps are called draws automatically, since the test has no power there.</p>
+
+    <h2>How to read a high draw count</h2>
+    <p>Draws are common here, and on some strata they are the majority. That reflects the
+      power of the test on short, one-step samples, not a claim that the forecasters are
+      identical. Two consequences follow.</p>
+    <p>First, the bar for a win is deliberately high. A forecaster that is slightly better
+      on average will still draw until the evidence accumulates, so win counts understate
+      small real edges and grow as coverage deepens.</p>
+    <p>Second, a draw is a good outcome for a challenger only in the sense that it is not a
+      loss. The "never worse than Laplace" property is measured as wins plus draws: the
+      portfolio may not beat Laplace, but the test cannot separate it from Laplace on the
+      series in question. The <a href="/sidecar.html">sidecar</a> and
+      <a href="/foundation/tirex.html">per-model</a> pages read their not-worse rates this
+      way.</p>
+
+    <h2>Scope</h2>
+    <p>All of these comparisons are one-step-ahead: the horizon is <code>k = 1</code>. Each
+      forecaster predicts the next change, is scored on it, and rolls forward. A
+      multi-horizon sweep (<code>k = 1, 2, 4, 8, 16</code>) is a planned extension and would
+      get its own protocol; the draw definition above carries over unchanged to any fixed
+      horizon. The full method is on the <a href="/guide.html">methodology</a> page.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family.
+  </footer>
+</body>
+</html>
