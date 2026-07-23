@@ -6,6 +6,11 @@
   <title>skaters &mdash; Draws</title>
   <meta name="description" content="What a draw means in the skaters comparisons: a per-series Diebold-Mariano test on the one-step log-score differential, with a HAC standard error and an explicit indistinguishability band." />
   <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .eq { text-align:center; font-size:1.1rem; margin:16px 0; font-variant-numeric:tabular-nums; }
+    .eq sub { font-size:.72em; }
+    .mean { text-decoration:overline; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -60,20 +65,23 @@
     <h2>The test</h2>
     <p>For a single series, take the two forecasters' per-step log-scores and difference
       them, step by step:</p>
-    <p style="text-align:center"><code>d&#8348; = log&nbsp;p&#7375;(y&#8348;) &minus; log&nbsp;p&#7387;(y&#8348;)</code></p>
-    <p>The mean <code>d&#772;</code> is how much better A scores than B on that series, in
-      nats per step. A <a href="https://en.wikipedia.org/wiki/Diebold%E2%80%93Mariano_test">Diebold&ndash;Mariano
-      test</a> asks whether <code>d&#772;</code> is far enough from zero to be real. The
-      verdict is</p>
+    <div class="eq">d<sub>t</sub> = log&nbsp;p<sub>A</sub>(y<sub>t</sub>) &minus; log&nbsp;p<sub>B</sub>(y<sub>t</sub>)</div>
+    <p>The mean <span class="mean">d</span> is how much better A scores than B on that
+      series, in nats per step. A <a href="https://en.wikipedia.org/wiki/Diebold%E2%80%93Mariano_test">Diebold&ndash;Mariano
+      test</a> asks whether <span class="mean">d</span> is far enough from zero to be real,
+      dividing it by its standard error to form</p>
+    <div class="eq"><i>t</i> = <span class="mean">d</span> / SE</div>
+    <p>and comparing that to the normal critical value <i>z</i> = 1.96. The verdict is</p>
     <ul>
-      <li><b>win</b> for A if <code>d&#772; &gt; 1.96&nbsp;&middot;&nbsp;SE</code>,</li>
-      <li><b>loss</b> for A if <code>d&#772; &lt; &minus;1.96&nbsp;&middot;&nbsp;SE</code>,</li>
-      <li><b>draw</b> otherwise, when <code>|d&#772;| &le; 1.96&nbsp;&middot;&nbsp;SE</code>.</li>
+      <li><b>win</b> for A when <i>t</i> &gt; 1.96,</li>
+      <li><b>loss</b> for A when <i>t</i> &lt; &minus;1.96,</li>
+      <li><b>draw</b> otherwise, i.e. when <span class="mean">d</span> lands inside the band
+        &plusmn;1.96&nbsp;&middot;&nbsp;SE.</li>
     </ul>
-    <p>The band <code>&plusmn;1.96&nbsp;SE</code> is the 95% confidence interval for the mean
-      differential. A draw is the case where that interval straddles zero: the average
-      log-score gap is smaller than its own sampling error, so neither forecaster is
-      distinguishable from the other on this series.</p>
+    <p>That band is the 95% confidence interval for the mean differential. A draw is the
+      case where it straddles zero: the average log-score gap is smaller than its own
+      sampling error, so neither forecaster is distinguishable from the other on this
+      series.</p>
 
     <h2>The standard error</h2>
     <p>Log-score differentials are serially correlated: a series in a hard patch scores
