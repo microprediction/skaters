@@ -11,15 +11,33 @@ every docs page so the site menu stays consistent.
     PYTHONPATH=src:benchmarks .venv-sota/bin/python benchmarks/foundation_pages.py
 """
 from __future__ import annotations
+import collections
 import csv
+import json
 import math
 import os
 import re
+
+import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
 FDIR = os.path.join(DOCS, "foundation")
 BENCH = os.path.dirname(os.path.abspath(__file__))
+PREDS = os.path.join(BENCH, "preds")
+
+# Radar regime axes, matching the site's challenges radar exactly
+# (make_challenges_radar.py): six axes, the M4-hourly stratum split into soft
+# waveforms (first 180 series in corpus order) and hard waveforms (the rest).
+# Tuple: (axis label, study key, m4 block or None).
+RADAR_AXES = [
+    ("economic (daily)", "daily:econ",     None),
+    ("weekly cycles",    "weekly:econ",    None),
+    ("yearly cycles",    "monthly:econ",   None),
+    ("soft waveforms",   "m4-hourly:econ", "soft"),
+    ("hard waveforms",   "m4-hourly:econ", "hard"),
+    ("price / returns",  "daily:price",    None),
+]
 
 # (csv study key, short radar axis label, long stratum label)
 STRATA = [
@@ -157,79 +175,141 @@ def sweep_nav():
     print(f"[nav] rewrote {n} of {len(pages)} pages")
 
 
-# --------------------------------------------------------------- star plot SVG
-def radar_svg(model, vs):
-    """Not-worse rate = (win+draw)/n across the five strata, one polygon per
-    variant. Laplace is the outer rim (not-worse-than-itself = 1.0)."""
-    variants = [("", "raw", "#9a9aa6", "raw")]
-    if model["arms"]:
-        variants += [("@lap", "@lap", "#b9b2ff", "@lap · laplace-driven"),
-                     ("&lap", "&lap", "#4a3aff", "&lap · portfolio")]
-    W, H, cx, cy, R = 460, 400, 230, 205, 150
-    K = len(STRATA)
+# --------------------------------------------------------------- radar / star plot
+def _m4_blocks():
+    """(soft, hard) series-id sets: first 180 of the M4-hourly corpus vs the rest,
+    the same soft/hard split the challenges radar uses."""
+    order = []
+    p = os.path.join(PREDS, "_corpus_m4-hourly.jsonl")
+    if os.path.exists(p):
+        with open(p) as fh:
+            for line in fh:
+                order.append(json.loads(line)["sid"])
+    return set(order[:180]), set(order[180:])
+
+
+def _smean(a, col):
+    a = np.asarray(a, float)
+    if col == "logpdf":
+        a = np.maximum(a, -20.0)
+    return float(np.nanmean(a)) if np.isfinite(a).any() else float("nan")
+
+
+def _ratio(store, study, subset, method, col, higher_wins):
+    """(wins + 0.5*ties)/n / 0.5 vs laplace on the given metric, the same ratio the
+    challenges radar plots: 1.0 = an even split with Laplace, 2.0 = always better,
+    0 = always worse. None below 30 shared series."""
+    wins = ties = n = 0
+    for s in subset:
+        km, kb = (study, s, method), (study, s, "laplace")
+        if km not in store or kb not in store:
+            continue
+        a, b = _smean(store[km][col], col), _smean(store[kb][col], col)
+        if not (np.isfinite(a) and np.isfinite(b)):
+            continue
+        n += 1
+        if a == b:
+            ties += 1
+        elif (a > b) == higher_wins:
+            wins += 1
+    return (round((wins + 0.5 * ties) / n / 0.5, 3), n) if n >= 30 else (None, n)
+
+
+def compute_radar(store):
+    """Per method -> {'ll':[6], 'crps':[6], 'n':[6]} over the six regime axes."""
+    soft, hard = _m4_blocks()
+    per_study = collections.defaultdict(set)
+    for (st, s, m) in store:
+        if m == "laplace":
+            per_study[st].add(s)
+    methods = {m for (_, _, m) in store} - {"laplace"}
+    out = {}
+    for method in methods:
+        ll, crps, ns = [], [], []
+        for _label, study, block in RADAR_AXES:
+            subset = per_study.get(study, set())
+            if block == "soft":
+                subset = subset & soft
+            elif block == "hard":
+                subset = subset & hard
+            l, n = _ratio(store, study, subset, method, "logpdf", True)
+            c, _ = _ratio(store, study, subset, method, "crps", False)
+            ll.append(l); crps.append(c); ns.append(n)
+        if any(v is not None for v in ll + crps):
+            out[method] = {"ll": ll, "crps": crps, "n": ns}
+    return out
+
+
+def radar_svg(model, radar):
+    """Six-axis regime star plot on the log-likelihood ratio vs Laplace, matching
+    the site's challenges radar: Laplace is the dashed 1.0 ring, outward is
+    better. Every variant is shaded so the raw model reads even when it dents
+    inward."""
+    variants = [("", "raw", "#6b7280"),
+                ("@lap", "@lap", "#8b5cf6"),
+                ("&lap", "&lap", "#4a3aff")]
+    if not model["arms"]:
+        variants = variants[:1]
+    W, H, cx, cy, R = 520, 440, 260, 220, 150
+    K = len(RADAR_AXES)
+    MAXV = 1.5
     esc = lambda t: t.replace("&", "&amp;")
 
     def ang(i):
         return -math.pi / 2 + i * 2 * math.pi / K
 
     def pt(i, v):
-        r = R * max(0.0, min(1.0, v))
+        r = R * min(max(v, 0.0), MAXV) / MAXV
         return cx + r * math.cos(ang(i)), cy + r * math.sin(ang(i))
 
-    parts = [f'<svg viewBox="0 0 {W} {H}" style="width:100%;max-width:480px;height:auto;'
+    parts = [f'<svg viewBox="0 0 {W} {H}" style="width:100%;max-width:520px;height:auto;'
              f'display:block;margin:0 auto" role="img" '
-             f'aria-label="Star plot: fraction of series where each {model["name"]} '
-             f'variant is not worse than Laplace, across five strata.">']
-    # rings
-    for rv in (0.25, 0.5, 0.75, 1.0):
+             f'aria-label="Star plot of {model["name"]} versus Laplace across six regime '
+             f'axes; the log-likelihood ratio, with Laplace on the 1.0 ring.">']
+    for rv in (0.5, 1.0, 1.5):
         pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, rv) for i in range(K)))
-        if rv == 1.0:
+        if abs(rv - 1.0) < 1e-9:
             parts.append(f'<polygon points="{pts}" fill="none" stroke="#1a8c4a" '
-                         f'stroke-dasharray="5 4" stroke-width="1.5" opacity=".7"/>')
+                         f'stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/>')
         else:
             parts.append(f'<polygon points="{pts}" fill="none" stroke="#e2e2e2" '
                          f'stroke-width="1"/>')
-    # spokes + axis labels
-    for i, (_k, short, _long) in enumerate(STRATA):
-        ex, ey = pt(i, 1.0)
+    for i, (label, _study, _blk) in enumerate(RADAR_AXES):
+        ex, ey = pt(i, MAXV)
         parts.append(f'<line x1="{cx}" y1="{cy}" x2="{ex:.1f}" y2="{ey:.1f}" '
                      f'stroke="#e2e2e2" stroke-width="1"/>')
-        lx, ly = pt(i, 1.16)
-        anchor = "middle" if abs(lx - cx) < 12 else ("start" if lx > cx else "end")
-        parts.append(f'<text x="{lx:.1f}" y="{ly + 4:.1f}" text-anchor="{anchor}" '
-                     f'font-size="12" fill="#5a5a5a">{short}</text>')
-    parts.append(f'<text x="{cx + 4}" y="{cy - R - 2}" font-size="11" fill="#1a8c4a">'
-                 f'Laplace = 1.0</text>')
-    # polygons per variant
-    for suf, _lab, color, _legend in variants:
-        vals, tips = [], []
-        for k, _short, _long in STRATA:
-            row = vs.get((k, model["key"] + suf))
-            if not row:
-                vals.append(None); tips.append(None); continue
-            n = float(row["n_series"]) or 1.0
-            rate = (float(row["win"]) + float(row["draw"])) / n
-            vals.append(rate); tips.append((rate, int(n)))
+        lx, ly = pt(i, 1.15)
+        anchor = "middle" if abs(lx - cx) < 14 else ("start" if lx > cx else "end")
+        dy = 4 if ly >= cy else 0
+        parts.append(f'<text x="{lx:.1f}" y="{ly + dy:.1f}" text-anchor="{anchor}" '
+                     f'font-size="12" fill="#5a5a5a">{label}</text>')
+    lref_x, lref_y = pt(0, 1.0)
+    parts.append(f'<text x="{lref_x + 6:.1f}" y="{lref_y - 5:.1f}" font-size="11" '
+                 f'fill="#1a8c4a">Laplace = 1.0</text>')
+    opacity = {"": ".14", "@lap": ".16", "&lap": ".20"}
+    for suf, _lab, color in variants:
+        d = radar.get(model["key"] + suf)
+        if not d:
+            continue
+        vals, ns = d["ll"], d["n"]
         pairs = [(i, v) for i, v in enumerate(vals) if v is not None]
         if not pairs:
             continue
         pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, v) for i, v in pairs))
-        fill = "none" if suf == "" else color
-        op = "" if suf == "" else ' fill-opacity=".12"'
-        parts.append(f'<polygon points="{pts}" fill="{fill}"{op} stroke="{color}" '
-                     f'stroke-width="2"{"" if suf else " stroke-dasharray=\"4 3\""}/>')
+        parts.append(f'<polygon points="{pts}" fill="{color}" fill-opacity="{opacity[suf]}" '
+                     f'stroke="{color}" stroke-width="2"/>')
         for i, v in pairs:
             x, y = pt(i, v)
-            rate, nn = tips[i]
             parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{color}" '
-                         f'stroke="#fff" stroke-width="1.5"><title>{STRATA[i][1]} '
-                         f'{esc(suf) or "raw"}: {rate:.0%} not worse than Laplace '
-                         f'(n={nn})</title></circle>')
+                         f'stroke="#fff" stroke-width="1.5"><title>{RADAR_AXES[i][0]} '
+                         f'{esc(suf) or "raw"}: log-likelihood ratio {v:.2f} vs Laplace '
+                         f'(n={ns[i]})</title></circle>')
     parts.append("</svg>")
+    labels = {"": "raw", "@lap": "@lap &middot; laplace-driven",
+              "&lap": "&lap &middot; portfolio"}
     legend = " ".join(
-        f'<span><i style="background:{c if s else "none"};'
-        f'{"" if s else "border:2px solid " + c + ";"}"></i>{esc(lg)}</span>'
-        for s, _l, c, lg in variants)
+        f'<span><i style="background:{c};opacity:.7"></i>{labels[s]}</span>'
+        for s, _l, c in variants)
     return "".join(parts), legend
 
 
@@ -328,8 +408,8 @@ def external_section(model):
     </ul>"""
 
 
-def build_page(slug, model, vs, cov):
-    svg, legend = radar_svg(model, vs)
+def build_page(slug, model, vs, cov, radar):
+    svg, legend = radar_svg(model, radar)
     ver = f" {model['version']}" if model.get("version") else ""
     vendor = f'{model["vendor"]} &middot; ' if model["vendor"] else ""
     intro = f'{model["blurb"]} {model["note"]}'
@@ -404,9 +484,12 @@ def build_page(slug, model, vs, cov):
       raw central-90% coverage (0.90 target).</p>
 
     <h2>Star plot</h2>
-    <p>Each axis is a stratum; the radius is the fraction of series where the variant is
-      <em>not worse</em> than Laplace (a win or a statistical draw). Laplace is the outer
-      rim by definition. Raw {model['name']} dents inward where it loses{'' if not model['arms'] else '; the portfolio hugs the rim'}.</p>
+    <p>The same six regime axes as the site's <a href="/challengers.html">standalone
+      radar</a>, so the two read alike. Each radius is the log-likelihood ratio against
+      Laplace: <code>(wins + &frac12;&middot;ties) / n</code>, scaled so an even split with
+      Laplace sits on the dashed 1.0 ring, outward is better, inward is worse. The M4-hourly
+      set is split into soft and hard waveforms by corpus order, matching that radar. Raw
+      {model['name']} dents inside the ring where it loses{'' if not model['arms'] else '; the &amp;lap portfolio pulls back out toward it'}.</p>
     <figure style="margin:16px 0 6px">
       {svg}
       <div class="key">{legend}</div>
@@ -435,8 +518,12 @@ def build_page(slug, model, vs, cov):
 def main():
     os.makedirs(FDIR, exist_ok=True)
     vs, cov = load_vs(), load_cov()
+    import summarize_canonical as sc
+    print("[radar] loading per-step store ...", flush=True)
+    radar = compute_radar(sc.load_all())
+    print(f"[radar] {len(radar)} methods over {len(RADAR_AXES)} regime axes", flush=True)
     for slug, model in MODELS.items():
-        html = build_page(slug, model, vs, cov)
+        html = build_page(slug, model, vs, cov, radar)
         open(os.path.join(FDIR, f"{slug}.html"), "w").write(html)
         print(f"[page] foundation/{slug}.html")
     sweep_nav()
