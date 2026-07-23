@@ -40,11 +40,35 @@ MODELS = {
                          "one-step change series."),
     "tirex": dict(name="TiRex", key="TiRex", vendor="NX-AI",
                   license="NXAI Community License", arms=True,
-                  blurb="TiRex is an xLSTM-based zero-shot forecaster that emits "
-                        "quantile predictions directly.",
+                  blurb="TiRex is a 35M-parameter, xLSTM-based zero-shot forecaster that "
+                        "emits quantile predictions directly.",
                   note="Loaded from NX-AI/TiRex on CPU. Commercial use is gated above "
                        "&euro;100M revenue; included here under research use with the "
-                       "required attribution."),
+                       "required attribution.",
+                  links=[
+                      ("GitHub", "https://github.com/NX-AI/tirex"),
+                      ("Model card", "https://huggingface.co/NX-AI/TiRex"),
+                      ("Paper (arXiv 2505.23719)", "https://arxiv.org/abs/2505.23719"),
+                      ("License", "https://huggingface.co/NX-AI/TiRex/blob/main/LICENSE"),
+                  ],
+                  external=[
+                      ("GIFT-Eval", "https://huggingface.co/spaces/Salesforce/GIFT-Eval",
+                       "Salesforce's general forecasting benchmark: 7 domains, about 98 "
+                       "dataset configs, multi-horizon point and quantile accuracy on the "
+                       "series levels. TiRex reports at the top of it, a 35M model ahead "
+                       "of far larger ones."),
+                      ("Chronos-ZS / fev-leaderboard",
+                       "https://huggingface.co/spaces/autogluon/fev-leaderboard",
+                       "AutoGluon's zero-shot leaderboard over the Chronos evaluation "
+                       "datasets, where TiRex also reports strongly."),
+                      ("Paper benchmarks (NeurIPS 2025)",
+                       "https://arxiv.org/abs/2505.23719",
+                       "The authors' own long- and short-horizon evaluation against "
+                       "TabPFN-TS, Chronos-Bolt, TimesFM, and Moirai."),
+                      ("Third-party analysis",
+                       "https://aihorizonforecast.substack.com/p/tirex-lstms-take-the-lead-again-in",
+                       "An independent write-up of TiRex's leaderboard results."),
+                  ]),
     "timesfm": dict(name="TimesFM", key="TimesFM", vendor="Google", version="2.5",
                     license="Apache-2.0", arms=True,
                     blurb="TimesFM is a decoder-only, patched time-series transformer; "
@@ -277,6 +301,31 @@ def combined_section(model, vs, cov):
       the fraction of series where the arm loses to Laplace by a Diebold&ndash;Mariano test.</p>"""
 
 
+def links_row(model):
+    if not model.get("links"):
+        return ""
+    items = " &middot; ".join(f'<a href="{u}">{l}</a>' for l, u in model["links"])
+    return (f'<p class="muted" style="font-size:.92rem;margin-top:-4px">Resources: '
+            f'{items}</p>')
+
+
+def external_section(model):
+    ext = model.get("external")
+    if not ext:
+        return ""
+    items = "\n".join(
+        f'<li><a href="{u}">{l}</a> &mdash; {note}</li>' for l, u, note in ext)
+    return f"""<h2>Existing benchmarks</h2>
+    <p>{model['name']} reports strongly on public forecasting leaderboards, which measure a
+      different task than this study. Those rank multi-horizon accuracy on curated dataset
+      collections; this study scores one-step-ahead density forecasts on economic
+      change-series against Laplace. A model can lead one and trail the other, so the
+      results here sit alongside, not against, the leaderboards below.</p>
+    <ul>
+      {items}
+    </ul>"""
+
+
 def build_page(slug, model, vs, cov):
     svg, legend = radar_svg(model, vs)
     ver = f" {model['version']}" if model.get("version") else ""
@@ -325,6 +374,7 @@ def build_page(slug, model, vs, cov):
       <span class="tag">one-step change series</span>
     </div>
     <p>{intro}</p>
+    {links_row(model)}
     <p><span class="snapshot" style="background:#ece9ff;color:var(--accent-dark);
       border-radius:4px;padding:2px 9px;font-size:.8rem;font-weight:600">Live snapshot</span>
       &nbsp;Derived from the week-long round-robin study; counts grow as coverage deepens.
@@ -366,6 +416,8 @@ def build_page(slug, model, vs, cov):
       own environment. Strata split the cached FRED universe and the M4-hourly set by
       frequency and regime. Full method on the <a href="/sidecar.html">sidecar pattern</a>
       page and in the <a href="/guide.html">methodology</a>.</p>
+
+    {external_section(model)}
   </main>
 
   <footer>

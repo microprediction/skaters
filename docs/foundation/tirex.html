@@ -72,7 +72,8 @@
       <span class="tag">zero-shot</span>
       <span class="tag">one-step change series</span>
     </div>
-    <p>TiRex is an xLSTM-based zero-shot forecaster that emits quantile predictions directly. Loaded from NX-AI/TiRex on CPU. Commercial use is gated above &euro;100M revenue; included here under research use with the required attribution.</p>
+    <p>TiRex is a 35M-parameter, xLSTM-based zero-shot forecaster that emits quantile predictions directly. Loaded from NX-AI/TiRex on CPU. Commercial use is gated above &euro;100M revenue; included here under research use with the required attribution.</p>
+    <p class="muted" style="font-size:.92rem;margin-top:-4px">Resources: <a href="https://github.com/NX-AI/tirex">GitHub</a> &middot; <a href="https://huggingface.co/NX-AI/TiRex">Model card</a> &middot; <a href="https://arxiv.org/abs/2505.23719">Paper (arXiv 2505.23719)</a> &middot; <a href="https://huggingface.co/NX-AI/TiRex/blob/main/LICENSE">License</a></p>
     <p><span class="snapshot" style="background:#ece9ff;color:var(--accent-dark);
       border-radius:4px;padding:2px 9px;font-size:.8rem;font-weight:600">Live snapshot</span>
       &nbsp;Derived from the week-long round-robin study; counts grow as coverage deepens.
@@ -136,6 +137,19 @@
       own environment. Strata split the cached FRED universe and the M4-hourly set by
       frequency and regime. Full method on the <a href="/sidecar.html">sidecar pattern</a>
       page and in the <a href="/guide.html">methodology</a>.</p>
+
+    <h2>Existing benchmarks</h2>
+    <p>TiRex reports strongly on public forecasting leaderboards, which measure a
+      different task than this study. Those rank multi-horizon accuracy on curated dataset
+      collections; this study scores one-step-ahead density forecasts on economic
+      change-series against Laplace. A model can lead one and trail the other, so the
+      results here sit alongside, not against, the leaderboards below.</p>
+    <ul>
+      <li><a href="https://huggingface.co/spaces/Salesforce/GIFT-Eval">GIFT-Eval</a> &mdash; Salesforce's general forecasting benchmark: 7 domains, about 98 dataset configs, multi-horizon point and quantile accuracy on the series levels. TiRex reports at the top of it, a 35M model ahead of far larger ones.</li>
+<li><a href="https://huggingface.co/spaces/autogluon/fev-leaderboard">Chronos-ZS / fev-leaderboard</a> &mdash; AutoGluon's zero-shot leaderboard over the Chronos evaluation datasets, where TiRex also reports strongly.</li>
+<li><a href="https://arxiv.org/abs/2505.23719">Paper benchmarks (NeurIPS 2025)</a> &mdash; The authors' own long- and short-horizon evaluation against TabPFN-TS, Chronos-Bolt, TimesFM, and Moirai.</li>
+<li><a href="https://aihorizonforecast.substack.com/p/tirex-lstms-take-the-lead-again-in">Third-party analysis</a> &mdash; An independent write-up of TiRex's leaderboard results.</li>
+    </ul>
   </main>
 
   <footer>
