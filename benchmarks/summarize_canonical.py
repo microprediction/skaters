@@ -32,7 +32,10 @@ import numpy as np
 import predictions as P
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-PREDS = os.path.join(_HERE, "preds")
+# CANON_PREDS lets the multi-horizon study summarize its own preds tree, and
+# CANON_SUFFIX names the output (e.g. "_h4") so it does not clobber the k=1 files.
+PREDS = os.environ.get("CANON_PREDS", os.path.join(_HERE, "preds"))
+SUFFIX = os.environ.get("CANON_SUFFIX", "")
 BASELINE = "laplace"
 _COLS = ("y", "q05", "q50", "q95", "logpdf", "crps")
 
@@ -70,7 +73,7 @@ def main():
     methods = sorted({m for (_, _, m) in store})
 
     # ---- paired, scale-free comparison of each model vs laplace ----
-    with open(os.path.join(_HERE, "canonical_summary_vs_laplace.csv"), "w", newline="") as fh:
+    with open(os.path.join(_HERE, f"canonical_summary_vs_laplace{SUFFIX}.csv"), "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["study", "model", "n_series", "win", "draw", "loss",
                     "med_dLL", "q25_dLL", "q75_dLL", "med_crps_ratio"])
@@ -107,7 +110,7 @@ def main():
                             f"{np.nanmedian(ratios):.4f}" if ratios else ""])
 
     # ---- calibration: interval coverage from the stored quantiles ----
-    with open(os.path.join(_HERE, "canonical_summary_coverage.csv"), "w", newline="") as fh:
+    with open(os.path.join(_HERE, f"canonical_summary_coverage{SUFFIX}.csv"), "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["study", "method", "n_steps", "cov_central90", "cal_median"])
         for study in studies:

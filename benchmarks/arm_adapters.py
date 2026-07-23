@@ -60,7 +60,7 @@ def laplace_dists(ch, h=1):
 
 # ------------------------------------------------------------------ foundation arms
 _sundial = None
-def sundial_dists(ch):
+def sundial_dists(ch, h=1):
     """Sundial (thuml, flow-matching generative head): sample paths -> KDE Dist."""
     global _sundial
     try:
@@ -69,18 +69,18 @@ def sundial_dists(ch):
         if _sundial is None:
             _sundial = AutoModelForCausalLM.from_pretrained(
                 "thuml/sundial-base-128m", trust_remote_code=True).to(DEVICE).eval()
-        ctx = fs._ctx_batch(ch).to(DEVICE)                 # [TEST, CTX]
+        ctx = fs._ctx_batch(ch if h == 1 else ch[:len(ch) - (h - 1)]).to(DEVICE)
         n_samples = int(os.environ.get("FM_SAMPLES", 30))
         with torch.no_grad():
-            out = _sundial.generate(ctx, num_samples=n_samples, max_new_tokens=1)
-        s = out[:, :, 0].float().cpu().numpy()             # [TEST, n_samples]
+            out = _sundial.generate(ctx, num_samples=n_samples, max_new_tokens=h)
+        s = out[:, :, h - 1].float().cpu().numpy()         # [TEST, n_samples] at horizon h
         return [fs.sample_dist(s[i]) for i in range(len(s))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  sundial failed: {e}", flush=True); return None
 
 
 _tirex = None
-def tirex_dists(ch):
+def tirex_dists(ch, h=1):
     """TiRex (NX-AI, 35M xLSTM): 9-quantile head -> smoothed-mixture Dist. CPU
     backend='torch' (no CUDA kernel on this box)."""
     global _tirex
@@ -89,17 +89,17 @@ def tirex_dists(ch):
         from tirex import load_model
         if _tirex is None:
             _tirex = load_model("NX-AI/TiRex", device=DEVICE, backend="torch")
-        ctx = fs._ctx_batch(ch)                            # [TEST, CTX]
-        q, _mean = _tirex.forecast(context=ctx, prediction_length=1,
-                                   output_type="numpy")     # q: [TEST, 1, 9]
-        q = np.asarray(q)[:, 0, :]
+        ctx = fs._ctx_batch(ch if h == 1 else ch[:len(ch) - (h - 1)])   # [TEST, CTX]
+        q, _mean = _tirex.forecast(context=ctx, prediction_length=h,
+                                   output_type="numpy")     # q: [TEST, h, 9]
+        q = np.asarray(q)[:, h - 1, :]                       # horizon h
         return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  tirex failed: {e}", flush=True); return None
 
 
 _flowstate = None
-def flowstate_dists(ch):
+def flowstate_dists(ch, h=1):
     """flowstate (IBM research checkpoint, SSM + functional-basis decoder):
     9-quantile output -> smoothed-mixture Dist."""
     global _flowstate
@@ -109,21 +109,25 @@ def flowstate_dists(ch):
         if _flowstate is None:
             _flowstate = FlowStateForPrediction.from_pretrained(
                 "ibm-research/flowstate", revision="r1.1").to(DEVICE).eval()
-        ctx = fs._ctx_batch(ch).to(DEVICE).unsqueeze(-1)   # [TEST, CTX, 1]
+        src = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        ctx = fs._ctx_batch(src).to(DEVICE).unsqueeze(-1)  # [TEST, CTX, 1]
         with torch.no_grad():
-            out = _flowstate(past_values=ctx, prediction_length=1)
-        q = out.quantile_outputs.float().cpu().numpy()     # [TEST, 9, 1, 1]
-        q = q[:, :, 0, 0]                                  # [TEST, 9]
+            out = _flowstate(past_values=ctx, prediction_length=h)
+        q = out.quantile_outputs.float().cpu().numpy()     # [TEST, 9, h, 1]
+        q = q[:, :, h - 1, 0]                              # [TEST, 9] at horizon h
         return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  flowstate failed: {e}", flush=True); return None
 
 
 _tabpfn = None
-def tabpfn_dists(ch):
+def tabpfn_dists(ch, h=1):
     """TabPFN-TS (Prior Labs, in-context Bayesian): 9-quantile head -> Dist.
     Needs TABPFN_TOKEN (one-time license acceptance) for LOCAL weights; runs
-    offline thereafter. Built with PriorLabs-TabPFN."""
+    offline thereafter. Built with PriorLabs-TabPFN. One-step only for now."""
+    if h != 1:
+        print("  tabpfn: multi-horizon not implemented; skipping", flush=True)
+        return None
     global _tabpfn
     try:
         import pandas as pd
@@ -184,10 +188,10 @@ def vincentize(dists_a, dists_b):
     return out
 
 
-def _sandwich(fm_fn):
+def _sandwich(fm_fn, h=1):
     """Arm = quantile-average of a foundation model with laplace, same window."""
     def run(ch):
-        return vincentize(fm_fn(ch), laplace_dists(ch))
+        return vincentize(fm_fn(ch, h), laplace_dists(ch, h))
     return run
 
 
@@ -202,14 +206,14 @@ def _sandwich(fm_fn):
 _RESID_WARM = int(os.environ.get("FM_RESID_WARM", "128"))
 
 
-def _resid_sandwich(fm_fn):
+def _resid_sandwich(fm_fn, h=1):
     """Arm = FM location + laplace on the FM residual stream (adaptive scale)."""
     def run(ch):
         target = TEST                       # stable scored-window length
         old = fs.TEST
         try:
             fs.TEST = target + _RESID_WARM  # FM forecasts the extended window
-            fmx = fm_fn(ch)
+            fmx = fm_fn(ch, h)
         finally:
             fs.TEST = old
         if fmx is None or len(fmx) < target + _RESID_WARM:
@@ -243,14 +247,14 @@ _PITLEVELS = [0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5,
               0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99]
 
 
-def pit_sandwich(fm_fn):
+def pit_sandwich(fm_fn, h=1):
     """Arm = laplace recalibration of the FM in its own PIT/normal-score space."""
     def run(ch):
         target = TEST
         old = fs.TEST
         try:
             fs.TEST = target + _RESID_WARM
-            fmx = fm_fn(ch)
+            fmx = fm_fn(ch, h)
         finally:
             fs.TEST = old
         if fmx is None or len(fmx) < target + _RESID_WARM:
@@ -303,7 +307,7 @@ def mix_dists(dists, w):
 _LAP_PRIOR = float(os.environ.get("PORT_LAP_PRIOR", "2.0"))
 
 
-def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None):
+def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None, h=1):
     """Arm = distribution-level long-only log-score portfolio of laplace and the
     PIT-recalibrated FM. laplace is the trusted incumbent: the weights start
     tilted to it (``lap_prior`` log-units) so the FM must EARN weight through
@@ -311,11 +315,11 @@ def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None):
     drag on strata where laplace dominates (e.g. daily:econ) while still letting
     a genuinely-better FM take over fast (seasonal). Never worse than plain
     laplace in the limit; near-never-worse in the window with the prior."""
-    pit = pit_sandwich(fm_fn)
+    pit = pit_sandwich(fm_fn, h)
     prior = _LAP_PRIOR if lap_prior is None else lap_prior
 
     def run(ch):
-        lap = laplace_dists(ch)
+        lap = laplace_dists(ch, h)
         rec = pit(ch)
         if rec is None or len(lap) != len(rec):
             return None
@@ -335,27 +339,34 @@ def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None):
 
 # Foundation registry (Chronos / TimesFM reused from foundation_study). The
 # "+lap" arms are the laplace-calibrated sandwiches of the sharp quantile models.
-REGISTRY = {
-    "laplace":     laplace_dists,
-    "Sundial":     sundial_dists,
-    "TiRex":       tirex_dists,
-    "flowstate":   flowstate_dists,
-    "TabPFN":      tabpfn_dists,
-    "Chronos":     fs.chronos_dists,
-    "TimesFM":     fs.timesfm_dists,
-    "TimesFM+lap": _sandwich(fs.timesfm_dists),
-    "TiRex+lap":   _sandwich(tirex_dists),
-    "Chronos+lap": _sandwich(fs.chronos_dists),
-    # adaptive: FM location + laplace conditional scale/tails on the residual
-    "TimesFM~lap": _resid_sandwich(fs.timesfm_dists),
-    "TiRex~lap":   _resid_sandwich(tirex_dists),
-    "Chronos~lap": _resid_sandwich(fs.chronos_dists),
-    # PIT recalibration: laplace predicts in the FM's own CDF space, then inverts
-    "TimesFM@lap": pit_sandwich(fs.timesfm_dists),
-    "TiRex@lap":   pit_sandwich(tirex_dists),
-    "Chronos@lap": pit_sandwich(fs.chronos_dists),
-    # never-worse portfolio: laplace + PIT-recalibrated FM, online log-score blend
-    "TimesFM&lap": portfolio_sandwich(fs.timesfm_dists),
-    "TiRex&lap":   portfolio_sandwich(tirex_dists),
-    "Chronos&lap": portfolio_sandwich(fs.chronos_dists),
-}
+# make_registry(h) builds the same roster at forecast horizon h (h=1 = the
+# canonical one-step study). Every adapter and sandwich takes an h that defaults
+# to 1, so REGISTRY (h=1) is byte-for-byte the original behaviour.
+def make_registry(h=1):
+    return {
+        "laplace":     lambda ch: laplace_dists(ch, h),
+        "Sundial":     lambda ch: sundial_dists(ch, h),
+        "TiRex":       lambda ch: tirex_dists(ch, h),
+        "flowstate":   lambda ch: flowstate_dists(ch, h),
+        "TabPFN":      lambda ch: tabpfn_dists(ch, h),
+        "Chronos":     lambda ch: fs.chronos_dists(ch, h),
+        "TimesFM":     lambda ch: fs.timesfm_dists(ch, h),
+        "TimesFM+lap": _sandwich(fs.timesfm_dists, h),
+        "TiRex+lap":   _sandwich(tirex_dists, h),
+        "Chronos+lap": _sandwich(fs.chronos_dists, h),
+        # adaptive: FM location + laplace conditional scale/tails on the residual
+        "TimesFM~lap": _resid_sandwich(fs.timesfm_dists, h),
+        "TiRex~lap":   _resid_sandwich(tirex_dists, h),
+        "Chronos~lap": _resid_sandwich(fs.chronos_dists, h),
+        # PIT recalibration: laplace predicts in the FM's own CDF space, then inverts
+        "TimesFM@lap": pit_sandwich(fs.timesfm_dists, h),
+        "TiRex@lap":   pit_sandwich(tirex_dists, h),
+        "Chronos@lap": pit_sandwich(fs.chronos_dists, h),
+        # never-worse portfolio: laplace + PIT-recalibrated FM, online log-score blend
+        "TimesFM&lap": portfolio_sandwich(fs.timesfm_dists, h=h),
+        "TiRex&lap":   portfolio_sandwich(tirex_dists, h=h),
+        "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
+    }
+
+
+REGISTRY = make_registry(1)

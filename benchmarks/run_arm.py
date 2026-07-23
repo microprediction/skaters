@@ -66,9 +66,12 @@ METHODS = [m for m in os.environ.get("ARM_METHODS", "").split(",") if m]
 ARM = os.environ.get("ARM_CORPUS", "")
 OUT = os.environ.get("PRED_OUT", "")
 ARM_MAX = int(os.environ.get("ARM_MAX", 0))
+ARM_H = int(os.environ.get("ARM_H", "1"))     # forecast horizon k (1 = canonical study)
 NSHARD = int(os.environ.get("ARM_NSHARD", 1))
 SHARDS = {int(s) for s in os.environ.get("ARM_SHARDS", "0").split(",") if s != ""}
-MINLEN = CTX + TEST + 12                 # context + test window + lag headroom
+# context + test window + lag headroom + horizon shift (h-1 for the k-step origin)
+MINLEN = CTX + TEST + 12 + max(0, ARM_H - 1)
+REGISTRY = aa.make_registry(ARM_H)
 
 
 def done_keys(path):
@@ -82,8 +85,8 @@ def main():
     if not (METHODS and ARM and OUT):
         sys.exit("set ARM_METHODS, ARM_CORPUS, PRED_OUT")
     for m in METHODS:
-        if m not in aa.REGISTRY:
-            sys.exit(f"unknown method {m!r}; have {sorted(aa.REGISTRY)}")
+        if m not in REGISTRY:
+            sys.exit(f"unknown method {m!r}; have {sorted(REGISTRY)}")
     done = done_keys(OUT)
     writer = PredictionWriter(OUT)
     series = list(iter_series(ARM))
@@ -91,7 +94,7 @@ def main():
         series = series[:ARM_MAX]
     series = [(j, x) for j, x in enumerate(series) if j % NSHARD in SHARDS]
     print(f"[run_arm] {ARM}: {len(series)} series (shard {sorted(SHARDS)}/{NSHARD}), "
-          f"methods={METHODS} CTX={CTX} TEST={TEST} dev={aa.DEVICE}", flush=True)
+          f"methods={METHODS} CTX={CTX} TEST={TEST} h={ARM_H} dev={aa.DEVICE}", flush=True)
 
     scored = skipped = 0
     for j, (sid, title, ch) in series:
@@ -107,7 +110,7 @@ def main():
         study = f"{ARM}:{regime(title)}"     # stratum = frequency x regime (radar axes)
         for m in todo:
             t = time.time()
-            dists = aa.REGISTRY[m](ch)
+            dists = REGISTRY[m](ch)
             if dists is None:
                 continue
             for step, d in enumerate(dists):
