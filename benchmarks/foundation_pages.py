@@ -241,19 +241,13 @@ def compute_radar(store):
 
 
 def radar_svg(model, radar):
-    """Six-axis regime star plot on the log-likelihood ratio vs Laplace, matching
-    the site's challenges radar: Laplace is the dashed 1.0 ring, outward is
-    better. Every variant is shaded so the raw model reads even when it dents
-    inward."""
-    variants = [("", "raw", "#6b7280"),
-                ("@lap", "@lap", "#8b5cf6"),
-                ("&lap", "&lap", "#4a3aff")]
-    if not model["arms"]:
-        variants = variants[:1]
-    W, H, cx, cy, R = 520, 440, 260, 220, 150
+    """One six-axis regime star plot: the raw model standalone vs Laplace, on the
+    log-likelihood ratio (Laplace = the dashed 1.0 ring, outward beats Laplace
+    more often). Standalone only; no sandwich arms."""
+    W, H, cx, cy, R = 560, 470, 280, 240, 180
     K = len(RADAR_AXES)
     MAXV = 1.5
-    esc = lambda t: t.replace("&", "&amp;")
+    color = "#4a3aff"
 
     def ang(i):
         return -math.pi / 2 + i * 2 * math.pi / K
@@ -262,10 +256,10 @@ def radar_svg(model, radar):
         r = R * min(max(v, 0.0), MAXV) / MAXV
         return cx + r * math.cos(ang(i)), cy + r * math.sin(ang(i))
 
-    parts = [f'<svg viewBox="0 0 {W} {H}" style="width:100%;max-width:520px;height:auto;'
+    parts = [f'<svg viewBox="0 0 {W} {H}" style="width:100%;max-width:560px;height:auto;'
              f'display:block;margin:0 auto" role="img" '
-             f'aria-label="Star plot of {model["name"]} versus Laplace across six regime '
-             f'axes; the log-likelihood ratio, with Laplace on the 1.0 ring.">']
+             f'aria-label="Star plot of {model["name"]} standalone versus Laplace across '
+             f'six regime axes; the log-likelihood ratio, Laplace on the 1.0 ring.">']
     for rv in (0.5, 1.0, 1.5):
         pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, rv) for i in range(K)))
         if abs(rv - 1.0) < 1e-9:
@@ -282,35 +276,25 @@ def radar_svg(model, radar):
         anchor = "middle" if abs(lx - cx) < 14 else ("start" if lx > cx else "end")
         dy = 4 if ly >= cy else 0
         parts.append(f'<text x="{lx:.1f}" y="{ly + dy:.1f}" text-anchor="{anchor}" '
-                     f'font-size="12" fill="#5a5a5a">{label}</text>')
+                     f'font-size="13" fill="#5a5a5a">{label}</text>')
     lref_x, lref_y = pt(0, 1.0)
     parts.append(f'<text x="{lref_x + 6:.1f}" y="{lref_y - 5:.1f}" font-size="11" '
                  f'fill="#1a8c4a">Laplace = 1.0</text>')
-    opacity = {"": ".14", "@lap": ".16", "&lap": ".20"}
-    for suf, _lab, color in variants:
-        d = radar.get(model["key"] + suf)
-        if not d:
-            continue
-        vals, ns = d["ll"], d["n"]
-        pairs = [(i, v) for i, v in enumerate(vals) if v is not None]
-        if not pairs:
-            continue
+    d = radar.get(model["key"])
+    pairs = [(i, v) for i, v in enumerate(d["ll"])] if d else []
+    pairs = [(i, v) for i, v in pairs if v is not None]
+    if pairs:
         pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, v) for i, v in pairs))
-        parts.append(f'<polygon points="{pts}" fill="{color}" fill-opacity="{opacity[suf]}" '
+        parts.append(f'<polygon points="{pts}" fill="{color}" fill-opacity=".16" '
                      f'stroke="{color}" stroke-width="2"/>')
         for i, v in pairs:
             x, y = pt(i, v)
-            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{color}" '
-                         f'stroke="#fff" stroke-width="1.5"><title>{RADAR_AXES[i][0]} '
-                         f'{esc(suf) or "raw"}: log-likelihood ratio {v:.2f} vs Laplace '
-                         f'(n={ns[i]})</title></circle>')
+            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{color}" '
+                         f'stroke="#fff" stroke-width="1.5"><title>{RADAR_AXES[i][0]}: '
+                         f'log-likelihood ratio {v:.2f} vs Laplace '
+                         f'(n={d["n"][i]})</title></circle>')
     parts.append("</svg>")
-    labels = {"": "raw", "@lap": "@lap &middot; laplace-driven",
-              "&lap": "&lap &middot; portfolio"}
-    legend = " ".join(
-        f'<span><i style="background:{c};opacity:.7"></i>{labels[s]}</span>'
-        for s, _l, c in variants)
-    return "".join(parts), legend
+    return "".join(parts)
 
 
 # ---------------------------------------------------------------- page builder
@@ -409,7 +393,7 @@ def external_section(model):
 
 
 def build_page(slug, model, vs, cov, radar):
-    svg, legend = radar_svg(model, radar)
+    svg = radar_svg(model, radar)
     ver = f" {model['version']}" if model.get("version") else ""
     vendor = f'{model["vendor"]} &middot; ' if model["vendor"] else ""
     intro = f'{model["blurb"]} {model["note"]}'
@@ -484,15 +468,13 @@ def build_page(slug, model, vs, cov, radar):
       raw central-90% coverage (0.90 target).</p>
 
     <h2>Star plot</h2>
-    <p>The same six regime axes as the site's <a href="/challengers.html">standalone
-      radar</a>, so the two read alike. Each radius is the log-likelihood ratio against
-      Laplace: <code>(wins + &frac12;&middot;ties) / n</code>, scaled so an even split with
-      Laplace sits on the dashed 1.0 ring, outward is better, inward is worse. The M4-hourly
-      set is split into soft and hard waveforms by corpus order, matching that radar. Raw
-      {model['name']} dents inside the ring where it loses{'' if not model['arms'] else '; the &amp;lap portfolio pulls back out toward it'}.</p>
+    <p>{model['name']} standalone against Laplace, on the same six regime axes as the site's
+      <a href="/challengers.html">standalone radar</a>. Each radius is the log-likelihood
+      ratio, <code>(wins + &frac12;&middot;ties) / n</code> scaled so an even split with
+      Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward less. The
+      M4-hourly set splits into soft and hard waveforms by corpus order, matching that radar.</p>
     <figure style="margin:16px 0 6px">
       {svg}
-      <div class="key">{legend}</div>
     </figure>
 
     {combined_section(model, vs, cov)}
