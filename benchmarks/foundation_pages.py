@@ -55,7 +55,21 @@ MODELS = {
                           "forecasts it autoregressively, like a language model over "
                           "quantized values.",
                     note="Reused from the earlier foundation study; run zero-shot on the "
-                         "one-step change series."),
+                         "one-step change series.",
+                    links=[
+                        ("GitHub", "https://github.com/amazon-science/chronos-forecasting"),
+                        ("Model card", "https://huggingface.co/amazon/chronos-bolt-small"),
+                        ("Paper (arXiv 2403.07815)", "https://arxiv.org/abs/2403.07815"),
+                    ],
+                    arch="Chronos treats forecasting as language modelling. It scales and "
+                         "quantises the series into a fixed token vocabulary, trains a "
+                         "T5-style transformer on the token sequences with a cross-entropy "
+                         "loss, and forecasts by sampling tokens. This study runs the "
+                         "Chronos-Bolt variant (chronos-bolt-small), which patches the "
+                         "context and emits quantiles directly in a single forward pass "
+                         "rather than sampling autoregressively; it is far faster, but its "
+                         "log-likelihood is a quantile reconstruction, so read its CRPS as "
+                         "the primary signal."),
     "tirex": dict(name="TiRex", key="TiRex", vendor="NX-AI",
                   license="NXAI Community License", arms=True,
                   blurb="TiRex is a 35M-parameter, xLSTM-based zero-shot forecaster that "
@@ -69,6 +83,12 @@ MODELS = {
                       ("Paper (arXiv 2505.23719)", "https://arxiv.org/abs/2505.23719"),
                       ("License", "https://huggingface.co/NX-AI/TiRex/blob/main/LICENSE"),
                   ],
+                  arch="TiRex is built on the xLSTM recurrent architecture rather than "
+                       "attention, at 35M parameters. It ingests the context and emits nine "
+                       "quantiles directly in one pass, and is trained for in-context "
+                       "zero-shot forecasting across both short and long horizons. Its small "
+                       "size is the notable part: it leads public leaderboards while being "
+                       "an order of magnitude smaller than the transformer foundation models.",
                   external=[
                       ("GIFT-Eval", "https://huggingface.co/spaces/Salesforce/GIFT-Eval",
                        "Salesforce's general forecasting benchmark: 7 domains, about 98 "
@@ -91,20 +111,52 @@ MODELS = {
                     license="Apache-2.0", arms=True,
                     blurb="TimesFM is a decoder-only, patched time-series transformer; "
                           "we score version 2.5.",
-                    note="Run zero-shot with a fixed 128-length context."),
-    "sundial": dict(name="Sundial", key="Sundial", vendor="",
+                    note="Run zero-shot with a fixed 128-length context.",
+                    links=[
+                        ("GitHub", "https://github.com/google-research/timesfm"),
+                        ("Paper (arXiv 2310.10688)", "https://arxiv.org/abs/2310.10688"),
+                    ],
+                    arch="TimesFM is a decoder-only transformer in the style of a language "
+                         "model. It splits the context into fixed-length patches, treats "
+                         "each patch as a token, and is pretrained on a large corpus of real "
+                         "and synthetic series. This study scores version 2.5 (200M "
+                         "parameters) with its continuous quantile head, which emits the "
+                         "predictive spread directly."),
+    "sundial": dict(name="Sundial", key="Sundial", vendor="Tsinghua (THUML)",
                     license="see model card", arms=False,
                     blurb="Sundial is a generative time-series model; we draw samples "
                           "per step and score the empirical predictive.",
                     note="Run raw only in this study; the collaborative arms were built "
-                         "for the three strongest models first."),
+                         "for the three strongest models first.",
+                    links=[
+                        ("GitHub", "https://github.com/thuml/Sundial"),
+                        ("Model card", "https://huggingface.co/thuml/sundial-base-128m"),
+                        ("Paper (arXiv 2502.00816)", "https://arxiv.org/abs/2502.00816"),
+                    ],
+                    arch="Sundial is a decoder-only transformer trained without discrete "
+                         "tokenisation. It embeds continuous-valued patches and learns a "
+                         "generative TimeFlow head by flow-matching, so instead of a "
+                         "parametric density it produces samples of plausible futures. This "
+                         "study draws those samples (the base-128m model) and scores their "
+                         "empirical predictive; it is pretrained on the trillion-point "
+                         "TimeBench corpus."),
     "flowstate": dict(name="FlowState", key="flowstate", vendor="IBM",
                       license="research checkpoint (arXiv:2508.05287)", arms=False,
                       blurb="FlowState is a state-space time-series model, loaded via "
                             "IBM's granite-tsfm.",
                       note="Research checkpoint (research use only); run raw. The "
                            "collaborative arms were built for the three strongest "
-                           "models first."),
+                           "models first.",
+                      links=[
+                          ("Model card", "https://huggingface.co/ibm-research/flowstate"),
+                          ("Paper (arXiv 2508.05287)", "https://arxiv.org/abs/2508.05287"),
+                      ],
+                      arch="FlowState pairs a state-space model (SSM) encoder with a "
+                           "functional-basis decoder. The decoder is continuous in time, "
+                           "which makes the model equivariant to the sampling rate and able "
+                           "to forecast at any resolution and horizon without retraining; it "
+                           "emits quantiles directly. It is an IBM research checkpoint loaded "
+                           "through granite-tsfm."),
 }
 
 NAV = """      <nav>
@@ -392,6 +444,13 @@ def external_section(model):
     </ul>"""
 
 
+def arch_section(model):
+    if not model.get("arch"):
+        return ""
+    return f"""<h2>Architecture and methodology</h2>
+    <p>{model['arch']}</p>"""
+
+
 def build_page(slug, model, vs, cov, radar):
     svg = radar_svg(model, radar)
     ver = f" {model['version']}" if model.get("version") else ""
@@ -486,6 +545,8 @@ def build_page(slug, model, vs, cov, radar):
       page and in the <a href="/guide.html">methodology</a>.</p>
 
     {external_section(model)}
+
+    {arch_section(model)}
   </main>
 
   <footer>
