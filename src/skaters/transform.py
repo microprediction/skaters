@@ -471,7 +471,8 @@ def holt_linear(alpha: float = 0.1, beta: float = 0.05):
 # GARCH(1,1) volatility scaling
 # ---------------------------------------------------------------------------
 
-def garch(omega: float = 0.01, alpha: float = 0.1, beta: float = 0.85, eps: float = 1e-8):
+def garch(omega: float = 0.01, alpha: float = 0.1, beta: float = 0.85,
+          mean_alpha: float = 0.05, eps: float = 1e-8):
     """GARCH(1,1) volatility transform.
 
     Divides by the conditional standard deviation, producing
@@ -497,20 +498,28 @@ def garch(omega: float = 0.01, alpha: float = 0.1, beta: float = 0.85, eps: floa
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
         if state is None:
-            # Initialize conditional variance at the unconditional level
-            # (or a sensible default if not stationary)
             persist = alpha + beta
             var0 = omega / (1 - persist) if persist < 1 else omega / eps
-            return y / max(math.sqrt(var0), eps), {"var": var0, "last_y": y}
+            return 0.0, {"var": var0, "last_dev": 0.0, "mu": y}
 
-        var = omega + alpha * state["last_y"] ** 2 + beta * state["var"]
+        # GARCH conditional variance of the DEVIATION from a running mean, not of
+        # the raw value. alpha * y^2 treats y as a mean-zero return; on a level
+        # series that makes the "volatility" of order |y|, and the inverse then
+        # re-inflates it -- unstable, and it widened real level-series forecasts.
+        # Tracking a mean (like `standardize`) makes garch shift-invariant. On the
+        # mean-zero returns garch is meant for, mu stays ~0 and this reduces to the
+        # original y/sigma exactly.
+        mu = state["mu"]
+        dev = y - mu
+        var = omega + alpha * state["last_dev"] ** 2 + beta * state["var"]
         sigma = math.sqrt(var) if var > eps * eps else eps
-        y_prime = y / sigma
-        return y_prime, {"var": var, "last_y": y}
+        y_prime = dev / sigma
+        mu_new = mu + mean_alpha * dev
+        return y_prime, {"var": var, "last_dev": dev, "mu": mu_new}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         sigma = math.sqrt(state["var"]) if state["var"] > 1e-16 else 1e-8
-        return [d.scale(sigma) for d in dists]
+        return [d.affine(sigma, state["mu"]) for d in dists]
 
     return forward, inverse_k
 
@@ -928,6 +937,53 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 # AR(p) transform with online recursive least squares
 # ---------------------------------------------------------------------------
 
+def _ar_spectral_radius(phi: list[float]) -> float:
+    """Spectral radius of the AR companion matrix (largest |characteristic root|).
+
+    The h-step AR forecast is governed by powers of this matrix: it converges
+    (a well-posed forecast) iff the radius is < 1, and diverges geometrically
+    otherwise. Closed form for p <= 2; power iteration for higher orders.
+    """
+    p = len(phi)
+    if p == 1:
+        return abs(phi[0])
+    if p == 2:
+        a, b = phi[0], phi[1]
+        disc = a * a + 4.0 * b
+        if disc >= 0.0:
+            r = math.sqrt(disc)
+            return max(abs((a + r) / 2.0), abs((a - r) / 2.0))
+        return math.hypot(a / 2.0, math.sqrt(-disc) / 2.0)   # |complex root|
+    v = [1.0] * p
+    rho = 0.0
+    for _ in range(60):
+        nv = [sum(phi[j] * v[j] for j in range(p))] + v[:-1]
+        m = max(abs(x) for x in nv) or 1.0
+        v = [x / m for x in nv]
+        rho = m
+    return rho
+
+
+def _ar_stationary(phi: list[float], margin: float = 0.999) -> list[float]:
+    """Damp AR coefficients into the stationary region for forecasting.
+
+    An online least-squares fit — especially from a handful of warm-up points —
+    can land outside the stationary region (a near-unit or explosive root). Its
+    multi-step forecast then diverges (an AR(2) fit to 3 points reached a
+    13-step mean of ~1e22 on real GIFT-Eval series). Scaling ``phi_j`` by
+    ``gamma**(j+1)`` scales every companion eigenvalue by ``gamma``, so choosing
+    ``gamma = margin / rho`` when ``rho > margin`` brings the radius to
+    ``margin`` and leaves an already-stationary fit untouched. This is
+    constrained forecasting, not a magnitude clip: the forecast stays the model's
+    own, just kept convergent.
+    """
+    rho = _ar_spectral_radius(phi)
+    if rho <= margin:
+        return phi
+    g = margin / rho
+    return [phi[j] * g ** (j + 1) for j in range(len(phi))]
+
+
 def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
        decay: float = 0.0):
     """Autoregressive transform with online coefficient estimation.
@@ -1024,36 +1080,46 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
 
         For j > h, y_{t+h-j} is known from the buffer.
         For j <= h, y_{t+h-j} is a previously recovered prediction.
-        Variance propagates: ar_var += phi_j^2 * var of uncertain lags.
+
+        The mean follows the AR recursion. The h-step forecast VARIANCE is the
+        MA(inf) form ``sigma^2 * sum_{i<h} psi_i^2`` (psi the impulse responses),
+        NOT ``sum_j phi_j^2 var_{h-j}`` -- the latter assumes the lagged forecasts
+        are independent and, since a stationary AR(2) can have |phi_1| > 1
+        (e.g. phi=[1.99,-0.99]), inflates the variance by phi_1^2 each step until
+        it explodes. The MA form converges for any stationary AR.
         """
         buf = list(state["buffer"])
-        phi = state["phi"]
-        recovered_means = []
-        recovered_vars = []
-        result = []
+        # Forecast with stationarity-constrained coefficients: a non-stationary
+        # online fit has no convergent multi-step forecast. The one-step fit in
+        # `state` is left intact; only the extrapolation is kept well-posed.
+        phi = _ar_stationary(state["phi"])
+        H = len(dists)
 
-        for h in range(len(dists)):
+        # Impulse responses psi_0..psi_{H-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
+        psi = [1.0]
+        for i in range(1, H):
+            psi.append(sum(phi[j] * psi[i - 1 - j] for j in range(p) if i - 1 - j >= 0))
+
+        recovered_means = []
+        result = []
+        cum_psi2 = 0.0
+        for h in range(H):
             ar_mean = 0.0
-            ar_var = 0.0
             for j in range(p):
                 lag_h = h - j - 1  # which previous horizon provides this lag
                 if lag_h < 0:
-                    # Known value from buffer
                     buf_idx = len(buf) + lag_h
                     if 0 <= buf_idx < len(buf):
                         ar_mean += phi[j] * buf[buf_idx]
-                else:
-                    # Previously recovered prediction
-                    if lag_h < len(recovered_means):
-                        ar_mean += phi[j] * recovered_means[lag_h]
-                        ar_var += phi[j] ** 2 * recovered_vars[lag_h]
+                elif lag_h < len(recovered_means):
+                    ar_mean += phi[j] * recovered_means[lag_h]
 
             total_mean = dists[h].mean + ar_mean
-            total_var = dists[h].var + ar_var
+            cum_psi2 += psi[h] * psi[h]
+            total_var = cum_psi2 * dists[h].var     # sigma^2 * sum psi_i^2
             total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
 
             recovered_means.append(total_mean)
-            recovered_vars.append(total_var)
             result.append(Dist.gaussian(total_mean, total_std))
 
         return result
@@ -1141,35 +1207,33 @@ def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         buf = list(state["buffer"])
         theta = state["theta"]
-        # Expand group coefficients to per-lag coefficients
-        phi = [theta[groups[j]] for j in range(max_lag)]
-
+        # Expand group coefficients to per-lag, then constrain to stationarity
+        # for a well-posed forecast (same fix as `ar`; grouped AR is AR-family).
+        phi = _ar_stationary([theta[groups[j]] for j in range(max_lag)])
+        H = len(dists)
+        psi = [1.0]
+        for i in range(1, H):
+            psi.append(sum(phi[j] * psi[i - 1 - j]
+                           for j in range(max_lag) if i - 1 - j >= 0))
         recovered_means = []
-        recovered_vars = []
         result = []
-
-        for h in range(len(dists)):
+        cum_psi2 = 0.0
+        for h in range(H):
             ar_mean = 0.0
-            ar_var = 0.0
             for j in range(max_lag):
                 lag_h = h - j - 1
                 if lag_h < 0:
                     buf_idx = len(buf) + lag_h
                     if 0 <= buf_idx < len(buf):
                         ar_mean += phi[j] * buf[buf_idx]
-                else:
-                    if lag_h < len(recovered_means):
-                        ar_mean += phi[j] * recovered_means[lag_h]
-                        ar_var += phi[j] ** 2 * recovered_vars[lag_h]
-
+                elif lag_h < len(recovered_means):
+                    ar_mean += phi[j] * recovered_means[lag_h]
             total_mean = dists[h].mean + ar_mean
-            total_var = dists[h].var + ar_var
+            cum_psi2 += psi[h] * psi[h]
+            total_var = cum_psi2 * dists[h].var   # sigma^2 * sum psi_i^2
             total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
-
             recovered_means.append(total_mean)
-            recovered_vars.append(total_var)
             result.append(Dist.gaussian(total_mean, total_std))
-
         return result
 
     return forward, inverse_k
