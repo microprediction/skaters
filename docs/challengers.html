@@ -136,12 +136,15 @@
     </p>
     <div class="card-grid">
       <div class="card">
-        <h3>TimesFM &mdash; David v Goliath</h3>
+        <h3>TimesFM &mdash; zero-shot and corrected distillation</h3>
         <p>Google&rsquo;s 200M-parameter foundation model: 69 of 69
-          continuous series on likelihood, a 2.26-nat median gap, and
-          where Goliath actually wins (predicting zeros).
-          <a href="/timesfm.html">The bout &rarr;</a></p>
+          continuous series lost on zero-shot likelihood. A corrected,
+          series-disjoint Laplace q-grid LoRA then lost &minus;0.155385 median
+          dLL to its zero-shot base and won 0/15 series by likelihood. The
+          earlier positive pilot used the wrong output channels and is invalid.
+          <a href="/timesfm.html">Both bouts &rarr;</a></p>
       </div>
+
       <div class="card">
         <h3>TabFM &mdash; David v Godzilla</h3>
         <p>TabFM is impressively competitive with laplace given its
