@@ -3,6 +3,7 @@
 // One forecaster: laplace (general). Volatility/mean-reversion are composable transforms.
 
 import { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
+import { gaussianPdf, gaussianCdf } from "./dist.mjs";
 import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
@@ -173,11 +174,69 @@ function laplaceSingleScale(k, objective, sticky, scaleAlpha) {
 // predictive scale tracks volatility). Default 0.03 beats the older 0.01 on
 // held-out log-likelihood AND CRPS across the continuous FRED universe; pass
 // scaleAlpha = 0.01 to reproduce the earlier default.
-export function laplace(k = 1, objective = "crps", sticky = true, scales = null, scaleAlpha = 0.03, tails = "gpd") {
-  // conditional tail fit (body -> region -> tail), then parade reads PIT/z
-  // against the spliced predictive (see tails.mjs, parade.mjs)
+
+// Diffuse floor: an always-on heavy-tailed escape hatch on an ABSOLUTE, ratcheting
+// scale, so a collapsed predictive meeting a jump can no longer detonate logpdf.
+// Faithful mirror of skaters/api.py (_FloorDist / _with_diffuse); touches
+// logpdf/cdf only, so mean/std/quantile/crps stay the body's. Production safety
+// net, not a scoring trick (studies eliminate out-of-scope series instead).
+const DIFFUSE_DECADES = 3;
+
+class FloorDist {
+  constructor(base, W, eps) {
+    this.base = base;
+    this.eps = eps;
+    const m0 = base.mean;
+    const per = eps / DIFFUSE_DECADES;
+    this.comps = [];
+    for (let j = 0; j < DIFFUSE_DECADES; j++) this.comps.push([per, m0, W * Math.pow(10.0, j)]);
+  }
+  get mean() { return this.base.mean; }
+  get std() { return this.base.std; }
+  quantile(p, tol = 1e-9, maxIter = 100) { return this.base.quantile(p, tol, maxIter); }
+  crps(x) { return this.base.crps(x); }
+  cdf(x) {
+    let c = (1.0 - this.eps) * this.base.cdf(x);
+    for (const [w, m, s] of this.comps) c += w * gaussianCdf(x, m, s);
+    return c;
+  }
+  logpdf(x) {
+    const terms = [Math.log(1.0 - this.eps) + this.base.logpdf(x)];
+    for (const [w, m, s] of this.comps) {
+      const p = gaussianPdf(x, m, s);
+      if (p > 0.0) terms.push(Math.log(w) + Math.log(p));
+    }
+    const hi = Math.max(...terms);
+    let sum = 0.0;
+    for (const t of terms) sum += Math.exp(t - hi);
+    return hi + Math.log(sum);
+  }
+}
+
+function addDiffuse(d, W, eps) {
+  if (W <= 0.0 || eps <= 0.0) return d;
+  return new FloorDist(d, W, eps);
+}
+
+function withDiffuse(f, priorScale, eps) {
+  return (y, state) => {
+    const st = state || {};
+    let scale = st.scale || 0.0;
+    const ay = Math.abs(y);
+    if (ay > scale) scale = ay;
+    const [dists, inner2] = f(y, st.inner);
+    const W = priorScale > scale ? priorScale : scale;
+    const out = dists.map((d) => addDiffuse(d, W, eps));
+    return [out, { inner: inner2, scale }];
+  };
+}
+
+export function laplace(k = 1, objective = "crps", sticky = true, scales = null, scaleAlpha = 0.03, tails = "gpd", diffuse = 1e-12, priorScale = 0.0) {
+  // conditional tail fit (body -> region -> tail), then the diffuse floor, then
+  // parade reads PIT/z against the floored, spliced predictive
   let f = multiscale((kk) => laplaceSingleScale(kk, objective, sticky, scaleAlpha), k, { scales });
   if (tails === "gpd") f = gpdtails(f, k);
+  if (diffuse > 0.0) f = withDiffuse(f, priorScale, diffuse);
   f = parade(f, k);
   f.skaterName = `laplace(k=${k})`;
   return f;
