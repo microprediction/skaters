@@ -246,3 +246,6 @@ papers/arxiv/*.pdf
 
 # rust core build artifacts
 rust/target/
+
+# FRED holdout snapshot (18MB, regenerate with benchmarks/fetch_holdout.py)
+benchmarks/data_holdout/
