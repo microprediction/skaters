@@ -15,6 +15,17 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .lede { color: #555; margin: 0 0 32px; font-size: 1.05em; }
+    .paper { margin: 0 0 34px; }
+    .paper h2 { margin: 0 0 6px; font-weight: 600; font-size: 1.3em; }
+    .paper h2 a { text-decoration: none; }
+    .paper h2 a:hover { text-decoration: underline; }
+    .paper .abstract { margin: 0 0 8px; color: #444; }
+    .paper .links a { text-decoration: none; margin-right: 16px; }
+    .paper .links a:hover { text-decoration: underline; }
+    .status { color: #888; font-size: 0.92em; font-style: italic; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -58,79 +69,52 @@
 
   <main>
     <h1>Papers</h1>
-    <p class="subtitle">The methods paper and the companion study. The benchmark studies
-      live on their <a href="/benchmarks.html">own page</a>.</p>
+    <p class="lede">Papers built on the skaters library. Sources and run logs are in the
+      <a href="https://github.com/microprediction/skaters/tree/main/papers">papers/</a> and
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">benchmarks/</a>
+      directories of the repository. The benchmark studies themselves live on the
+      <a href="/benchmarks.html">benchmarks page</a>.</p>
 
-    <h2>The paper</h2>
-    <p>
-      <strong>Transforms All the Way Down — Automatic Online Distributional
-      Forecasting by Conjugation.</strong> P. Cotton.
-    </p>
-    <p>
-      Every prediction is a full predictive distribution, assembled by composition: invertible
-      transforms chain together above a single distributional leaf, and ensembles combine such
-      chains. Because the leaf fits its shape by optimising a proper scoring rule, its objective is
-      a choice — fit the model by likelihood, then conform the predictive tail to a downstream score
-      such as CRPS. The library is written twice, in pure Python and in zero-dependency JavaScript
-      that agrees to 1e-6, so the same model runs on a server or in a browser.
-    </p>
-    <p>
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF →</a>
-      &nbsp;·&nbsp;
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX (JSS)</a>
-      &nbsp;·&nbsp;
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters.md">Markdown draft</a>
-    </p>
-    <p>
-      A preprint is posted on SSRN (2026), and a short software paper is under review at the
-      <a href="https://joss.theoj.org/">Journal of Open Source Software</a>
-      (<a href="https://github.com/microprediction/skaters/blob/main/papers/joss/paper.md">paper.md</a>).
-    </p>
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">Transforms
+      all the way down: automatic online distributional forecasting by conjugation</a></h2>
+      <p class="abstract">The methods paper. Every prediction is a full predictive
+      distribution, assembled by composition: invertible transforms chain onto a single
+      distributional leaf fitted by a proper scoring rule, and the collection collapses into
+      one forecast function with no exposed tuning parameters. It leads the held-out
+      log-likelihood race against classical, neural, and foundation-model baselines on FRED
+      series, with the asset-price split reported rather than averaged away. Written twice,
+      in pure Python and zero-dependency JavaScript, held to 1e-6 agreement by a parity
+      suite.</p>
+      <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF</a>
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX</a>
+      <span class="status">SSRN, 2026</span></p>
+    </div>
 
-    <h2>Companion paper &mdash; the conformal information gap</h2>
-    <p>
-      <strong>An Empirical Study of the Conformal Information Gap.</strong> P. Cotton.
-    </p>
-    <p>
-      The library serves as the measurement instrument for a study of what residual pooling
-      costs. Under logarithmic loss the irreducible cost of a retained representation is a
-      conditional mutual information, the information gap. A nested ladder of skaters
-      transforms prices each representation family prequentially on 701 FRED series:
-      conditional scale is the largest and most reliable component of the gain, and
-      scale-normalized empirical pooling beats raw pooling on 87 percent of series under
-      CRPS. The experiment scripts live in this repository's
-      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">benchmarks</a>
-      directory. Preprint on SSRN (2026).
-    </p>
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/conformalprediction/blob/main/papers/frontier/frontier.pdf">An
+      empirical study of the conformal information gap</a></h2>
+      <p class="abstract">The companion study, with skaters as the measurement instrument.
+      Under logarithmic loss the irreducible cost of a retained representation is a
+      conditional mutual information, the information gap. A nested ladder of transforms
+      prices each representation family prequentially on 701 economic series: conditional
+      scale is the largest and most reliable component of the gain, and scale-normalized
+      empirical pooling beats raw pooling on 87 percent of series under CRPS.</p>
+      <p class="links"><a href="https://github.com/microprediction/conformalprediction/blob/main/papers/frontier/frontier.pdf">PDF</a>
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">experiment scripts</a>
+      <span class="status">SSRN preprint, 2026; under journal review</span></p>
+    </div>
 
-    <h2>Related reading</h2>
-    <ul>
-      <li><strong>Why skaters ranks by likelihood, by default.</strong> A scoring
-        rule is a settlement rule — match it to the target. Why a reusable
-        density is best judged by held-out log-likelihood (locality, the wealth a
-        market pays, additivity under composition, the information gap) and where
-        CRPS is the better target instead.
-        <a href="./metrics.html">Read it →</a></li>
-      <li><strong>On Prophet.</strong> The famous critique of Facebook Prophet —
-        <em>“Is Facebook’s Prophet the Time-Series Messiah, or Just a Very Naughty Boy?”</em>
-        (P. Cotton). <a href="https://medium.com/geekculture/is-facebooks-prophet-the-time-series-messiah-or-just-a-very-naughty-boy-8b71b136bc8c">Read it →</a></li>
-      <li><strong>The sandwich.</strong> Every model improved by running in
-        laplace's coordinates: forecasters and detectors, with measured
-        lifts. <a href="./sandwich.html">Read it →</a></li>
-      <li><strong>Challengers.</strong> Prophet at three scales and TabFM
-        pre-registered: frozen universes, statements before results, and the
-        sandwich verdicts. <a href="./challengers.html">Read it →</a></li>
-      <li><strong>The 99.9% interval that is actually 99.9%.</strong> Why
-        every predictive now carries censored-ML generalized-Pareto tails,
-        and the alarm budgets that come true.
-        <a href="./tails.html">Read it →</a></li>
-      <li><strong>Anomaly detection literature map.</strong> The streaming anomaly
-        detection literature, annotated and organized around one question: who can
-        promise a false-alarm rate on a drifting stream?
-        <a href="./anomaly-literature.html">Read it →</a></li>
-      <li><strong>Benchmarks repository.</strong> All studies are reproducible end-to-end:
-        <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">skaters/benchmarks</a>.</li>
-    </ul>
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/joss/paper.md">skaters:
+      online distributional time-series forecasting by conjugation, in Python and
+      JavaScript</a></h2>
+      <p class="abstract">The short software paper describing the package itself: the
+      transform contract, the conjugation recursion, the parity-locked ports, and the
+      calibration state that turns the forecaster into an anomaly detector.</p>
+      <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/joss/paper.md">paper.md</a>
+      <span class="status">under review at the Journal of Open Source Software</span></p>
+    </div>
 
     <h2>Citation</h2>
 <pre><code>@misc{cotton2026skaters,
