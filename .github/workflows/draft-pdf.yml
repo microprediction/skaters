@@ -1,0 +1,27 @@
+name: Draft PDF
+# JOSS pre-submission compile check: builds papers/joss/paper.md with the
+# official openjournals action and uploads the PDF as an artifact.
+on:
+  push:
+    paths:
+      - papers/joss/**
+      - .github/workflows/draft-pdf.yml
+  workflow_dispatch:
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    name: Paper Draft
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build draft PDF
+        uses: openjournals/openjournals-draft-action@master
+        with:
+          journal: joss
+          paper-path: papers/joss/paper.md
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: papers/joss/paper.pdf

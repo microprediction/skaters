@@ -54,6 +54,14 @@ forecasting software returns point forecasts or intervals, refits in
 batch, or requires a scientific-computing stack. Practitioners who need a
 predictive *distribution* per tick, updated online at microsecond-to-second
 cadence, on a server or in a browser, have had to assemble one from parts.
+Established open-source forecasters occupy different corners: `statsmodels`
+[@seabold2010statsmodels] and `darts` [@herzen2022darts] are batch-refit and
+largely point- or interval-oriented, Prophet [@taylor2018forecasting] targets
+batch seasonal decomposition, `GluonTS` [@alexandrov2020gluonts] is
+distributional but assumes a deep-learning stack and offline training, and
+`river` [@montiel2021river] is natively online but centred on point
+prediction. None provides an online predictive density as a single
+dependency-free function.
 
 `skaters` fills that gap with a single dependency-free function. On 894
 continuous non-price FRED series it leads classical, neural, and
@@ -64,7 +72,10 @@ forecaster into an anomaly detector with stated false-alarm rates: alarm
 when $\mathrm{erfc}(|z|/\sqrt{2}) < \alpha$, with measured rates near
 nominal on economic series. Methods, benchmarks, and the tail-calibration
 studies are documented in a companion methods paper in the repository and
-at https://skaters.microprediction.org.
+at https://skaters.microprediction.org. The package also serves as the
+measurement instrument in an ongoing empirical study of representation
+value in conformal prediction, whose experiment scripts live in this
+repository's `benchmarks` directory.
 
 The design distills ideas from the author's earlier `timemachines`
 package [@cotton2021timemachines] and from live distributional-prediction
