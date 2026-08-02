@@ -74,8 +74,13 @@ def _load_levels(series_id):
     if os.path.exists(cache):
         rows = []
         for line in open(cache):
-            d, v = line.rstrip("\n").split(",")
-            rows.append((d, float(v)))
+            parts = line.rstrip("\n").split(",")
+            if len(parts) != 2:      # header, wide-format, or a stray non-FRED file
+                continue
+            try:
+                rows.append((parts[0], float(parts[1])))
+            except ValueError:       # non-numeric value (e.g. FRED "." gap marker)
+                continue
         return rows
     rows = _fetch(series_id)
     if rows:

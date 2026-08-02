@@ -239,6 +239,12 @@ benchmarks/nonprice_study.log
 benchmarks/results_overnight.csv
 benchmarks/overnight_horserace.log
 
+# week-long study: the per-step canonical store + corpus cache + logs are large
+# and regenerable, so ignore them. The small derived summaries
+# (benchmarks/canonical_summary_*.csv) ARE committed — they are the chart source
+# (the lost-run lesson: never gitignore chart source data).
+benchmarks/preds/
+
 # arXiv staging: tarball is the artifact, intermediates are not
 papers/arxiv/*.aux
 papers/arxiv/*.out
@@ -247,5 +253,14 @@ papers/arxiv/*.pdf
 # rust core build artifacts
 rust/target/
 
+# FRED cache brought in as a symlink or a local dir (never commit the data)
+benchmarks/data
+data-fred-cache/
+.DS_Store
+# dated raw study tapes (local run outputs; the diagrams/READMEs are the artifact)
+benchmarks/results_large_*.csv
+benchmarks/results_sota_*.csv
+benchmarks/out_of_scope.csv
+benchmarks/preds_h/
 # FRED holdout snapshot (18MB, regenerate with benchmarks/fetch_holdout.py)
 benchmarks/data_holdout/

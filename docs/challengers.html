@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>skaters &mdash; Challenges</title>
+  <title>skaters &mdash; Laplace Algorithm Empirical Results</title>
   <meta name="description" content="One tiny, fast, online model against heavy machinery on their respective home turf. Every comparison with its tape, and the corners where other methods win." />
   <link rel="stylesheet" href="./academic.css" />
 </head>
@@ -13,22 +13,33 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+          </span>
+        </span>
         <a href="/demos/">Demos</a>
-        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
+            <a href="/guide.html">Methodology</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/faq.html">FAQ</a>
             <a href="/skills.html">Skills</a>
-          </span>
-        </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
-          <span class="drop">
-            <a href="/challengers.html">Challenges</a>
-            <a href="/sandwich.html">Sandwich</a>
-            <a href="/papers.html">Papers</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -37,9 +48,56 @@
   </header>
 
   <main>
-    <h1>Challenges</h1>
+    <h1>Laplace Algorithm Empirical Results</h1>
     <p class="subtitle">One tiny, fast, online model against heavy machinery,
-      on their respective home turf. That is hard.</p>
+      on their respective home turf. As Malcolm Fraser once said, life wasn&rsquo;t
+      meant to be easy.</p>
+
+    <h2>Strengths by regime</h2>
+    <p>
+      Five regimes plus a price/returns axis, one score each: how often a
+      challenger beats <code>laplace</code> per series, ties split, scaled so a
+      50/50 draw is 1.0. The dashed ring is <code>laplace</code> itself; outside
+      the ring the challenger is winning that regime, inside it is losing. Soft
+      vs hard waveforms are the two halves of M4-Hourly (noisy daily cycles
+      vs nearly deterministic ones; see the
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
+      Price/returns is the one axis <code>laplace</code> is not built for, and
+      <code>GARCH-t</code> wins it decisively (~1.8x on 2500 return series).
+      Pick up to six challengers &mdash; <code>GARCH-t</code>, Prophet, the
+      foundation models and more. Entries marked <em>(sandwiched)</em> are drawn
+      <strong>dashed</strong>: those models run inside <code>laplace</code>'s own
+      coordinates and beat it by construction, so they are collaboration, not a
+      head-to-head win (see <a href="/sandwich.html">collaborative use</a>). The
+      default view includes the <strong>PyMC&ndash;laplace sandwich</strong>,
+      which finishes ahead across the whole universe when run this way &mdash;
+      the clearest case of cooperation beating competition.
+    </p>
+    <div class="panel" id="radar-panel">
+      <div class="controls">
+        <div class="control" style="max-width:100%">
+          <label>Challengers (up to 6)</label>
+          <div id="radar-models" style="display:flex;flex-wrap:wrap;gap:2px 14px;max-width:760px"></div>
+        </div>
+        <div class="control">
+          <label>Metric</label>
+          <span>
+            <label><input type="radio" name="radar-metric" value="ll" checked /> Log-likelihood</label>
+            &nbsp;
+            <label><input type="radio" name="radar-metric" value="crps" /> CRPS</label>
+          </span>
+        </div>
+      </div>
+      <canvas id="radar" class="plot" width="640" height="480" tabindex="0"
+              aria-label="Radar chart: challenger strength relative to laplace by regime"></canvas>
+      <div class="legend" id="radar-legend"></div>
+      <div id="radar-tip" style="position:absolute;display:none;background:#fff;border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:0.85rem;box-shadow:0 2px 8px rgba(0,0,0,0.12);pointer-events:none"></div>
+      <table id="radar-table">
+        <thead><tr id="radar-table-head"><th>regime</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <script src="/js/challenges-radar-data.js"></script>
 
     <h2>Should you use something else?</h2>
     <p>
@@ -51,15 +109,24 @@
       record below marks each of those corners where we found them, in its
       own row rather than averaged away. What laplace is for,
       and what it deliberately is not, is set out on the
-      <a href="/scope.html">scope page</a>.
+      <a href="/scope.html">scope page</a>, and the whole record is written
+      up in the <a href="/papers.html">papers</a>.
     </p>
 
+    <h2>Should you use laplace <em>with</em> something else?</h2>
     <p>
-      skaters also cooperates as well as it competes: sandwiched in
-      laplace's coordinates, every challenger below improves dramatically
-      (<a href="/sandwich.html">the sandwich</a>), so a bare horserace can
-      mislead. These pages look for the types of series and regimes where
-      each method does its best work.
+      Very possibly &mdash; and it is the more interesting question. skaters
+      cooperates as well as it competes: sandwiched in laplace's coordinates a
+      challenger keeps its own strengths but inherits laplace's calibration and
+      manufactured stationarity, and usually improves dramatically
+      (<a href="/sandwich.html">the sandwich</a>). <strong>PyMC</strong>, new but
+      already strong, finishes ahead across the whole universe once sandwiched
+      (+0.04 nats median on 65% of series) &mdash; it is the dashed entry in the
+      star map above. <strong>Prophet</strong>, which wins only 4 of 921
+      pre-registered series raw, changes character entirely in these
+      coordinates. So a bare horserace can mislead: these pages look for the
+      series and regimes where each method does its best work, alone or
+      sandwiched.
     </p>
 
     <h2>Featured bouts</h2>
@@ -102,42 +169,6 @@
     </div>
 
 
-    <h2>Strengths by regime</h2>
-    <p>
-      Five regimes, one score each: how often a challenger beats
-      <code>laplace</code> per series, ties split, scaled so a 50/50 draw is
-      1.0. The dashed ring is <code>laplace</code> itself; outside the ring
-      the challenger is winning that regime, inside it is losing. Soft
-      vs hard waveforms are the two halves of M4-Hourly (noisy daily cycles
-      vs nearly deterministic ones; see the
-      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
-      Pick up to four challengers.
-    </p>
-    <div class="panel" id="radar-panel">
-      <div class="controls">
-        <div class="control" style="max-width:100%">
-          <label>Challengers (up to 4)</label>
-          <div id="radar-models" style="display:flex;flex-wrap:wrap;gap:2px 14px;max-width:760px"></div>
-        </div>
-        <div class="control">
-          <label>Metric</label>
-          <span>
-            <label><input type="radio" name="radar-metric" value="ll" checked /> Log-likelihood</label>
-            &nbsp;
-            <label><input type="radio" name="radar-metric" value="crps" /> CRPS</label>
-          </span>
-        </div>
-      </div>
-      <canvas id="radar" class="plot" width="640" height="480" tabindex="0"
-              aria-label="Radar chart: challenger strength relative to laplace by regime"></canvas>
-      <div class="legend" id="radar-legend"></div>
-      <div id="radar-tip" style="position:absolute;display:none;background:#fff;border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:0.85rem;box-shadow:0 2px 8px rgba(0,0,0,0.12);pointer-events:none"></div>
-      <table id="radar-table">
-        <thead><tr id="radar-table-head"><th>regime</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <script src="/js/challenges-radar-data.js"></script>
     <script>
     (function () {
       var data = CHALLENGES_RADAR;
@@ -149,11 +180,15 @@
       var legend = document.getElementById("radar-legend");
       var thead = document.getElementById("radar-table-head");
       var tbody = document.querySelector("#radar-table tbody");
-      var SLOTS = ["#2a78d6", "#1baf7a", "#eda100", "#008300"];  // fixed order
-      var FILLS = ["rgba(42,120,214,0.10)", "rgba(27,175,122,0.10)",
-                   "rgba(237,161,0,0.10)", "rgba(0,131,0,0.10)"];
+      var SLOTS = ["#2a78d6", "#008300", "#eda100", "#8e44ad",
+                   "#d6392a", "#1baf7a"];  // fixed order, 6 slots
+      var FILLS = ["rgba(42,120,214,0.10)", "rgba(0,131,0,0.10)",
+                   "rgba(237,161,0,0.10)", "rgba(142,68,173,0.10)",
+                   "rgba(214,57,42,0.10)", "rgba(27,175,122,0.10)"];
       var REF = "#5a5a5a", INK = "#1a1a1a", MUTED = "#5a5a5a";
-      var MAXV = 2.0, MAXSEL = 4;
+      var MAXSEL = 6;
+      // checked on load; PyMC-Forecast (sandwiched) is dashed (a collaboration)
+      var DEFAULTS = ["CSP", "GARCH-t", "TabFM (clf8)", "PyMC-Forecast (sandwiched)"];
       var slotOf = {};                 // model name -> slot index (stable while selected)
       var vertsBy = {};                // model name -> screen vertices
       var focusIdx = -1;
@@ -163,7 +198,7 @@
         lab.style.fontWeight = "400";
         var cb = document.createElement("input");
         cb.type = "checkbox"; cb.value = name;
-        if (name === "Prophet") cb.checked = true;
+        if (DEFAULTS.indexOf(name) >= 0) cb.checked = true;
         cb.addEventListener("change", onToggle);
         lab.appendChild(cb);
         lab.appendChild(document.createTextNode(" " + name));
@@ -177,20 +212,38 @@
       function metric() {
         return document.querySelector("input[name=radar-metric]:checked").value;
       }
+      // Log-likelihood ratios spread wider than CRPS, so give it a tighter
+      // outer ring (1.5x laplace) to keep the polygons readable.
+      function maxv() { return metric() === "ll" ? 1.5 : 2.0; }
+      var selOrder = DEFAULTS.slice();   // selection order, for drop-oldest
+      function uncheckByName(nm) {
+        var inputs = box.querySelectorAll("input[type=checkbox]");
+        for (var j = 0; j < inputs.length; j++) {
+          if (inputs[j].value === nm) { inputs[j].checked = false; break; }
+        }
+      }
       function onToggle(e) {
-        var sel = selected();
+        var name = e.target.value;
         if (e.target.checked) {
-          if (sel.length > MAXSEL) { e.target.checked = false; return; }
-          var used = sel.map(function (n) { return slotOf[n]; });
+          selOrder.push(name);
+          // Drop the oldest so picking a new challenger never needs unclicking one first.
+          while (selOrder.length > MAXSEL) {
+            var old = selOrder.shift();
+            uncheckByName(old);
+            delete slotOf[old];
+          }
+          var used = selected().map(function (n) { return slotOf[n]; });
           for (var s = 0; s < MAXSEL; s++) {
-            if (used.indexOf(s) < 0) { slotOf[e.target.value] = s; break; }
+            if (used.indexOf(s) < 0) { slotOf[name] = s; break; }
           }
         } else {
-          delete slotOf[e.target.value];   // others keep their colors
+          var i = selOrder.indexOf(name);
+          if (i >= 0) selOrder.splice(i, 1);
+          delete slotOf[name];             // others keep their colors
         }
         draw();
       }
-      slotOf["Prophet"] = 0;
+      DEFAULTS.forEach(function (nm, i) { slotOf[nm] = i; });
 
       function draw() {
         var dpr = window.devicePixelRatio || 1;
@@ -202,12 +255,15 @@
         var cx = cssW / 2, cy = cssH / 2 + 8;
         var R = Math.min(cssW, cssH) / 2 - 56;
         var K = data.axes.length;
+        var MAXV = maxv();
+        var rings = [];
+        for (var rv = 0.5; rv <= MAXV + 1e-9; rv += 0.5) rings.push(rv);
         function pt(i, v) {
           var a = -Math.PI / 2 + i * 2 * Math.PI / K;
           var r = R * Math.min(v, MAXV) / MAXV;
           return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
         }
-        [0.5, 1.0, 1.5, 2.0].forEach(function (v) {
+        rings.forEach(function (v) {
           ctx.beginPath();
           for (var i = 0; i <= K; i++) {
             var p = pt(i % K, v);
@@ -248,7 +304,13 @@
           }
           ctx.closePath();
           ctx.fillStyle = FILLS[slot]; ctx.fill();
-          ctx.strokeStyle = SLOTS[slot]; ctx.lineWidth = 2; ctx.stroke();
+          // "(sandwiched)" models run inside laplace's coordinates (collaboration,
+          // they beat laplace by construction), so draw them dashed to distinguish
+          // them from the head-to-head challengers.
+          ctx.strokeStyle = SLOTS[slot]; ctx.lineWidth = 2;
+          if (name.indexOf("(sandwiched)") >= 0) ctx.setLineDash([7, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
           for (var i = 0; i < K; i++) {
             if (!verts[i]) continue;
             var p = verts[i];
@@ -275,12 +337,23 @@
       function drawLegend(sel) {
         legend.textContent = "";
         sel.forEach(function (name) {
+          var vals = data.models[name][metric()];
+          var hasData = vals.some(function (v) { return v != null; });
+          var collab = name.indexOf("(sandwiched)") >= 0;
+          var col = SLOTS[slotOf[name] || 0];
           var span = document.createElement("span");
           var sw = document.createElement("span");
           sw.className = "swatch";
-          sw.style.background = SLOTS[slotOf[name] || 0];
+          // dashed swatch for a collaboration (sandwiched) model, matching the chart
+          if (collab) sw.style.cssText = "background:none;border:1.5px dashed " +
+            col + ";height:9px;margin-top:2px";
+          else sw.style.background = col;
           span.appendChild(sw);
-          span.appendChild(document.createTextNode(name));
+          // a model with no data for the active metric would otherwise vanish
+          // from the chart; say so instead of drawing nothing
+          var tag = hasData ? "" : " (no " + (metric() === "ll" ? "LL" : "CRPS") + ")";
+          if (!hasData) span.style.opacity = "0.5";
+          span.appendChild(document.createTextNode(name + tag));
           legend.appendChild(span);
         });
         var ref = document.createElement("span");
@@ -374,176 +447,6 @@
       });
       canvas.addEventListener("blur", function () { focusIdx = -1; tip.style.display = "none"; draw(); });
 
-      document.querySelectorAll("input[name=radar-metric]").forEach(function (r) {
-        r.addEventListener("change", draw);
-      });
-      window.addEventListener("resize", draw);
-      panel.style.position = "relative";
-      draw();
-    })();
-    </script>
-    <script>
-    (function () {
-      var data = CHALLENGES_RADAR;
-      var canvas = document.getElementById("radar");
-      var ctx = canvas.getContext("2d");
-      var sel = document.getElementById("radar-model");
-      var tip = document.getElementById("radar-tip");
-      var panel = document.getElementById("radar-panel");
-      var legendName = document.getElementById("radar-legend-model");
-      var tbody = document.querySelector("#radar-table tbody");
-      var ACCENT = "#4a3aff", REF = "#5a5a5a", INK = "#1a1a1a", MUTED = "#5a5a5a";
-      var MAXV = 2.0;
-      var verts = [];        // screen positions of the current vertices
-      var focusIdx = -1;
-
-      Object.keys(data.models).forEach(function (name) {
-        var o = document.createElement("option");
-        o.value = name; o.textContent = name;
-        sel.appendChild(o);
-      });
-
-      function metric() {
-        return document.querySelector("input[name=radar-metric]:checked").value;
-      }
-      function model() { return sel.value; }
-
-      function draw() {
-        var dpr = window.devicePixelRatio || 1;
-        var cssW = canvas.clientWidth || 640, cssH = Math.round(cssW * 0.75);
-        canvas.width = cssW * dpr; canvas.height = cssH * dpr;
-        canvas.style.height = cssH + "px";
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, cssW, cssH);
-        var cx = cssW / 2, cy = cssH / 2 + 8;
-        var R = Math.min(cssW, cssH) / 2 - 56;
-        var K = data.axes.length;
-        function pt(i, v) {
-          var a = -Math.PI / 2 + i * 2 * Math.PI / K;
-          var r = R * Math.min(v, MAXV) / MAXV;
-          return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-        }
-        // rings (recessive); the 1.0 ring is the laplace reference
-        [0.5, 1.0, 1.5, 2.0].forEach(function (v) {
-          ctx.beginPath();
-          for (var i = 0; i <= K; i++) {
-            var p = pt(i % K, v);
-            i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
-          }
-          if (v === 1.0) { ctx.strokeStyle = REF; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6; }
-          else { ctx.strokeStyle = "#e2e2e2"; ctx.setLineDash([]); ctx.lineWidth = 1; }
-          ctx.stroke(); ctx.setLineDash([]);
-        });
-        // spokes + axis labels
-        ctx.fillStyle = INK; ctx.font = "13px -apple-system, sans-serif";
-        for (var i = 0; i < K; i++) {
-          var pe = pt(i, MAXV);
-          ctx.strokeStyle = "#e2e2e2"; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pe[0], pe[1]); ctx.stroke();
-          var pl = pt(i, MAXV * 1.14);
-          ctx.textAlign = Math.abs(pl[0] - cx) < 10 ? "center" : (pl[0] > cx ? "left" : "right");
-          ctx.fillText(data.axes[i], pl[0], pl[1] + 4);
-        }
-        // scale label on the reference ring
-        ctx.fillStyle = MUTED; ctx.font = "11px -apple-system, sans-serif";
-        ctx.textAlign = "left";
-        var pref = pt(0, 1.0);
-        ctx.fillText("laplace = 1", pref[0] + 6, pref[1] - 6);
-        // model polygon
-        var vals = data.models[model()][metric()];
-        verts = [];
-        ctx.beginPath();
-        var started = false;
-        for (var i = 0; i < K; i++) {
-          if (vals[i] == null) { verts.push(null); continue; }
-          var p = pt(i, vals[i]);
-          verts.push(p);
-          started ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]);
-          started = true;
-        }
-        ctx.closePath();
-        ctx.fillStyle = "rgba(74,58,255,0.12)"; ctx.fill();
-        ctx.strokeStyle = ACCENT; ctx.lineWidth = 2; ctx.stroke();
-        // vertices + direct value labels
-        for (var i = 0; i < K; i++) {
-          if (!verts[i]) continue;
-          var p = verts[i];
-          ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, 2 * Math.PI);
-          ctx.fillStyle = ACCENT; ctx.fill();
-          ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
-          ctx.fillStyle = INK; ctx.font = "600 12px -apple-system, sans-serif";
-          ctx.textAlign = p[0] >= cx ? "left" : "right";
-          var dx = p[0] >= cx ? 8 : -8;
-          ctx.fillText(vals[i].toFixed(2), p[0] + dx, p[1] + (p[1] < cy ? -6 : 14));
-          if (i === focusIdx) {
-            ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 2 * Math.PI);
-            ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.5; ctx.stroke();
-          }
-        }
-        legendName.textContent = model();
-        fillTable();
-      }
-
-      function fillTable() {
-        var m = data.models[model()];
-        tbody.textContent = "";
-        data.axes.forEach(function (ax, i) {
-          var tr = document.createElement("tr");
-          [ax,
-           m.crps[i] == null ? "not run" : m.crps[i].toFixed(2),
-           m.ll[i] == null ? "not run" : m.ll[i].toFixed(2),
-           m.n[i] || ""].forEach(function (v, j) {
-            var td = document.createElement("td");
-            if (j) td.className = "num";
-            td.textContent = v;
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        });
-      }
-
-      function showTip(i, clientX, clientY) {
-        var m = data.models[model()];
-        var v = m[metric()][i];
-        if (v == null) { tip.style.display = "none"; return; }
-        var pct = Math.round(v * 50);
-        tip.textContent = data.axes[i] + ": beats laplace on " + pct +
-          "% of " + m.n[i] + " series (" +
-          (metric() === "crps" ? "CRPS" : "log-likelihood") + "), ratio " + v.toFixed(2);
-        var pr = panel.getBoundingClientRect();
-        tip.style.display = "block";
-        tip.style.left = (clientX - pr.left + 14) + "px";
-        tip.style.top = (clientY - pr.top - 10) + "px";
-      }
-
-      canvas.addEventListener("pointermove", function (e) {
-        var r = canvas.getBoundingClientRect();
-        var x = e.clientX - r.left, y = e.clientY - r.top;
-        var best = -1, bd = 24 * 24;
-        verts.forEach(function (p, i) {
-          if (!p) return;
-          var d = (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y);
-          if (d < bd) { bd = d; best = i; }
-        });
-        if (best >= 0) showTip(best, e.clientX, e.clientY);
-        else tip.style.display = "none";
-      });
-      canvas.addEventListener("pointerleave", function () { tip.style.display = "none"; });
-      canvas.addEventListener("keydown", function (e) {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        var K = data.axes.length;
-        focusIdx = ((focusIdx + (e.key === "ArrowRight" ? 1 : -1)) % K + K) % K;
-        draw();
-        var p = verts[focusIdx];
-        if (p) {
-          var r = canvas.getBoundingClientRect();
-          showTip(focusIdx, r.left + p[0], r.top + p[1]);
-        }
-      });
-      canvas.addEventListener("blur", function () { focusIdx = -1; tip.style.display = "none"; draw(); });
-
-      sel.addEventListener("change", draw);
       document.querySelectorAll("input[name=radar-metric]").forEach(function (r) {
         r.addEventListener("change", draw);
       });

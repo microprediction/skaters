@@ -28,20 +28,41 @@ Z90 = 1.6448536269514722                     # 90% two-sided z
 # ---- the single scorer ------------------------------------------------------
 
 def score_dist(d, y):
-    """(logpdf, crps) of a Dist at realized y; -inf logpdf floored to -20."""
+    """(logpdf, crps) of a Dist at realized y; logpdf floored to -20.
+
+    The floor is a bound on the loss, not a repair of -inf alone: a collapsed
+    scale can put the realization at z ~ 1e18 and return a FINITE logpdf like
+    -1e36, which single-handedly poisons a study mean while an outright -inf
+    would have been floored. Every method funnels through here, so the bound
+    is the same for all of them.
+    """
     lp = d.logpdf(y)
-    return (lp if math.isfinite(lp) else -20.0), d.crps(y)
+    if not (lp >= -20.0):        # catches -inf, NaN, and absurd finite values
+        lp = -20.0
+    return lp, d.crps(y)
 
 
 def roll_dist_scores(factory, changes, start=BURN):
     """Mean (logpdf, crps, n) of an online Dist-emitting forecaster, scoring every
     step with index >= `start` (the warm-up before `start` is fed but not scored).
-    `factory()` returns a skater f(y, state) -> (dists, state)."""
+    `factory()` returns a skater f(y, state) -> (dists, state).
+
+    A point is never judged until the history it conditions on holds at least two
+    distinct values. With one value seen (e.g. a long all-zeros run), an autonomous
+    forecaster has no scale information, so the first departure carries no fair
+    predictive to score against; judging it is what detonates the log-score
+    (a near-zero predictive variance meeting a large jump). Normal series clear
+    this within a handful of steps, well before `start`, so they are unaffected."""
     f = factory(); state = None; pend = None
     lp = cr = 0.0; n = 0
+    seen = set(); scorable = False   # >=2 distinct values in the conditioning history
     for i, y in enumerate(changes):
-        if pend is not None and i >= start:
+        if pend is not None and i >= start and scorable:
             a, b = score_dist(pend[0], y); lp += a; cr += b; n += 1
+        if not scorable:
+            seen.add(y)
+            if len(seen) >= 2:
+                scorable = True; seen = None
         pend, state = f(y, state)
     return (lp / n, cr / n, n) if n else (float("nan"), float("nan"), 0)
 

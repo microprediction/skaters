@@ -19,7 +19,10 @@ class TestGarch:
         y_prime, state = fwd(1.0, None)
         assert math.isfinite(y_prime)
         assert "var" in state
-        assert "last_y" in state
+        # The recursion runs on deviations from a running mean, not the raw
+        # value, so scale is shift-invariant (see test_scale_invariance).
+        assert "last_dev" in state
+        assert "mu" in state
 
     def test_forward_reduces_vol_clustering(self):
         """After GARCH scaling, the variance of transformed values should be more stable."""

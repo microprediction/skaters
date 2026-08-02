@@ -144,4 +144,4 @@ header.site-header nav .menu .drop {
 }
 header.site-header nav .menu:hover .drop,
 header.site-header nav .menu:focus-within .drop { display: block; }
-header.site-header nav .menu .drop a { display: block; padding: 4px 14px; }
+header.site-header nav .menu .drop a { display: block; padding: 4px 14px; white-space: nowrap; }

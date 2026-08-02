@@ -1,7 +1,7 @@
 """Generate the challenges radar data (docs/js/challenges-radar-data.js).
 
-Five regime axes, one ratio per model per metric: how often the model beats
-laplace with ties split, normalised so a 50/50 draw is 1.0 —
+Five regime axes plus a price/returns axis, one ratio per model per metric: how
+often the model beats laplace with ties split, normalised so a 50/50 draw is 1.0 —
 
     ratio = (wins + 0.5 * ties) / n / 0.5        (0 .. 2, laplace ring = 1)
 
@@ -149,6 +149,123 @@ def main():
                 "crps": [None] * K,
                 "ll": [round((wins + 0.5 * ties) / n / 0.5, 3)] + [None] * (K - 1),
                 "n": [n] + [0] * (K - 1)}
+    # Price / returns axis (6th spoke): GARCH-t's home turf. Scored against the
+    # laplace rows in _price_study.csv (2500 return series). Only the opponents
+    # that were run on price get a cell; everyone else stays null there. Appended
+    # last so every model built above (incl. Prophet) gets the extra column.
+    PRICE_METHOD = {"GARCH-t": "GARCH-t", "AutoARIMA": "AutoARIMA", "AutoETS": "AutoETS"}
+    data["axes"].append("price / returns")
+    for entry in data["models"].values():
+        entry["crps"].append(None); entry["ll"].append(None); entry["n"].append(0)
+    price_path = os.path.join(_HERE, "_price_study.csv")
+    if os.path.exists(price_path):
+        by = load([price_path])
+        for name, method in PRICE_METHOD.items():
+            c, n = ratio(by, set(by), method, 1, higher_wins=False)
+            l, _ = ratio(by, set(by), method, 0, higher_wins=True)
+            if not n:
+                continue
+            entry = data["models"].setdefault(
+                name, {"crps": [None] * (K + 1), "ll": [None] * (K + 1), "n": [0] * (K + 1)})
+            entry["crps"][-1], entry["ll"][-1], entry["n"][-1] = c, l, n
+    # TabFM (clf8) on the seasonal/waveform arms (results_tabfm_arms.csv, from
+    # tabfm_arms_study.py): fills the weekly/monthly/soft/hard cells so TabFM is
+    # a full shape rather than the single economic-daily point the wide study
+    # leaves. Scored against the laplace rows in the same file.
+    import glob
+    arm_files = sorted(glob.glob(os.path.join(_BENCH, "results_tabfm_arms*.csv")))
+    entry = data["models"].get("TabFM (clf8)")
+    if entry and arm_files:
+        by_arm = {}
+        for path in arm_files:
+            with open(path) as f:
+                for row in csv.DictReader(f):
+                    lp = float(row["logpdf"]) if row.get("logpdf") else None
+                    cr = float(row["crps"]) if row.get("crps") else None
+                    by_arm.setdefault(row["arm"], {}).setdefault(
+                        row["series"], {})[row["method"]] = (lp, cr)
+        m4 = by_arm.get("m4-hourly", {})
+        targets = [(1, by_arm.get("weekly", {})),
+                   (2, by_arm.get("monthly", {})),
+                   (3, {s: v for s, v in m4.items() if s in blocks["A"]}),
+                   (4, {s: v for s, v in m4.items() if s in blocks["B"]})]
+        for idx, by in targets:
+            c, n = ratio(by, set(by), "clf8", 1, higher_wins=False)
+            l, _ = ratio(by, set(by), "clf8", 0, higher_wins=True)
+            if n:
+                entry["crps"][idx], entry["ll"][idx], entry["n"][idx] = c, l, n
+
+    # PyMC-Forecast on the head-to-head radar uses the STANDALONE `raw` arm
+    # (PyMC on the raw changes, blockwise refit) — a fair fight, unlike `solo`,
+    # which fits on laplace's own residual z-stream and so wins by construction
+    # (that collaboration result belongs on the sandwich page). Log-likelihood
+    # only (these studies score LL, not CRPS): daily cell from the sandwich
+    # study, weekly/monthly/soft/hard from pymc_arms_study PF_METHOD=raw.
+    pf = {"crps": [None] * (K + 1), "ll": [None] * (K + 1), "n": [0] * (K + 1)}
+    pf_daily = os.path.join(_BENCH, "results_pymc_forecast_sandwich.csv")
+    if os.path.exists(pf_daily):
+        by = {}
+        for row in csv.DictReader(open(pf_daily)):
+            v = row.get("logpdf")
+            lp = float(v) if v not in (None, "", "nan") else None
+            by.setdefault(row["series"], {})[row["method"]] = (lp, None)
+        l, n = ratio(by, set(by), "raw", 0, higher_wins=True)
+        if n:
+            pf["ll"][0], pf["n"][0] = l, n
+    pf_files = sorted(glob.glob(os.path.join(_BENCH, "results_pymc_raw_arms*.csv")))
+    if pf_files:
+        by_pf_arm = {}
+        for path in pf_files:
+            for row in csv.DictReader(open(path)):
+                v = row.get("logpdf")
+                lp = float(v) if v not in (None, "", "nan") else None
+                by_pf_arm.setdefault(row["arm"], {}).setdefault(
+                    row["series"], {})[row["method"]] = (lp, None)
+        m4 = by_pf_arm.get("m4-hourly", {})
+        for idx, by in [(1, by_pf_arm.get("weekly", {})),
+                        (2, by_pf_arm.get("monthly", {})),
+                        (3, {s: v for s, v in m4.items() if s in blocks["A"]}),
+                        (4, {s: v for s, v in m4.items() if s in blocks["B"]})]:
+            l, n = ratio(by, set(by), "raw", 0, higher_wins=True)
+            if n:
+                pf["ll"][idx], pf["n"][idx] = l, n
+    if any(v is not None for v in pf["ll"]):
+        data["models"]["PyMC-Forecast"] = pf
+
+    # PyMC-Forecast (sandwiched): the COLLABORATION shape. `solo` fits PyMC on
+    # laplace's residual z-stream, so it beats laplace by construction — this is
+    # collaborative use, not a head-to-head win. The chart draws it dashed to
+    # say so. Daily solo from the sandwich study, arms solo from pymc_arms_study.
+    pfs = {"crps": [None] * (K + 1), "ll": [None] * (K + 1), "n": [0] * (K + 1)}
+    if os.path.exists(pf_daily):
+        by = {}
+        for row in csv.DictReader(open(pf_daily)):
+            v = row.get("logpdf")
+            lp = float(v) if v not in (None, "", "nan") else None
+            by.setdefault(row["series"], {})[row["method"]] = (lp, None)
+        l, n = ratio(by, set(by), "solo", 0, higher_wins=True)
+        if n:
+            pfs["ll"][0], pfs["n"][0] = l, n
+    solo_files = sorted(glob.glob(os.path.join(_BENCH, "results_pymc_arms*.csv")))
+    if solo_files:
+        by_s = {}
+        for path in solo_files:
+            for row in csv.DictReader(open(path)):
+                v = row.get("logpdf")
+                lp = float(v) if v not in (None, "", "nan") else None
+                by_s.setdefault(row["arm"], {}).setdefault(
+                    row["series"], {})[row["method"]] = (lp, None)
+        m4 = by_s.get("m4-hourly", {})
+        for idx, by in [(1, by_s.get("weekly", {})),
+                        (2, by_s.get("monthly", {})),
+                        (3, {s: v for s, v in m4.items() if s in blocks["A"]}),
+                        (4, {s: v for s, v in m4.items() if s in blocks["B"]})]:
+            l, n = ratio(by, set(by), "solo", 0, higher_wins=True)
+            if n:
+                pfs["ll"][idx], pfs["n"][idx] = l, n
+    if any(v is not None for v in pfs["ll"]):
+        data["models"]["PyMC-Forecast (sandwiched)"] = pfs
+
     with open(OUT, "w") as f:
         f.write("// generated by benchmarks/comparisons/make_challenges_radar.py\n")
         f.write("const CHALLENGES_RADAR = " + json.dumps(data, indent=2) + ";\n")

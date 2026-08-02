@@ -13,22 +13,33 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+          </span>
+        </span>
         <a href="/demos/">Demos</a>
-        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
+            <a href="/guide.html">Methodology</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/faq.html">FAQ</a>
             <a href="/skills.html">Skills</a>
-          </span>
-        </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
-          <span class="drop">
-            <a href="/challengers.html">Challenges</a>
-            <a href="/sandwich.html">Sandwich</a>
-            <a href="/papers.html">Papers</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -67,18 +78,18 @@
       that has better things to spend attention on.
     </p>
     <p>
-      <strong>Anomaly detection falls out for free.</strong> Because every
+      <strong>A calibrated surprise signal falls out for free.</strong> Because every
       prediction is a density, every arriving point gets a probability integral
       transform against the forecast that was made <em>for it</em>: the state
       carries <code>state["pit"]</code> (roughly Uniform when the stream is
       behaving) and <code>state["z"]</code> (roughly N(0,1)) at every horizon
-      1..k, resolved online with no extra compute. A |z| of five is an anomaly
-      by construction — scored against a model that has already adapted to the
-      stream's drift, volatility clock, seasonality, and coordinate, which is
-      precisely what separates an anomaly from a regime the model should have
-      learned. Multi-horizon agreement (the same point surprising at h = 1, 5,
-      and 20) separates one-off spikes from genuine breaks. See the
-      <a href="/skills.html#anomaly-detection">anomaly-detection skill</a>.
+      1..k, resolved online with no extra compute — scored against a model that
+      has already adapted to the stream's drift, volatility clock, seasonality,
+      and coordinate, which is precisely what separates a genuine surprise from a
+      regime the model should have learned. Turning that signal into streaming
+      anomaly detection with honest false-alarm rates is its own project,
+      <a href="https://timemachines.microprediction.org/">timemachines</a>,
+      built on skaters.
     </p>
 
     <h2>The objections it is not refuted by</h2>

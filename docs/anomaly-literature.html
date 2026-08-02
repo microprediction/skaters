@@ -19,22 +19,33 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+          </span>
+        </span>
         <a href="/demos/">Demos</a>
-        <a href="/guide.html">Guide</a>
+        <a href="/papers.html">Papers</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
+            <a href="/guide.html">Methodology</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/faq.html">FAQ</a>
             <a href="/skills.html">Skills</a>
-          </span>
-        </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
-          <span class="drop">
-            <a href="/challengers.html">Challenges</a>
-            <a href="/sandwich.html">Sandwich</a>
-            <a href="/papers.html">Papers</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -46,6 +57,13 @@
     <h1>Anomaly detection: a literature map</h1>
     <p class="subtitle">Organized around one question: who can promise a false-alarm rate
       on a drifting stream?</p>
+
+    <p class="lead" style="border-left:3px solid var(--accent,#4a3aff);padding-left:12px">
+      The detector this map is about lives in its own project,
+      <a href="https://timemachines.microprediction.org/"><strong>timemachines</strong></a>
+      (calibrated online anomaly detection, built on skaters). Start there for the method,
+      its measured false-alarm rates, and benchmarks. The map below is kept as reference.
+    </p>
 
     <p class="lead">
       Streaming anomaly detection is two jobs wearing one name. <strong>Job 1 — where is the
@@ -238,23 +256,18 @@
         calibration-aware evaluation found anywhere is inside the W1-ACAS paper itself.</li>
     </ul>
 
-    <h2>Where skaters sits</h2>
+    <h2>Where this sits</h2>
     <p>
-      The library's claim is upstream of every line above: <code>laplace</code> is an online
-      forecaster whose parade state exposes PIT/z residuals — manufacturing, on a drifting
+      skaters' contribution is upstream of every line above: <code>laplace</code> is an online
+      forecaster whose parade state exposes PIT/z residuals, manufacturing, on a drifting
       seasonal stream, the near-i.i.d. uniforms that conformal, online-FDR, and e-process
-      machinery all assume and none can create. The <a
-      href="https://github.com/microprediction/skaters/blob/main/benchmarks/anomaly/RESULTS.md">full-archive
-      studies</a> locate the value precisely: the front-end lifts distributional alarm heads
-      (DSPOT 2–5&times;), does nothing for similarity-search heads (they carry their own
-      normalizer) — and the calibration panel (empirical false-alarm rate vs nominal &alpha;,
-      prequentially, on the benchmarks' own certified-clean data) first <em>failed</em> the
-      library's Gaussian tails at 1e-3, then, as of v0.13.0, passes them: censored-ML GPD tails
-      are spliced into every predictive (SPOT's theorem, native to the surprise stream), the
-      stated alarm rate comes true within the genuine-anomaly base rate, and the 99.9% interval
-      is empirically 99.85% (Gaussian read: 99.13%). See the
-      <a href="/robustness.html">coverage study</a> — the 90% interval that is actually 90%,
-      now extended to the tail.
+      machinery all assume and none can create. The detector built on that signal, with its
+      measured false-alarm rates and its lifts to third-party heads (DSPOT, RRCF), is
+      <a href="https://timemachines.microprediction.org/"><strong>timemachines</strong></a> —
+      that is where the alarm logic and the full-archive studies live. (skaters keeps the tail
+      story that makes the surprise stream honest: censored-ML GPD tails are spliced into every
+      predictive from v0.13.0, so the 99.9% interval is empirically 99.85%; see the
+      <a href="/robustness.html">coverage study</a> and <a href="/tails.html">the tail essay</a>.)
     </p>
 
     <p class="byline">Assembled 2026-07-09 from a verified forward-citation sweep (25/25 claims

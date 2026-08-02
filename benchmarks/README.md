@@ -42,6 +42,32 @@ Everything is judged by **held-out predictive log-likelihood** (higher is
 better). Coverage is deliberately not a criterion: a method can hit nominal
 coverage with a terrible density.
 
+## Out-of-scope series
+
+A purely autonomous distributional forecaster has only the series' own past to
+set a scale. Two degenerate patterns give it nothing to work with, and both are
+declared out of scope rather than scored:
+
+1. **No scale yet.** A point is never judged until the conditioning history
+   holds at least two distinct values (`bench_core.roll_dist_scores`). After a
+   long constant run (an all-zeros stretch, say) there is no scale, so the first
+   departure carries no fair predictive to score against; judging it is what
+   detonates the log-score, a near-zero predictive variance meeting a large
+   jump. Normal series clear this within a few steps, well before the warm-up.
+
+2. **A jump dwarfing the series.** A series whose largest move exceeds
+   `STUDY_MAX_EXCURSION` (default 1000) times its own MAD, or whose MAD is zero,
+   is screened out in `study.py` (`_in_scope`). No calibrated finite-scale
+   autonomous forecaster can be prepared for a single excursion that large
+   relative to everything it has seen; the honest statement is that the problem
+   is out of scope, not that any method "failed" it. This screens the
+   mostly-constant and calm-then-jump classes in one rule.
+
+Neither is cherry-picking: both are properties of the series, fixed before any
+score is read, and they change the median results negligibly while keeping the
+mean (and the accuracy/speed frontier) from being dominated by a handful of
+numerically pathological points.
+
 ## The conformal foil
 
 The harness includes a **conformal predictive distribution** as a baseline,
@@ -257,7 +283,7 @@ its **best calibration window per series**:
 > w400 96.9%, w750 97.0% (family 64.8 / 66.7 / 66.8%) — so no retrospective choice
 > is doing the work.
 
-Per-policy (current 0.8.0 set; each a single fixed config), CRPS vs best-of-crepes:
+Per-policy (current 0.13.0 set; each a single fixed config), CRPS vs best-of-crepes:
 
 | policy | CRPS raw | CRPS family | mean logpdf |
 |---|---|---|---|
@@ -283,7 +309,7 @@ both — likelihood trunk, CRPS leaf — beats the likelihood-only policy on **e
 axis (CRPS raw, CRPS family, *and* likelihood): a CRPS-fit leaf is more
 outlier-robust, so it even generalises slightly better on likelihood. No trade.
 
-This is the **0.8.0 default**: `laplace(k)` *is* the top row (CRPS tail + sticky);
+This is the **0.13.0 default**: `laplace(k)` *is* the top row (CRPS terminal leaf, sticky lattice, GPD tail-splice on, and multi-scale at `k>1`);
 `laplace(k, objective="likelihood")` is the log-tail row; `laplace(k,
 sticky=False)` turns off the lattice projection (the `laplace-nostick` row).
 
@@ -353,4 +379,4 @@ with `crepes` + a FRED key).
 - `naive-gauss` — last value + rolling Gaussian residual.
 - `conformal-PD` — the conformal foil (above).
 - `scale-mix leaf` — the discrepancy-from-N(0,1) leaf over a simple EMA mean.
-- `laplace` / `kahneman` / `skater` — the named policies (terminal-leaf ensemble).
+- `laplace` — the one named policy (terminal-leaf ensemble), with `objective=` and `sticky=` knobs.

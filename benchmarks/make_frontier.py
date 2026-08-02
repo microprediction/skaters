@@ -17,15 +17,19 @@ import matplotlib.pyplot as plt
 from study import _rfrac
 
 WINDOW = 300  # one-step forecasts per series
-RESULTS = os.environ.get("STUDY_RESULTS", "benchmarks/results_nonprice.csv")
+RESULTS = os.environ.get("STUDY_RESULTS", "benchmarks/results_frontier_big_aug.csv")
 
 # Measured single-core runtime (ms/series at TEST=300) — universe-independent.
 SPEED_MS = {
     "laplace": 196, "GARCH-t": 226, "AutoETS": 275, "ETS-sm": 300,
-    "SARIMAX": 1178, "AutoARIMA": 863, "AutoARIMA+ACI": 900,
-    "AutoARIMA+conformal": 900, "NF-StudentT": 1897,
+    "SARIMAX": 1178, "AutoARIMA": 863,
+    # laplace (196) + one ADVI fit on its residual z-stream (~1.8s), measured
+    # single-core at TEST=300 (benchmarks/pymc_frontier_solo.py).
+    "PyMC-sandwich": 2000,
+    # AutoARIMA+conformal / +ACI omitted: their split-conformal density collapses
+    # to near-zero (mean LL ~ -96) on a handful of series, off the chart.
 }
-DISPLAY = {"NF-StudentT": "NeuralForecast-t", "ETS-sm": "ETS"}
+DISPLAY = {"ETS-sm": "ETS", "PyMC-sandwich": "PyMC-laplace sandwich"}
 
 rows = {}
 with open(RESULTS) as fh:
@@ -34,11 +38,16 @@ with open(RESULTS) as fh:
         if lp in ("", "nan"):
             continue
         rows.setdefault(r["series"], {})[r["method"]] = float(lp)
-cont = [s for s in rows if "laplace" in rows[s] and _rfrac(s) < 0.05]
+cont = [s for s in rows if "laplace" in rows[s] and "GARCH-t" in rows[s]
+        and _rfrac(s) < 0.05]                       # common baseline universe
 
 
 def mean_ll(method):
-    v = [rows[s][method] for s in cont if method in rows[s]]
+    # Floor per-series LL at -20 (the studies' convention): a few degenerate
+    # series drive some baselines (GARCH-t, AutoARIMA) to a variance-collapse
+    # -1e3 that would otherwise dominate the mean. -20 nats caps the blow-up
+    # without touching normal scores (laplace/sandwich never come near it).
+    v = [max(rows[s][method], -20.0) for s in cont if method in rows[s]]
     return sum(v) / len(v) if v else None
 
 
@@ -61,6 +70,11 @@ for label, spd, acc, ours in pts:
                    edgecolor="white", linewidth=1.2)
         ax.annotate(label, (spd, acc), xytext=(-10, 10), textcoords="offset points",
                     fontsize=12.5, fontweight="bold", color="#4a3aff", ha="right")
+    elif label == "PyMC-laplace sandwich":
+        ax.scatter(spd, acc, s=150, marker="D", color="#7a3aff", zorder=4,
+                   edgecolor="white", linewidth=1.0)
+        ax.annotate(label, (spd, acc), xytext=(10, 8), textcoords="offset points",
+                    fontsize=10.5, fontweight="bold", color="#7a3aff", ha="left")
     else:
         ax.scatter(spd, acc, s=55, color="#888", zorder=3)
         ax.annotate(label, (spd, acc), xytext=(8, -3), textcoords="offset points",

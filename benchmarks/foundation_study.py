@@ -136,7 +136,7 @@ def _ctx_batch(ch):
 
 
 _chronos = None
-def chronos_dists(ch):
+def chronos_dists(ch, h=1):
     """Chronos-Bolt (quantile head) zero-shot. We use Bolt rather than the
     autoregressive T5 sampler: it is ~36x faster (a single forward pass) and does
     not stall, at the cost of being quantile-only -> its log-likelihood is a
@@ -148,11 +148,11 @@ def chronos_dists(ch):
             from chronos import BaseChronosPipeline
             _chronos = BaseChronosPipeline.from_pretrained(
                 "amazon/chronos-bolt-small", device_map=DEVICE, torch_dtype=torch.float32)
-        ctx = _ctx_batch(ch)
+        ctx = _ctx_batch(ch if h == 1 else ch[:len(ch) - (h - 1)])
         levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        q, _ = _chronos.predict_quantiles(inputs=ctx, prediction_length=1,
+        q, _ = _chronos.predict_quantiles(inputs=ctx, prediction_length=h,
                                           quantile_levels=levels)
-        q = q[:, 0, :].cpu().numpy()        # [B, n_levels]
+        q = q[:, h - 1, :].cpu().numpy()    # [B, n_levels] at horizon h
         return [quantile_dist(levels, q[i]) for i in range(len(q))]
     except Exception as e:                  # noqa: BLE001
         print(f"  chronos failed: {e}", flush=True); return None
@@ -229,8 +229,9 @@ def lagllama_dists(ch):
 
 
 _timesfm = None
-def timesfm_dists(ch):
-    """TimesFM 2.5 zero-shot; decile quantile head -> quantile_dist."""
+def timesfm_dists(ch, h=1):
+    """TimesFM 2.5 zero-shot; decile quantile head -> quantile_dist. For h>1 the
+    context ends h steps before each target and the horizon-h forecast is scored."""
     global _timesfm
     try:
         import timesfm
@@ -238,18 +239,19 @@ def timesfm_dists(ch):
             M = timesfm.TimesFM_2p5_200M_torch
             m = M.from_pretrained(M.DEFAULT_REPO_ID)
             m.compile(timesfm.ForecastConfig(
-                max_context=CTX, max_horizon=1, normalize_inputs=True,
+                max_context=CTX, max_horizon=h, normalize_inputs=True,
                 use_continuous_quantile_head=True, per_core_batch_size=64))
             _timesfm = m
-        n = len(ch); start = n - TEST
-        inputs = [np.asarray(ch[t - CTX:t], dtype=np.float32) for t in range(start, n)]
-        _, quant = _timesfm.forecast(horizon=1, inputs=inputs)   # [B, 1, Q]
+        n = len(ch); start = n - TEST; sh = h - 1
+        inputs = [np.asarray(ch[t - sh - CTX:t - sh], dtype=np.float32)
+                  for t in range(start, n)]
+        _, quant = _timesfm.forecast(horizon=h, inputs=inputs)   # [B, h, Q]
         Q = quant.shape[-1]
         # TimesFM emits deciles; a leading column is the mean when Q==10.
         if Q >= 10:
-            qcols, levels = quant[:, 0, 1:10], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+            qcols, levels = quant[:, h - 1, 1:10], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         else:
-            qcols = quant[:, 0, :Q]
+            qcols = quant[:, h - 1, :Q]
             levels = list(np.linspace(0.1, 0.9, Q))
         # NB forecast() pads `inputs` in place to per_core_batch_size but returns
         # exactly one row per real window; iterate over the returned rows.

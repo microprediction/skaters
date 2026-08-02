@@ -1,22 +1,32 @@
 # skaters ([demo](https://skaters.microprediction.org/demos/playground.html),[docs](https://skaters.microprediction.org/))
 
-One univariate time-series model to rule them all? For non-price economic series, near enough and you can watch *Laplace* [here](https://skaters.microprediction.org/demos/playground.html).
+A light, accurate, autonomous distributional forecaster for non-price economic series in particular. Watch [here](https://skaters.microprediction.org/demos/playground.html).
 
 
 
 <p align="center">
   <a href="https://skaters.microprediction.org/"><img src="https://img.shields.io/badge/docs%20%26%20live%20demos-skaters.microprediction.org-4a3aff?style=for-the-badge" alt="Documentation and live demos"></a>
-  <a href="#javascript-r--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JavaScript%20%7C%20R-1a8c4a?style=for-the-badge" alt="Python, JavaScript and R"></a>
+  <a href="#javascript-r-julia-rust--the-browser"><img src="https://img.shields.io/badge/implementations-Python%20%7C%20JS%20%7C%20R%20%7C%20Julia%20%7C%20Rust-1a8c4a?style=for-the-badge" alt="Python, JavaScript, R, Julia and Rust"></a>
 </p>
 
 Laplace beats (almost) everything.
 
 <p align="center">
-  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 894 non-price FRED series: laplace has both the highest held-out log-likelihood and the highest forecasts-per-second, alone in the top-right, while AutoARIMA, AutoETS, SARIMAX, GARCH-t, conformal and NeuralForecast trade accuracy for far more compute." width="680">
+  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 2,775 non-price FRED series: laplace sits top-right, fastest and tied for the best held-out log-likelihood; only the PyMC-laplace sandwich edges it on accuracy, at about ten times the compute, while AutoARIMA, AutoETS, SARIMAX and GARCH-t trade accuracy for speed." width="680">
 </p>
 
+And it beats them across nearly every regime, giving ground only on price/returns (to GARCH-t) and, narrowly, on the hard, repeating waveforms (to CSP[^csp]).
 
-Laplace is fast, dependency-free, **online** univariate *distributional* forecasting in **Python _and_ JavaScript** (identical to 1e-6, browser-ready via [Pyodide](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
+[^csp]: On the hard-waveform arm (near-deterministic, repeating cycles) CSP is handed the seasonal period, while `laplace` is not and must infer structure generically. Its edge there reflects that head start, not a like-for-like loss.
+
+<p align="center">
+  <img src="docs/assets/radar.png" alt="Radar chart of per-regime win-rate against laplace on log-likelihood for CSP, Theta, nnetar and GARCH-t. All sit inside the dashed laplace ring except GARCH-t, which breaks out on the price/returns axis, and CSP, which edges past on the hard waveforms." width="560">
+</p>
+
+<p align="center"><sub>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split, <code>laplace</code> = the dashed ring). Outside the ring the challenger wins that regime; inside, <code>laplace</code> does. GARCH-t breaks out on price/returns; CSP edges past on the hard, repeating waveforms, where it is handed the period and <code>laplace</code> is not. <a href="https://skaters.microprediction.org/challengers.html">Explore it interactively →</a></sub></p>
+
+
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
 
 **Not for price/return series:** 
 We recommend GARCH-t there instead. 
@@ -93,9 +103,11 @@ f = laplace(k=1, sticky=False)            # no lattice projection
 forecasts previously made *for it*: `state["pit"][m-1]` is its probability
 integral transform under the m-step-ahead predictive issued m steps ago
 (roughly Uniform(0,1) when calibrated) and `state["z"][m-1]` the same through
-the standard-normal quantile (roughly N(0,1) — so `abs(z) > 4` is an anomaly
-detector with no extra compute; z is clamped to ±7.03, never infinite). See
-the [anomaly-detection skill](https://skaters.microprediction.org/skills.html#anomaly-detection).
+the standard-normal quantile (roughly N(0,1); z is clamped to ±7.03, never
+infinite). That calibrated-surprise signal is the null model streaming anomaly
+detection is built on, and that work lives in its own project:
+[**timemachines**](https://timemachines.microprediction.org/) — calibrated
+online anomaly detection with honest false-alarm rates, built on skaters.
 
 **Tails that keep their stated rates (v0.13.0).** Every predictive carries censored-ML
 generalized-Pareto tails beyond the body's ~2% region (the *conditional tail
@@ -152,8 +164,15 @@ from skaters.leaf import leaf
 from skaters.transform import ou_transform, yeo_johnson
 
 f = conjugate(leaf(k=10), ou_transform(kappa=0.1), k=10)                       # linear (spreads)
-f = conjugate(conjugate(leaf(k=10), ou_transform(0.1), k=10), yeo_johnson(0.5), k=10)  # positive (vol/rates)
+f = conjugate(conjugate(leaf(k=10), ou_transform(0.1), k=10), yeo_johnson(0.5, exact=True), k=10)  # positive (vol/rates)
 ```
+
+`exact=True` maps the predictive back through the exact change of variables
+instead of the component-wise delta method, which cannot carry the skew of the
+coordinate change. The difference grows with horizon: at `h=10` on strictly
+positive FRED levels it is worth a median +0.015 to +0.018 nats of held-out
+log-likelihood (72–78% of series), and at `h=1` the two agree. The candidate
+pool keeps the default (its one-step spreads are where they agree).
 
 `laplace(k>1)` already carries an OU group in its pool, so the general forecaster
 picks up reversion automatically at multi-step horizons. The OU-on-a-coordinate
@@ -218,9 +237,9 @@ Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inve
 | `standardize(`$\alpha$`)` | $y'_t = (y_t - \hat\mu_t) / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D + \hat\mu_t$ | Remove scale |
 | `garch(`$\omega, \alpha, \beta$`)` | $y'_t = y_t / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D$ | Volatility clustering |
 | `seasonal_difference(`$s$`)` | $y'_t = y_t - y_{t-s}$ | Shift by lagged value | Periodicity |
-| `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method | Tail compression |
+| `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method (`exact=True` for the pushforward) | Tail compression |
 | `theta(`$\alpha$`)` | $y'_t = y_t - \text{SES}_t$ | Shift by smoothed level + drift | Theta method (M3 winner) |
-| `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Component-wise delta method | Coordinate learning (log/root/linear) |
+| `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Delta method (`exact=True` for the pushforward) | Coordinate learning (log/root/linear) |
 | `ou_transform(`$\kappa$`)` | Deviation from running mean, OU speed $\kappa$ | Exact OU moments (scale + shift) | Mean reversion |
 
 ## Conjugation
@@ -369,7 +388,7 @@ def my_transform():
     return forward, inverse_k
 ```
 
-## JavaScript, R & the browser
+## JavaScript, R, Julia, Rust & the browser
 
 The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
 transform, ensemble, and named policy. It is verified against the Python reference by a parity
@@ -383,8 +402,12 @@ parity values at 1e-6, including the transforms, ensembles, lattice
 projection, calibration state, and the GPD tail splice. Continuous
 installs via
 `install.packages("skaters", repos = "https://microprediction.r-universe.dev")`.
-A Julia port is planned next; the parity vectors make each new language a
-porting exercise with a built-in referee.
+
+The **Julia port** ([microprediction/Skaters.jl](https://github.com/microprediction/Skaters.jl))
+and a portable **Rust core** (`rust/`, the fast native backend, with Python
+bindings in `rust/python/`) complete five parity-locked implementations. The
+shared parity vectors make each new language a porting exercise with a built-in
+referee.
 
 ```html
 <script type="module">
