@@ -1296,3 +1296,229 @@ def _mat_vec(M: list[float], v: list[float], n: int) -> list[float]:
 def _dot(a: list[float], b: list[float], n: int) -> float:
     """Dot product."""
     return sum(a[i] * b[i] for i in range(n))
+
+
+# ---------------------------------------------------------------------------
+# Gaussianize: probit of the smoothed fence-post empirical CDF
+# ---------------------------------------------------------------------------
+
+def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
+                smooth: bool = False):
+    """Empirical Gaussianization: z = Phi^{-1}(F_hat(y)) with fence-post weights.
+
+    F_hat is built from a running quantile sketch of past inputs (at most
+    ``max_knots`` equal-mass centers, so memory and per-step cost are bounded
+    regardless of series length).
+
+    With ``smooth=False`` F_hat is the piecewise-linear interpolation of the
+    fence-post empirical CDF: knots at order statistics y_(i) with probability
+    (i+1)/(n+1), extended linearly beyond the edge knots. Linear extension in
+    (y, z) coordinates gives Gaussian-shaped tails in y. This is the minimal
+    smoothing that makes the fence-post transform an invertible change of
+    variables with a density, but the density is piecewise constant.
+
+    With ``smooth=True`` F_hat is a Gaussian-kernel CDF (Silverman bandwidth)
+    evaluated on the sketch centers, represented by a monotone C^1 cubic
+    (Fritsch-Butland tangents) through those samples. The transformed density
+    is then continuous, which matters under the log score.
+
+    Two guards apply in both modes. Knot-segment slopes are capped at 20 times
+    the interquartile slope, an explicit tail assumption that stops a single
+    upstream outlier from creating an explosive inverse map. The forward
+    output is clamped to |z| <= 8: no fence-post rank exceeds probability
+    n/(n+1), and Phi^{-1}(n/(n+1)) < 8 for any feasible n, so the clamp
+    protects downstream expanding-memory states (Welford variances, RLS sums)
+    from a degenerate warmup emission.
+
+    Forward:   z_t = map(y_t) using the sketch built from y_1..y_{t-1}
+    Inverse:   each Dist component is mapped through the inverse by an
+               equal-probability particle approximation (n_particles local
+               Gaussians at mapped quantile midpoints, widths from the mapped
+               quantile spacing), so the empirical shape survives the pushback.
+
+    Before ``warmup`` observations the transform standardizes by expanding
+    moments, which is the n -> 0 limit of the empirical map.
+    """
+    import bisect as _bisect
+    from math import erf as _erf
+    from statistics import NormalDist as _ND
+    nd = _ND()
+    SLOPE_CAP = 20.0
+    Z_MAX = 8.0
+    SQ2 = math.sqrt(2.0)
+    J = n_particles
+    _mids = [nd.inv_cdf((j + 0.5) / J) for j in range(J)]
+    _edges = [nd.inv_cdf(j / J) for j in range(1, J)]
+
+    def _cap_slopes(ys, zs):
+        """Cap segment slopes dy/dz at SLOPE_CAP times the interquartile
+        slope, walking outward from the median knot."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return
+        c = len(ys) // 2
+        for i in range(c + 1, len(ys)):
+            ys[i] = min(ys[i], ys[i - 1] + cap * (zs[i] - zs[i - 1]))
+        for i in range(c - 1, -1, -1):
+            ys[i] = max(ys[i], ys[i + 1] - cap * (zs[i + 1] - zs[i]))
+
+    def _tangents(xs, vs):
+        """Fritsch-Butland harmonic-mean tangents: monotone C^1 cubic."""
+        d = [(vs[i + 1] - vs[i]) / (xs[i + 1] - xs[i]) for i in range(len(xs) - 1)]
+        t = [d[0]]
+        for i in range(1, len(xs) - 1):
+            a, b = d[i - 1], d[i]
+            t.append(2.0 * a * b / (a + b) if a * b > 0 else 0.0)
+        t.append(d[-1])
+        return t
+
+    def _herm(s, dx, v0, v1, t0, t1):
+        s2 = s * s
+        s3 = s2 * s
+        return (v0 * (2 * s3 - 3 * s2 + 1) + dx * t0 * (s3 - 2 * s2 + s)
+                + v1 * (-2 * s3 + 3 * s2) + dx * t1 * (s3 - s2))
+
+    def _herm_ds(s, dx, v0, v1, t0, t1):
+        s2 = s * s
+        return (v0 * (6 * s2 - 6 * s) + dx * t0 * (3 * s2 - 4 * s + 1)
+                + v1 * (-6 * s2 + 6 * s) + dx * t1 * (3 * s2 - 2 * s))
+
+    def _build(buf):
+        n = len(buf)
+        m = min(max_knots, n)
+        cs, idxs = [], []
+        for i in range(m):
+            idx = int((i + 0.5) * n / m)
+            y = buf[idx]
+            if cs and y <= cs[-1]:
+                continue
+            cs.append(y)
+            idxs.append(idx)
+        if len(cs) < 2:
+            return None
+        if not smooth:
+            zs = [nd.inv_cdf((idx + 1) / (n + 1)) for idx in idxs]
+            _cap_slopes(cs, zs)
+            return cs, zs, None
+        # kernel-smoothed CDF on the sketch, Silverman bandwidth
+        mm = len(cs)
+        i1, i3 = mm // 4, 3 * mm // 4
+        iqr = cs[i3] - cs[i1]
+        mean = sum(cs) / mm
+        sd = math.sqrt(sum((c - mean) ** 2 for c in cs) / mm)
+        scale = min(sd, iqr / 1.34) if iqr > 0 else sd
+        if scale <= 0:
+            scale = max(abs(cs[-1] - cs[0]), 1e-8)
+        h = max(0.9 * scale * n ** -0.2, 1e-12)
+        R = 8.0 * h
+        zs = []
+        lo = hi = 0
+        for c in cs:
+            while lo < mm and cs[lo] < c - R:
+                lo += 1
+            while hi < mm and cs[hi] <= c + R:
+                hi += 1
+            f = (lo + sum(0.5 * (1.0 + _erf((c - cs[j]) / (SQ2 * h)))
+                          for j in range(lo, hi))) / mm
+            zs.append(nd.inv_cdf((1.0 + n * f) / (n + 2.0)))
+        cs2, zs2 = [cs[0]], [zs[0]]
+        for c, z in zip(cs[1:], zs[1:]):
+            if z > zs2[-1] + 1e-12:
+                cs2.append(c)
+                zs2.append(z)
+        if len(cs2) < 2:
+            return None
+        _cap_slopes(cs2, zs2)
+        return cs2, zs2, _tangents(cs2, zs2)
+
+    def _fwd(y, knots):
+        cs, zs, ts = knots
+        if y <= cs[0]:
+            s0 = ts[0] if ts else (zs[1] - zs[0]) / (cs[1] - cs[0])
+            return zs[0] + s0 * (y - cs[0])
+        if y >= cs[-1]:
+            s1 = ts[-1] if ts else (zs[-1] - zs[-2]) / (cs[-1] - cs[-2])
+            return zs[-1] + s1 * (y - cs[-1])
+        i = _bisect.bisect_right(cs, y) - 1
+        if ts is None:
+            return zs[i] + (zs[i + 1] - zs[i]) * (y - cs[i]) / (cs[i + 1] - cs[i])
+        dx = cs[i + 1] - cs[i]
+        return _herm((y - cs[i]) / dx, dx, zs[i], zs[i + 1], ts[i], ts[i + 1])
+
+    def _inv(z, knots):
+        cs, zs, ts = knots
+        if z <= zs[0]:
+            s0 = ts[0] if ts else (zs[1] - zs[0]) / (cs[1] - cs[0])
+            return cs[0] + (z - zs[0]) / max(s0, 1e-12)
+        if z >= zs[-1]:
+            s1 = ts[-1] if ts else (zs[-1] - zs[-2]) / (cs[-1] - cs[-2])
+            return cs[-1] + (z - zs[-1]) / max(s1, 1e-12)
+        i = _bisect.bisect_right(zs, z) - 1
+        if ts is None:
+            return cs[i] + (cs[i + 1] - cs[i]) * (z - zs[i]) / (zs[i + 1] - zs[i])
+        dx = cs[i + 1] - cs[i]
+        s = (z - zs[i]) / (zs[i + 1] - zs[i])
+        for _ in range(6):
+            d = _herm_ds(s, dx, zs[i], zs[i + 1], ts[i], ts[i + 1])
+            if d <= 1e-14:
+                break
+            s -= (_herm(s, dx, zs[i], zs[i + 1], ts[i], ts[i + 1]) - z) / d
+            s = 0.0 if s < 0.0 else (1.0 if s > 1.0 else s)
+        return cs[i] + s * dx
+
+    def _moments(state):
+        n, mu, m2 = state["n"], state["mu"], state["m2"]
+        var = m2 / (n - 1) if n > 2 else 0.0
+        sigma = math.sqrt(var) if var > 0 else 1e-8
+        return mu, sigma
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            state = {"buf": [], "n": 0, "mu": 0.0, "m2": 0.0, "knots": None}
+        knots = state["knots"]
+        if knots is not None:
+            z = _fwd(y, knots)
+        else:
+            mu, sigma = _moments(state)
+            if sigma <= 1e-8:
+                # cold start: scale by the first observed deviation so the
+                # early z values are O(1) and cannot poison downstream state
+                sigma = max(abs(y - mu), 1e-8)
+            z = (y - mu) / sigma if state["n"] else 0.0
+        z = max(-Z_MAX, min(Z_MAX, z))
+        _bisect.insort(state["buf"], y)
+        n = state["n"] + 1
+        d0 = y - state["mu"]
+        mu = state["mu"] + d0 / n
+        state.update(n=n, mu=mu, m2=state["m2"] + d0 * (y - mu))
+        state["knots"] = _build(state["buf"]) if n >= warmup else None
+        return z, state
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        knots = state["knots"]
+        if knots is None:
+            mu, sigma = _moments(state)
+            return [d.affine(sigma, mu) for d in dists]
+        result = []
+        for d in dists:
+            comps = []
+            for w, mu, sig in d.components:
+                pts = [_inv(mu + sig * q, knots) for q in _mids]
+                eds = [_inv(mu + sig * e, knots) for e in _edges]
+                for j in range(J):
+                    lo = eds[j - 1] if j > 0 else None
+                    hi = eds[j] if j < J - 1 else None
+                    if lo is not None and hi is not None:
+                        std = (hi - lo) / 2.0
+                    elif hi is not None:
+                        std = hi - pts[j]
+                    else:
+                        std = pts[j] - lo
+                    comps.append((w / J, pts[j], max(std, 1e-9)))
+            result.append(Dist(comps).prune(12))
+        return result
+
+    return forward, inverse_k

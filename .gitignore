@@ -262,3 +262,5 @@ benchmarks/results_large_*.csv
 benchmarks/results_sota_*.csv
 benchmarks/out_of_scope.csv
 benchmarks/preds_h/
+# FRED holdout snapshot (18MB, regenerate with benchmarks/fetch_holdout.py)
+benchmarks/data_holdout/
