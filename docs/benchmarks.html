@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — benchmarks</title>
+  <meta name="description" content="The benchmark studies: twelve distributional baselines, foundation models, and the challengers." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — benchmarks" />
+  <meta property="og:description" content="The benchmark studies: twelve distributional baselines, foundation models, and the challengers." />
+  <meta property="og:url" content="https://skaters.microprediction.org/benchmarks.html" />
+  <meta property="og:image" content="https://skaters.microprediction.org/assets/frontier.png" />
+  <meta property="og:image:alt" content="Accuracy vs speed: laplace has the best held-out likelihood at a fraction of the baselines' runtime." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="./academic.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Benchmarks</h1>
+    <p class="subtitle">A new practical benchmark for univariate distributional prediction —
+      simpler and lighter than Prophet, and scored where it counts: held-out likelihood.</p>
+
+    <h2>Benchmark 1 — the non-price universe</h2>
+    <p>
+      A fair rolling one-step-ahead comparison on the <strong>non-price</strong> FRED universe —
+      894 continuous daily change-series (57 correlated families); equity/fx/commodity returns are
+      excluded and treated separately in the price caveat below. Every method — ours and theirs — is
+      turned into the same <code>Dist</code> and scored on held-out log-likelihood <em>and</em> CRPS.
+      Per-series win-rate of <code>laplace</code>, reported <em>raw</em> and <em>family-weighted</em>
+      (one vote per correlated family):
+    </p>
+    <table>
+      <thead><tr><th>Baseline</th><th>LL (raw / fam)</th><th>CRPS (raw / fam)</th><th>mean LL</th></tr></thead>
+      <tbody>
+        <tr><td>AutoARIMA</td><td>82 / 90%</td><td>53 / 65%</td><td>2.80</td></tr>
+        <tr><td>AutoETS</td><td>97 / 99%</td><td>83 / 92%</td><td>2.79</td></tr>
+        <tr><td>SARIMAX (statsmodels)</td><td>87 / 86%</td><td>53 / 64%</td><td>2.92</td></tr>
+        <tr><td>ETS (statsmodels)</td><td>96 / 98%</td><td>81 / 90%</td><td>2.89</td></tr>
+        <tr><td>GARCH(1,1)-t (<code>arch</code>)</td><td>68 / 65%</td><td>54 / 45%</td><td>3.03</td></tr>
+        <tr><td>AutoARIMA + conformal</td><td>86 / 88%</td><td>31 / 31%</td><td>2.27</td></tr>
+        <tr><td>AutoARIMA + ACI</td><td>88 / 88%</td><td>29 / 29%</td><td>2.51</td></tr>
+        <tr><td>naive conformal</td><td>— (CDF)</td><td>92 / 93%</td><td>—</td></tr>
+        <tr><td>NF-StudentT (NeuralForecast)</td><td>100 / 100%</td><td>78 / 76%</td><td>0.82</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>laplace</code> (mean log-likelihood <strong>3.20</strong>) wins the likelihood race
+      against every baseline on non-price series — including <strong>GARCH-t</strong>, the heavy-tail
+      SOTA (68% raw / 65% family-weighted; mean LL 3.20 vs 3.03). On CRPS it beats the mean-model
+      baselines and loses only to the CRPS-specialists (fitted conformal ~30%, GARCH-t 45%
+      family-weighted) — their home turf. <strong>No free lunch on price/returns:</strong> on
+      equity/fx/commodity return series GARCH-t has the higher log-likelihood, and we recommend it
+      there rather than averaging the two regimes into one number.
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
+    </p>
+
+    <h2>Benchmark 2 — zero-shot foundation models</h2>
+    <p>
+      A different protocol: pretrained models used zero-shot (fixed 256-context, no refit) on 120
+      change-series (69 continuous). Per-series win-rate of <code>laplace</code>:
+    </p>
+    <table>
+      <thead><tr><th>Model</th><th>density</th><th>LL (all / cont)</th><th>CRPS (all / cont)</th></tr></thead>
+      <tbody>
+        <tr><td>Moirai (1.1-R-small)</td><td>native Student-t</td><td>98 / 97%</td><td>94 / 93%</td></tr>
+        <tr><td>Lag-Llama</td><td>native Student-t</td><td>67 / 99%</td><td>65 / 94%</td></tr>
+        <tr><td>Chronos-Bolt (small)</td><td>quantile*</td><td>76 / 100%</td><td>67 / 88%</td></tr>
+        <tr><td><a href="/timesfm.html">TimesFM (2.5-200M)</a></td><td>quantile*</td><td>75 / 100%</td><td>58 / 72%</td></tr>
+      </tbody>
+    </table>
+    <p>
+      On the continuous series, <code>laplace</code> beats all four zero-shot. The native-density
+      models (Moirai, Lag-Llama) are the closest. Naive per-series <em>fine-tuning</em> doesn't
+      rescue them — it catastrophically overfits (logpdf +1.5 → −118). A zero-dependency online
+      ensemble holding its own against 200M-parameter transformers.
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">The foundation study →</a>
+    </p>
+
+    <h2>Challengers</h2>
+    <p>
+      Every method that has stepped up, one row each with its tape, lives on
+      its own page now, built for the ones still coming:
+      <a href="/challengers.html">Challengers</a>.
+    </p>
+
+    <h2>Reproducibility</h2>
+    <p>All studies are reproducible end-to-end from
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">skaters/benchmarks</a>.
+      The papers behind them are on the <a href="/papers.html">papers page</a>.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>
