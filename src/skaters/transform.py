@@ -1303,7 +1303,8 @@ def _dot(a: list[float], b: list[float], n: int) -> float:
 # ---------------------------------------------------------------------------
 
 def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
-                smooth: bool = False):
+                smooth: bool = False, slope_cap: float = 20.0,
+                z_max: float = 8.0):
     """Empirical Gaussianization: z = Phi^{-1}(F_hat(y)) with fence-post weights.
 
     F_hat is built from a running quantile sketch of past inputs (at most
@@ -1343,8 +1344,8 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
     from math import erf as _erf
     from statistics import NormalDist as _ND
     nd = _ND()
-    SLOPE_CAP = 20.0
-    Z_MAX = 8.0
+    SLOPE_CAP = slope_cap
+    Z_MAX = z_max
     SQ2 = math.sqrt(2.0)
     J = n_particles
     _mids = [nd.inv_cdf((j + 0.5) / J) for j in range(J)]
