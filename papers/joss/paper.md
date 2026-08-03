@@ -54,16 +54,7 @@ forecasting software returns point forecasts or intervals, refits in
 batch, or requires a scientific-computing stack. Practitioners who need a
 predictive *distribution* per tick, updated online at microsecond-to-second
 cadence, on a server or in a browser, have had to assemble one from parts.
-Established open-source forecasters occupy different corners: `statsmodels`
-[@seabold2010statsmodels] and `darts` [@herzen2022darts] are batch-refit and
-largely point- or interval-oriented, Prophet [@taylor2018forecasting] targets
-batch seasonal decomposition, `GluonTS` [@alexandrov2020gluonts] is
-distributional but assumes a deep-learning stack and offline training, and
-`river` [@montiel2021river] is natively online but centred on point
-prediction. None provides an online predictive density as a single
-dependency-free function.
-
-`skaters` fills that gap with a single dependency-free function. On 894
+`skaters` supplies one as a single dependency-free function. On 894
 continuous non-price FRED series it leads classical, neural, and
 foundation-model baselines on held-out log-likelihood under a rolling
 one-step protocol; on asset prices a GARCH-t model remains preferable, a
@@ -72,16 +63,69 @@ forecaster into an anomaly detector with stated false-alarm rates: alarm
 when $\mathrm{erfc}(|z|/\sqrt{2}) < \alpha$, with measured rates near
 nominal on economic series. Methods, benchmarks, and the tail-calibration
 studies are documented in a companion methods paper in the repository and
-at https://skaters.microprediction.org. The package also serves as the
-measurement instrument in an ongoing empirical study of representation
-value in conformal prediction, whose experiment scripts live in this
-repository's `benchmarks` directory.
+at https://skaters.microprediction.org.
 
-The design distills ideas from the author's earlier `timemachines`
-package [@cotton2021timemachines] and from live distributional-prediction
-contests on the microprediction platform [@cotton2022microprediction],
-where multi-level prediction of residual streams anticipated the
-conjugation recursion.
+# State of the field
+
+Established open-source forecasters occupy different corners: `statsmodels`
+[@seabold2010statsmodels] and `darts` [@herzen2022darts] are batch-refit and
+largely point- or interval-oriented, Prophet [@taylor2018forecasting] targets
+batch seasonal decomposition, `GluonTS` [@alexandrov2020gluonts] is
+distributional but assumes a deep-learning stack and offline training, and
+`river` [@montiel2021river] is natively online but centred on point
+prediction. None provides an online predictive density as a single
+dependency-free function, and none runs unchanged in a browser. The design
+distills ideas from the author's earlier `timemachines` package
+[@cotton2021timemachines] and from live distributional-prediction contests
+on the microprediction platform [@cotton2022microprediction], where
+multi-level prediction of residual streams anticipated the conjugation
+recursion. The repository's benchmark harness compares against
+representatives of each corner (AutoARIMA, AutoETS, the reference R
+forecasters, GARCH-t, neural and zero-shot foundation baselines) under a
+common rolling protocol, and the split of regimes is reported rather than
+averaged away.
+
+# Software design
+
+Every forecaster satisfies one protocol: a pure function
+`(y, state) -> (dists, state)` that consumes one observation and returns
+$k$ predictive distributions plus its own next state. State is an explicit
+dictionary, never hidden in an object, so a model can be checkpointed as
+JSON, resumed elsewhere, or handed across a language boundary mid-stream.
+Conjugation is function composition under this protocol: a transform wraps
+an inner skater, and because the wrapped object satisfies the same
+protocol, models nest to any depth and an ensemble is just another
+skater. The public surface is one factory, `laplace`, whose defaults
+require no tuning. The package has no runtime dependencies in any of its
+five ports (Python, JavaScript, R, Julia, Rust); the ports are locked to
+the Python reference by a parity suite of roughly 100,000 probe values at
+$10^{-6}$ agreement, run in continuous integration, which is what allows a
+model trained on a server to continue bit-compatibly in a browser via
+Pyodide [@pyodide2021].
+
+# Research impact statement
+
+The package is the measurement instrument in an ongoing empirical study of
+representation value in conformal prediction, whose experiment scripts
+live in this repository's `benchmarks` directory, and the companion
+methods paper reports the underlying benchmark across 5,402 FRED series.
+Beyond its own results, the harness gives researchers a reproducible
+rolling-protocol comparison of distributional forecasters under
+log-likelihood and CRPS, with per-regime splits, and the calibration state
+gives applied users anomaly alarms with stated false-alarm rates. The
+browser build is used for interactive teaching demonstrations at
+https://skaters.microprediction.org.
+
+# AI usage disclosure
+
+Portions of the source code, the multi-language ports, the parity and test
+suites, and drafts of this manuscript were produced with the assistance of
+a large language model (Claude, Anthropic) operated interactively by the
+author, who directed the design, reviewed the output, and takes
+responsibility for the content. The numerical claims are reproducible from
+the scripts in `benchmarks/`, and the cross-language parity suite checks
+the ports against the Python reference on every continuous-integration
+run.
 
 # Acknowledgements
 
