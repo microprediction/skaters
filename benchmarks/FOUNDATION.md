@@ -1,16 +1,21 @@
 # Foundation-model studies — setup & running (incl. Mac Studio / MPS)
 
-Two studies, two protocols:
+The studies use separate protocols:
 
-1. **Zero-shot** (`foundation_study.py`) — no weight updates; the model conditions
-   on a sliding 256-step context window. **Done on CPU; results in the repo.**
-2. **Fine-tuned** (`foundation_finetune.py`) — fine-tune each model on the
-   series' own history, then forecast the held-out window. **GPU/MPS-bound for the
-   larger models** — this is the Mac Studio job.
+- **Zero-shot** (`foundation_study.py`) — no weight updates; the model conditions
+  on a sliding 256-step context window. **Done on CPU; results in the repo.**
+- **Per-series fine-tuned** (`foundation_finetune.py`) — fine-tune each model
+  on one series, then forecast its held-out window. **GPU/MPS-bound for larger
+  models.**
+- **TiRex-2 challenger** (`tirex2_issue138.py`) — public zero-shot q10–q90
+  checkpoint on a frozen M4-hourly validation/test panel, with matched-context
+  and online Laplace comparators.
 
-Both score every model through the same `Dist` as the eight-baseline study, and
-re-score `laplace` on the identical window. Win-rates merge across runs via
-`summarize()`.
+Every study maps model output to the same `Dist` and canonical prediction
+contracts and re-scores `laplace` on identical forecast origins. The original
+zero-shot and per-series harnesses merge win-rates with `summarize()`. Studies
+that persist per-origin predictions derive paired and Diebold-Mariano summaries
+from those stores.
 
 ## Why separate conda envs
 
@@ -81,3 +86,16 @@ python benchmarks/foundation_finetune.py summarize
 > `foundation_finetune.py` harness is kept for completeness, but the zero-shot
 > study is the headline and per-series fine-tuning is **not worth GPU time**
 > without heavy per-series regularization (which defeats the purpose).
+
+## TiRex-2 challenger
+
+Issue #138 now has a normal `TiRex-2` registry entry and a completed frozen
+M4-hourly benchmark. On 24 series, TiRex-2 versus matched-context Laplace has
+median dLL **+0.195903**, median CRPS ratio **0.847979**, and a per-series DM
+record of 15 wins, 9 draws, and 0 losses.
+
+“Table-R1” and “TwbFB” remain unidentified, so the contribution does not claim
+to reproduce either. The report and exact missing-information request are in
+[`ISSUE138.md`](ISSUE138.md); frozen sources, native quantiles, canonical
+scores, runtime/source hashes, and checksums are in
+[`tirex2_artifacts/`](tirex2_artifacts/).

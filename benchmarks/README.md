@@ -229,6 +229,20 @@ own env (conflicting `gluonts`/`torch`/`jax` pins); the harness writes one
 `results_foundation_<tag>.csv` per run and `summarize()` merges them:
 `FM_MODELS=Chronos,Moirai FM_TAG=cm PYTHONPATH=src python benchmarks/foundation_study.py`.
 
+## TiRex-2 challenger (`tirex2_issue138.py`)
+
+Issue [#138](https://github.com/microprediction/skaters/issues/138) now has a
+runnable TiRex-2 adapter and a frozen 24-series M4-hourly benchmark. Against
+Laplace with the same 128-value context, TiRex-2 records median dLL
+**+0.195903**, median CRPS ratio **0.847979**, and a per-series DM record of
+15 wins, 9 draws, and 0 losses. Native q10–q90 and canonical score rows are
+persisted separately.
+
+This does not identify or reproduce “Table-R1” or “TwbFB”; the issue does not
+specify either artifact. See [`ISSUE138.md`](ISSUE138.md) and
+[`tirex2_artifacts/`](tirex2_artifacts/) for the result, missing-identifier
+request, protocol, source archive, runtime manifest, and checksums.
+
 ## Headline result: skaters vs crepes, on CRPS (curated 42-series; now `study.py conformal-scale`)
 
 The skater is a *pluggable proper-scoring-rule optimizer* — the leaf fits its
