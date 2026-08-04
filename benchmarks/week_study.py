@@ -30,8 +30,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
-PREDS = os.path.join(_HERE, "preds")
+PREDS = os.path.join(_HERE, os.environ.get("WEEK_PREDS", "preds"))
 STOP = os.path.join(PREDS, "STOP")
+ARM_H = os.environ.get("WEEK_H", "1")   # forecast horizon k (1 = canonical study).
+# A multi-step run MUST use its own WEEK_PREDS dir: the k=1 cache is not
+# horizon-keyed, so sharing the dir would corrupt it.
+# WEEK_HS="1 2 3 5 8 13" runs a SWEEP of horizons round-robin, each into its own
+# PREDS/h{k}/ subdir, so every k accumulates partial results that grow each round
+# (never exhausting one horizon). Unset = single ARM_H at the flat path.
+_HS = os.environ.get("WEEK_HS", "").split()
+HORIZONS = [int(x) for x in _HS] if _HS else [int(ARM_H)]
+MULTI_H = bool(_HS)
 
 # ---- protocol (uniform across arms so scores are comparable) -------------------
 CTX = os.environ.get("WEEK_CTX", "128")
@@ -96,15 +105,23 @@ def enabled_models():
     return out
 
 
-def job(name, venv, tier, extra, corpus, cap):
-    """Run one (model, corpus) increment as a subprocess in the model's venv."""
-    out = os.path.join(PREDS, f"{name}__{corpus}.csv")
+def job(name, venv, tier, extra, corpus, cap, k=None):
+    """Run one (model, corpus[, horizon]) increment as a subprocess."""
+    if k is None:
+        k = int(ARM_H)
+    if MULTI_H:
+        hdir = os.path.join(PREDS, f"h{k}")
+        os.makedirs(hdir, exist_ok=True)
+        out = os.path.join(hdir, f"{name}__{corpus}.csv")
+    else:
+        out = os.path.join(PREDS, f"{name}__{corpus}.csv")
     env = dict(os.environ)
     env.update(_BASE_ENV)
     env.update(extra)
     env.update({
         "PYTHONPATH": f"{os.path.join(_ROOT, 'src')}:{_HERE}",
         "ARM_METHODS": name, "ARM_CORPUS": corpus, "PRED_OUT": out,
+        "ARM_H": str(k),
         "ARM_MAX": str(cap), "FM_CTX": CTX, "FM_TEST": TEST, "FM_DEVICE": DEVICE,
     })
     if name == "TabPFN" and os.environ.get("TABPFN_TOKEN"):
@@ -148,11 +165,13 @@ def main():
             break
         rnd += 1
         jobs = []
-        for name, (venv, tier, extra) in models.items():
-            cap = rnd * (BATCH_A if tier == "A" else BATCH_C)
-            for corpus in CORPORA:
-                jobs.append((name, venv, tier, extra, corpus, cap))
-        print(f"\n[week] === round {rnd} : {len(jobs)} jobs ===", flush=True)
+        for k in HORIZONS:
+            for name, (venv, tier, extra) in models.items():
+                cap = rnd * (BATCH_A if tier == "A" else BATCH_C)
+                for corpus in CORPORA:
+                    jobs.append((name, venv, tier, extra, corpus, cap, k))
+        print(f"\n[week] === round {rnd} : {len(jobs)} jobs "
+              f"(horizons {HORIZONS}) ===", flush=True)
         t0 = time.time()
         with ThreadPoolExecutor(max_workers=PAR) as ex:
             futs = [ex.submit(job, *j) for j in jobs]
