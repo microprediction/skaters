@@ -1378,6 +1378,68 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
             return ys, zs
         return [ys[i] for i in keep], [zs[i] for i in keep]
 
+    def _emin_knots(buf, ys, zs, idxs):
+        """Smallest-rank-displacement guard. Find the smallest integer e
+        such that knot values bracketed within e ranks of their order
+        statistics admit the slope cap, then project the knots into that
+        corridor, keeping each at its exact order statistic where feasible.
+        Levels are never moved, so the certificate pays exactly
+        Delta_n + e/(n+1), the least the budget allows."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return ys, zs
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return ys, zs
+        nb, K = len(buf), len(ys)
+        dz = [zs[j + 1] - zs[j] for j in range(K - 1)]
+
+        def corridor(e):
+            lo = [buf[max(0, idxs[j] - e)] for j in range(K)]
+            hi = [buf[min(nb - 1, idxs[j] + e)] for j in range(K)]
+            U = [0.0] * K
+            U[K - 1] = hi[K - 1]
+            for j in range(K - 2, -1, -1):
+                U[j] = min(hi[j], U[j + 1])
+            Db = [0.0] * K
+            Db[K - 1] = lo[K - 1]
+            for j in range(K - 2, -1, -1):
+                Db[j] = max(lo[j], Db[j + 1] - cap * dz[j])
+            L = [0.0] * K
+            L[0] = Db[0]
+            for j in range(1, K):
+                L[j] = max(Db[j], L[j - 1])
+            if any(L[j] > U[j] for j in range(K)):
+                return None
+            return L, U
+
+        if corridor(0) is not None:
+            return ys, zs
+        lo_e, hi_e = 0, nb
+        while hi_e - lo_e > 1:
+            mid = (lo_e + hi_e) // 2
+            if corridor(mid) is not None:
+                hi_e = mid
+            else:
+                lo_e = mid
+        res = corridor(hi_e)
+        if res is None:
+            return ys, zs
+        L, U = res
+        w = [0.0] * K
+        w[0] = max(L[0], min(ys[0], U[0]))
+        for j in range(1, K):
+            a_j = max(L[j], w[j - 1])
+            b_j = min(U[j], w[j - 1] + cap * dz[j - 1])
+            w[j] = max(a_j, min(ys[j], b_j))
+        # drop any knot that failed to stay strictly increasing
+        ks, kz = [w[0]], [zs[0]]
+        for j in range(1, K):
+            if w[j] > ks[-1]:
+                ks.append(w[j])
+                kz.append(zs[j])
+        return ks, kz
+
     def _cap_slopes(ys, zs):
         """Cap segment slopes dy/dz at SLOPE_CAP times the interquartile
         slope, walking outward from the median knot."""
@@ -1431,6 +1493,8 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
             zs = [nd.inv_cdf((idx + 1) / (n + 1)) for idx in idxs]
             if guard == "delete":
                 cs, zs = _prune_slopes(cs, zs)
+            elif guard == "emin":
+                cs, zs = _emin_knots(buf, cs, zs, idxs)
             else:
                 _cap_slopes(cs, zs)
             return cs, zs, None

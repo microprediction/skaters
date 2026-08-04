@@ -164,6 +164,9 @@ def make_config(name):
         return _chain(ema_transform(0.1), standardize(0.05), gaussianize())
     if name == "E_ar":
         return _chain(ema_transform(0.1), standardize(0.05), gaussianize(), ar(1))
+    if name == "E_emin":
+        return _chain(ema_transform(0.1), standardize(0.05),
+                      gaussianize(guard="emin"), ar(1))
     if name == "E_delete":
         return _chain(ema_transform(0.1), standardize(0.05),
                       gaussianize(guard="delete"), ar(1))
@@ -305,6 +308,8 @@ def main():
         run_nulls(limit)
     elif cmd == "delguard":
         run_corpus(["E_delete", "D0_delete"], "grammar_campaign_delguard.csv", limit=limit)
+    elif cmd == "emin":
+        run_corpus(["E_emin"], "grammar_campaign_emin.csv", limit=limit)
     elif cmd == "guards":
         cfgs = [f"GUARD_{s}_{z}" for s in (10, 20, 40) for z in (6, 8, 10)]
         run_corpus(cfgs, "grammar_campaign_guards.csv", limit or 100)
