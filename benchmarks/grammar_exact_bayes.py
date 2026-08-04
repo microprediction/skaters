@@ -1,5 +1,9 @@
 """Genuinely exact Bayes pools for the grammar paper's nesting proposition.
 
+Mixture weights are reset to the depth prior at the scored-window boundary
+(observation BURN), so the telescoping bound with the initial prior mass
+applies to the reported post-burn-in scores.
+
 The earlier runner (gaussianize_pool_exact.py) used the shared ensemble,
 which clamps each expert's log density to [-20, 20] before the weight
 update, prunes the emitted mixture to 20 components, and leaves the
@@ -55,7 +59,8 @@ def exact_bayes_pool(cands, prior_log_weights):
         if state is None:
             state = {"s": [None] * len(cands), "pend": [None] * len(cands),
                      "lw": list(prior_log_weights),
-                     "n": 0, "mu": 0.0, "m2": 0.0}
+                     "n": 0, "mu": 0.0, "m2": 0.0, "t": 0}
+        state["t"] += 1
         # 1. update weights with the blended likelihood of each pending
         #    predictive, using the reference built from strictly past data
         if state["pend"][0] is not None and state["n"] > 2 and state["m2"] > 0:
@@ -77,6 +82,13 @@ def exact_bayes_pool(cands, prior_log_weights):
         d0 = y - state["mu"]
         state["mu"] += d0 / state["n"]
         state["m2"] += d0 * (y - state["mu"])
+        # 2b. reset the mixture weights to the prior at the scored-window
+        #     boundary: the predictive emitted on this call is the first one
+        #     the scorer counts, so the nesting bound's log(1/pi_Q) penalty
+        #     applies to the reported suffix with the depth prior, not with
+        #     whatever posterior the burn-in produced.
+        if state["t"] == GC.BURN + 1:
+            state["lw"] = list(prior_log_weights)
         # 3. run the experts and emit the full posterior-weighted mixture
         dists = []
         for i, c in enumerate(cands):

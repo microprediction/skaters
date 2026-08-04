@@ -151,16 +151,20 @@ def standardize(alpha: float = 0.05, eps: float = 1e-8):
         mu = state["mu"]
         var = state["var"]
         diff = y - mu
-        # Center against the PRIOR mean (centering by the post-update mean would
-        # shrink the residual by (1-alpha) — systematic overconfidence). Scale by
-        # the updated EWMA std, which avoids a cold-start divide-by-zero. The
-        # variance recursion is the standard EWMA var = (1-a) var + a diff^2; the
-        # previous (1-a)(var + a diff^2) biased the scale low by sqrt(1-a).
-        mu_new = mu + alpha * diff
-        var = (1 - alpha) * var + alpha * diff * diff
-        sigma = math.sqrt(var) if var > eps * eps else eps
+        # Emit against the PRIOR state, so the forward map is the affine change
+        # of coordinates z = (y - mu) / sigma that the inverse applies. Scaling
+        # by the post-update std makes the emission self-normalized (bounded by
+        # 1/sqrt(alpha)) and the affine inverse is then not its inverse.
+        # Cold start: before the variance is informative, scale by the first
+        # nonzero residual, so the first informative emission is +-1.
+        if var > eps * eps:
+            sigma = math.sqrt(var)
+        else:
+            sigma = abs(diff) if abs(diff) > eps else eps
         y_prime = diff / sigma
-        return y_prime, {"mu": mu_new, "var": var}
+        mu_new = mu + alpha * diff
+        var_new = (1 - alpha) * var + alpha * diff * diff
+        return y_prime, {"mu": mu_new, "var": var_new}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         mu = state["mu"]
