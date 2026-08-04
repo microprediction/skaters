@@ -1304,7 +1304,7 @@ def _dot(a: list[float], b: list[float], n: int) -> float:
 
 def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
                 smooth: bool = False, slope_cap: float = 20.0,
-                z_max: float = 8.0):
+                z_max: float = 8.0, guard: str = "move"):
     """Empirical Gaussianization: z = Phi^{-1}(F_hat(y)) with fence-post weights.
 
     F_hat is built from a running quantile sketch of past inputs (at most
@@ -1350,6 +1350,33 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
     J = n_particles
     _mids = [nd.inv_cdf((j + 0.5) / J) for j in range(J)]
     _edges = [nd.inv_cdf(j / J) for j in range(1, J)]
+
+    def _prune_slopes(ys, zs):
+        """Delete knots whose segment inverse slope dy/dz exceeds SLOPE_CAP
+        times the interquartile slope, walking outward from the median knot.
+        Surviving knots keep their original values and levels, so they remain
+        exact order statistics and retained-level exactness is preserved at
+        an enlarged cell width."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return ys, zs
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return ys, zs
+        c = len(ys) // 2
+        keep = [c]
+        for i in range(c + 1, len(ys)):
+            j = keep[-1]
+            if (ys[i] - ys[j]) / (zs[i] - zs[j]) <= cap:
+                keep.append(i)
+        for i in range(c - 1, -1, -1):
+            j = min(k for k in keep)
+            if (ys[j] - ys[i]) / (zs[j] - zs[i]) <= cap:
+                keep.append(i)
+        keep.sort()
+        if len(keep) < 2:
+            return ys, zs
+        return [ys[i] for i in keep], [zs[i] for i in keep]
 
     def _cap_slopes(ys, zs):
         """Cap segment slopes dy/dz at SLOPE_CAP times the interquartile
@@ -1402,7 +1429,10 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
             return None
         if not smooth:
             zs = [nd.inv_cdf((idx + 1) / (n + 1)) for idx in idxs]
-            _cap_slopes(cs, zs)
+            if guard == "delete":
+                cs, zs = _prune_slopes(cs, zs)
+            else:
+                _cap_slopes(cs, zs)
             return cs, zs, None
         # kernel-smoothed CDF on the sketch, Silverman bandwidth
         mm = len(cs)
