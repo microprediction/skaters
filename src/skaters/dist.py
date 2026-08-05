@@ -128,22 +128,57 @@ class Dist:
         return t1 - 0.5 * t2
 
     def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
-        """Inverse CDF via bisection."""
+        """Inverse CDF via bisection.
+
+        The bracket spans every component's +/-8 sigma range, and the
+        stopping tolerance is ``tol`` times the SMALLEST component sigma
+        (x-space, never probability-space), so tiny scales, distant
+        low-weight components, and narrow-inside-wide mixtures all resolve
+        while unit-scale behavior matches the historical tolerance exactly.
+        Terminates at machine resolution or ``max_iter`` otherwise.
+        """
         assert 0 < p < 1
-        # Initial bracket
-        mu = self.mean
-        sigma = math.sqrt(self.var)
-        lo = mu - 8 * sigma
-        hi = mu + 8 * sigma
+        # Localize before bisecting. The component +/-8 sigma endpoints are
+        # not change points of the mixture cdf (it is smooth), but they are
+        # useful partition landmarks: sorted, they bound the regions where
+        # each component carries essentially all of its mass, so binary
+        # searching them costs O(log n) cdf calls and lands on a gap that
+        # contains p and is no wider than the local structure. Bisecting the
+        # GLOBAL span instead cannot resolve a narrow component inside a
+        # hugely separated mixture: the width ratio can exceed what max_iter
+        # halvings can bridge.
+        edges = sorted({m - 8.0 * s for _, m, s in self.components}
+                       | {m + 8.0 * s for _, m, s in self.components})
+        i, j = 0, len(edges) - 1
+        while j - i > 1:
+            k = (i + j) // 2
+            if self.cdf(edges[k]) < p:
+                i = k
+            else:
+                j = k
+        lo, hi = edges[i], edges[j]
+        # x-space tolerance at the smallest component scale: resolves narrow
+        # components inside wide mixtures, and at unit scale reduces to the
+        # historical absolute tolerance (preserving deep-tail diagnostics).
+        sigmas = [s for _, _, s in self.components if s > 0.0]
+        x_tol = tol * min(sigmas) if sigmas else 0.0
         for _ in range(max_iter):
             mid = 0.5 * (lo + hi)
+            if mid == lo or mid == hi:
+                break  # bracket at machine resolution
             if self.cdf(mid) < p:
                 lo = mid
             else:
                 hi = mid
-            if hi - lo < tol:
+            if hi - lo <= x_tol:
                 break
-        return 0.5 * (lo + hi)
+        # `hi` is the tightest point known to satisfy cdf(x) >= p, which is
+        # the quantile's definition; the midpoint can fall on the cdf(x) < p
+        # side. They differ by at most half the final bracket (<= x_tol/2),
+        # except where float64 cannot resolve the component at all — there,
+        # returning `hi` lands on the one representable point that carries
+        # the mass instead of the neighbour just below it.
+        return hi
 
     @property
     def mean(self) -> float:

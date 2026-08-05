@@ -111,22 +111,47 @@ impl Dist {
 
     pub fn quantile_tol(&self, p: f64, tol: f64, max_iter: usize) -> f64 {
         assert!(0.0 < p && p < 1.0);
-        let mu = self.mean();
-        let sigma = self.var().sqrt();
-        let mut lo = mu - 8.0 * sigma;
-        let mut hi = mu + 8.0 * sigma;
+        // Localize before bisecting: the sorted component +/-8 sigma
+        // endpoints are partition landmarks (not cdf change points),
+        // binary-searched for a gap containing p; then x-space tolerance at
+        // the smallest component sigma (parity with the Python fix).
+        let mut edges: Vec<f64> = Vec::with_capacity(self.components.len() * 2);
+        let mut s_min = f64::INFINITY;
+        for &(_, m, s) in &self.components {
+            edges.push(m - 8.0 * s);
+            edges.push(m + 8.0 * s);
+            if s > 0.0 && s < s_min {
+                s_min = s;
+            }
+        }
+        edges.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        edges.dedup();
+        let (mut i, mut j) = (0usize, edges.len() - 1);
+        while j - i > 1 {
+            let k = (i + j) / 2;
+            if self.cdf(edges[k]) < p {
+                i = k;
+            } else {
+                j = k;
+            }
+        }
+        let (mut lo, mut hi) = (edges[i], edges[j]);
+        let x_tol = if s_min.is_finite() { tol * s_min } else { 0.0 };
         for _ in 0..max_iter {
             let mid = 0.5 * (lo + hi);
+            if mid == lo || mid == hi {
+                break; // machine resolution
+            }
             if self.cdf(mid) < p {
                 lo = mid;
             } else {
                 hi = mid;
             }
-            if hi - lo < tol {
+            if hi - lo <= x_tol {
                 break;
             }
         }
-        0.5 * (lo + hi)
+        hi
     }
 
     pub fn mean(&self) -> f64 {
