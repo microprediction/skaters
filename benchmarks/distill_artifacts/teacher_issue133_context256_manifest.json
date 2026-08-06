@@ -1,0 +1,161 @@
+{
+  "byte_identity_scope": "Guaranteed only for the recorded producer runtime and frozen source bytes; cross-platform byte identity is not claimed.",
+  "output": {
+    "bytes": 2115667,
+    "context_lengths": [
+      256
+    ],
+    "file": "teacher_issue133_context256.jsonl.gz",
+    "file_sha256": "cec28f9fc88373bb5385ca05a4622738abf626b2c2263c7fb0ae017e7cb5799f",
+    "producer_file": "teacher-256.jsonl.gz",
+    "records_sha256": "13559dd8b286c4b6f135d9eaf96bf08663b429d38f75020cf605bec14e546a12",
+    "rows": 3584,
+    "series": 56,
+    "splits": {
+      "test": 960,
+      "train": 2240,
+      "validation": 384
+    }
+  },
+  "producer_runtime": {
+    "executable_name": "python3",
+    "machine": "arm64",
+    "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "python": "3.14.2",
+    "python_implementation": "CPython",
+    "zlib_compile": "1.2.12",
+    "zlib_runtime": "1.2.12"
+  },
+  "reproducer_source_tree": {
+    "files": {
+      "benchmarks/corpus.py": "d5b488d9c9e67526840aa172d8972d7e7311ad5ab62b7d0dc244d25e46281ef2",
+      "benchmarks/fred.py": "3449d4852b6cea9e490f57ece3a4872f57891b55eb0569f1215fa517caf1688a",
+      "benchmarks/fred_universe.py": "c2fc51f16ddc213028415194019b50bb8036314c2177745db88eb1dce1685ef5",
+      "benchmarks/laplace_distill.py": "c436d691f5c1e4570a846d679bdf30bf5cc45f7811fe1cee898e5312758d305e",
+      "benchmarks/predictions.py": "a77d86d5dbbfc2be2538f2bf106c9045d1f4be182652d2434b175d6968d9904a",
+      "benchmarks/timesfm_distill.py": "72e0ab67bef78ef8892e4006712b89096a3b319ac6ab2e2a9a007ad0c3958054",
+      "src/skaters/__init__.py": "04cae0aca6c3de644c775358d47ca3773372413e5d085b7d41e6e076bd59af0c",
+      "src/skaters/anomaly.py": "986a4c95137aa6eb1728235ed25f9fb4cc1440f2455e000f669f790a29081e8b",
+      "src/skaters/api.py": "32e9a2347c6e5ef2b7fff26c5369a68222922d7b74dbd4ba8e42e7fe83ca22c3",
+      "src/skaters/bayesian.py": "27f60b4d4b387b1d40469deae73e02d557b549ad1d219f96b7610da921456b47",
+      "src/skaters/conjugate.py": "df5b9baa292b5b7fc01ca96563f52a4c39826fe0c90a3967dbb8abfcd7910c18",
+      "src/skaters/conventions.py": "6820aed0631f6ce8a65c5d87218e86da8eb84602cc20cd232f2219644617753f",
+      "src/skaters/dist.py": "a40b96e34f5d96ab352c0f4a483f25176aa2f4d41b51470959cc17708b67a48b",
+      "src/skaters/ema.py": "7f04424b761fa9526ba93d11ecf8a6fbf168634d588f639f2373d6f649f08abe",
+      "src/skaters/ensemble.py": "31f90af7e37fe72df05cfe63b275e16330a22df8115f13f83083c9e7582524bd",
+      "src/skaters/leaf.py": "2a28d9477c7de0b6f7709680d44102297da00fdc59f3a191fe63f34a2fddfe4b",
+      "src/skaters/markov.py": "64ce6d985af6e17ed44bf239f159ce7114abaf45396477af70b32743ee449fcf",
+      "src/skaters/multiscale.py": "a56b399cb954d203bcd7c61773f4b6e0895b0837f7ff52c0c12cb2748a881efa",
+      "src/skaters/parade.py": "d1d9bb99a8acc15ed9d6cdbf11aea8fed8d9980479e62e3d1404f156c4b439b7",
+      "src/skaters/periodicity.py": "0c4c18b475ce6777e994c568e7f4e148bd333a071ca57b2bb414986c7104a1a3",
+      "src/skaters/pushforward.py": "54cfee9b14cdea9c172fc659115224291a6b1c8b1f41cdb922af13eeec38d968",
+      "src/skaters/runstats.py": "4be80ef91bf1a04cb243f1212d0714c68822ada95e91d01363f09897042e1d8f",
+      "src/skaters/search.py": "f6e390aa8bc47f2dc18a4019986d733c79a7250bdefde9d621ffaa4421decead",
+      "src/skaters/spec.py": "40b8ed85c47c40896e9161fedd7d8a4b726f93d116696fbf8bbde0557d83f473",
+      "src/skaters/sticky.py": "5935c723d390ad987334c7b0384f9c34e3f953ffc9592994d9358d032f01e7f4",
+      "src/skaters/tails.py": "fd3961249a3683e9563a43b0ea5028d436ccc0cfceafea0d87158483d47b35d3",
+      "src/skaters/terminal.py": "a171645157aeda0f2dc412cfb77bc37b7811ffd11f46976e00925c5e3046603e",
+      "src/skaters/transform.py": "289c2ad904c2677c044ae9f09b6180e4cd290443e60b92c9cc2b706fa249da62"
+    },
+    "sha256": "45bb7b3b7160df28551dd478af129e41ed7f6d341743961f018552a42ca48838"
+  },
+  "reproducer_source_tree_role": "current contribution source tree; not claimed as the byte-identical producer runtime",
+  "schema": "laplace-distill-producer-v1",
+  "settings": {
+    "context": 256,
+    "inputs": [
+      "synthetic-256.jsonl.gz",
+      "m4-256.jsonl.gz",
+      "fred-256.jsonl.gz"
+    ],
+    "mode": "merge",
+    "source_archive": null
+  },
+  "source_contract": {
+    "fred_core": {
+      "BAMLH0A0HYM2": {
+        "first_date": "2023-07-25",
+        "last_date": "2026-07-23",
+        "rows": 787,
+        "sha256": "68f24558080d9185bed7408fc278b9e99fe2c9db2b98c7ce753bae6083b6c589"
+      },
+      "DCOILWTICO": {
+        "first_date": "1986-01-02",
+        "last_date": "2026-07-20",
+        "rows": 10205,
+        "sha256": "f8ef0d9ff8baf6b61d83735be83516d51c6bb89ae1e0258e6f45578f8772cf71"
+      },
+      "DEXJPUS": {
+        "first_date": "1971-01-04",
+        "last_date": "2026-07-17",
+        "rows": 13921,
+        "sha256": "162578ed3892895645fa31cc85fa2dc600243f23625d90524010687f7ef1aee5"
+      },
+      "DEXUSEU": {
+        "first_date": "1999-01-04",
+        "last_date": "2026-07-17",
+        "rows": 6906,
+        "sha256": "cdc7166a43d670b5b14780b1665f2cd92af928b362f63304eff13d1dd763fb05"
+      },
+      "DFF": {
+        "first_date": "1954-07-01",
+        "last_date": "2026-07-23",
+        "rows": 26321,
+        "sha256": "818dea0a635c317f7c22ff2a469b8a559fe26ddd62b8b6232c5e3138bbc949f2"
+      },
+      "DGS10": {
+        "first_date": "1962-01-02",
+        "last_date": "2026-07-23",
+        "rows": 16124,
+        "sha256": "2eab94df8804a0e4635030bc3695efbac68bf51622b07242d60a1838eae88c99"
+      },
+      "T10Y2Y": {
+        "first_date": "1976-06-01",
+        "last_date": "2026-07-24",
+        "rows": 12533,
+        "sha256": "d489a93ee1bd3fb396de5e4055df0a7050fe9d6a3067e44329722e05c4b6e24e"
+      },
+      "VIXCLS": {
+        "first_date": "1990-01-02",
+        "last_date": "2026-07-23",
+        "rows": 9236,
+        "sha256": "2037f86109f6b9c26e657d64d226f3d0703517dc357dfa8f3285819456b15ec0"
+      }
+    },
+    "m4_hourly_sha256": "ea59b7783573c49077a835ab6465c7d66f1474783360f310988a9a737fbca62f"
+  },
+  "source_tree": {
+    "files": {
+      "benchmarks/corpus.py": "d5b488d9c9e67526840aa172d8972d7e7311ad5ab62b7d0dc244d25e46281ef2",
+      "benchmarks/foundation_study.py": "afb5d63a8c205f76ab25c1aa9302cf5a3ee7edf2e570b7e135e97af661ce1d90",
+      "benchmarks/fred.py": "3449d4852b6cea9e490f57ece3a4872f57891b55eb0569f1215fa517caf1688a",
+      "benchmarks/laplace_distill.py": "c62400375070a2f9ae4c3969f8a696435ae33303435321da7a19e3d4208c34d0",
+      "benchmarks/predictions.py": "a77d86d5dbbfc2be2538f2bf106c9045d1f4be182652d2434b175d6968d9904a",
+      "benchmarks/timesfm_distill.py": "d84a8f6ab96a2fb330a5f3583c667e1a56e353b4391d463c8b54e44755feb2f8",
+      "src/skaters/__init__.py": "04cae0aca6c3de644c775358d47ca3773372413e5d085b7d41e6e076bd59af0c",
+      "src/skaters/anomaly.py": "986a4c95137aa6eb1728235ed25f9fb4cc1440f2455e000f669f790a29081e8b",
+      "src/skaters/api.py": "32e9a2347c6e5ef2b7fff26c5369a68222922d7b74dbd4ba8e42e7fe83ca22c3",
+      "src/skaters/bayesian.py": "27f60b4d4b387b1d40469deae73e02d557b549ad1d219f96b7610da921456b47",
+      "src/skaters/conjugate.py": "df5b9baa292b5b7fc01ca96563f52a4c39826fe0c90a3967dbb8abfcd7910c18",
+      "src/skaters/conventions.py": "6820aed0631f6ce8a65c5d87218e86da8eb84602cc20cd232f2219644617753f",
+      "src/skaters/dist.py": "a40b96e34f5d96ab352c0f4a483f25176aa2f4d41b51470959cc17708b67a48b",
+      "src/skaters/ema.py": "7f04424b761fa9526ba93d11ecf8a6fbf168634d588f639f2373d6f649f08abe",
+      "src/skaters/ensemble.py": "31f90af7e37fe72df05cfe63b275e16330a22df8115f13f83083c9e7582524bd",
+      "src/skaters/leaf.py": "2a28d9477c7de0b6f7709680d44102297da00fdc59f3a191fe63f34a2fddfe4b",
+      "src/skaters/markov.py": "64ce6d985af6e17ed44bf239f159ce7114abaf45396477af70b32743ee449fcf",
+      "src/skaters/multiscale.py": "a56b399cb954d203bcd7c61773f4b6e0895b0837f7ff52c0c12cb2748a881efa",
+      "src/skaters/parade.py": "d1d9bb99a8acc15ed9d6cdbf11aea8fed8d9980479e62e3d1404f156c4b439b7",
+      "src/skaters/periodicity.py": "0c4c18b475ce6777e994c568e7f4e148bd333a071ca57b2bb414986c7104a1a3",
+      "src/skaters/pushforward.py": "54cfee9b14cdea9c172fc659115224291a6b1c8b1f41cdb922af13eeec38d968",
+      "src/skaters/runstats.py": "4be80ef91bf1a04cb243f1212d0714c68822ada95e91d01363f09897042e1d8f",
+      "src/skaters/search.py": "f6e390aa8bc47f2dc18a4019986d733c79a7250bdefde9d621ffaa4421decead",
+      "src/skaters/spec.py": "40b8ed85c47c40896e9161fedd7d8a4b726f93d116696fbf8bbde0557d83f473",
+      "src/skaters/sticky.py": "5935c723d390ad987334c7b0384f9c34e3f953ffc9592994d9358d032f01e7f4",
+      "src/skaters/tails.py": "fd3961249a3683e9563a43b0ea5028d436ccc0cfceafea0d87158483d47b35d3",
+      "src/skaters/terminal.py": "a171645157aeda0f2dc412cfb77bc37b7811ffd11f46976e00925c5e3046603e",
+      "src/skaters/transform.py": "289c2ad904c2677c044ae9f09b6180e4cd290443e60b92c9cc2b706fa249da62"
+    },
+    "sha256": "7a219581a7ce4cfa92f7604f50e2441c1f1d8eb3ad03e04654625b611527a8ca"
+  },
+  "source_tree_role": "captured by the teacher producer runtime"
+}
