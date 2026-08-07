@@ -186,17 +186,36 @@ export class Dist {
 
   quantile(p, tol = 1e-9, maxIter = 100) {
     if (!(p > 0 && p < 1)) throw new Error("quantile p must be in (0, 1)");
-    const mu = this.mean;
-    const sigma = Math.sqrt(this.var);
-    let lo = mu - 8 * sigma;
-    let hi = mu + 8 * sigma;
-    for (let i = 0; i < maxIter; i++) {
+    // Localize before bisecting: the sorted component +/-8 sigma endpoints
+    // are partition landmarks (not cdf change points), binary-searched for a
+    // gap containing p; then x-space tolerance at the smallest component
+    // sigma (parity with the Python reference fix).
+    const edgeSet = new Set();
+    let sMin = Infinity;
+    for (const [, m, s] of this.components) {
+      edgeSet.add(m - 8 * s);
+      edgeSet.add(m + 8 * s);
+      if (s > 0 && s < sMin) sMin = s;
+    }
+    const edges = Array.from(edgeSet).sort((a, b) => a - b);
+    let i = 0;
+    let j = edges.length - 1;
+    while (j - i > 1) {
+      const k = Math.floor((i + j) / 2);
+      if (this.cdf(edges[k]) < p) i = k;
+      else j = k;
+    }
+    let lo = edges[i];
+    let hi = edges[j];
+    const xTol = Number.isFinite(sMin) ? tol * sMin : 0;
+    for (let n = 0; n < maxIter; n++) {
       const mid = 0.5 * (lo + hi);
+      if (mid === lo || mid === hi) break; // machine resolution
       if (this.cdf(mid) < p) lo = mid;
       else hi = mid;
-      if (hi - lo < tol) break;
+      if (hi - lo <= xTol) break;
     }
-    return 0.5 * (lo + hi);
+    return hi;
   }
 
   get mean() {
