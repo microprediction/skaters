@@ -31,6 +31,8 @@ from skaters.api import laplace, dantzig
 from skaters.multiscale import multiscale
 from skaters.parade import parade
 from skaters.anomaly import mahalanobis, zbank
+from skaters.residual_transform import residual_transform, ResidualDiagnostics, CorrectedDist
+from skaters.homogenize import homogenize, make_candidates as homogenize_candidates, HomogenizedDist
 from skaters.sticky import sticky
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
@@ -77,6 +79,12 @@ __all__ = [
     "parade",
     "mahalanobis",
     "zbank",
+    "residual_transform",
+    "ResidualDiagnostics",
+    "CorrectedDist",
+    "homogenize",
+    "homogenize_candidates",
+    "HomogenizedDist",
     "search",
     # Spec system
     "build",
