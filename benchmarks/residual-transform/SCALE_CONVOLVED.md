@@ -521,14 +521,20 @@ designs built earlier in the session.
    choices -- the cell model's simpler H_2-filter hypotheses, hedged the
    same way, beat the exact-noise-law machinery's more elaborate ones on
    every arm tested.
-7. Natural next steps: promote `laplace_scale_cell_model` from a benchmark
-   script to a proper `skaters` transform/wrapper now that it has cleared
-   both gates (synthetic and real-data); a finer cell-model candidate grid
-   to see if the FRED median-based metrics (currently a small but positive
-   +0.0012, not yet the clean sweep the mean-based metrics show) can be
-   pushed further; re-running the THREEFY9-style diagnosis on the cell
-   model to see if it avoids the Kalman-grid's specific persistence-bet
-   failure mode or just fails less often; a blended grid mixing cell-model
-   and Kalman-grid hypotheses in one pool; applying the correction at a
-   different point in `laplace`'s own transform chain (leaf-level vs.
-   final-output, raised but not explored).
+7. `laplace_scale_cell_model` has been promoted to a proper `skaters`
+   primitive: `skaters.homogenize`, an explicit opt-in wrapper
+   (`homogenize(laplace(k=1))`), not a change to `laplace`'s own default
+   output. See the "Why this is a wrapper and not the default" note in
+   `src/skaters/homogenize.py`'s module docstring for the reasoning
+   (narrow-but-real evidence, domain-dependent effect size, a non-`Dist`
+   output type, always-on compute cost, and preserving the raw-vs-corrected
+   baseline this research trail depends on).
+8. Remaining next steps: a finer cell-model candidate grid to see if the
+   FRED median-based metrics (currently a small but positive +0.0012, not
+   yet the clean sweep the mean-based metrics show) can be pushed further;
+   re-running the THREEFY9-style diagnosis on the cell model to see if it
+   avoids the Kalman-grid's specific persistence-bet failure mode or just
+   fails less often; a blended grid mixing cell-model and Kalman-grid
+   hypotheses in one pool; applying the correction at a different point in
+   `laplace`'s own transform chain (leaf-level vs. final-output, raised but
+   not explored).

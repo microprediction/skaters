@@ -53,6 +53,33 @@ so there is no closed-form ``H_t`` quantile/cdf -- :class:`HomogenizedDist`
 evaluates the mixture directly (log-sum-exp for the density, a weighted sum
 of component cdfs, bisection for the quantile) instead of dispatching to a
 :class:`~skaters.residual_transform.Family`.
+
+Why this is a wrapper and not part of ``laplace``'s default output, despite
+winning or being genuinely non-negative on every real-data arm tested
+(``benchmarks/residual-transform/SCALE_CONVOLVED.md``):
+
+- The evidence is real but still narrow -- one round of testing across
+  three sample arms (generic FRED macro, M4-hourly waveform, price against
+  ``garch_leaf``), not the extensive, incremental validation ``laplace``'s
+  existing defaults have accumulated. The effect size is also domain-
+  dependent, not uniform: a clear win on cyclic/waveform data, only a
+  marginal one on generic macro data (median-of-medians barely above a
+  coin flip there). A tool that helps a lot in one regime and barely at
+  all in another is a good opt-in, not an obvious universal default.
+- :class:`HomogenizedDist` duck-types the ``Dist`` interface but is not a
+  ``Dist`` instance. Some internals (``bayesian_ensemble``, via
+  ``Dist.combine()``) require genuine ``Dist`` objects; silently changing
+  what ``laplace`` returns could break anything downstream that composes
+  its output into a further ensemble.
+- It adds an always-on pool of candidates -- extra compute on every call,
+  including the Pyodide/browser deployment this library is built for,
+  where that cost is not free the way it is on a server.
+- Baking it into ``laplace`` would collapse the "raw vs. corrected"
+  distinction this module's own research trail depends on: every existing
+  and future study that measures whether this correction helps assumes
+  raw ``laplace`` stays a stable baseline to compare against.
+
+Apply it explicitly instead: ``homogenize(laplace(k=1))``.
 """
 
 from __future__ import annotations
