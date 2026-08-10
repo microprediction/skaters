@@ -302,6 +302,32 @@ fn parity_vectors() {
         n_scenarios += 1;
     }
 
+    // Missing observations: the parade's non-finite tick rule (skip the update,
+    // age the fan). The series carries the same "nan" sentinel the outputs use,
+    // since JSON has no NaN literal.
+    if let Some(gap) = v["gap_scenarios"].as_object() {
+        let gap_series: Vec<f64> = v["gap_series"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(parse_val)
+            .collect();
+        for (full, sc) in gap {
+            let k = sc["k"].as_u64().unwrap() as usize;
+            let (base, kk) = scenario_name(full).unwrap_or((full.as_str(), k));
+            run_scenario(
+                &format!("gap:{full}"),
+                build(base, kk),
+                &gap_series,
+                burn,
+                &sc["out"],
+                &mut checked,
+                &mut failures,
+            );
+            n_scenarios += 1;
+        }
+    }
+
     // Covariance estimators on the fixed multivariate series (cov block).
     let vec_series: Vec<Vec<f64>> = v["vec_series"]
         .as_array()
@@ -397,6 +423,36 @@ fn parity_vectors() {
         }
         assert_eq!(oi, out.len(), "periodicity: scored-step count mismatch");
         n_scenarios += 1;
+    }
+
+    // Structure: the candidate population itself, not its numbers. Numeric
+    // probes cannot see a port missing a candidate -- the R port ran 57 against
+    // Python's 60 while every individual transform still matched to 1e-6. The
+    // depth vector also pins ORDER, since the ensemble aligns depths by index.
+    if let Some(structure) = v["structure"].as_object() {
+        for (kname, want) in structure {
+            let kk: usize = kname.parse().expect("structure key must be an integer k");
+            let (cands, depths) = skaters_core::api::build_candidates(kk);
+            let want_n = want["n_candidates"].as_u64().unwrap() as usize;
+            if cands.len() != want_n {
+                failures.push(format!(
+                    "structure k={kk}: {} candidates, want {want_n}",
+                    cands.len()
+                ));
+            }
+            let want_d: Vec<f64> = want["depths"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_f64().unwrap())
+                .collect();
+            if depths != want_d {
+                failures.push(format!("structure k={kk}: depth vector differs"));
+            }
+            if cands.len() == want_n && depths == want_d {
+                println!("ok   structure k={kk}   {} candidates", cands.len());
+            }
+        }
     }
 
     println!("parity: {n_scenarios} scenarios, {checked} values checked");

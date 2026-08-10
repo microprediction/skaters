@@ -210,16 +210,23 @@ impl Standardize {
         }
         let mu = self.mu;
         let diff = y - mu;
-        let mu_new = mu + self.alpha * diff;
-        let var = (1.0 - self.alpha) * self.var + self.alpha * diff * diff;
-        let sigma = if var > self.eps * self.eps {
-            var.sqrt()
+        // Emit against the PRIOR state, so the forward map is the affine change
+        // of coordinates z = (y - mu) / sigma that the inverse applies. Scaling
+        // by the post-update std makes the emission self-normalized (bounded by
+        // 1/sqrt(alpha)) and the affine inverse is then not its inverse.
+        // Cold start: before the variance is informative, scale by the first
+        // nonzero residual, so the first informative emission is +-1.
+        let sigma = if self.var > self.eps * self.eps {
+            self.var.sqrt()
+        } else if diff.abs() > self.eps {
+            diff.abs()
         } else {
             self.eps
         };
-        self.mu = mu_new;
-        self.var = var;
-        diff / sigma
+        let y_prime = diff / sigma;
+        self.mu = mu + self.alpha * diff;
+        self.var = (1.0 - self.alpha) * self.var + self.alpha * diff * diff;
+        y_prime
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
