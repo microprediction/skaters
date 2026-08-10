@@ -1,0 +1,71 @@
+name: Publish Rust port to crates.io
+
+# Publishes rust/ (the Rust port, crate name `skaters`) to crates.io when a
+# GitHub Release is published, after re-checking Python<->Rust numeric parity.
+# Bump the version in rust/Cargo.toml before tagging the release.
+#
+# Requires a repo secret CARGO_REGISTRY_TOKEN, scoped publish-new +
+# publish-update. Mirrors publish.yml (npm), including the discipline that the
+# parity vectors are REGENERATED from the Python reference before the gate runs:
+# parity/vectors.json is generated and untracked, so a stale copy reports
+# PARITY OK against a reference that no longer exists.
+#
+# `cargo publish` is irreversible: a version can be yanked but never deleted and
+# never reused. Use the workflow_dispatch dry run to rehearse the whole job
+# without uploading.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Package and verify without uploading"
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python (parity reference)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the Python package
+        run: pip install -e .
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # The crate version is the thing being claimed forever, so refuse to
+      # publish one that disagrees with the tag that triggered this run.
+      - name: Crate version must match the release tag
+        if: github.event_name == 'release'
+        run: |
+          crate=$(sed -n 's/^version = "\(.*\)"/\1/p' rust/Cargo.toml | head -1)
+          tag="${GITHUB_REF_NAME#v}"
+          echo "crate=$crate tag=$tag"
+          if [ "$crate" != "$tag" ]; then
+            echo "::error::rust/Cargo.toml is $crate but the release tag is $tag"
+            exit 1
+          fi
+
+      - name: Parity gate (regenerate vectors from Python, then check the Rust port)
+        env:
+          PYTHONPATH: src
+        run: |
+          python parity/gen_vectors.py
+          cargo test --release --manifest-path rust/Cargo.toml
+
+      - name: Publish to crates.io
+        working-directory: rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            cargo publish --dry-run
+          else
+            cargo publish
+          fi
