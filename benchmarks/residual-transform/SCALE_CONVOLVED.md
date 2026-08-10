@@ -38,7 +38,7 @@ true mean/variance of `log(z^2)`, the round-trip on iid `N(0,1)` data came
 back with variance ~0.86 and kurtosis ~1.86, not the ~1/~3 it should be.
 Isolating it (feeding `ScaleMetaCorrectedDist` the *true* non-Gaussian law
 of `log(z^2)` directly, bypassing any Gaussian approximation) reproduced
-`N(0,1)` almost exactly — so the composition math was right; the coordinate
+`N(0,1)` almost exactly -- so the composition math was right; the coordinate
 was wrong. `log(chi-sq_1)` is substantially left-skewed, and a
 Gaussian-mixture leaf (symmetric components only) cannot represent that
 skew regardless of how much data it sees. That's a structural mismatch, not
@@ -55,7 +55,7 @@ across 8 seeds.
 *marginal* shape Gaussian." If scale is genuinely time-varying,
 `e_t = sigma_t * xi_t`, the thing worth tracking is additive in *log*
 coordinates: `log(sigma_t^2 xi_t^2) = log(sigma_t^2) + log(xi_t^2)`. A power
-transform gives `sigma_t^(2/3) xi_t^(2/3)` — still multiplicative, buys
+transform gives `sigma_t^(2/3) xi_t^(2/3)` -- still multiplicative, buys
 nothing for tracking dynamics even though it helps the static shape.
 `log(z^2)` was the right coordinate for *tracking* all along; what was
 missing was the exact shape for the noise term.
@@ -73,7 +73,7 @@ quadrature (reusing `skaters.pushforward._GH7`, not a new quadrature
 scheme). With `h_hat`/`V_h` taken from `laplace`'s own predictive
 mean/variance on `x_t = log(z_t^2) + 1.27036` (net of the known noise
 variance, `V_h = max(laplace_var - R, 0)`), this is `laplace_scale_convolved`
-— synthetic iid null var=0.90 (8-seed sd 0.009), periodic-vol var=1.00
+-- synthetic iid null var=0.90 (8-seed sd 0.009), periodic-vol var=1.00
 (8-seed sd 0.013). Both stable across seeds, not a lucky draw.
 
 ## The closure non-issue, and the real remaining issue
@@ -88,7 +88,7 @@ framing was a distraction from the actual remaining problem.
 
 The real issue: `ConvolvedExactLogChiSq` collapses the meta-forecaster's own
 predictive *mixture* for `h` down to a single `(mean, variance)` before
-convolving — exactly the averaging mistake `terminal_leaf_ensemble` already
+convolving -- exactly the averaging mistake `terminal_leaf_ensemble` already
 exists to avoid at the output layer ("Bayesian model averaging preserves
 mean and variance but washes the kurtosis out"), just committed one level
 up, at the latent-state layer. `MixtureConvolvedExactLogChiSq` fixes this by
@@ -96,10 +96,10 @@ convolving each of the meta-forecaster's own components separately and
 mixing the results. Tested against the moment-matched version: **worse**,
 not better (iid null var 0.86 vs 0.90; periodic-vol var 0.89 vs 1.01), and a
 log-score comparison confirmed it wasn't a mixture-vs-moments measurement
-artifact — the mixture version scored worse too (median delta ~0, mean
+artifact -- the mixture version scored worse too (median delta ~0, mean
 delta slightly negative, minority of ticks improved). Diagnosis: laplace's
 15 candidates agreed almost exactly on the mean (`between`-component
-variance was `0.000` at every tick checked) — all the disagreement was
+variance was `0.000` at every tick checked) -- all the disagreement was
 about width, so preserving the mixture structure bought nothing here. A
 real, informative negative result, not a wasted detour.
 
@@ -109,7 +109,7 @@ Tested on 20 real FRED series (same loader/methodology as `README.md`'s
 M0/M1/M2 study): **every single series had a negative per-series median.**
 Mean of means was -0.30, dominated by one catastrophic outlier
 (`RIFSPPFAAD30NB`: -5.76 on a single bad tick), but even the median of
-medians (-0.0107) was consistently negative — not noise, a real,
+medians (-0.0107) was consistently negative -- not noise, a real,
 reproducible degradation, despite passing every synthetic check. The two
 curated synthetic cases (iid null, one exactly-known clean period) simply
 didn't stress-test what messy real dynamics in `log(z^2)` actually look
@@ -129,12 +129,12 @@ method-of-moments estimate of a Kalman filter's `(rho, tau^2)` that divided
 by a near-zero quantity and produced nonsense values like `rho=643205`).
 
 The actually-correct fix follows directly from properness: this is signal
-extraction with a *known* observation-noise variance (`R`, exact) — the
+extraction with a *known* observation-noise variance (`R`, exact) -- the
 textbook solution is a Kalman filter (the classical econometric precedent
 for treating `log(y_t^2)` this way is Harvey, Ruiz & Shephard 1994
 quasi-ML stochastic volatility estimation), and the failure mode was never
 the Kalman logic (a single hand-picked `(rho=0.98, tau=0.1)` filter already
-gave the best synthetic-null result of the session, var=0.99/kurt=3.02) —
+gave the best synthetic-null result of the session, var=0.99/kurt=3.02) --
 it was trying to point-estimate the hyperparameters from one noisy ratio.
 The fix already used everywhere else in this codebase: don't point-estimate,
 run a small **fixed grid** of `(rho, tau^2)` candidates (including a
@@ -154,7 +154,7 @@ Synthetic (seed 1, T=3000):
 | Kalman-grid | **1.03 / 3.30** | 1.16 / 4.10 |
 
 Kalman-grid is the closest to exactly calibrated on the null of anything
-tried. Periodic-vol is now over-dispersed rather than under — given
+tried. Periodic-vol is now over-dispersed rather than under -- given
 everything above about asymmetric cost, that's the cheap direction to be
 wrong in.
 
@@ -170,7 +170,7 @@ Real FRED, 20 series (`run_scale_convolved_fred.py` vs `run_kalman_grid_fred.py`
 
 The catastrophic tail case shrinks by more than 10x, and the typical
 per-tick outcome moves from systematically unfavorable (~40% of ticks
-improve) to close to a coin flip (~47%) — exactly the signature of a
+improve) to close to a coin flip (~47%) -- exactly the signature of a
 mechanism that stopped making occasional badly-overconfident bets and
 started reporting an honest, hedged belief instead. It is **not** a clean
 win: only 3 of 20 series show a net-positive median. This reads as "roughly
@@ -282,7 +282,7 @@ whose CRPS delta is -0.014 alone). The Kalman-grid's slower, filtered
 capture the rare large win.
 
 This settles the question the section title asks: the specific noise-law/
-Kalman machinery is *not* what was load-bearing all session -- a much
+Kalman machinery is *not* what was doing the work all session -- a much
 simpler invertible-transform composition does the same job, confirming
 (again) that the real fix was always NFL-safe hedging (a grid including a
 "do nothing" candidate, combined by online evidence) rather than any
