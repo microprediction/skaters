@@ -450,7 +450,7 @@ absence of catastrophic tails, cross-domain generalization, and compute
 cost -- this design outperforms both of the exact-noise-law-motivated
 designs built earlier in the session.
 
-## Honest verdict
+## Verdict
 
 1. The M1/M2 leverage idea (`README.md`) is closed: negative everywhere
    tested, including on actual price/GARCH data.
