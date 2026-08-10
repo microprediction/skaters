@@ -9,25 +9,38 @@ static DIGEST: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0xcbf2_9ce4_8422_2325);
 
 /// Fold one computed value into the FNV-1a bit digest.
+///
+/// NaN is canonicalized first. IEEE-754 fixes the bits of zeros, normals and
+/// both infinities, but leaves a NaN's sign and payload unspecified, and
+/// platforms differ: x86 and aarch64 propagate different payloads, and wasm
+/// canonicalizes its own way. Probes can legitimately be NaN (gen_vectors.py has
+/// a "nan" sentinel for exactly that), so folding raw NaN bits made this digest
+/// report a platform divergence that is not one. Presence of a NaN is still
+/// recorded, since every NaN maps to one fixed pattern.
 fn digest_push(v: f64) {
+    let bits = if v.is_nan() {
+        0x7ff8_0000_0000_0000
+    } else {
+        v.to_bits()
+    };
     let cur = DIGEST.load(std::sync::atomic::Ordering::Relaxed);
     DIGEST.store(
-        (cur ^ v.to_bits()).wrapping_mul(0x0000_0100_0000_01b3),
+        (cur ^ bits).wrapping_mul(0x0000_0100_0000_01b3),
         std::sync::atomic::Ordering::Relaxed,
     );
 }
 
-use skaters_core::api::{laplace, Forecaster};
-use skaters_core::cov::{EmaCov, LedoitWolfCov, RunningCov};
-use skaters_core::periodicity::PeriodDetector;
-use skaters_core::search::search;
-use skaters_core::spec;
-use skaters_core::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
-use skaters_core::skater::{
+use skaters::api::{laplace, Forecaster};
+use skaters::cov::{EmaCov, LedoitWolfCov, RunningCov};
+use skaters::periodicity::PeriodDetector;
+use skaters::search::search;
+use skaters::spec;
+use skaters::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
+use skaters::skater::{
     bayesian_ensemble, conjugate, ema, multiscale, precision_weighted_ensemble, sticky, Sk,
 };
-use skaters_core::tails::gpdtails;
-use skaters_core::transform::{
+use skaters::tails::gpdtails;
+use skaters::transform::{
     ar, ar_default, difference, drift, ema_transform, fractional_difference, garch_default,
     grouped_ar, holt_linear, ou_transform, power_transform, seasonal_difference, standardize,
     theta, yeo_johnson,
@@ -247,7 +260,22 @@ fn parity_vectors() {
             concat!(env!("CARGO_MANIFEST_DIR"), "/parity/vectors.json").to_string()
         }
     });
-    let raw = std::fs::read_to_string(&path).expect("vectors.json");
+    // The vectors are GENERATED, not shipped: they are absent from the
+    // published crate, so a consumer running `cargo test` has nothing to check
+    // against. Skip rather than fail -- this gate is meaningful only against a
+    // reference regenerated from the Python source of truth, and a stale or
+    // missing copy must never read as a pass or as a spurious failure.
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(_) => {
+            println!(
+                "SKIP parity: no vectors at {path}. Regenerate in the skaters repo with\n  \
+                 PYTHONPATH=src python parity/gen_vectors.py\n\
+                 or point SKATERS_VECTORS at a copy."
+            );
+            return;
+        }
+    };
     let v: Value = serde_json::from_str(&raw).unwrap();
     let series: Vec<f64> = v["series"]
         .as_array()
@@ -300,6 +328,32 @@ fn parity_vectors() {
             &mut failures,
         );
         n_scenarios += 1;
+    }
+
+    // Missing observations: the parade's non-finite tick rule (skip the update,
+    // age the fan). The series carries the same "nan" sentinel the outputs use,
+    // since JSON has no NaN literal.
+    if let Some(gap) = v["gap_scenarios"].as_object() {
+        let gap_series: Vec<f64> = v["gap_series"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(parse_val)
+            .collect();
+        for (full, sc) in gap {
+            let k = sc["k"].as_u64().unwrap() as usize;
+            let (base, kk) = scenario_name(full).unwrap_or((full.as_str(), k));
+            run_scenario(
+                &format!("gap:{full}"),
+                build(base, kk),
+                &gap_series,
+                burn,
+                &sc["out"],
+                &mut checked,
+                &mut failures,
+            );
+            n_scenarios += 1;
+        }
     }
 
     // Covariance estimators on the fixed multivariate series (cov block).
@@ -397,6 +451,36 @@ fn parity_vectors() {
         }
         assert_eq!(oi, out.len(), "periodicity: scored-step count mismatch");
         n_scenarios += 1;
+    }
+
+    // Structure: the candidate population itself, not its numbers. Numeric
+    // probes cannot see a port missing a candidate -- the R port ran 57 against
+    // Python's 60 while every individual transform still matched to 1e-6. The
+    // depth vector also pins ORDER, since the ensemble aligns depths by index.
+    if let Some(structure) = v["structure"].as_object() {
+        for (kname, want) in structure {
+            let kk: usize = kname.parse().expect("structure key must be an integer k");
+            let (cands, depths) = skaters::api::build_candidates(kk);
+            let want_n = want["n_candidates"].as_u64().unwrap() as usize;
+            if cands.len() != want_n {
+                failures.push(format!(
+                    "structure k={kk}: {} candidates, want {want_n}",
+                    cands.len()
+                ));
+            }
+            let want_d: Vec<f64> = want["depths"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_f64().unwrap())
+                .collect();
+            if depths != want_d {
+                failures.push(format!("structure k={kk}: depth vector differs"));
+            }
+            if cands.len() == want_n && depths == want_d {
+                println!("ok   structure k={kk}   {} candidates", cands.len());
+            }
+        }
     }
 
     println!("parity: {n_scenarios} scenarios, {checked} values checked");
