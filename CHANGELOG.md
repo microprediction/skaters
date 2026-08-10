@@ -1,5 +1,26 @@
 # Changelog
 
+## Note for anyone upgrading from 0.14.0
+
+0.16.0 is the first release since **0.14.0** (2026-07-24). The `v0.15.0` tag
+exists in git but was never turned into a GitHub Release, so the publish
+workflows never fired and neither PyPI nor npm ever served 0.15.0. Installing
+0.16.0 therefore brings two releases of change: everything listed below, plus
+0.15.0's additions.
+
+### 0.15.0 (tagged 2026-08-02, never published)
+
+- `gaussianize`: empirical Gaussianization, `z = Phi^-1(F_hat(y))`, from a
+  running quantile sketch with fence-post weights
+- Empirical distributional leaves
+- Benchmark suite for the conformal information gap paper
+
+Also landed after that tag and included here: `homogenize` and
+`residual_transform` (#182), the online scale-mixture correction on a skater's
+own residual stream, applied explicitly as `homogenize(laplace(k=1))` rather
+than being part of `laplace`'s default output; and the `gaussianize`
+knot-deletion and smallest-rank-displacement guards (#169).
+
 ## 0.16.0
 
 Two user-visible behavior changes, and the first release in which the Python,
