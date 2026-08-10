@@ -2,7 +2,7 @@
 //! The input series is the parity vectors' embedded series, tiled — fully
 //! deterministic, no RNG dependency.
 
-use skaters_core::api::laplace;
+use skaters::api::laplace;
 use std::time::Instant;
 
 fn main() {

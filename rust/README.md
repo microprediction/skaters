@@ -1,4 +1,4 @@
-# skaters-core
+# skaters
 
 Rust port of the [skaters](https://github.com/microprediction/skaters) online
 distributional forecasting core. Every forecaster is a struct with
@@ -44,7 +44,7 @@ bit-deterministic.
 ## Usage
 
 ```rust
-use skaters_core::laplace;
+use skaters::laplace;
 
 let mut f = laplace(1);
 for y in observations {
