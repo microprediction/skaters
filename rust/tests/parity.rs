@@ -9,10 +9,23 @@ static DIGEST: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0xcbf2_9ce4_8422_2325);
 
 /// Fold one computed value into the FNV-1a bit digest.
+///
+/// NaN is canonicalized first. IEEE-754 fixes the bits of zeros, normals and
+/// both infinities, but leaves a NaN's sign and payload unspecified, and
+/// platforms differ: x86 and aarch64 propagate different payloads, and wasm
+/// canonicalizes its own way. Probes can legitimately be NaN (gen_vectors.py has
+/// a "nan" sentinel for exactly that), so folding raw NaN bits made this digest
+/// report a platform divergence that is not one. Presence of a NaN is still
+/// recorded, since every NaN maps to one fixed pattern.
 fn digest_push(v: f64) {
+    let bits = if v.is_nan() {
+        0x7ff8_0000_0000_0000
+    } else {
+        v.to_bits()
+    };
     let cur = DIGEST.load(std::sync::atomic::Ordering::Relaxed);
     DIGEST.store(
-        (cur ^ v.to_bits()).wrapping_mul(0x0000_0100_0000_01b3),
+        (cur ^ bits).wrapping_mul(0x0000_0100_0000_01b3),
         std::sync::atomic::Ordering::Relaxed,
     );
 }
