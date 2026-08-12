@@ -21,6 +21,9 @@
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
     td.note { color: #777; font-size: 0.88em; }
     .caveats li { margin-bottom: 7px; }
+    .links a { text-decoration: none; }
+    .links a:hover { text-decoration: underline; }
+    pre code { font-size: 0.9em; }
     .stamp { color: #888; font-size: 0.88em; font-style: italic; }
   </style>
 </head>
@@ -80,14 +83,14 @@
       every time. This is the regime a live deployment runs in.</p>
     <table class="perf">
       <tr><th>model</th><th>ms per observation</th><th>vs laplace (Rust) k=1</th></tr>
-      <tr><td>laplace (Rust) k=12</td><td class=num>0.1484</td><td class=num>12&times;</td></tr>
-      <tr><td>laplace (Python) k=1</td><td class=num>0.2481</td><td class=num>20&times;</td></tr>
-      <tr><td>AutoETS (refit)</td><td class=num>1.9604</td><td class=num>158&times;</td></tr>
-      <tr><td>Chronos-Bolt-small</td><td class=num>7.4360</td><td class=num>599&times;</td></tr>
-      <tr><td>Prophet (refit)</td><td class=num>28.2250</td><td class=num>2,274&times;</td></tr>
-      <tr><td>AutoARIMA (refit)</td><td class=num>62.7220</td><td class=num>5,052&times;</td></tr>
-      <tr><td>TiRex</td><td class=num>95.0422</td><td class=num>7,656&times;</td></tr>
-      <tr><td>TimesFM-2.5-200M</td><td class=num>319.1572</td><td class=num>25,708&times;</td></tr>
+      <tr><td>laplace (Rust) k=12</td><td class=num>0.1511</td><td class=num>12&times;</td></tr>
+      <tr><td>laplace (Python) k=1</td><td class=num>0.2506</td><td class=num>20&times;</td></tr>
+      <tr><td>AutoETS (refit)</td><td class=num>1.9310</td><td class=num>157&times;</td></tr>
+      <tr><td>Chronos-Bolt-small</td><td class=num>7.4397</td><td class=num>604&times;</td></tr>
+      <tr><td>Prophet (refit)</td><td class=num>29.9660</td><td class=num>2,434&times;</td></tr>
+      <tr><td>AutoARIMA (refit)</td><td class=num>62.1336</td><td class=num>5,047&times;</td></tr>
+      <tr><td>TiRex</td><td class=num>95.6831</td><td class=num>7,772&times;</td></tr>
+      <tr><td>TimesFM-2.5-200M</td><td class=num>329.8290</td><td class=num>26,792&times;</td></tr>
     </table>
 
     <h2>Batch: one forecast for a series never seen before</h2>
@@ -96,45 +99,45 @@
       forward pass across many series. Best batch size shown per model.</p>
     <table class="perf">
       <tr><th>model</th><th>ms per series</th><th>regime</th></tr>
-      <tr><td>Chronos-Bolt-small</td><td class=num>0.7272</td><td class=note>cold b=64</td></tr>
-      <tr><td>AutoETS (refit)</td><td class=num>1.9604</td><td class=note>cold</td></tr>
-      <tr><td>laplace (Rust) k=1</td><td class=num>3.3642</td><td class=note>cold</td></tr>
-      <tr><td>TimesFM-2.5-200M</td><td class=num>4.9655</td><td class=note>cold b=64</td></tr>
-      <tr><td>Prophet (refit)</td><td class=num>28.2250</td><td class=note>cold</td></tr>
-      <tr><td>laplace (Rust) k=12</td><td class=num>42.4769</td><td class=note>cold</td></tr>
-      <tr><td>AutoARIMA (refit)</td><td class=num>62.7220</td><td class=note>cold</td></tr>
-      <tr><td>laplace (Python) k=1</td><td class=num>66.3491</td><td class=note>cold</td></tr>
-      <tr><td>TiRex</td><td class=num>74.6386</td><td class=note>cold b=16</td></tr>
+      <tr><td>Chronos-Bolt-small</td><td class=num>0.7215</td><td class=note>cold b=64</td></tr>
+      <tr><td>AutoETS (refit)</td><td class=num>1.9310</td><td class=note>cold</td></tr>
+      <tr><td>laplace (Rust) k=1</td><td class=num>3.3897</td><td class=note>cold</td></tr>
+      <tr><td>TimesFM-2.5-200M</td><td class=num>5.0996</td><td class=note>cold b=64</td></tr>
+      <tr><td>Prophet (refit)</td><td class=num>29.9660</td><td class=note>cold</td></tr>
+      <tr><td>laplace (Rust) k=12</td><td class=num>42.6171</td><td class=note>cold</td></tr>
+      <tr><td>AutoARIMA (refit)</td><td class=num>62.1336</td><td class=note>cold</td></tr>
+      <tr><td>laplace (Python) k=1</td><td class=num>67.0809</td><td class=note>cold</td></tr>
+      <tr><td>TiRex</td><td class=num>74.9486</td><td class=note>cold b=16</td></tr>
     </table>
 
     <h2>Every measurement</h2>
     <table class="perf">
       <tr><th>model</th><th>regime</th><th>ms</th><th>note</th></tr>
-      <tr><td>laplace (Rust) k=1</td><td>cold</td><td class=num>3.3642</td><td class=note>replays 256 points</td></tr>
-      <tr><td>laplace (Rust) k=1</td><td>warm</td><td class=num>0.0124</td><td class=note>one online update</td></tr>
-      <tr><td>laplace (Rust) k=12</td><td>cold</td><td class=num>42.4769</td><td class=note>replays 256 points</td></tr>
-      <tr><td>laplace (Rust) k=12</td><td>warm</td><td class=num>0.1484</td><td class=note>one online update</td></tr>
-      <tr><td>laplace (Python) k=1</td><td>cold</td><td class=num>66.3491</td><td class=note>replays 256 points</td></tr>
-      <tr><td>laplace (Python) k=1</td><td>warm</td><td class=num>0.2481</td><td class=note>one online update</td></tr>
-      <tr><td>Chronos-Bolt-small</td><td>cold b=1</td><td class=num>7.2887</td><td class=note>48M params, batched</td></tr>
-      <tr><td>Chronos-Bolt-small</td><td>cold b=16</td><td class=num>1.2830</td><td class=note>48M params, batched</td></tr>
-      <tr><td>Chronos-Bolt-small</td><td>cold b=64</td><td class=num>0.7272</td><td class=note>48M params, batched</td></tr>
-      <tr><td>Chronos-Bolt-small</td><td>warm</td><td class=num>7.4360</td><td class=note>stateless: full re-forward</td></tr>
-      <tr><td>TiRex</td><td>cold b=1</td><td class=num>94.4089</td><td class=note>35M params, xLSTM, batched</td></tr>
-      <tr><td>TiRex</td><td>cold b=16</td><td class=num>74.6386</td><td class=note>35M params, xLSTM, batched</td></tr>
-      <tr><td>TiRex</td><td>cold b=64</td><td class=num>75.3902</td><td class=note>35M params, xLSTM, batched</td></tr>
-      <tr><td>TiRex</td><td>warm</td><td class=num>95.0422</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>laplace (Rust) k=1</td><td>cold</td><td class=num>3.3897</td><td class=note>replays 256 points</td></tr>
+      <tr><td>laplace (Rust) k=1</td><td>warm</td><td class=num>0.0123</td><td class=note>one online update</td></tr>
+      <tr><td>laplace (Rust) k=12</td><td>cold</td><td class=num>42.6171</td><td class=note>replays 256 points</td></tr>
+      <tr><td>laplace (Rust) k=12</td><td>warm</td><td class=num>0.1511</td><td class=note>one online update</td></tr>
+      <tr><td>laplace (Python) k=1</td><td>cold</td><td class=num>67.0809</td><td class=note>replays 256 points</td></tr>
+      <tr><td>laplace (Python) k=1</td><td>warm</td><td class=num>0.2506</td><td class=note>one online update</td></tr>
+      <tr><td>Chronos-Bolt-small</td><td>cold b=1</td><td class=num>7.4409</td><td class=note>48M params, batched</td></tr>
+      <tr><td>Chronos-Bolt-small</td><td>cold b=16</td><td class=num>1.2924</td><td class=note>48M params, batched</td></tr>
+      <tr><td>Chronos-Bolt-small</td><td>cold b=64</td><td class=num>0.7215</td><td class=note>48M params, batched</td></tr>
+      <tr><td>Chronos-Bolt-small</td><td>warm</td><td class=num>7.4397</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>TiRex</td><td>cold b=1</td><td class=num>96.4729</td><td class=note>35M params, xLSTM, batched</td></tr>
+      <tr><td>TiRex</td><td>cold b=16</td><td class=num>74.9486</td><td class=note>35M params, xLSTM, batched</td></tr>
+      <tr><td>TiRex</td><td>cold b=64</td><td class=num>76.3377</td><td class=note>35M params, xLSTM, batched</td></tr>
+      <tr><td>TiRex</td><td>warm</td><td class=num>95.6831</td><td class=note>stateless: full re-forward</td></tr>
       <tr><td>Sundial-base-128m</td><td>cold</td><td class=num>n/a</td><td class=note>unavailable: AttributeError: 'DynamicCache' object has no attribute 'seen_tokens'</td></tr>
-      <tr><td>TimesFM-2.5-200M</td><td>cold b=1</td><td class=num>318.4692</td><td class=note>200M params, batched</td></tr>
-      <tr><td>TimesFM-2.5-200M</td><td>cold b=16</td><td class=num>20.0734</td><td class=note>200M params, batched</td></tr>
-      <tr><td>TimesFM-2.5-200M</td><td>cold b=64</td><td class=num>4.9655</td><td class=note>200M params, batched</td></tr>
-      <tr><td>TimesFM-2.5-200M</td><td>warm</td><td class=num>319.1572</td><td class=note>stateless: full re-forward</td></tr>
-      <tr><td>AutoARIMA (refit)</td><td>cold</td><td class=num>62.7220</td><td class=note>fit on 256 points</td></tr>
-      <tr><td>AutoARIMA (refit)</td><td>warm</td><td class=num>62.7220</td><td class=note>refits from scratch every step</td></tr>
-      <tr><td>AutoETS (refit)</td><td>cold</td><td class=num>1.9604</td><td class=note>fit on 256 points</td></tr>
-      <tr><td>AutoETS (refit)</td><td>warm</td><td class=num>1.9604</td><td class=note>refits from scratch every step</td></tr>
-      <tr><td>Prophet (refit)</td><td>cold</td><td class=num>28.2250</td><td class=note>fit on 256 points</td></tr>
-      <tr><td>Prophet (refit)</td><td>warm</td><td class=num>28.2250</td><td class=note>refits from scratch every step</td></tr>
+      <tr><td>TimesFM-2.5-200M</td><td>cold b=1</td><td class=num>323.4401</td><td class=note>200M params, batched</td></tr>
+      <tr><td>TimesFM-2.5-200M</td><td>cold b=16</td><td class=num>20.2639</td><td class=note>200M params, batched</td></tr>
+      <tr><td>TimesFM-2.5-200M</td><td>cold b=64</td><td class=num>5.0996</td><td class=note>200M params, batched</td></tr>
+      <tr><td>TimesFM-2.5-200M</td><td>warm</td><td class=num>329.8290</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>AutoARIMA (refit)</td><td>cold</td><td class=num>62.1336</td><td class=note>fit on 256 points</td></tr>
+      <tr><td>AutoARIMA (refit)</td><td>warm</td><td class=num>62.1336</td><td class=note>refits from scratch every step</td></tr>
+      <tr><td>AutoETS (refit)</td><td>cold</td><td class=num>1.9310</td><td class=note>fit on 256 points</td></tr>
+      <tr><td>AutoETS (refit)</td><td>warm</td><td class=num>1.9310</td><td class=note>refits from scratch every step</td></tr>
+      <tr><td>Prophet (refit)</td><td>cold</td><td class=num>29.9660</td><td class=note>fit on 256 points</td></tr>
+      <tr><td>Prophet (refit)</td><td>warm</td><td class=num>29.9660</td><td class=note>refits from scratch every step</td></tr>
     </table>
 
     <h2>Caveats</h2>
@@ -159,10 +162,24 @@
         foundation models need torch and hundreds of megabytes of weights.</li>
     </ul>
 
+    <h2>Reproducing this</h2>
+    <p>Every number on this page is generated, not typed. The script measures each
+      model and writes both this page and the machine-readable results beside it, so
+      re-running it refreshes the page and nothing here can drift from the data.</p>
+<pre><code>PYTHONPATH=src:benchmarks python benchmarks/perf_compare.py</code></pre>
+    <p class="links">
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/perf_compare.py">perf_compare.py</a> &mdash; the measurement script
+      &middot;
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/perf_results.json">perf_results.json</a> &mdash; these numbers as data
+    </p>
+    <p>Knobs, as environment variables: <code>PERF_L</code> context length,
+      <code>PERF_H</code> horizon, <code>PERF_N</code> series count,
+      <code>TORCH_THREADS</code> core budget for the neural models. Each model is warmed
+      up before timing and reported as the median of repeats.</p>
+
     <p class="stamp">Measured 2026-08-12 on Darwin arm64, Python
-      3.11.15, skaters 0.16.0+d778bdf, context 256
-      points, horizon 12, 64 series, median of repeats.
-      Regenerate with <code>benchmarks/perf_compare.py</code>.</p>
+      3.11.15, skaters 0.16.0+8ddc8d5, context 256
+      points, horizon 12, 64 series, median of repeats.</p>
   </main>
 
   <footer>

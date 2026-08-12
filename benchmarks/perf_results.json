@@ -1,7 +1,7 @@
 {
  "meta": {
   "version": "0.16.0",
-  "commit": "d778bdf",
+  "commit": "8ddc8d5",
   "python": "3.11.15",
   "machine": "Darwin arm64",
   "torch_threads": 1,
@@ -14,85 +14,85 @@
   {
    "model": "laplace (Rust) k=1",
    "regime": "cold",
-   "ms": 3.364190749834961,
+   "ms": 3.389684250123537,
    "note": "replays 256 points"
   },
   {
    "model": "laplace (Rust) k=1",
    "regime": "warm",
-   "ms": 0.012414582015480846,
+   "ms": 0.012310668011195958,
    "note": "one online update"
   },
   {
    "model": "laplace (Rust) k=12",
    "regime": "cold",
-   "ms": 42.47689973408342,
+   "ms": 42.61712239076587,
    "note": "replays 256 points"
   },
   {
    "model": "laplace (Rust) k=12",
    "regime": "warm",
-   "ms": 0.14843166602076963,
+   "ms": 0.1510795839712955,
    "note": "one online update"
   },
   {
    "model": "laplace (Python) k=1",
    "regime": "cold",
-   "ms": 66.34913012385368,
+   "ms": 67.08088549930835,
    "note": "replays 256 points"
   },
   {
    "model": "laplace (Python) k=1",
    "regime": "warm",
-   "ms": 0.248072776691212,
+   "ms": 0.2505761099746451,
    "note": "one online update"
   },
   {
    "model": "Chronos-Bolt-small",
    "regime": "cold b=1",
-   "ms": 7.288692062502378,
+   "ms": 7.440869781476067,
    "note": "48M params, batched"
   },
   {
    "model": "Chronos-Bolt-small",
    "regime": "cold b=16",
-   "ms": 1.2829765628339374,
+   "ms": 1.292375640332466,
    "note": "48M params, batched"
   },
   {
    "model": "Chronos-Bolt-small",
    "regime": "cold b=64",
-   "ms": 0.7271972654052661,
+   "ms": 0.7214869842755434,
    "note": "48M params, batched"
   },
   {
    "model": "Chronos-Bolt-small",
    "regime": "warm",
-   "ms": 7.436000014422461,
+   "ms": 7.439749984769151,
    "note": "stateless: full re-forward"
   },
   {
    "model": "TiRex",
    "regime": "cold b=1",
-   "ms": 94.40885026560863,
+   "ms": 96.47288345286142,
    "note": "35M params, xLSTM, batched"
   },
   {
    "model": "TiRex",
    "regime": "cold b=16",
-   "ms": 74.638590500399,
+   "ms": 74.94859895314221,
    "note": "35M params, xLSTM, batched"
   },
   {
    "model": "TiRex",
    "regime": "cold b=64",
-   "ms": 75.39016535929477,
+   "ms": 76.33774023406659,
    "note": "35M params, xLSTM, batched"
   },
   {
    "model": "TiRex",
    "regime": "warm",
-   "ms": 95.04220800590701,
+   "ms": 95.68308299640194,
    "note": "stateless: full re-forward"
   },
   {
@@ -104,61 +104,61 @@
   {
    "model": "TimesFM-2.5-200M",
    "regime": "cold b=1",
-   "ms": 318.4692278591683,
+   "ms": 323.44013217198153,
    "note": "200M params, batched"
   },
   {
    "model": "TimesFM-2.5-200M",
    "regime": "cold b=16",
-   "ms": 20.073409500128037,
+   "ms": 20.263938156404038,
    "note": "200M params, batched"
   },
   {
    "model": "TimesFM-2.5-200M",
    "regime": "cold b=64",
-   "ms": 4.965540359535225,
+   "ms": 5.099649094063352,
    "note": "200M params, batched"
   },
   {
    "model": "TimesFM-2.5-200M",
    "regime": "warm",
-   "ms": 319.157207995886,
+   "ms": 329.82900002389215,
    "note": "stateless: full re-forward"
   },
   {
    "model": "AutoARIMA (refit)",
    "regime": "cold",
-   "ms": 62.722041009692475,
+   "ms": 62.13358402601443,
    "note": "fit on 256 points"
   },
   {
    "model": "AutoARIMA (refit)",
    "regime": "warm",
-   "ms": 62.722041009692475,
+   "ms": 62.13358402601443,
    "note": "refits from scratch every step"
   },
   {
    "model": "AutoETS (refit)",
    "regime": "cold",
-   "ms": 1.960374996997416,
+   "ms": 1.9309580093249679,
    "note": "fit on 256 points"
   },
   {
    "model": "AutoETS (refit)",
    "regime": "warm",
-   "ms": 1.960374996997416,
+   "ms": 1.9309580093249679,
    "note": "refits from scratch every step"
   },
   {
    "model": "Prophet (refit)",
    "regime": "cold",
-   "ms": 28.225000001839362,
+   "ms": 29.965979483677074,
    "note": "fit on 256 points"
   },
   {
    "model": "Prophet (refit)",
    "regime": "warm",
-   "ms": 28.225000001839362,
+   "ms": 29.965979483677074,
    "note": "refits from scratch every step"
   }
  ]

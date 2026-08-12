@@ -296,6 +296,9 @@ def render(rows, meta):
     td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
     td.note {{ color: #777; font-size: 0.88em; }}
     .caveats li {{ margin-bottom: 7px; }}
+    .links a {{ text-decoration: none; }}
+    .links a:hover {{ text-decoration: underline; }}
+    pre code {{ font-size: 0.9em; }}
     .stamp {{ color: #888; font-size: 0.88em; font-style: italic; }}
   </style>
 </head>
@@ -356,10 +359,24 @@ def render(rows, meta):
         foundation models need torch and hundreds of megabytes of weights.</li>
     </ul>
 
+    <h2>Reproducing this</h2>
+    <p>Every number on this page is generated, not typed. The script measures each
+      model and writes both this page and the machine-readable results beside it, so
+      re-running it refreshes the page and nothing here can drift from the data.</p>
+<pre><code>PYTHONPATH=src:benchmarks python benchmarks/perf_compare.py</code></pre>
+    <p class="links">
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/perf_compare.py">perf_compare.py</a> &mdash; the measurement script
+      &middot;
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/perf_results.json">perf_results.json</a> &mdash; these numbers as data
+    </p>
+    <p>Knobs, as environment variables: <code>PERF_L</code> context length,
+      <code>PERF_H</code> horizon, <code>PERF_N</code> series count,
+      <code>TORCH_THREADS</code> core budget for the neural models. Each model is warmed
+      up before timing and reported as the median of repeats.</p>
+
     <p class="stamp">Measured {meta['date']} on {meta['machine']}, Python
       {meta['python']}, skaters {meta['version']}+{meta['commit']}, context {meta['context']}
-      points, horizon {meta['horizon']}, {meta['series']} series, median of repeats.
-      Regenerate with <code>benchmarks/perf_compare.py</code>.</p>
+      points, horizon {meta['horizon']}, {meta['series']} series, median of repeats.</p>
   </main>
 
   <footer>
