@@ -159,40 +159,12 @@ MODELS = {
                            "through granite-tsfm."),
 }
 
-NAV = """      <nav>
-        <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
-          <span class="drop">
-            <a href="/challengers.html">Standalone</a>
-            <a href="/sandwich.html">Sandwich pattern</a>
-            <a href="/sidecar.html">Sidecar pattern</a>
-          </span>
-        </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
-          <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-          </span>
-        </span>
-        <a href="/demos/">Demos</a>
-        <a href="/papers.html">Papers</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
-          <span class="drop">
-            <a href="/guide.html">Methodology</a>
-            <a href="/draws.html">Draws</a>
-            <a href="/scope.html">Scope</a>
-            <a href="/languages.html">Languages</a>
-            <a href="/heritage.html">Heritage</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/skills.html">Skills</a>
-          </span>
-        </span>
-        <a href="https://github.com/microprediction/skaters">GitHub</a>
-      </nav>"""
+# NAV comes from docs/sweep_nav.py, the single source of truth. This file used
+# to hold its own copy and rewrite only the inner <nav>, which is how the site
+# ended up serving three different menus simultaneously.
+import sys as _sys
+_sys.path.insert(0, os.path.join(ROOT, "docs"))
+from sweep_nav import NAV                      # noqa: E402
 
 
 def load_vs():
