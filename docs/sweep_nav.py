@@ -15,23 +15,41 @@ import os
 import re
 import sys
 
+# THE one nav. `benchmarks/foundation_pages.py` used to carry a second copy and
+# rewrote only the inner <nav>, which is how the site ended up with three
+# different menus at once (25 pages on one variant, 7 on another, and this
+# constant matching neither). That generator now imports NAV from here, so this
+# is the single source. Changing the menu means editing this and running the
+# sweep; nothing else should write a <nav>.
 CANONICAL = """  <header class="site-header">
     <div class="nav-inner">
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Direct comparisons</a>
-            <a href="/sandwich.html">Collaborative use</a>
-            <a href="/sidecar.html">Foundation models</a>
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
-        <a href="/guide.html">Guide</a>
         <a href="/papers.html">Papers</a>
+        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
@@ -43,6 +61,9 @@ CANONICAL = """  <header class="site-header">
       </nav>
     </div>
   </header>"""
+
+# The inner <nav> only, for consumers that replace just that block.
+NAV = CANONICAL[CANONICAL.index("      <nav>"):CANONICAL.index("</nav>") + len("</nav>")]
 
 HEADER_RE = re.compile(r'[ \t]*<header class="site-header">.*?</header>', re.DOTALL)
 
