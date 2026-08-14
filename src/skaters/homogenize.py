@@ -379,42 +379,129 @@ class HomogenizedDist:
 # The wrapper
 # ---------------------------------------------------------------------------
 
-def homogenize(base, candidates: tuple | None = None, k: int = 1):
-    """Wrap a k=1 skater with an online homogenized scale-mixture correction.
+def _couple(cells: list, mode: str, lam: float, candidates: tuple) -> None:
+    """Borrow strength across horizons, in place.
+
+    Horizon m resolves only every m ticks in effective-information terms, so the
+    long horizons see far less matured evidence than h=1 while needing the larger
+    correction (measured on FRED at 0.16.0: implied residual sd 0.903 at h=1
+    against 0.772 at h=6). Independent pools are therefore noisiest exactly where
+    the defect is biggest, which is the textbook case for shrinkage.
+
+      "weights"  pull each candidate's log-weight toward its cross-horizon mean.
+                 Encodes "which correction STYLE fits" as a property of the
+                 series rather than of the horizon. One parameter, cheap.
+      "state"    pull each candidate's filter state q_m toward q_{m-1}, i.e.
+                 smooth along the horizon axis. Encodes the smoothness the data
+                 shows (the sd sequence moves gradually in m, not arbitrarily).
+      "shared"   one pool for every horizon: maximal pooling, the stable/blunt
+                 extreme, useful as a bound rather than as a candidate.
+
+    lam=0 is independence; lam=1 is full pooling of the coupled quantity.
+    """
+    live = [c for c in cells if c is not None]
+    if len(live) < 2 or lam <= 0.0:
+        return
+    n = len(live[0]["dynamic"])
+    if mode == "weights":
+        for i in range(n):
+            mean_w = sum(c["dynamic"][i]["log_weight"] for c in live) / len(live)
+            for c in live:
+                d = c["dynamic"][i]
+                d["log_weight"] = (1.0 - lam) * d["log_weight"] + lam * mean_w
+    elif mode == "state":
+        idxs = [j for j, c in enumerate(cells) if c is not None]
+        for i in range(n):
+            prev = None
+            for j in idxs:
+                d = cells[j]["dynamic"][i]
+                if prev is not None:
+                    d["q"] = (1.0 - lam) * d["q"] + lam * prev
+                prev = d["q"]
+
+
+def homogenize(base, candidates: tuple | None = None, k: int = 1,
+               couple: str = "none", lam: float = 0.25):
+    """Wrap a skater with an online homogenized scale-mixture correction.
+
+    One INDEPENDENT candidate pool per horizon. Horizon m's residual is only
+    resolvable m steps later -- it is the PIT of y_t under the m-step-ahead
+    predictive issued at t-m -- so the wrapper keeps a queue of past predictive
+    lists and scores each horizon against its own matured forecast, the same
+    bookkeeping ``parade`` uses for its per-horizon pit/z. Horizons are corrected
+    independently because their miscalibration differs in kind, not just degree:
+    measured on FRED at 0.16.0 the implied residual sd is 0.903 at h=1 but 0.772
+    at h=6, so one shared correction would under-treat the horizon that needs it
+    most.
+
+    At k == 1 this reduces exactly to the previous single-pool behaviour.
 
     Args:
-        base: a k=1 skater callable, ``(y, state) -> (list[Dist], state)``.
+        base: a skater callable ``(y, state) -> (list[Dist], state)`` emitting k
+            horizons.
         candidates: optional candidate grid from :func:`make_candidates`;
             defaults to ``make_candidates()`` if not given.
-        k: forecast horizon of ``base``; only k=1 is supported.
+        k: forecast horizon of ``base``.
 
     Returns:
-        A skater callable ``(y, state) -> ([HomogenizedDist], state)``. The
+        A skater callable ``(y, state) -> (list, state)`` of length k. The
         returned state additionally carries, mirroring ``residual_transform``:
 
-        state["raw"]   F_t, the base skater's own (uncorrected) forecast for
-                       y_{t+1}.
-        state["cell"]  the pooled-candidate online state (see :func:`cell_step`).
+        state["pending"]     deque of the last k issued predictive lists, so
+                             horizon m can be resolved when it matures.
+        state["cell"][m-1]   the pooled-candidate online state for horizon m
+                             (see :func:`cell_step`).
+        state["raw"]         F_t, the base skater's own (uncorrected) one-step
+                             forecast, kept for backward compatibility.
     """
-    assert k == 1, "homogenize currently supports k=1 only"
+    assert k >= 1
+    assert couple in ("none", "weights", "state", "shared")
     candidates = candidates if candidates is not None else make_candidates()
 
     def _skater(y: float, state: dict | None) -> tuple[list, dict]:
         if state is None:
-            state = {"base": None, "raw": None, "cell": None, "correction": None}
+            state = {"base": None, "raw": None, "pending": [],
+                     "cell": [None] * k, "correction": [None] * k}
         s = state
 
-        if s["raw"] is not None:
-            u = _clamp01(s["raw"].cdf(y))
+        # Resolve every horizon whose forecast has matured: the list issued m
+        # steps ago carries the m-step predictive for THIS y.
+        pend = s["pending"]
+        n = len(pend)
+        for m in range(1, k + 1):
+            if m > n:
+                continue
+            d_m = pend[n - m][m - 1]
+            u = _clamp01(d_m.cdf(y))
             z = _phi_inv(u)
-            s["correction"], s["cell"] = cell_step(z, s["cell"], candidates)
+            if not (z == z):                     # non-finite PIT: no information
+                continue
+            slot = 0 if couple == "shared" else m - 1
+            corr, s["cell"][slot] = cell_step(z, s["cell"][slot], candidates)
+            if couple == "shared":
+                for j in range(k):
+                    s["correction"][j] = corr
+            else:
+                s["correction"][m - 1] = corr
+
+        if couple in ("weights", "state"):
+            _couple(s["cell"], couple, lam, candidates)
+            for m in range(k):                       # re-issue after shrinkage
+                if s["cell"][m] is not None:
+                    s["correction"][m] = _pool(candidates, s["cell"][m]["dynamic"])
 
         dists, s["base"] = base(y, s["base"])
-        f_t = dists[0]
-        s["raw"] = f_t
+        s["raw"] = dists[0]
+        pend.append(list(dists))
+        if len(pend) > k:
+            pend.pop(0)
 
-        corrected = f_t if s["correction"] is None else HomogenizedDist(f_t, s["correction"])
-        return [corrected], s
+        out = []
+        for m in range(1, k + 1):
+            d = dists[m - 1] if m - 1 < len(dists) else dists[-1]
+            corr = s["correction"][m - 1]
+            out.append(d if corr is None else HomogenizedDist(d, corr))
+        return out, s
 
-    _skater.__name__ = f"homogenize({getattr(base, '__name__', '?')})"
+    _skater.__name__ = f"homogenize({getattr(base, '__name__', '?')}, k={k})"
     return _skater
