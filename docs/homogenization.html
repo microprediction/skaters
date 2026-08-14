@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; homogenization</title>
+  <meta name="description" content="Homogenization: an online scale-mixture correction on a forecaster's own PIT residuals. Motivation, mechanism, and measured results by horizon." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters &mdash; homogenization" />
+  <meta property="og:description" content="An online correction for the part of a predictive distribution that is systematically the wrong width." />
+  <meta property="og:url" content="https://skaters.microprediction.org/homogenization.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .lede { color: #555; margin: 0 0 28px; font-size: 1.05em; }
+    table.res { border-collapse: collapse; margin: 0 0 24px; width: 100%; }
+    table.res th, table.res td { border-bottom: 1px solid #e3e3e3; padding: 6px 9px;
+      text-align: left; font-size: 0.94em; }
+    table.res th { border-bottom: 2px solid #bbb; font-weight: 600; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .caveats li { margin-bottom: 7px; }
+    .stamp { color: #888; font-size: 0.88em; font-style: italic; }
+    .links a { text-decoration: none; } .links a:hover { text-decoration: underline; }
+    blockquote { margin: 0 0 20px; padding: 2px 0 2px 14px; border-left: 3px solid #ddd;
+      color: #444; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/performance.html">Performance</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Homogenization</h1>
+    <p class="lede">A forecast can have the right centre and the wrong width. Homogenization
+      is an online correction for the width, learned from the forecaster's own track record
+      rather than from the data directly. It is worth about
+      3.3% of pinball loss at the horizon where it helps most,
+      and it never made things worse in any cell measured.</p>
+
+    <h2>The motivation: a forecaster that grades itself</h2>
+    <p>If a predictive distribution is correct, then pushing each realized value through its
+      own forecast CDF gives a uniform number, and through the normal quantile gives a
+      standard normal one. That transformed residual is what <code>skaters</code> calls the
+      <em>parade</em> z, and it is available online, for free, at every horizon.</p>
+    <p>So the forecaster can grade itself. If those z values have variance below one, the
+      intervals were too wide; above one, too narrow. Either way the miscalibration is
+      visible without any held-out data, because the grade only uses forecasts that have
+      already matured.</p>
+    <p>Two kinds of structure are commonly left over. The first is a <em>predictable shift in
+      conditional variance</em>: quiet stretches and violent ones, which a single fixed scale
+      cannot serve. The second is <em>unresolved heterogeneity</em>: excess kurtosis that no
+      single time-varying variance explains, because the residual is really drawn from
+      several latent regimes at once. A Hermite expansion names both precisely, as the
+      <code>H&#8322;</code> and <code>H&#8324;</code> terms, but the correction it suggests is
+      not usable: it can go negative in the tails, so it is not a density at all.</p>
+
+    <h2>The mechanism: a two-point scale mixture, hedged</h2>
+    <p>The correction used instead is the simplest object with both effects built in and no
+      way to go negative, a two-point Gaussian scale mixture:</p>
+    <blockquote><code>g(z) = &frac12; N(0, v(1&minus;&delta;)) + &frac12; N(0, v(1+&delta;))</code></blockquote>
+    <p>Here <code>v</code> carries the variance level and <code>&delta;</code> splits one
+      variance into two nearby ones, which is exactly how excess kurtosis arises from purely
+      Gaussian pieces. It is a genuine density for any <code>v &gt; 0</code>. The name comes
+      from that split: an unresolved mixture of latent regimes is replaced by an effective
+      aggregate description, without ever committing to which regime is active now.</p>
+    <p>A small fixed grid of candidates is run in parallel, each with its own filter on the
+      residual stream, and combined by discounted Bayesian weight. One candidate is the
+      <strong>identity</strong>, frozen at <code>v = 1</code> and holding most of the prior
+      weight, which is what makes the whole thing safe: on a well-specified forecaster the
+      identity wins and the correction does nothing.</p>
+
+    <h2>Results by horizon</h2>
+    <p>One candidate pool per horizon, each resolved against its own matured forecast.
+      FRED economic change-series, 792 paired series per horizon,
+      one-step through twelve-step. Ratio below 1 means homogenization wins; the coverage
+      target is 0.800, and implied sd of 1.000 would be perfect whitening.</p>
+    <table class="res">
+      <tr><th>h</th><th>n</th><th>pinball ratio</th><th>wins</th><th>coverage raw</th>
+        <th>coverage corrected</th><th>implied residual sd</th></tr>
+      <tr><td class=num>1</td><td class=num>792</td><td class=num>0.9909</td><td class=num>61.4%</td><td class=num>0.854</td><td class=num>0.841</td><td class=num>0.882 &rarr; 0.909</td></tr>
+      <tr><td class=num>2</td><td class=num>791</td><td class=num>0.9938</td><td class=num>56.8%</td><td class=num>0.849</td><td class=num>0.834</td><td class=num>0.893 &rarr; 0.926</td></tr>
+      <tr><td class=num>3</td><td class=num>791</td><td class=num>0.9910</td><td class=num>58.2%</td><td class=num>0.858</td><td class=num>0.856</td><td class=num>0.874 &rarr; 0.877</td></tr>
+      <tr><td class=num>4</td><td class=num>790</td><td class=num>0.9723</td><td class=num>63.4%</td><td class=num>0.871</td><td class=num>0.829</td><td class=num>0.844 &rarr; 0.937</td></tr>
+      <tr><td class=num>5</td><td class=num>792</td><td class=num>0.9666</td><td class=num>64.4%</td><td class=num>0.920</td><td class=num>0.869</td><td class=num>0.732 &rarr; 0.849</td></tr>
+      <tr><td class=num>6</td><td class=num>790</td><td class=num>0.9676</td><td class=num>64.7%</td><td class=num>0.902</td><td class=num>0.859</td><td class=num>0.773 &rarr; 0.871</td></tr>
+      <tr><td class=num>7</td><td class=num>792</td><td class=num>0.9711</td><td class=num>63.4%</td><td class=num>0.848</td><td class=num>0.794</td><td class=num>0.896 &rarr; 1.014</td></tr>
+      <tr><td class=num>8</td><td class=num>790</td><td class=num>0.9764</td><td class=num>62.7%</td><td class=num>0.894</td><td class=num>0.849</td><td class=num>0.793 &rarr; 0.893</td></tr>
+      <tr><td class=num>9</td><td class=num>792</td><td class=num>0.9790</td><td class=num>62.6%</td><td class=num>0.868</td><td class=num>0.823</td><td class=num>0.852 &rarr; 0.950</td></tr>
+      <tr><td class=num>10</td><td class=num>790</td><td class=num>0.9760</td><td class=num>62.9%</td><td class=num>0.900</td><td class=num>0.863</td><td class=num>0.779 &rarr; 0.863</td></tr>
+      <tr><td class=num>11</td><td class=num>792</td><td class=num>0.9809</td><td class=num>60.9%</td><td class=num>0.839</td><td class=num>0.794</td><td class=num>0.915 &rarr; 1.014</td></tr>
+      <tr><td class=num>12</td><td class=num>786</td><td class=num>0.9672</td><td class=num>65.8%</td><td class=num>0.856</td><td class=num>0.802</td><td class=num>0.877 &rarr; 0.994</td></tr>
+    </table>
+    <p>Two things stand out. The gain <strong>grows with horizon</strong>: about
+      0.9% at one step, rising to
+      3.3% at h=5. And the defect being corrected is
+      real and largest in the middle of the range, where raw laplace's implied residual sd
+      falls to <strong>0.732</strong> at h=5 &mdash; intervals
+      roughly 37% too wide. Coverage moves toward nominal
+      at every horizon.</p>
+
+    <h2>One step, held-out corpus</h2>
+    <p>Independently on GIFT-Eval, at one step, across 21 datasets and
+      3,299 paired series: median ratio 0.9950,
+      winning 57.7% of series
+      (56.0% weighting every dataset equally), and
+      positive on 15 of 21 datasets. So
+      the effect is not confined to the corpus it was developed on.</p>
+
+    <h2>Using it</h2>
+<pre><code>from skaters import laplace
+from skaters.homogenize import homogenize
+
+f = homogenize(laplace(k=12), k=12)     # one pool per horizon
+state = None
+for y in stream:
+    dists, state = f(y, state)          # dists[h-1] is the corrected h-step predictive
+</code></pre>
+    <p>It is deliberately <strong>opt-in</strong> rather than part of <code>laplace</code>'s
+      default output. It costs roughly 10% more compute per step, and keeping raw laplace as
+      a stable baseline is what makes measuring the correction possible at all.</p>
+
+    <h2>What did not work</h2>
+    <ul class="caveats">
+      <li><strong>Sharing one pool across horizons.</strong> The obvious economy is a single
+        correction for every horizon. It overshoots to an implied sd above 1, turning
+        too-wide intervals into too-narrow ones, and loses 2&ndash;4% of pinball beyond one
+        step. The horizons genuinely differ.</li>
+      <li><strong>Regularizing between horizons.</strong> Since long horizons resolve less
+        often, shrinking their pools toward their neighbours should stabilise them. Two
+        variants were tried, shrinking the candidate weights and smoothing the filter states
+        along the horizon axis. Both were within noise of independent pools, and insensitive
+        to the shrinkage strength, which says the quantities being pooled were already nearly
+        equal. Independence is left in place because nothing beat it.</li>
+    </ul>
+
+    <h2>Caveats</h2>
+    <ul class="caveats">
+      <li>The multi-horizon table is FRED only so far. The held-out GIFT figure is one step,
+        because that arm predates the multi-horizon version.</li>
+      <li>Gains are small in absolute terms: about 1% of pinball at one step and 3% at the
+        middle horizons. Reliable and cheap, not transformational.</li>
+      <li>Coverage still exceeds nominal after correction at most horizons, so the width
+        problem is reduced rather than solved.</li>
+      <li>These are one-step-ahead and multi-step density forecasts of economic change
+        series. Nothing here speaks to level forecasting or to seasonal data.</li>
+    </ul>
+
+    <h2>Reproducing this</h2>
+<pre><code>PYTHONPATH=src:benchmarks python benchmarks/homogenization_page.py</code></pre>
+    <p class="links">
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/homogenization_page.py">homogenization_page.py</a> &mdash; generates this page
+      &middot;
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/homogenization_results.json">homogenization_results.json</a> &mdash; these numbers as data
+      &middot;
+      <a href="https://github.com/microprediction/skaters/blob/main/src/skaters/homogenize.py">homogenize.py</a> &mdash; the implementation
+    </p>
+
+    <p class="stamp">Measured with skaters 0.16.0+ff9740f, written
+      2026-08-14. Every figure on this page is generated from the results store, not
+      transcribed.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>
