@@ -42,6 +42,16 @@ def test_js_adversarial_gate():
         check=True, cwd=ROOT)
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_quantile_contract():
+    """The JS twin must invert its own cdf in every mixture geometry that
+    broke the shipped bisection — same numbers as
+    tests/test_quantile_inverse_contract.py and rust/tests/quantile_contract.rs."""
+    subprocess.run(
+        ["node", os.path.join(ROOT, "parity", "quantile_contract.mjs")],
+        check=True, cwd=ROOT)
+
+
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
 def test_rust_parity():
     """The Rust core (rust/) must reproduce the Python numerics: regenerate
