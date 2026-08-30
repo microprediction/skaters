@@ -47,10 +47,18 @@ def test_1e100_spike_keeps_predictive_finite():
     assert _all_finite(dists)
 
 
-def test_prune_survives_nan_components():
-    d = Dist([(0.5, float("nan"), 1.0)] + [(0.5 / 30, float(i), 1.0)
+def test_nan_component_rejected_at_construction():
+    # This test used to assert that prune() survived a NaN mean, back when
+    # the constructor accepted one. The constructor now refuses nonfinite
+    # parameters outright (issue #200): a Dist with a NaN mean has NaN
+    # pdf/cdf/mean everywhere, so surviving prune only preserved the poison.
+    # The relentless-extremes torture tests above prove no internal path
+    # manufactures nonfinite components; the parade gate is the barrier for
+    # nonfinite inputs.
+    import pytest
+    with pytest.raises(ValueError):
+        Dist([(0.5, float("nan"), 1.0)] + [(0.5 / 30, float(i), 1.0)
                                            for i in range(30)])
-    assert len(d.prune(8)) <= 8
 
 
 def test_relentless_extremes():
