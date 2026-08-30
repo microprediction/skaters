@@ -4,11 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — the sandwich</title>
-  <meta name="description" content="Every model improved by the laplace sandwich: run it in laplace's coordinates, map back exactly. Forecasters and detectors, with the measured lifts." />
+  <meta name="description" content="The laplace sandwich: run any model in laplace's coordinates, map back exactly. Forecasters and detectors, with the measured lifts and the measured limits." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="skaters" />
   <meta property="og:title" content="skaters — the sandwich" />
-  <meta property="og:description" content="Every model improved by the laplace sandwich, with the measured lifts." />
+  <meta property="og:description" content="The laplace sandwich: any model in laplace's coordinates, with the measured lifts and limits." />
   <meta property="og:url" content="https://skaters.microprediction.org/sandwich.html" />
   <meta name="twitter:card" content="summary" />
   <link rel="stylesheet" href="./academic.css" />
@@ -59,7 +59,9 @@
   <main>
     <h1>The sandwich</h1>
     <p class="subtitle">Run any model in laplace's coordinates, map back
-      exactly. Everyone improves.</p>
+      exactly. Forecasters converge to laplace plus whatever they see that it
+      missed; detectors that want stationary input improve, template matchers
+      do not.</p>
 
     <svg viewBox="0 0 720 240" role="img" aria-label="The laplace sandwich: transform bread, any model as filling, exact inverse bread"
          style="max-width:680px;width:100%;display:block;margin:18px auto;">
@@ -130,9 +132,10 @@
       positive epsilon spans the whole universe rather than one stratum:
       ahead of laplace on 65% of series, +0.04 nats median, filed as its
       pre-registered convergence hypothesis. The z stream also suits
-      Bayesian machinery unusually well. Its marginal is N(0,1) by
-      construction, so priors centred at no structure and unit scale are
-      exactly right rather than guesswork, and a single pre-test ADVI fit
+      Bayesian machinery unusually well. To the extent laplace's predictive
+      cdf is right, the z stream is close to standard normal (that is what the
+      PIT tables measure), so priors centred at no structure and unit scale
+      are a measured default rather than guesswork, and a single pre-test ADVI fit
       frozen through all 150 test steps still ties laplace to the third
       decimal: in these coordinates, batch-refit staleness costs almost
       nothing. One pooled hierarchical fit across all 226 series lost to

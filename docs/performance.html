@@ -150,8 +150,9 @@
         Streaming, laplace is orders of magnitude cheaper. Which number applies depends
         entirely on whether you are scoring a benchmark or running a service.</li>
       <li><strong>Rust and Python differ by roughly 18&times;.</strong> Ratios here are
-        against the Rust core (<code>skaters_fast</code>), which is what ships; the
-        pure-Python reference is correspondingly slower.</li>
+        against the Rust core (<code>skaters_fast</code>), the opt-in accelerator; the
+        pure-Python reference, which is what <code>pip install skaters</code> serves,
+        is correspondingly slower.</li>
       <li><strong>Horizon costs laplace.</strong> Going from k=1 to k=12 costs it roughly
         an order of magnitude, because the multi-scale ensemble runs a full candidate pool
         per decimation stride per horizon.</li>

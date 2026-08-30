@@ -70,14 +70,16 @@ from skaters import laplace
 
 f = laplace(k=1)          # general-purpose, online, the default
 state = None
+forecast = None           # the predictive issued LAST tick, aimed at this y
 for y in stream:
+    if forecast is not None:
+        forecast.logpdf(y) # <-- a real density: one-step-ahead log score
+        forecast.crps(y)   # ...and CRPS, same discipline
     dists, state = f(y, state)
-    d = dists[0]
-    d.mean                 # point forecast
-    d.std                  # uncertainty
-    d.quantile(0.975)      # upper edge of the central 95% band
-    d.logpdf(y)            # <-- a real density: scorable on log-likelihood
-    d.crps(y)              # ...and on CRPS
+    forecast = dists[0]
+    forecast.mean          # point forecast for the NEXT tick
+    forecast.std           # uncertainty
+    forecast.quantile(0.975)  # upper edge of the central 95% band
 ```
 
 For price/return series with volatility clustering, swap in the GARCH(1,1)-t
@@ -97,7 +99,7 @@ f = laplace(k=20)              # multi-scale: strides {1, 5, 20}
 f = laplace(k=20, scales=[1])  # single-scale native fan-out
 ```
 
-Defaults worth knowing: `laplace` runs *model first, conform last* (likelihood
+Defaults worth knowing: `laplace` runs *model first, score-optimize last* (likelihood
 trunk + CRPS leaf), a near-Dirac **lattice projection** for series that revisit
 exact values (`sticky=True`, free on continuous data), and online Yeo–Johnson
 **coordinate** learning. Turn the leaf objective back to pure likelihood with
