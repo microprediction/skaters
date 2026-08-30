@@ -149,7 +149,7 @@ for y in observations:
     dists, state = f(y, state)
     dists[0].mean              # point forecast
     dists[0].std               # uncertainty
-    dists[0].quantile(0.975)   # 95th percentile
+    dists[0].quantile(0.975)   # upper edge of the central 95% band
     dists[0].logpdf(y)         # log-likelihood
     dists[0].cdf(y)            # CDF at y</code></pre>
     <p>
