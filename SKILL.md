@@ -75,7 +75,7 @@ for y in stream:
     d = dists[0]
     d.mean                 # point forecast
     d.std                  # uncertainty
-    d.quantile(0.975)      # 95th percentile
+    d.quantile(0.975)      # upper edge of the central 95% band
     d.logpdf(y)            # <-- a real density: scorable on log-likelihood
     d.crps(y)              # ...and on CRPS
 ```
