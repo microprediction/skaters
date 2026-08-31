@@ -229,6 +229,23 @@ own env (conflicting `gluonts`/`torch`/`jax` pins); the harness writes one
 `results_foundation_<tag>.csv` per run and `summarize()` merges them:
 `FM_MODELS=Chronos,Moirai FM_TAG=cm PYTHONPATH=src python benchmarks/foundation_study.py`.
 
+## Corrected Laplace teacher distillation (`timesfm_distill.py`)
+
+Issue [#133](https://github.com/microprediction/skaters/issues/133) has a
+complete causal, series-disjoint teacher/student experiment. The first pilot is
+invalid because it decoded the TimesFM output channels incorrectly. Two fresh
+adapters use channel 5 as the mean and channels
+`[0,1,2,3,4,6,7,8,9]` as q10–q90.
+
+The corrected context-128 adapter is a negative result: versus zero-shot
+TimesFM it has median dLL **−0.155385**, median CRPS ratio **1.002855**, and
+0/15 LL wins. Context 256 does not reverse the result. Matched-context and
+full-history Laplace also win. The invalid adapter and scores are not retained.
+
+The source contract, fresh adapters, raw quantiles, canonical rows, independent
+summaries, checksums, limitations, and exact commands are in
+[`ISSUE133.md`](ISSUE133.md) and [`distill_artifacts/`](distill_artifacts/).
+
 ## Headline result: skaters vs crepes, on CRPS (curated 42-series; now `study.py conformal-scale`)
 
 The skater is a *pluggable proper-scoring-rule optimizer* — the leaf fits its

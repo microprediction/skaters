@@ -286,16 +286,64 @@
       comparison.
     </p>
 
+    <h2>Can Laplace teach TimesFM?</h2>
+    <p>
+      Issue <a href="https://github.com/microprediction/skaters/issues/133">#133</a>
+      tested domain-level distillation on 35 training series, selected on 6
+      validation series, and scored on 15 disjoint test series (960 causal
+      origins). The first pilot decoded the TimesFM head incorrectly and is
+      invalid. Fresh adapters use channel 5 as the mean and channels
+      0,1,2,3,4,6,7,8,9 as q10&ndash;q90.
+    </p>
+    <p>
+      The committed sidecars preserve those native channels before ordering
+      repair. They cross on almost every test row; canonical density scores
+      apply a declared row-wise PAVA isotonic projection before the
+      validation-frozen mixture reconstruction.
+    </p>
+    <table>
+      <thead><tr><th>method vs online Laplace (context 128 run)</th><th>median dLL</th><th>median CRPS ratio</th><th>LL wins</th><th>CRPS wins</th></tr></thead>
+      <tbody>
+        <tr><td>TimesFM zero-shot</td><td>&minus;0.333</td><td>1.039</td><td>1/15</td><td>3/15</td></tr>
+        <tr><td>corrected Laplace-distilled TimesFM</td><td>&minus;0.557</td><td>1.039</td><td>0/15</td><td>2/15</td></tr>
+        <tr><td>teacher q-grid oracle</td><td>+0.0005</td><td>0.9984</td><td>8/15</td><td>12/15</td></tr>
+        <tr><td>exact teacher GMM body</td><td>+0.0038</td><td>0.9980</td><td>10/15</td><td>12/15</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Against zero-shot TimesFM, the corrected adapter has
+      &minus;0.155385 median dLL, a 1.002855 CRPS ratio, 0/15 LL wins,
+      and 7/15 CRPS wins. Its LL Diebold&ndash;Mariano record is 0 wins,
+      10 draws, and 5 losses. Context 256 does not reverse the result.
+    </p>
+    <p>
+      Matched-context Laplace also wins: the corrected adapter is
+      &minus;0.510919 median dLL behind when both see 128 values. The
+      validation-frozen teacher q-grid and exact GMM body both remain close to
+      complete Laplace, so the corrected experiment identifies failed student
+      transfer rather than a dominant q-grid reconstruction loss.
+    </p>
+    <p>
+      Both corrected adapters are negative research evidence, not deployment
+      candidates. The
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/ISSUE133.md">technical
+      report</a> includes chronology, 128/256 results, frozen source data,
+      fresh adapters, raw quantiles, canonical predictions, checksums,
+      limitations, and exact commands.
+    </p>
+
+
     <h2>What has not been run</h2>
     <p>
       Thoroughness includes the ledger of what is missing. Point accuracy
       (MAE of the median) has not been scored, though CRPS bounds how
       different it can be. The level-series protocol, the TimesFM home turf,
-      has not been run on this universe. Context lengths other than 256,
-      larger TimesFM checkpoints, and per-series compute cost are unrun.
-      None of these should reverse a 69-of-69 likelihood split, and this
-      page will be updated if any of them is run and says otherwise. The
-      harness needs an environment with <code>timesfm</code> installed and a
+      has not been run on this universe. The original 120-series zero-shot
+      protocol has not tested contexts other than 256, larger checkpoints, or
+      per-series compute cost. The separate issue-133 study uses a 128 context
+      and a post-hoc 256-context sensitivity on 15 disjoint test series.
+      The zero-shot harness needs an environment with <code>timesfm</code>
+      installed and a
       FRED key; everything else is one command.
     </p>
 
