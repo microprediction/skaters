@@ -4,19 +4,20 @@ Each adapter takes a one-step *change* series `ch` and returns a list of TEST
 per-step predictive `Dist`s over the rolling one-step test window (the last
 `fs.TEST` observations, each forecast from a `fs.CTX`-long context ending just
 before it), or None if the model is unavailable. Every model's predictive is
-turned into the SAME `Dist` (samples -> Gaussian KDE, quantiles -> smoothed
-mixture) by reusing foundation_study's helpers, so scores are comparable and
-nothing is reimplemented. The canonical runner (run_arm.py) walks these into the
-per-step predictions.py schema.
+turned into the same `Dist` contract (samples -> Gaussian KDE, quantiles ->
+an explicit mixture reconstruction), so scores use the canonical
+`predictions.py` schema. The canonical runner (`run_arm.py`) walks these
+predictives into that per-step store.
 
 Protocol matches foundation_study.py exactly (fixed context window, batched
 inference, zero-shot), so laplace re-scored on the identical window is an
 apples-to-apples baseline. Each arm runs in its OWN venv (deps conflict); the
 registry entry is imported lazily so a venv missing a package still loads.
 
-Attribution (research use): TabPFN "Built with PriorLabs-TabPFN"; TiRex includes
-materials developed at NXAI under the NXAI Community License; flowstate uses the
-ibm-research research checkpoint (arXiv:2508.05287), research-use only.
+Attribution (research use): TabPFN "Built with PriorLabs-TabPFN"; legacy TiRex
+includes materials developed at NXAI under the NXAI Community License;
+TiRex-2 is Apache-2.0; flowstate uses the ibm-research research checkpoint
+(arXiv:2508.05287), research-use only.
 """
 from __future__ import annotations
 import math
@@ -39,6 +40,52 @@ def _ncdf(z):
 CTX, TEST = fs.CTX, fs.TEST
 LEVELS9 = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 DEVICE = os.environ.get("FM_DEVICE", "cpu")
+
+TIREX2_MODEL_ID = "NX-AI/TiRex-2"
+TIREX2_MODEL_REVISION = "05e5b26db52bfb256f1ae1bdf785589850482de3"
+
+
+def fixed_bandwidth_quantile_dist(
+    levels,
+    quantiles,
+    *,
+    spacing_multiplier=0.5,
+):
+    """Reconstruct a ``Dist`` from ordered quantiles with one fixed bandwidth."""
+    probabilities = np.asarray(levels, dtype=float).reshape(-1)
+    values = np.asarray(quantiles, dtype=float).reshape(-1)
+    multiplier = float(spacing_multiplier)
+    if probabilities.size < 2 or probabilities.size != values.size:
+        raise ValueError("levels and quantiles must have the same length of at least two")
+    if not np.all(np.isfinite(probabilities)) or not np.all(np.isfinite(values)):
+        raise ValueError("levels and quantiles must be finite")
+    if not math.isfinite(multiplier) or multiplier <= 0.0:
+        raise ValueError("spacing_multiplier must be finite and positive")
+    order = np.argsort(probabilities)
+    probabilities, values = probabilities[order], values[order]
+    if probabilities[0] <= 0.0 or probabilities[-1] >= 1.0:
+        raise ValueError("quantile levels must lie strictly between zero and one")
+    if np.any(np.diff(probabilities) <= 0.0):
+        raise ValueError("quantile levels must be strictly increasing")
+    if np.any(np.diff(values) < 0.0):
+        raise ValueError("quantiles must be nondecreasing")
+    components = []
+    for index, value in enumerate(values):
+        lower = probabilities[index - 1] if index > 0 else 0.0
+        upper = probabilities[index + 1] if index < len(values) - 1 else 1.0
+        weight = max((upper - lower) / 2.0, 1e-6)
+        if index == 0:
+            spacing = abs(values[1] - values[0])
+        elif index == len(values) - 1:
+            spacing = abs(values[-1] - values[-2])
+        else:
+            spacing = abs(values[index + 1] - values[index - 1]) / 2.0
+        components.append((
+            weight,
+            float(value),
+            max(multiplier * float(spacing), 1e-9),
+        ))
+    return Dist(components)
 
 
 # ------------------------------------------------------------------ laplace baseline
@@ -96,6 +143,83 @@ def tirex_dists(ch, h=1):
         return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  tirex failed: {e}", flush=True); return None
+
+
+_tirex2 = None
+def tirex2_quantiles_from_contexts(
+    contexts,
+    h=1,
+    *,
+    model_id=TIREX2_MODEL_ID,
+    revision=TIREX2_MODEL_REVISION,
+    batch_size=None,
+):
+    """Return TiRex-2's native q10..q90 forecast at horizon ``h``.
+
+    ``contexts`` is a two-dimensional array with one univariate context per row.
+    The checkpoint revision and both test-time augmentations are explicit so
+    benchmark runs cannot silently change when upstream defaults move.
+    """
+    global _tirex2
+    import torch
+    from tirex2 import TimeseriesType, load_model
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.asarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if _tirex2 is None:
+        _tirex2 = load_model(
+            model_id,
+            device=DEVICE,
+            hf_kwargs={"revision": revision},
+        )
+    configured_levels = np.asarray(_tirex2._quantile_levels(), dtype=float)
+    if configured_levels.shape != (9,) or not np.allclose(configured_levels, LEVELS9):
+        raise ValueError(f"unexpected TiRex-2 quantile levels: {configured_levels.tolist()}")
+    timeseries = [
+        TimeseriesType(
+            target=torch.from_numpy(row).unsqueeze(0),
+            past_covariates=None,
+            future_covariates=None,
+        )
+        for row in values
+    ]
+    forecasts = _tirex2.forecast(
+        timeseries,
+        prediction_length=h,
+        output_type="numpy",
+        batch_size=batch_size or int(os.environ.get("TIREX2_BATCH", "128")),
+        tta_sign_flip=False,
+        tta_diff=False,
+    )
+    quantiles = np.stack(
+        [np.asarray(forecast, dtype=float)[0, :, h - 1] for forecast in forecasts]
+    )
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected TiRex-2 forecast shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("TiRex-2 produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("TiRex-2 produced crossing quantiles")
+    return quantiles
+
+
+def tirex2_dists(ch, h=1):
+    """TiRex-2 native quantiles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = tirex2_quantiles_from_contexts(contexts, h=h)
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        return [fixed_bandwidth_quantile_dist(
+            LEVELS9, row, spacing_multiplier=spacing
+        ) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  tirex2 failed: {e}", flush=True); return None
 
 
 _flowstate = None
@@ -347,6 +471,7 @@ def make_registry(h=1):
         "laplace":     lambda ch: laplace_dists(ch, h),
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
+        "TiRex-2":     lambda ch: tirex2_dists(ch, h),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
         "Chronos":     lambda ch: fs.chronos_dists(ch, h),
