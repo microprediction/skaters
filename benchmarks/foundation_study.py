@@ -293,9 +293,13 @@ def timesfm3_dists(ch, h=1):
                 f"(TEST={TEST} CTX={CTX} h={h}), got {n}")
         inputs = [np.asarray(ch[t - sh - CTX:t - sh], dtype=np.float32)
                   for t in range(start, n)]
+        # make_positive=False: the evaluator's benchmark default clamps
+        # forecasts nonnegative, and these are signed change series.
+        # univariate=True is a no-op for 1-D contexts but pins the intent.
         outs = list(_timesfm3.predict_batch(
             inputs, horizon=h, return_quantiles=True,
-            use_symmetric_averaging=False))
+            use_symmetric_averaging=False,
+            make_positive=False, univariate=True))
         levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         dists = []
         for o in outs:
