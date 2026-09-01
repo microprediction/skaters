@@ -260,9 +260,64 @@ def timesfm_dists(ch, h=1):
         print(f"  timesfm failed: {e}", flush=True); return None
 
 
+_timesfm3 = None
+def timesfm3_dists(ch, h=1):
+    """TimesFM 3.0 zero-shot, univariate mode; 9-decile quantile output ->
+    quantile_dist. Same windowing contract as timesfm_dists: for h>1 the
+    context ends h steps before each target and the horizon-h row is scored.
+
+    Weights (google/timesfm-3.0-pytorch) are under timesfm-non-commercial
+    -license-v1.0: research benchmarking only, no production use. The 3.0
+    API lives in the timesfm3 namespace of the same pip package; contexts
+    are a list of 1-D float32 arrays and predict_batch returns one output
+    per context with .quantiles of shape [h, 9] (deciles 0.1..0.9)."""
+    global _timesfm3
+    try:
+        from timesfm3 import TimesFM3Evaluator, ModelConfig
+        if _timesfm3 is None:
+            try:
+                from importlib.metadata import version as _pkgver
+                _v = _pkgver("timesfm")
+            except Exception:               # noqa: BLE001
+                _v = "?"
+            print(f"  timesfm package {_v}, "
+                  f"checkpoint google/timesfm-3.0-pytorch, device {DEVICE}",
+                  flush=True)
+            _timesfm3 = TimesFM3Evaluator(ModelConfig(
+                checkpoint_path="google/timesfm-3.0-pytorch",
+                per_core_batch_size=32, device=DEVICE))
+        n = len(ch); start = n - TEST; sh = h - 1
+        if start - sh - CTX < 0:
+            raise ValueError(
+                f"series too short: need >= {TEST + CTX + sh} changes "
+                f"(TEST={TEST} CTX={CTX} h={h}), got {n}")
+        inputs = [np.asarray(ch[t - sh - CTX:t - sh], dtype=np.float32)
+                  for t in range(start, n)]
+        # make_positive=False: the evaluator's benchmark default clamps
+        # forecasts nonnegative, and these are signed change series.
+        # univariate=True is a no-op for 1-D contexts but pins the intent.
+        outs = list(_timesfm3.predict_batch(
+            inputs, horizon=h, return_quantiles=True,
+            use_symmetric_averaging=False,
+            make_positive=False, univariate=True))
+        levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        dists = []
+        for o in outs:
+            q = np.asarray(o.quantiles, dtype=float)   # [h, 9] univariate
+            if q.ndim == 3:                            # [1, h, 9] defensive
+                q = q[0]
+            dists.append(quantile_dist(levels, q[h - 1]))
+        if len(dists) != TEST:
+            raise ValueError(f"expected {TEST} outputs, got {len(dists)}")
+        return dists
+    except Exception as e:                  # noqa: BLE001
+        print(f"  timesfm3 failed: {e}", flush=True); return None
+
+
 # ---------------------------------------------------------------- runner
 _ALL_MODELS = [("Chronos", chronos_dists), ("Moirai", moirai_dists),
-               ("Lag-Llama", lagllama_dists), ("TimesFM", timesfm_dists)]
+               ("Lag-Llama", lagllama_dists), ("TimesFM", timesfm_dists),
+               ("TimesFM3", timesfm3_dists)]
 _SEL = os.environ.get("FM_MODELS", "")      # comma list; empty = all
 MODELS = [(n, f) for n, f in _ALL_MODELS if not _SEL or n in _SEL.split(",")]
 
