@@ -56,7 +56,9 @@ def install_fake_timesfm3():
 
     def predict_batch(self, contexts, horizon, past_only_covariates=None,
                       past_future_covariates=None, return_quantiles=True,
-                      use_symmetric_averaging=False):
+                      use_symmetric_averaging=False, make_positive=False,
+                      univariate=False):
+        assert not make_positive, "signed changes: make_positive must be False"
         for c in contexts:
             c = np.asarray(c, dtype=np.float32)
             assert c.ndim == 1, "adapter must send univariate 1-D contexts"
