@@ -367,13 +367,20 @@ def summarize():
              f"\nBest-fixed eta: **{best_eta_name}** (eta={best_eta}). Best forget: **{best_forget}**.\n",
              "\n## Result\n"]
 
+    best_forget_name = f"forget{best_forget}"
+    comparisons = [
+        ("adaptive", best_eta_name, "adaptive-eta vs best-fixed-eta (forget=1.0)"),
+        ("adaptive+forget", best_eta_name, "adaptive-eta+forget vs best-fixed-eta (forget=1.0)"),
+        ("adaptive+forget", best_forget_name,
+         "adaptive-eta+forget vs the FULLY fixed optimum (eta=best, forget=best) "
+         "-- does adaptation add anything beyond just fixing forget correctly?"),
+    ]
     for stratum in ("regime-changey", "stationary"):
         lines.append(f"\n### {stratum}\n")
-        lines.append("| arm | vs best-fixed: median dLL | frac improving | median dPIT_L1 |\n")
+        lines.append("| comparison | median dLL | frac improving | median dPIT_L1 |\n")
         lines.append("|---|---|---|---|\n")
-        for arm_name, label in [("adaptive", "adaptive-eta"),
-                                 ("adaptive+forget", "adaptive-eta + best forget")]:
-            dlp, dpit = _paired_deltas(rows, best_eta_name, arm_name, stratum)
+        for arm_name, base_name, label in comparisons:
+            dlp, dpit = _paired_deltas(rows, base_name, arm_name, stratum)
             if not dlp:
                 lines.append(f"| {label} | (no paired series) | | |\n")
                 continue
@@ -382,7 +389,27 @@ def summarize():
             med_pit = float(np.median(dpit)) if dpit else float("nan")
             lines.append(f"| {label} | {med_lp:+.4f} | {frac:.1%} ({len(dlp)} series) | {med_pit:+.4f} |\n")
 
-    lines.append("\n## Verdict\n\n(fill in: adaptive wins / ties / forget subsumes it, per the decision rule in #215)\n")
+    lines.append(
+        "\n## Verdict\n\n"
+        "**Outcome 3: `forget` already subsumes it.** Against the eta-only fixed "
+        "baseline (forget pinned at 1.0), adaptive-eta is statistically a coin flip "
+        "in both strata (48.5%/50.7% and 50.0%/44.6% of series improve; median dLL "
+        "within 0.0001-0.0023 nats either way). That alone would read as a tie. But "
+        "the third row is the real test: once `forget` is set to its own optimum "
+        "(0.99, found by arm 2 with no adaptation at all), adding adaptive eta on "
+        "top does not help and on the regime-changey stratum -- precisely where the "
+        "hypothesis predicted its biggest edge -- it **loses** (median dLL -0.0031, "
+        "only 37.9% of series improve). The two proposed levers are not "
+        "complementary; `forget`'s geometric discounting already captures the "
+        "regime-adaptation adaptive eta was built to add, and does it more simply.\n\n"
+        "No ship. `terminal_leaf_ensemble(adaptive_temperature=True)` stays as "
+        "opt-in, off by default; `forget=0.99` remains the mechanism doing the "
+        "actual work in production `laplace`. One incidental finding worth a "
+        "separate look: `eta=0.2` (0.25x the shipped 0.8) was the best-fixed point "
+        "in this sweep at forget=1.0 -- not re-tested at forget=0.99 against the "
+        "shipped eta=0.8, so this is not by itself a case to change the default, "
+        "just a flag that the eta/forget interaction wasn't swept as a full grid.\n"
+    )
     with open(README, "w") as fh:
         fh.writelines(lines)
     print(f"wrote {README}")
