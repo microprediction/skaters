@@ -52,16 +52,18 @@ from skaters import laplace
 
 f = laplace(k=3)
 state = None
+forecast = None            # the fan issued LAST tick, aimed at this y
 for y in observations:
-    dists, state = f(y, state)
-    dists[0].mean              # point forecast
-    dists[0].std               # uncertainty
-    dists[0].quantile(0.975)   # 95th percentile
-    dists[0].logpdf(y)         # log-likelihood
-    dists[0].cdf(y)            # CDF at y
+    if forecast is not None:
+        forecast[0].logpdf(y)          # one-step-ahead log score
+        forecast[0].cdf(y)             # one-step-ahead PIT
+    forecast, state = f(y, state)
+    forecast[0].mean                   # point forecast for the NEXT tick
+    forecast[0].std                    # uncertainty
+    forecast[0].quantile(0.975)        # upper edge of the central 95% band
 ```
 
-Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
+Score a forecast only against observations that arrive after it was issued; the predictive returned alongside `y` aims at the next tick, and the parade in `state["pit"]`/`state["z"]` does this bookkeeping for you. Every skater returns a list of predictive distributions, one for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
 ## `laplace` — the general forecaster
 
@@ -83,7 +85,7 @@ differencing, drift, Holt, AR, fractional differencing, seasonal, a Yeo-Johnson
 (`k>1`) — an **Ornstein–Uhlenbeck mean-reversion** group). Three things are on by
 default, each a free or near-free win:
 
-- **model first, conform last** — the trunk is weighted by **likelihood**;
+- **model first, score-optimize last** — the trunk is weighted by **likelihood**;
   the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
   2,500-series FRED study this matches a CRPS specialist on CRPS *and* lifts
   likelihood on real data. Switch back with `objective="likelihood"`.
