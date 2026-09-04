@@ -40,8 +40,13 @@ RESULTS = os.path.join(_HERE, f"results_foundation_{FM_TAG}.csv")
 
 N_SERIES = int(os.environ.get("FM_N", 120))     # subset size (zero-shot CPU cost)
 HIST = 1000
-TEST = int(os.environ.get("FM_TEST", 150))      # rolling one-step test window
-CTX = int(os.environ.get("FM_CTX", 256))        # context window length
+# These defaults MUST match week_study.py's WEEK_TEST/WEEK_CTX defaults. Any
+# arm can be run either through that driver (which sets FM_TEST/FM_CTX
+# explicitly) or by invoking run_arm.py directly (which falls back to these
+# defaults); a mismatch silently produces a different-context, non-comparable
+# run that summarize_canonical.py can no longer paper over -- it now raises.
+TEST = int(os.environ.get("FM_TEST", 64))       # rolling one-step test window
+CTX = int(os.environ.get("FM_CTX", 128))        # context window length
 NUM_SAMPLES = int(os.environ.get("FM_SAMPLES", 30))
 DEVICE = os.environ.get("FM_DEVICE", "cpu")     # cpu | mps (Mac Studio) | cuda
 
