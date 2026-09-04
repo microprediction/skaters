@@ -100,6 +100,27 @@ def test_terminal_ensemble_runs_and_is_finite():
         assert d.std > 0 and math.isfinite(d.logpdf(0.0))
 
 
+def test_terminal_ensemble_adaptive_temperature_runs_and_stays_in_band():
+    """skaters#213: adaptive_temperature=False is unchanged (asserted by every
+    other test in this file, none of which pass the flag); True must run
+    finite, keep eta within [learning_rate/temp_band, learning_rate*temp_band],
+    and leave state picklable (checkpoint/restore contract)."""
+    import pickle
+    subs = [conjugate(leaf(1), ema_transform(a), 1) for a in (0.05, 0.2, 0.5)]
+    eta, band = 0.8, 3.0
+    f = terminal_leaf_ensemble(subs, k=1, learning_rate=eta, forget=0.99,
+                                adaptive_temperature=True, temp_band=band)
+    state = None
+    random.seed(4)
+    for t in range(500):
+        scale = 1.0 if t < 250 else 5.0     # a regime shift partway through
+        dists, state = f(random.gauss(0, scale), state)
+        assert math.isfinite(dists[0].logpdf(0.0))
+        eta_t = math.exp(state["adapt"]["log_eta"])
+        assert eta / band - 1e-9 <= eta_t <= eta * band + 1e-9
+    pickle.loads(pickle.dumps(state))
+
+
 def test_terminal_leaf_beats_gaussian_terminal_on_heavy_tails():
     series = _student_t(3, 3000, seed=3)
     subs_g = [conjugate(leaf(1), ema_transform(a), 1) for a in (0.05, 0.2)]
