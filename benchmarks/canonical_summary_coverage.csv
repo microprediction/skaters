@@ -59,11 +59,11 @@ monthly:econ,TiRex&lap,170560,0.9187,0.5084
 monthly:econ,TiRex@lap,170560,0.9034,0.4829
 monthly:econ,TimesFM,186240,0.8012,0.5041
 monthly:econ,TimesFM&lap,170560,0.9210,0.5153
-monthly:econ,TimesFM3,1031680,0.8035,0.4978
-monthly:econ,TimesFM3&lap,962880,0.9186,0.5086
-monthly:econ,TimesFM3+lap,1031680,0.8968,0.5032
-monthly:econ,TimesFM3@lap,962880,0.9083,0.4937
-monthly:econ,TimesFM3~lap,962880,0.9471,0.5048
+monthly:econ,TimesFM3,1034240,0.8035,0.4978
+monthly:econ,TimesFM3&lap,965376,0.9186,0.5086
+monthly:econ,TimesFM3+lap,1034240,0.8968,0.5031
+monthly:econ,TimesFM3@lap,965376,0.9083,0.4937
+monthly:econ,TimesFM3~lap,965376,0.9471,0.5048
 monthly:econ,TimesFM@lap,170560,0.9068,0.4987
 monthly:econ,flowstate,186880,0.6595,0.5176
 monthly:econ,laplace,356864,0.9233,0.5153
