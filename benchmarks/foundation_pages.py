@@ -122,6 +122,24 @@ MODELS = {
                          "and synthetic series. This study scores version 2.5 (200M "
                          "parameters) with its continuous quantile head, which emits the "
                          "predictive spread directly."),
+    "timesfm3": dict(name="TimesFM3", key="TimesFM3", vendor="Google",
+                      license="timesfm-non-commercial-license-v1.0", arms=True,
+                      blurb="Google's next TimesFM generation; same decoder-only, "
+                            "patched-transformer family as 2.5, scored on the identical "
+                            "protocol so the two checkpoints are directly comparable.",
+                      note="Run zero-shot with a fixed 128-length context, same as 2.5. "
+                           "Research/benchmarking use only under the model's license.",
+                      links=[
+                          ("GitHub", "https://github.com/google-research/timesfm"),
+                          ("Model card", "https://huggingface.co/google/timesfm-3.0-pytorch"),
+                      ],
+                      arch="Same decoder-only, patched-transformer architecture as TimesFM "
+                           "2.5. This study scores the 3.0 checkpoint with its native "
+                           "quantile head, under the identical protocol (128-length "
+                           "context, one-step change series) used for every other model "
+                           "here, so a comparison to the 2.5 numbers on the "
+                           "<a href=\"/foundation/timesfm.html\">TimesFM page</a> is "
+                           "apples-to-apples."),
     "sundial": dict(name="Sundial", key="Sundial", vendor="Tsinghua (THUML)",
                     license="see model card", arms=False,
                     blurb="Sundial is a generative time-series model; we draw samples "
