@@ -151,16 +151,20 @@ def standardize(alpha: float = 0.05, eps: float = 1e-8):
         mu = state["mu"]
         var = state["var"]
         diff = y - mu
-        # Center against the PRIOR mean (centering by the post-update mean would
-        # shrink the residual by (1-alpha) — systematic overconfidence). Scale by
-        # the updated EWMA std, which avoids a cold-start divide-by-zero. The
-        # variance recursion is the standard EWMA var = (1-a) var + a diff^2; the
-        # previous (1-a)(var + a diff^2) biased the scale low by sqrt(1-a).
-        mu_new = mu + alpha * diff
-        var = (1 - alpha) * var + alpha * diff * diff
-        sigma = math.sqrt(var) if var > eps * eps else eps
+        # Emit against the PRIOR state, so the forward map is the affine change
+        # of coordinates z = (y - mu) / sigma that the inverse applies. Scaling
+        # by the post-update std makes the emission self-normalized (bounded by
+        # 1/sqrt(alpha)) and the affine inverse is then not its inverse.
+        # Cold start: before the variance is informative, scale by the first
+        # nonzero residual, so the first informative emission is +-1.
+        if var > eps * eps:
+            sigma = math.sqrt(var)
+        else:
+            sigma = abs(diff) if abs(diff) > eps else eps
         y_prime = diff / sigma
-        return y_prime, {"mu": mu_new, "var": var}
+        mu_new = mu + alpha * diff
+        var_new = (1 - alpha) * var + alpha * diff * diff
+        return y_prime, {"mu": mu_new, "var": var_new}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         mu = state["mu"]
@@ -1304,7 +1308,7 @@ def _dot(a: list[float], b: list[float], n: int) -> float:
 
 def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
                 smooth: bool = False, slope_cap: float = 20.0,
-                z_max: float = 8.0):
+                z_max: float = 8.0, guard: str = "move"):
     """Empirical Gaussianization: z = Phi^{-1}(F_hat(y)) with fence-post weights.
 
     F_hat is built from a running quantile sketch of past inputs (at most
@@ -1350,6 +1354,95 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
     J = n_particles
     _mids = [nd.inv_cdf((j + 0.5) / J) for j in range(J)]
     _edges = [nd.inv_cdf(j / J) for j in range(1, J)]
+
+    def _prune_slopes(ys, zs):
+        """Delete knots whose segment inverse slope dy/dz exceeds SLOPE_CAP
+        times the interquartile slope, walking outward from the median knot.
+        Surviving knots keep their original values and levels, so they remain
+        exact order statistics and retained-level exactness is preserved at
+        an enlarged cell width."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return ys, zs
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return ys, zs
+        c = len(ys) // 2
+        keep = [c]
+        for i in range(c + 1, len(ys)):
+            j = keep[-1]
+            if (ys[i] - ys[j]) / (zs[i] - zs[j]) <= cap:
+                keep.append(i)
+        for i in range(c - 1, -1, -1):
+            j = min(k for k in keep)
+            if (ys[j] - ys[i]) / (zs[j] - zs[i]) <= cap:
+                keep.append(i)
+        keep.sort()
+        if len(keep) < 2:
+            return ys, zs
+        return [ys[i] for i in keep], [zs[i] for i in keep]
+
+    def _emin_knots(buf, ys, zs, idxs):
+        """Smallest-rank-displacement guard. Find the smallest integer e
+        such that knot values bracketed within e ranks of their order
+        statistics admit the slope cap, then project the knots into that
+        corridor, keeping each at its exact order statistic where feasible.
+        Levels are never moved, so the certificate pays exactly
+        Delta_n + e/(n+1), the least the budget allows."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return ys, zs
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return ys, zs
+        nb, K = len(buf), len(ys)
+        dz = [zs[j + 1] - zs[j] for j in range(K - 1)]
+
+        def corridor(e):
+            lo = [buf[max(0, idxs[j] - e)] for j in range(K)]
+            hi = [buf[min(nb - 1, idxs[j] + e)] for j in range(K)]
+            U = [0.0] * K
+            U[K - 1] = hi[K - 1]
+            for j in range(K - 2, -1, -1):
+                U[j] = min(hi[j], U[j + 1])
+            Db = [0.0] * K
+            Db[K - 1] = lo[K - 1]
+            for j in range(K - 2, -1, -1):
+                Db[j] = max(lo[j], Db[j + 1] - cap * dz[j])
+            L = [0.0] * K
+            L[0] = Db[0]
+            for j in range(1, K):
+                L[j] = max(Db[j], L[j - 1])
+            if any(L[j] > U[j] for j in range(K)):
+                return None
+            return L, U
+
+        if corridor(0) is not None:
+            return ys, zs
+        lo_e, hi_e = 0, nb
+        while hi_e - lo_e > 1:
+            mid = (lo_e + hi_e) // 2
+            if corridor(mid) is not None:
+                hi_e = mid
+            else:
+                lo_e = mid
+        res = corridor(hi_e)
+        if res is None:
+            return ys, zs
+        L, U = res
+        w = [0.0] * K
+        w[0] = max(L[0], min(ys[0], U[0]))
+        for j in range(1, K):
+            a_j = max(L[j], w[j - 1])
+            b_j = min(U[j], w[j - 1] + cap * dz[j - 1])
+            w[j] = max(a_j, min(ys[j], b_j))
+        # drop any knot that failed to stay strictly increasing
+        ks, kz = [w[0]], [zs[0]]
+        for j in range(1, K):
+            if w[j] > ks[-1]:
+                ks.append(w[j])
+                kz.append(zs[j])
+        return ks, kz
 
     def _cap_slopes(ys, zs):
         """Cap segment slopes dy/dz at SLOPE_CAP times the interquartile
@@ -1402,7 +1495,12 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
             return None
         if not smooth:
             zs = [nd.inv_cdf((idx + 1) / (n + 1)) for idx in idxs]
-            _cap_slopes(cs, zs)
+            if guard == "delete":
+                cs, zs = _prune_slopes(cs, zs)
+            elif guard == "emin":
+                cs, zs = _emin_knots(buf, cs, zs, idxs)
+            else:
+                _cap_slopes(cs, zs)
             return cs, zs, None
         # kernel-smoothed CDF on the sketch, Silverman bandwidth
         mm = len(cs)

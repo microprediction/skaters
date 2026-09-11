@@ -210,16 +210,23 @@ impl Standardize {
         }
         let mu = self.mu;
         let diff = y - mu;
-        let mu_new = mu + self.alpha * diff;
-        let var = (1.0 - self.alpha) * self.var + self.alpha * diff * diff;
-        let sigma = if var > self.eps * self.eps {
-            var.sqrt()
+        // Emit against the PRIOR state, so the forward map is the affine change
+        // of coordinates z = (y - mu) / sigma that the inverse applies. Scaling
+        // by the post-update std makes the emission self-normalized (bounded by
+        // 1/sqrt(alpha)) and the affine inverse is then not its inverse.
+        // Cold start: before the variance is informative, scale by the first
+        // nonzero residual, so the first informative emission is +-1.
+        let sigma = if self.var > self.eps * self.eps {
+            self.var.sqrt()
+        } else if diff.abs() > self.eps {
+            diff.abs()
         } else {
             self.eps
         };
-        self.mu = mu_new;
-        self.var = var;
-        diff / sigma
+        let y_prime = diff / sigma;
+        self.mu = mu + self.alpha * diff;
+        self.var = (1.0 - self.alpha) * self.var + self.alpha * diff * diff;
+        y_prime
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
@@ -1053,7 +1060,14 @@ fn ar_spectral_radius(phi: &[f64]) -> f64 {
             let r = disc.sqrt();
             return ((a + r) / 2.0).abs().max(((a - r) / 2.0).abs());
         }
-        return (a / 2.0).hypot((-disc).sqrt() / 2.0);
+        // libm::hypot, not f64::hypot: the std method calls the platform's own
+        // libm (MSVC's differs from glibc's and Apple's) and is not guaranteed
+        // bit-identical, which broke the cross-platform digest on Windows while
+        // Linux, macOS and wasm agreed. Every other transcendental here already
+        // routes through the libm crate for exactly this reason. Python's
+        // math.hypot is also platform libm, so the 1e-6 parity tolerance covers
+        // the reference comparison; bit-identity is a Rust-to-Rust claim.
+        return libm::hypot(a / 2.0, (-disc).sqrt() / 2.0);
     }
     let mut v = vec![1.0_f64; p];
     let mut rho = 0.0;
@@ -1090,8 +1104,12 @@ fn ar_stationary(phi: &[f64]) -> Vec<f64> {
         return phi.to_vec();
     }
     let g = margin / rho;
+    // libm::pow, not f64::powi: powi lowers to the llvm.powi intrinsic, whose
+    // expansion is target dependent, so it is not bit-stable across platforms.
+    // pow also matches the reference more closely, since Python's `g ** (j + 1)`
+    // calls C pow rather than doing repeated multiplication.
     (0..phi.len())
-        .map(|j| phi[j] * g.powi((j + 1) as i32))
+        .map(|j| phi[j] * libm::pow(g, (j + 1) as f64))
         .collect()
 }
 

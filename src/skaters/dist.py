@@ -12,7 +12,9 @@ All math uses only the standard library (math.erf, math.exp, math.log).
 No numpy, no scipy. Runs in Pyodide.
 
 A Dist is a list of components: [(weight, mean, std), ...].
-Weights are positive and sum to 1. Std is always > 0.
+Weights are nonnegative and sum to 1. Std is finite and >= 0; a std of 0 is
+a point mass (the lattice projection emits them). The constructor enforces
+this with ValueError, not assert, so validation survives ``python -O``.
 """
 
 from __future__ import annotations
@@ -31,11 +33,27 @@ class Dist:
     def __init__(self, components: list[tuple[float, float, float]]):
         """Create from a list of (weight, mean, std) tuples.
 
-        Weights must be positive. They will be normalized to sum to 1.
+        Weights must be nonnegative with a positive total; they are
+        normalized to sum to 1. Means must be finite. Stds must be finite
+        and nonnegative (std == 0 is a point mass, used by the lattice
+        projection). Validation raises ValueError rather than asserting,
+        so it survives ``python -O``; a negative weight or std would make
+        pdf/cdf silently stop being a probability distribution.
         """
-        assert len(components) > 0
+        if len(components) == 0:
+            raise ValueError("Dist needs at least one component")
+        for w, m, s in components:
+            if not (math.isfinite(w) and w >= 0.0):
+                raise ValueError(f"component weight must be finite and >= 0, got {w}")
+            if not math.isfinite(m):
+                raise ValueError(f"component mean must be finite, got {m}")
+            if not (math.isfinite(s) and s >= 0.0):
+                raise ValueError(f"component std must be finite and >= 0, got {s}")
+        # builtin sum, not a += loop: sum() compensates float error (Neumaier),
+        # and the normalization must stay bit-identical to the parity vectors.
         w_total = sum(w for w, _, _ in components)
-        assert w_total > 0
+        if not w_total > 0.0:
+            raise ValueError("total component weight must be positive")
         self.components = [(w / w_total, m, s) for w, m, s in components]
 
     # --- Constructors ---
@@ -52,9 +70,16 @@ class Dist:
         This is the correct way to ensemble distributional predictions.
         """
         n = len(dists)
+        if n == 0:
+            raise ValueError("combine needs at least one distribution")
         if weights is None:
             weights = [1.0 / n] * n
+        if len(weights) != n:
+            raise ValueError(
+                f"combine got {n} distributions but {len(weights)} weights")
         w_total = sum(weights)
+        if not (math.isfinite(w_total) and w_total > 0.0):
+            raise ValueError("combine weights must be finite with a positive total")
         components = []
         for d, w_outer in zip(dists, weights):
             for w_inner, m, s in d.components:
@@ -129,12 +154,35 @@ class Dist:
 
     def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
         """Inverse CDF via bisection."""
-        assert 0 < p < 1
-        # Initial bracket
+        if not 0 < p < 1:
+            raise ValueError(f"quantile needs 0 < p < 1, got {p}")
+        # Initial bracket. mu +- 8 sigma covers every ordinary mixture, but a
+        # small component far from the bulk can put the quantile outside it,
+        # and bisection against a bracket that excludes the answer converges
+        # to the endpoint with no signal. Expand geometrically until the
+        # bracket genuinely contains p; the expansion never fires for a
+        # bracket that was already sufficient, so existing results are
+        # bit-identical.
         mu = self.mean
         sigma = math.sqrt(self.var)
         lo = mu - 8 * sigma
         hi = mu + 8 * sigma
+        width = max(16 * sigma, 1e-12)
+        for _ in range(120):
+            if self.cdf(lo) <= p:
+                break
+            lo -= width
+            width *= 2.0
+        else:
+            raise ArithmeticError(f"could not bracket quantile p={p} from below")
+        width = max(16 * sigma, 1e-12)
+        for _ in range(120):
+            if self.cdf(hi) >= p:
+                break
+            hi += width
+            width *= 2.0
+        else:
+            raise ArithmeticError(f"could not bracket quantile p={p} from above")
         for _ in range(max_iter):
             mid = 0.5 * (lo + hi)
             if self.cdf(mid) < p:
@@ -176,13 +224,15 @@ class Dist:
 
     def scale(self, factor: float) -> Dist:
         """Scale location and spread by factor (for standardize inverse)."""
-        assert factor != 0
+        if factor == 0:
+            raise ValueError("scale factor must be nonzero")
         f = abs(factor)
         return Dist([(w, m * factor, s * f) for w, m, s in self.components])
 
     def affine(self, a: float, b: float) -> Dist:
         """Apply affine transform: x -> a*x + b."""
-        assert a != 0
+        if a == 0:
+            raise ValueError("affine multiplier must be nonzero")
         return Dist([(w, a * m + b, abs(a) * s) for w, m, s in self.components])
 
     # --- Pruning ---
