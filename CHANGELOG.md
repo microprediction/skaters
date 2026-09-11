@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- `Dist` validates its inputs (#200): negative or nonfinite weights, nonfinite
+  means, and negative or nonfinite stds now raise `ValueError` instead of
+  producing an object whose pdf can go negative while logpdf silently ignores
+  the bad component. Zero weights (softmax underflow) and zero stds (lattice
+  point masses) remain legal. Validation raises rather than asserts, so it
+  survives `python -O`.
+- `Dist.combine` raises on a length mismatch between distributions and weights
+  instead of silently zip-dropping the extras, and rejects empty input and
+  nonpositive total weight.
+- `Dist.quantile` expands its bracket geometrically until it contains the
+  requested probability, instead of bisecting a fixed `mu +- 8 sigma` window
+  and silently converging to the endpoint when a small far component put the
+  true quantile outside it. `p` outside (0, 1) raises `ValueError`.
+- Parity-neutral: regenerated `parity/vectors.json` is byte-identical, so no
+  port is affected.
+
 ## Note for anyone upgrading from 0.14.0
 
 0.16.0 is the first release since **0.14.0** (2026-07-24). The `v0.15.0` tag

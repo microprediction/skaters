@@ -351,19 +351,24 @@ def make_registry(h=1):
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
         "Chronos":     lambda ch: fs.chronos_dists(ch, h),
         "TimesFM":     lambda ch: fs.timesfm_dists(ch, h),
+        "TimesFM3":    lambda ch: fs.timesfm3_dists(ch, h),
         "TimesFM+lap": _sandwich(fs.timesfm_dists, h),
+        "TimesFM3+lap": _sandwich(fs.timesfm3_dists, h),
         "TiRex+lap":   _sandwich(tirex_dists, h),
         "Chronos+lap": _sandwich(fs.chronos_dists, h),
         # adaptive: FM location + laplace conditional scale/tails on the residual
         "TimesFM~lap": _resid_sandwich(fs.timesfm_dists, h),
+        "TimesFM3~lap": _resid_sandwich(fs.timesfm3_dists, h),
         "TiRex~lap":   _resid_sandwich(tirex_dists, h),
         "Chronos~lap": _resid_sandwich(fs.chronos_dists, h),
         # PIT recalibration: laplace predicts in the FM's own CDF space, then inverts
         "TimesFM@lap": pit_sandwich(fs.timesfm_dists, h),
+        "TimesFM3@lap": pit_sandwich(fs.timesfm3_dists, h),
         "TiRex@lap":   pit_sandwich(tirex_dists, h),
         "Chronos@lap": pit_sandwich(fs.chronos_dists, h),
         # never-worse portfolio: laplace + PIT-recalibrated FM, online log-score blend
         "TimesFM&lap": portfolio_sandwich(fs.timesfm_dists, h=h),
+        "TimesFM3&lap": portfolio_sandwich(fs.timesfm3_dists, h=h),
         "TiRex&lap":   portfolio_sandwich(tirex_dists, h=h),
         "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
     }
