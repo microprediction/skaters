@@ -1,4 +1,4 @@
-\begin{thebibliography}{46}
+\begin{thebibliography}{47}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -63,6 +63,12 @@ Drew Creal, Siem~Jan Koopman, and Andr{\'e} Lucas.
 \newblock Generalized autoregressive score models with applications.
 \newblock \emph{Journal of Applied Econometrics}, 28\penalty0 (5):\penalty0
   777--795, 2013.
+
+\bibitem[Czado et~al.(2009)Czado, Gneiting, and Held]{czado2009predictive}
+Claudia Czado, Tilmann Gneiting, and Leonhard Held.
+\newblock Predictive model assessment for count data.
+\newblock \emph{Biometrics}, 65\penalty0 (4):\penalty0 1254--1261, 2009.
+\newblock \doi{10.1111/j.1541-0420.2009.01191.x}.
 
 \bibitem[Das et~al.(2024)Das, Kong, Sen, and Zhou]{das2024timesfm}
 Abhimanyu Das, Weihao Kong, Rajat Sen, and Yichen Zhou.

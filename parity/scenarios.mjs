@@ -80,3 +80,13 @@ export function buildRepeatScenarios() {
     ["sticky_ema", 1, sticky(conjugate(leaf(1), emaTransform(0.1), 1), 1)],
   ];
 }
+
+// Missing-observation scenarios run on the gap series: a non-finite tick must
+// not reach the tree, must not advance the base state, and must age the fan by
+// one horizon. k=1 holds the previous predictive; k=3 shifts.
+export function buildGapScenarios() {
+  return [
+    ["pol_laplace", 1, laplace(1)],
+    ["pol_laplace_k3", 3, laplace(3)],
+  ];
+}

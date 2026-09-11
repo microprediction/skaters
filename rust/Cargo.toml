@@ -5,8 +5,8 @@ members = ["python"]
 default-members = ["."]
 
 [package]
-name = "skaters-core"
-version = "0.1.0"
+name = "skaters"
+version = "0.16.0"
 edition = "2021"
 # MSRV. Conservative: the deps (pyo3 0.22 -> 1.63, serde_json 1 -> 1.56, edition
 # 2021 -> 1.56) all admit older toolchains, but only stable 1.96 is available in
@@ -15,6 +15,12 @@ edition = "2021"
 rust-version = "1.74"
 description = "Rust port of the skaters online distributional forecasting core, parity-gated against the Python reference."
 license = "MIT"
+repository = "https://github.com/microprediction/skaters"
+homepage = "https://skaters.microprediction.org"
+documentation = "https://docs.rs/skaters"
+readme = "README.md"
+keywords = ["forecasting", "time-series", "probabilistic", "online", "quantile"]
+categories = ["science", "mathematics"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

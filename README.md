@@ -12,7 +12,7 @@ A light, accurate, autonomous distributional forecaster for non-price economic s
 Laplace beats (almost) everything.
 
 <p align="center">
-  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 1,902 non-price FRED series: laplace sits top-right, fastest and tied for the best held-out log-likelihood; only the PyMC-laplace sandwich edges it on accuracy, at about ten times the compute, while AutoARIMA, AutoETS, SARIMAX and GARCH-t trade accuracy for speed." width="680">
+  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 2,775 non-price FRED series: laplace sits top-right, fastest and tied for the best held-out log-likelihood; only the PyMC-laplace sandwich edges it on accuracy, at about ten times the compute, while AutoARIMA, AutoETS, SARIMAX and GARCH-t trade accuracy for speed." width="680">
 </p>
 
 And it beats them across nearly every regime, giving ground only on price/returns (to GARCH-t) and, narrowly, on the hard, repeating waveforms (to CSP[^csp]).
@@ -52,16 +52,18 @@ from skaters import laplace
 
 f = laplace(k=3)
 state = None
+forecast = None            # the fan issued LAST tick, aimed at this y
 for y in observations:
-    dists, state = f(y, state)
-    dists[0].mean              # point forecast
-    dists[0].std               # uncertainty
-    dists[0].quantile(0.975)   # 95th percentile
-    dists[0].logpdf(y)         # log-likelihood
-    dists[0].cdf(y)            # CDF at y
+    if forecast is not None:
+        forecast[0].logpdf(y)          # one-step-ahead log score
+        forecast[0].cdf(y)             # one-step-ahead PIT
+    forecast, state = f(y, state)
+    forecast[0].mean                   # point forecast for the NEXT tick
+    forecast[0].std                    # uncertainty
+    forecast[0].quantile(0.975)        # upper edge of the central 95% band
 ```
 
-Every skater returns `list[Dist]` — a weighted Gaussian mixture for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
+Score a forecast only against observations that arrive after it was issued; the predictive returned alongside `y` aims at the next tick, and the parade in `state["pit"]`/`state["z"]` does this bookkeeping for you. Every skater returns a list of predictive distributions, one for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
 ## `laplace` — the general forecaster
 
@@ -83,7 +85,7 @@ differencing, drift, Holt, AR, fractional differencing, seasonal, a Yeo-Johnson
 (`k>1`) — an **Ornstein–Uhlenbeck mean-reversion** group). Three things are on by
 default, each a free or near-free win:
 
-- **model first, conform last** — the trunk is weighted by **likelihood**;
+- **model first, score-optimize last** — the trunk is weighted by **likelihood**;
   the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
   2,500-series FRED study this matches a CRPS specialist on CRPS *and* lifts
   likelihood on real data. Switch back with `objective="likelihood"`.
@@ -164,8 +166,15 @@ from skaters.leaf import leaf
 from skaters.transform import ou_transform, yeo_johnson
 
 f = conjugate(leaf(k=10), ou_transform(kappa=0.1), k=10)                       # linear (spreads)
-f = conjugate(conjugate(leaf(k=10), ou_transform(0.1), k=10), yeo_johnson(0.5), k=10)  # positive (vol/rates)
+f = conjugate(conjugate(leaf(k=10), ou_transform(0.1), k=10), yeo_johnson(0.5, exact=True), k=10)  # positive (vol/rates)
 ```
+
+`exact=True` maps the predictive back through the exact change of variables
+instead of the component-wise delta method, which cannot carry the skew of the
+coordinate change. The difference grows with horizon: at `h=10` on strictly
+positive FRED levels it is worth a median +0.015 to +0.018 nats of held-out
+log-likelihood (72–78% of series), and at `h=1` the two agree. The candidate
+pool keeps the default (its one-step spreads are where they agree).
 
 `laplace(k>1)` already carries an OU group in its pool, so the general forecaster
 picks up reversion automatically at multi-step horizons. The OU-on-a-coordinate
@@ -230,9 +239,9 @@ Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inve
 | `standardize(`$\alpha$`)` | $y'_t = (y_t - \hat\mu_t) / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D + \hat\mu_t$ | Remove scale |
 | `garch(`$\omega, \alpha, \beta$`)` | $y'_t = y_t / \hat\sigma_t$ | $D \mapsto \hat\sigma_t \cdot D$ | Volatility clustering |
 | `seasonal_difference(`$s$`)` | $y'_t = y_t - y_{t-s}$ | Shift by lagged value | Periodicity |
-| `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method | Tail compression |
+| `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method (`exact=True` for the pushforward) | Tail compression |
 | `theta(`$\alpha$`)` | $y'_t = y_t - \text{SES}_t$ | Shift by smoothed level + drift | Theta method (M3 winner) |
-| `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Component-wise delta method | Coordinate learning (log/root/linear) |
+| `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Delta method (`exact=True` for the pushforward) | Coordinate learning (log/root/linear) |
 | `ou_transform(`$\kappa$`)` | Deviation from running mean, OU speed $\kappa$ | Exact OU moments (scale + shift) | Mean reversion |
 
 ## Conjugation

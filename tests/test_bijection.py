@@ -173,8 +173,11 @@ class TestPredictionBijection:
 # uses the post-update state (the prior for the *next* step), so immediate
 # self-inversion does not hold by design. Their correct, predictive roundtrip is
 # covered by TestBijection.test_k1_bijection / test_k3_bijection (snapshot state).
+# garch de-means against the PRIOR mean (like standardize/ema), so its inverse
+# re-centres at the post-update mean and immediate self-inversion does not hold
+# by design. Its predictive roundtrip is covered by test_k1/test_k3 (snapshot
+# state, tolerance). Only genuinely point-wise transforms remain here.
 POINTWISE_TRANSFORMS = [
-    ("garch", lambda: garch()),
     ("power_transform(0.5)", lambda: power_transform(0.5)),
 ]
 

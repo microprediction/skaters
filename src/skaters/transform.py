@@ -151,16 +151,20 @@ def standardize(alpha: float = 0.05, eps: float = 1e-8):
         mu = state["mu"]
         var = state["var"]
         diff = y - mu
-        # Center against the PRIOR mean (centering by the post-update mean would
-        # shrink the residual by (1-alpha) — systematic overconfidence). Scale by
-        # the updated EWMA std, which avoids a cold-start divide-by-zero. The
-        # variance recursion is the standard EWMA var = (1-a) var + a diff^2; the
-        # previous (1-a)(var + a diff^2) biased the scale low by sqrt(1-a).
-        mu_new = mu + alpha * diff
-        var = (1 - alpha) * var + alpha * diff * diff
-        sigma = math.sqrt(var) if var > eps * eps else eps
+        # Emit against the PRIOR state, so the forward map is the affine change
+        # of coordinates z = (y - mu) / sigma that the inverse applies. Scaling
+        # by the post-update std makes the emission self-normalized (bounded by
+        # 1/sqrt(alpha)) and the affine inverse is then not its inverse.
+        # Cold start: before the variance is informative, scale by the first
+        # nonzero residual, so the first informative emission is +-1.
+        if var > eps * eps:
+            sigma = math.sqrt(var)
+        else:
+            sigma = abs(diff) if abs(diff) > eps else eps
         y_prime = diff / sigma
-        return y_prime, {"mu": mu_new, "var": var}
+        mu_new = mu + alpha * diff
+        var_new = (1 - alpha) * var + alpha * diff * diff
+        return y_prime, {"mu": mu_new, "var": var_new}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         mu = state["mu"]
@@ -471,7 +475,8 @@ def holt_linear(alpha: float = 0.1, beta: float = 0.05):
 # GARCH(1,1) volatility scaling
 # ---------------------------------------------------------------------------
 
-def garch(omega: float = 0.01, alpha: float = 0.1, beta: float = 0.85, eps: float = 1e-8):
+def garch(omega: float = 0.01, alpha: float = 0.1, beta: float = 0.85,
+          mean_alpha: float = 0.05, eps: float = 1e-8):
     """GARCH(1,1) volatility transform.
 
     Divides by the conditional standard deviation, producing
@@ -497,20 +502,28 @@ def garch(omega: float = 0.01, alpha: float = 0.1, beta: float = 0.85, eps: floa
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
         if state is None:
-            # Initialize conditional variance at the unconditional level
-            # (or a sensible default if not stationary)
             persist = alpha + beta
             var0 = omega / (1 - persist) if persist < 1 else omega / eps
-            return y / max(math.sqrt(var0), eps), {"var": var0, "last_y": y}
+            return 0.0, {"var": var0, "last_dev": 0.0, "mu": y}
 
-        var = omega + alpha * state["last_y"] ** 2 + beta * state["var"]
+        # GARCH conditional variance of the DEVIATION from a running mean, not of
+        # the raw value. alpha * y^2 treats y as a mean-zero return; on a level
+        # series that makes the "volatility" of order |y|, and the inverse then
+        # re-inflates it -- unstable, and it widened real level-series forecasts.
+        # Tracking a mean (like `standardize`) makes garch shift-invariant. On the
+        # mean-zero returns garch is meant for, mu stays ~0 and this reduces to the
+        # original y/sigma exactly.
+        mu = state["mu"]
+        dev = y - mu
+        var = omega + alpha * state["last_dev"] ** 2 + beta * state["var"]
         sigma = math.sqrt(var) if var > eps * eps else eps
-        y_prime = y / sigma
-        return y_prime, {"var": var, "last_y": y}
+        y_prime = dev / sigma
+        mu_new = mu + mean_alpha * dev
+        return y_prime, {"var": var, "last_dev": dev, "mu": mu_new}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         sigma = math.sqrt(state["var"]) if state["var"] > 1e-16 else 1e-8
-        return [d.scale(sigma) for d in dists]
+        return [d.affine(sigma, state["mu"]) for d in dists]
 
     return forward, inverse_k
 
@@ -759,7 +772,29 @@ def seasonal_scale(period: int, alpha: float = 0.05, center: bool = False,
 # Signed power transform (works on any real value)
 # ---------------------------------------------------------------------------
 
-def power_transform(p: float = 0.5):
+def _exact_inverse_k(inv_fn):
+    """Build an inverse_k that emits the exact pushforward.
+
+    The table window adapts to each predictive: [m - 10s, m + 10s] over the
+    mixture. A fixed window fails in level coordinates (positive levels live
+    at z ~ 2 sqrt(y) under lambda = 0.5, far from any static range) and
+    everything beyond a table extrapolates with the wrong curvature.
+    """
+    from skaters.pushforward import PushforwardDist, table_from_map
+
+    def inverse_k(dists: list, state: dict) -> list:
+        out = []
+        for d in dists:
+            lo = min(m - 10.0 * s for _, m, s in d.components)
+            hi = max(m + 10.0 * s for _, m, s in d.components)
+            ys, zs = table_from_map(inv_fn, lo, hi)
+            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
+        return out
+
+    return inverse_k
+
+
+def power_transform(p: float = 0.5, exact: bool = False):
     """Signed power transform: compresses large values, handles negatives.
 
     Forward:   y'_t = sign(y_t) * |y_t|^p
@@ -768,15 +803,20 @@ def power_transform(p: float = 0.5):
     For 0 < p < 1, this compresses the tails (like log) but works on
     all reals — no explosion on negatives.
 
-    The inverse is nonlinear, so we linearize around the Dist mean
-    for each component: if y' ~ N(mu, sigma^2) in transformed space,
-    the inverse is approximately:
+    By default the inverse linearizes around each component's mean
+    (delta method):
         mean_orig = sign(mu) * |mu|^(1/p)
-        std_orig  = sigma * (1/p) * |mu|^(1/p - 1)   (delta method)
+        std_orig  = sigma * (1/p) * |mu|^(1/p - 1)
+
+    ``exact=True`` emits the exact pushforward instead (see
+    :mod:`skaters.pushforward` and :func:`yeo_johnson` for when the delta
+    method's missing skew becomes material).
 
     Args:
         p: power in (0, 1). Smaller = more compression.
            p=0.5 is the signed square root.
+        exact: emit :class:`PushforwardDist` (exact change of variables)
+            instead of delta-method component mapping.
     """
     assert 0 < p < 1
     inv_p = 1.0 / p
@@ -807,10 +847,10 @@ def power_transform(p: float = 0.5):
             result.append(Dist(components))
         return result
 
-    return forward, inverse_k
+    return forward, (_exact_inverse_k(_inv) if exact else inverse_k)
 
 
-def yeo_johnson(lmbda: float = 0.0):
+def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
     """Yeo-Johnson coordinate transform — the signed Box-Cox family.
 
     A one-parameter family that picks the *coordinate in which the series is
@@ -824,8 +864,18 @@ def yeo_johnson(lmbda: float = 0.0):
         y >= 0:  ((y+1)**L - 1) / L            (L != 0);   log(y+1)      (L == 0)
         y <  0:  -(((-y+1)**(2-L) - 1)/(2-L))  (L != 2);  -log(-y+1)     (L == 2)
 
-    The inverse is nonlinear, so each Dist component is mapped by the exact
-    inverse on the mean and the delta method on the std (deriv = d inv / dy').
+    By default each Dist component is mapped by the exact inverse on the mean
+    and the delta method on the std (deriv = d inv / dy'). The delta method
+    cannot carry the skew of the coordinate change (the mapped mixture is
+    location-symmetric about the mapped median) and its error grows with the
+    predictive spread, hence with horizon. ``exact=True`` emits the exact
+    pushforward (:class:`skaters.pushforward.PushforwardDist`) instead: on
+    120 strictly positive FRED level series under the standalone composition
+    from the README (leaf under OU under Yeo-Johnson, k=10), exact beats
+    delta by a median +0.018 nats at h=10 (72% of series) at lmbda=0, and
+    +0.015 (78%) at lmbda=0.5, with h=1 a wash. Inside the candidate pool the
+    trunk consumes means, one-step likelihoods and warm-up mixtures, all at
+    small spreads where the two agree, so the pool keeps the default.
 
     Fit the *family* the NFL-safe way: put a coarse grid of lmbda in the
     candidate pool (see :func:`skaters.api._build_candidates`) and let the
@@ -834,6 +884,9 @@ def yeo_johnson(lmbda: float = 0.0):
     Args:
         lmbda: the transform parameter. 0 = log1p (multiplicative / non-negative),
             1 = identity, 0.5 = signed-sqrt-ish compression.
+        exact: emit :class:`PushforwardDist` (exact change of variables)
+            instead of delta-method component mapping. Prefer it for
+            standalone conjugation at multi-step horizons.
     """
     L = float(lmbda)
 
@@ -881,12 +934,59 @@ def yeo_johnson(lmbda: float = 0.0):
             result.append(Dist(comps))
         return result
 
-    return forward, inverse_k
+    return forward, (_exact_inverse_k(_inv) if exact else inverse_k)
 
 
 # ---------------------------------------------------------------------------
 # AR(p) transform with online recursive least squares
 # ---------------------------------------------------------------------------
+
+def _ar_spectral_radius(phi: list[float]) -> float:
+    """Spectral radius of the AR companion matrix (largest |characteristic root|).
+
+    The h-step AR forecast is governed by powers of this matrix: it converges
+    (a well-posed forecast) iff the radius is < 1, and diverges geometrically
+    otherwise. Closed form for p <= 2; power iteration for higher orders.
+    """
+    p = len(phi)
+    if p == 1:
+        return abs(phi[0])
+    if p == 2:
+        a, b = phi[0], phi[1]
+        disc = a * a + 4.0 * b
+        if disc >= 0.0:
+            r = math.sqrt(disc)
+            return max(abs((a + r) / 2.0), abs((a - r) / 2.0))
+        return math.hypot(a / 2.0, math.sqrt(-disc) / 2.0)   # |complex root|
+    v = [1.0] * p
+    rho = 0.0
+    for _ in range(60):
+        nv = [sum(phi[j] * v[j] for j in range(p))] + v[:-1]
+        m = max(abs(x) for x in nv) or 1.0
+        v = [x / m for x in nv]
+        rho = m
+    return rho
+
+
+def _ar_stationary(phi: list[float], margin: float = 0.999) -> list[float]:
+    """Damp AR coefficients into the stationary region for forecasting.
+
+    An online least-squares fit — especially from a handful of warm-up points —
+    can land outside the stationary region (a near-unit or explosive root). Its
+    multi-step forecast then diverges (an AR(2) fit to 3 points reached a
+    13-step mean of ~1e22 on real GIFT-Eval series). Scaling ``phi_j`` by
+    ``gamma**(j+1)`` scales every companion eigenvalue by ``gamma``, so choosing
+    ``gamma = margin / rho`` when ``rho > margin`` brings the radius to
+    ``margin`` and leaves an already-stationary fit untouched. This is
+    constrained forecasting, not a magnitude clip: the forecast stays the model's
+    own, just kept convergent.
+    """
+    rho = _ar_spectral_radius(phi)
+    if rho <= margin:
+        return phi
+    g = margin / rho
+    return [phi[j] * g ** (j + 1) for j in range(len(phi))]
+
 
 def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
        decay: float = 0.0):
@@ -984,36 +1084,46 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
 
         For j > h, y_{t+h-j} is known from the buffer.
         For j <= h, y_{t+h-j} is a previously recovered prediction.
-        Variance propagates: ar_var += phi_j^2 * var of uncertain lags.
+
+        The mean follows the AR recursion. The h-step forecast VARIANCE is the
+        MA(inf) form ``sigma^2 * sum_{i<h} psi_i^2`` (psi the impulse responses),
+        NOT ``sum_j phi_j^2 var_{h-j}`` -- the latter assumes the lagged forecasts
+        are independent and, since a stationary AR(2) can have |phi_1| > 1
+        (e.g. phi=[1.99,-0.99]), inflates the variance by phi_1^2 each step until
+        it explodes. The MA form converges for any stationary AR.
         """
         buf = list(state["buffer"])
-        phi = state["phi"]
-        recovered_means = []
-        recovered_vars = []
-        result = []
+        # Forecast with stationarity-constrained coefficients: a non-stationary
+        # online fit has no convergent multi-step forecast. The one-step fit in
+        # `state` is left intact; only the extrapolation is kept well-posed.
+        phi = _ar_stationary(state["phi"])
+        H = len(dists)
 
-        for h in range(len(dists)):
+        # Impulse responses psi_0..psi_{H-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
+        psi = [1.0]
+        for i in range(1, H):
+            psi.append(sum(phi[j] * psi[i - 1 - j] for j in range(p) if i - 1 - j >= 0))
+
+        recovered_means = []
+        result = []
+        cum_psi2 = 0.0
+        for h in range(H):
             ar_mean = 0.0
-            ar_var = 0.0
             for j in range(p):
                 lag_h = h - j - 1  # which previous horizon provides this lag
                 if lag_h < 0:
-                    # Known value from buffer
                     buf_idx = len(buf) + lag_h
                     if 0 <= buf_idx < len(buf):
                         ar_mean += phi[j] * buf[buf_idx]
-                else:
-                    # Previously recovered prediction
-                    if lag_h < len(recovered_means):
-                        ar_mean += phi[j] * recovered_means[lag_h]
-                        ar_var += phi[j] ** 2 * recovered_vars[lag_h]
+                elif lag_h < len(recovered_means):
+                    ar_mean += phi[j] * recovered_means[lag_h]
 
             total_mean = dists[h].mean + ar_mean
-            total_var = dists[h].var + ar_var
+            cum_psi2 += psi[h] * psi[h]
+            total_var = cum_psi2 * dists[h].var     # sigma^2 * sum psi_i^2
             total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
 
             recovered_means.append(total_mean)
-            recovered_vars.append(total_var)
             result.append(Dist.gaussian(total_mean, total_std))
 
         return result
@@ -1101,35 +1211,33 @@ def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         buf = list(state["buffer"])
         theta = state["theta"]
-        # Expand group coefficients to per-lag coefficients
-        phi = [theta[groups[j]] for j in range(max_lag)]
-
+        # Expand group coefficients to per-lag, then constrain to stationarity
+        # for a well-posed forecast (same fix as `ar`; grouped AR is AR-family).
+        phi = _ar_stationary([theta[groups[j]] for j in range(max_lag)])
+        H = len(dists)
+        psi = [1.0]
+        for i in range(1, H):
+            psi.append(sum(phi[j] * psi[i - 1 - j]
+                           for j in range(max_lag) if i - 1 - j >= 0))
         recovered_means = []
-        recovered_vars = []
         result = []
-
-        for h in range(len(dists)):
+        cum_psi2 = 0.0
+        for h in range(H):
             ar_mean = 0.0
-            ar_var = 0.0
             for j in range(max_lag):
                 lag_h = h - j - 1
                 if lag_h < 0:
                     buf_idx = len(buf) + lag_h
                     if 0 <= buf_idx < len(buf):
                         ar_mean += phi[j] * buf[buf_idx]
-                else:
-                    if lag_h < len(recovered_means):
-                        ar_mean += phi[j] * recovered_means[lag_h]
-                        ar_var += phi[j] ** 2 * recovered_vars[lag_h]
-
+                elif lag_h < len(recovered_means):
+                    ar_mean += phi[j] * recovered_means[lag_h]
             total_mean = dists[h].mean + ar_mean
-            total_var = dists[h].var + ar_var
+            cum_psi2 += psi[h] * psi[h]
+            total_var = cum_psi2 * dists[h].var   # sigma^2 * sum psi_i^2
             total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
-
             recovered_means.append(total_mean)
-            recovered_vars.append(total_var)
             result.append(Dist.gaussian(total_mean, total_std))
-
         return result
 
     return forward, inverse_k
@@ -1192,3 +1300,324 @@ def _mat_vec(M: list[float], v: list[float], n: int) -> list[float]:
 def _dot(a: list[float], b: list[float], n: int) -> float:
     """Dot product."""
     return sum(a[i] * b[i] for i in range(n))
+
+
+# ---------------------------------------------------------------------------
+# Gaussianize: probit of the smoothed fence-post empirical CDF
+# ---------------------------------------------------------------------------
+
+def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
+                smooth: bool = False, slope_cap: float = 20.0,
+                z_max: float = 8.0, guard: str = "move"):
+    """Empirical Gaussianization: z = Phi^{-1}(F_hat(y)) with fence-post weights.
+
+    F_hat is built from a running quantile sketch of past inputs (at most
+    ``max_knots`` equal-mass centers, so memory and per-step cost are bounded
+    regardless of series length).
+
+    With ``smooth=False`` F_hat is the piecewise-linear interpolation of the
+    fence-post empirical CDF: knots at order statistics y_(i) with probability
+    (i+1)/(n+1), extended linearly beyond the edge knots. Linear extension in
+    (y, z) coordinates gives Gaussian-shaped tails in y. This is the minimal
+    smoothing that makes the fence-post transform an invertible change of
+    variables with a density, but the density is piecewise constant.
+
+    With ``smooth=True`` F_hat is a Gaussian-kernel CDF (Silverman bandwidth)
+    evaluated on the sketch centers, represented by a monotone C^1 cubic
+    (Fritsch-Butland tangents) through those samples. The transformed density
+    is then continuous, which matters under the log score.
+
+    Two guards apply in both modes. Knot-segment slopes are capped at 20 times
+    the interquartile slope, an explicit tail assumption that stops a single
+    upstream outlier from creating an explosive inverse map. The forward
+    output is clamped to |z| <= 8: no fence-post rank exceeds probability
+    n/(n+1), and Phi^{-1}(n/(n+1)) < 8 for any feasible n, so the clamp
+    protects downstream expanding-memory states (Welford variances, RLS sums)
+    from a degenerate warmup emission.
+
+    Forward:   z_t = map(y_t) using the sketch built from y_1..y_{t-1}
+    Inverse:   each Dist component is mapped through the inverse by an
+               equal-probability particle approximation (n_particles local
+               Gaussians at mapped quantile midpoints, widths from the mapped
+               quantile spacing), so the empirical shape survives the pushback.
+
+    Before ``warmup`` observations the transform standardizes by expanding
+    moments, which is the n -> 0 limit of the empirical map.
+    """
+    import bisect as _bisect
+    from math import erf as _erf
+    from statistics import NormalDist as _ND
+    nd = _ND()
+    SLOPE_CAP = slope_cap
+    Z_MAX = z_max
+    SQ2 = math.sqrt(2.0)
+    J = n_particles
+    _mids = [nd.inv_cdf((j + 0.5) / J) for j in range(J)]
+    _edges = [nd.inv_cdf(j / J) for j in range(1, J)]
+
+    def _prune_slopes(ys, zs):
+        """Delete knots whose segment inverse slope dy/dz exceeds SLOPE_CAP
+        times the interquartile slope, walking outward from the median knot.
+        Surviving knots keep their original values and levels, so they remain
+        exact order statistics and retained-level exactness is preserved at
+        an enlarged cell width."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return ys, zs
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return ys, zs
+        c = len(ys) // 2
+        keep = [c]
+        for i in range(c + 1, len(ys)):
+            j = keep[-1]
+            if (ys[i] - ys[j]) / (zs[i] - zs[j]) <= cap:
+                keep.append(i)
+        for i in range(c - 1, -1, -1):
+            j = min(k for k in keep)
+            if (ys[j] - ys[i]) / (zs[j] - zs[i]) <= cap:
+                keep.append(i)
+        keep.sort()
+        if len(keep) < 2:
+            return ys, zs
+        return [ys[i] for i in keep], [zs[i] for i in keep]
+
+    def _emin_knots(buf, ys, zs, idxs):
+        """Smallest-rank-displacement guard. Find the smallest integer e
+        such that knot values bracketed within e ranks of their order
+        statistics admit the slope cap, then project the knots into that
+        corridor, keeping each at its exact order statistic where feasible.
+        Levels are never moved, so the certificate pays exactly
+        Delta_n + e/(n+1), the least the budget allows."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return ys, zs
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return ys, zs
+        nb, K = len(buf), len(ys)
+        dz = [zs[j + 1] - zs[j] for j in range(K - 1)]
+
+        def corridor(e):
+            lo = [buf[max(0, idxs[j] - e)] for j in range(K)]
+            hi = [buf[min(nb - 1, idxs[j] + e)] for j in range(K)]
+            U = [0.0] * K
+            U[K - 1] = hi[K - 1]
+            for j in range(K - 2, -1, -1):
+                U[j] = min(hi[j], U[j + 1])
+            Db = [0.0] * K
+            Db[K - 1] = lo[K - 1]
+            for j in range(K - 2, -1, -1):
+                Db[j] = max(lo[j], Db[j + 1] - cap * dz[j])
+            L = [0.0] * K
+            L[0] = Db[0]
+            for j in range(1, K):
+                L[j] = max(Db[j], L[j - 1])
+            if any(L[j] > U[j] for j in range(K)):
+                return None
+            return L, U
+
+        if corridor(0) is not None:
+            return ys, zs
+        lo_e, hi_e = 0, nb
+        while hi_e - lo_e > 1:
+            mid = (lo_e + hi_e) // 2
+            if corridor(mid) is not None:
+                hi_e = mid
+            else:
+                lo_e = mid
+        res = corridor(hi_e)
+        if res is None:
+            return ys, zs
+        L, U = res
+        w = [0.0] * K
+        w[0] = max(L[0], min(ys[0], U[0]))
+        for j in range(1, K):
+            a_j = max(L[j], w[j - 1])
+            b_j = min(U[j], w[j - 1] + cap * dz[j - 1])
+            w[j] = max(a_j, min(ys[j], b_j))
+        # drop any knot that failed to stay strictly increasing
+        ks, kz = [w[0]], [zs[0]]
+        for j in range(1, K):
+            if w[j] > ks[-1]:
+                ks.append(w[j])
+                kz.append(zs[j])
+        return ks, kz
+
+    def _cap_slopes(ys, zs):
+        """Cap segment slopes dy/dz at SLOPE_CAP times the interquartile
+        slope, walking outward from the median knot."""
+        i1, i3 = len(ys) // 4, 3 * len(ys) // 4
+        if i3 <= i1 or zs[i3] <= zs[i1]:
+            return
+        cap = SLOPE_CAP * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1])
+        if cap <= 0:
+            return
+        c = len(ys) // 2
+        for i in range(c + 1, len(ys)):
+            ys[i] = min(ys[i], ys[i - 1] + cap * (zs[i] - zs[i - 1]))
+        for i in range(c - 1, -1, -1):
+            ys[i] = max(ys[i], ys[i + 1] - cap * (zs[i + 1] - zs[i]))
+
+    def _tangents(xs, vs):
+        """Fritsch-Butland harmonic-mean tangents: monotone C^1 cubic."""
+        d = [(vs[i + 1] - vs[i]) / (xs[i + 1] - xs[i]) for i in range(len(xs) - 1)]
+        t = [d[0]]
+        for i in range(1, len(xs) - 1):
+            a, b = d[i - 1], d[i]
+            t.append(2.0 * a * b / (a + b) if a * b > 0 else 0.0)
+        t.append(d[-1])
+        return t
+
+    def _herm(s, dx, v0, v1, t0, t1):
+        s2 = s * s
+        s3 = s2 * s
+        return (v0 * (2 * s3 - 3 * s2 + 1) + dx * t0 * (s3 - 2 * s2 + s)
+                + v1 * (-2 * s3 + 3 * s2) + dx * t1 * (s3 - s2))
+
+    def _herm_ds(s, dx, v0, v1, t0, t1):
+        s2 = s * s
+        return (v0 * (6 * s2 - 6 * s) + dx * t0 * (3 * s2 - 4 * s + 1)
+                + v1 * (-6 * s2 + 6 * s) + dx * t1 * (3 * s2 - 2 * s))
+
+    def _build(buf):
+        n = len(buf)
+        m = min(max_knots, n)
+        cs, idxs = [], []
+        for i in range(m):
+            idx = int((i + 0.5) * n / m)
+            y = buf[idx]
+            if cs and y <= cs[-1]:
+                continue
+            cs.append(y)
+            idxs.append(idx)
+        if len(cs) < 2:
+            return None
+        if not smooth:
+            zs = [nd.inv_cdf((idx + 1) / (n + 1)) for idx in idxs]
+            if guard == "delete":
+                cs, zs = _prune_slopes(cs, zs)
+            elif guard == "emin":
+                cs, zs = _emin_knots(buf, cs, zs, idxs)
+            else:
+                _cap_slopes(cs, zs)
+            return cs, zs, None
+        # kernel-smoothed CDF on the sketch, Silverman bandwidth
+        mm = len(cs)
+        i1, i3 = mm // 4, 3 * mm // 4
+        iqr = cs[i3] - cs[i1]
+        mean = sum(cs) / mm
+        sd = math.sqrt(sum((c - mean) ** 2 for c in cs) / mm)
+        scale = min(sd, iqr / 1.34) if iqr > 0 else sd
+        if scale <= 0:
+            scale = max(abs(cs[-1] - cs[0]), 1e-8)
+        h = max(0.9 * scale * n ** -0.2, 1e-12)
+        R = 8.0 * h
+        zs = []
+        lo = hi = 0
+        for c in cs:
+            while lo < mm and cs[lo] < c - R:
+                lo += 1
+            while hi < mm and cs[hi] <= c + R:
+                hi += 1
+            f = (lo + sum(0.5 * (1.0 + _erf((c - cs[j]) / (SQ2 * h)))
+                          for j in range(lo, hi))) / mm
+            zs.append(nd.inv_cdf((1.0 + n * f) / (n + 2.0)))
+        cs2, zs2 = [cs[0]], [zs[0]]
+        for c, z in zip(cs[1:], zs[1:]):
+            if z > zs2[-1] + 1e-12:
+                cs2.append(c)
+                zs2.append(z)
+        if len(cs2) < 2:
+            return None
+        _cap_slopes(cs2, zs2)
+        return cs2, zs2, _tangents(cs2, zs2)
+
+    def _fwd(y, knots):
+        cs, zs, ts = knots
+        if y <= cs[0]:
+            s0 = ts[0] if ts else (zs[1] - zs[0]) / (cs[1] - cs[0])
+            return zs[0] + s0 * (y - cs[0])
+        if y >= cs[-1]:
+            s1 = ts[-1] if ts else (zs[-1] - zs[-2]) / (cs[-1] - cs[-2])
+            return zs[-1] + s1 * (y - cs[-1])
+        i = _bisect.bisect_right(cs, y) - 1
+        if ts is None:
+            return zs[i] + (zs[i + 1] - zs[i]) * (y - cs[i]) / (cs[i + 1] - cs[i])
+        dx = cs[i + 1] - cs[i]
+        return _herm((y - cs[i]) / dx, dx, zs[i], zs[i + 1], ts[i], ts[i + 1])
+
+    def _inv(z, knots):
+        cs, zs, ts = knots
+        if z <= zs[0]:
+            s0 = ts[0] if ts else (zs[1] - zs[0]) / (cs[1] - cs[0])
+            return cs[0] + (z - zs[0]) / max(s0, 1e-12)
+        if z >= zs[-1]:
+            s1 = ts[-1] if ts else (zs[-1] - zs[-2]) / (cs[-1] - cs[-2])
+            return cs[-1] + (z - zs[-1]) / max(s1, 1e-12)
+        i = _bisect.bisect_right(zs, z) - 1
+        if ts is None:
+            return cs[i] + (cs[i + 1] - cs[i]) * (z - zs[i]) / (zs[i + 1] - zs[i])
+        dx = cs[i + 1] - cs[i]
+        s = (z - zs[i]) / (zs[i + 1] - zs[i])
+        for _ in range(6):
+            d = _herm_ds(s, dx, zs[i], zs[i + 1], ts[i], ts[i + 1])
+            if d <= 1e-14:
+                break
+            s -= (_herm(s, dx, zs[i], zs[i + 1], ts[i], ts[i + 1]) - z) / d
+            s = 0.0 if s < 0.0 else (1.0 if s > 1.0 else s)
+        return cs[i] + s * dx
+
+    def _moments(state):
+        n, mu, m2 = state["n"], state["mu"], state["m2"]
+        var = m2 / (n - 1) if n > 2 else 0.0
+        sigma = math.sqrt(var) if var > 0 else 1e-8
+        return mu, sigma
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if state is None:
+            state = {"buf": [], "n": 0, "mu": 0.0, "m2": 0.0, "knots": None}
+        knots = state["knots"]
+        if knots is not None:
+            z = _fwd(y, knots)
+        else:
+            mu, sigma = _moments(state)
+            if sigma <= 1e-8:
+                # cold start: scale by the first observed deviation so the
+                # early z values are O(1) and cannot poison downstream state
+                sigma = max(abs(y - mu), 1e-8)
+            z = (y - mu) / sigma if state["n"] else 0.0
+        z = max(-Z_MAX, min(Z_MAX, z))
+        _bisect.insort(state["buf"], y)
+        n = state["n"] + 1
+        d0 = y - state["mu"]
+        mu = state["mu"] + d0 / n
+        state.update(n=n, mu=mu, m2=state["m2"] + d0 * (y - mu))
+        state["knots"] = _build(state["buf"]) if n >= warmup else None
+        return z, state
+
+    def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
+        knots = state["knots"]
+        if knots is None:
+            mu, sigma = _moments(state)
+            return [d.affine(sigma, mu) for d in dists]
+        result = []
+        for d in dists:
+            comps = []
+            for w, mu, sig in d.components:
+                pts = [_inv(mu + sig * q, knots) for q in _mids]
+                eds = [_inv(mu + sig * e, knots) for e in _edges]
+                for j in range(J):
+                    lo = eds[j - 1] if j > 0 else None
+                    hi = eds[j] if j < J - 1 else None
+                    if lo is not None and hi is not None:
+                        std = (hi - lo) / 2.0
+                    elif hi is not None:
+                        std = hi - pts[j]
+                    else:
+                        std = pts[j] - lo
+                    comps.append((w / J, pts[j], max(std, 1e-9)))
+            result.append(Dist(comps).prune(12))
+        return result
+
+    return forward, inverse_k
