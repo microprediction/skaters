@@ -23,6 +23,12 @@ import corpus
 PREDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preds")
 ARMS = os.environ.get("CORPUS_ARMS", "daily weekly monthly").split()
 LIMIT = int(os.environ.get("CORPUS_LIMIT", "10000"))
+# Paced deliberately: an earlier unthrottled fetch run drew a wall of FRED 429s
+# (see benchmarks/_enlarge.log). _fetch already retries on error, but nothing
+# paces the happy path -- for a long unattended run (this script exists for
+# exactly that) a small per-series delay is cheap insurance against sustained
+# rate-limiting, not just per-request retry.
+FETCH_DELAY = float(os.environ.get("CORPUS_FETCH_DELAY", "0.3"))
 
 
 def main():
@@ -40,6 +46,8 @@ def main():
                 continue
             fresh.append(json.dumps({"sid": sid, "title": title,
                                      "ch": [float(x) for x in ch]}))
+            if FETCH_DELAY > 0:
+                time.sleep(FETCH_DELAY)
             if len(fresh) % 200 == 0:
                 print(f"  [{arm}] +{len(fresh)} new ...", flush=True)
         tmp = path + ".tmp"
