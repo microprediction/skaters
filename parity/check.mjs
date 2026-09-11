@@ -4,8 +4,9 @@
 // Exits non-zero if any scenario diverges beyond tolerance.
 
 import { readFileSync } from "fs";
-import { buildScenarios, buildRepeatScenarios } from "./scenarios.mjs";
+import { buildScenarios, buildRepeatScenarios, buildGapScenarios } from "./scenarios.mjs";
 import { periodDetector } from "../docs/js/skaters/periodicity.mjs";
+import { buildCandidates } from "../docs/js/skaters/api.mjs";
 import { runningCov, emaCov, ledoitWolfCov } from "../docs/js/skaters/cov.mjs";
 
 const ATOL = 1e-6;
@@ -105,6 +106,54 @@ function main() {
       }
       if (f > 0) { failures += f; console.error(`FAIL ${name}: ${f} mismatches`); }
       else console.log(`ok   ${name}`);
+    }
+  }
+
+  // Missing observations on the gap series. The series is transported with the
+  // same "nan" sentinel the outputs use, since JSON has no NaN literal.
+  if (vectors.gap_scenarios) {
+    const gaps = vectors.gap_series.map((v) => (v === "nan" ? NaN : decode(v)));
+    const gapScen = new Map(buildGapScenarios().map(([n, k, sk]) => [n, sk]));
+    for (const [name, expected] of Object.entries(vectors.gap_scenarios)) {
+      const sk = gapScen.get(name);
+      if (!sk) { missing.push(`gap:${name}`); continue; }
+      const got = runScenario(sk, gaps, burn, probe, qLo, qHi);
+      let f = 0;
+      for (let step = 0; step < expected.out.length; step++) {
+        for (let h = 0; h < expected.out[step].length; h++) {
+          for (let j = 0; j < 7; j++) {
+            checked++;
+            if (!close(got[step][h][j], expected.out[step][h][j])) {
+              f++;
+              if (f <= 3) console.error(`  MISMATCH gap:${name} step=${step + burn} h=${h} ${LABELS[j]}: js=${got[step][h][j]} py=${decode(expected.out[step][h][j])}`);
+            }
+          }
+        }
+      }
+      if (f > 0) { failures += f; console.error(`FAIL gap:${name}: ${f} mismatches`); }
+      else console.log(`ok   gap:${name}`);
+    }
+  }
+
+  // Structure: the candidate population itself, not its numbers. Numeric probes
+  // cannot see a port that is missing a candidate -- the R port ran 57 against
+  // Python's 60 while every individual transform still matched to 1e-6. The
+  // depth histogram also pins ORDER, since the ensemble aligns depths by index.
+  if (vectors.structure) {
+    for (const [kname, want] of Object.entries(vectors.structure)) {
+      const kk = Number(kname);
+      const [cands, depths] = buildCandidates(kk);
+      let bad = 0;
+      if (cands.length !== want.n_candidates) {
+        console.error(`FAIL structure k=${kk}: ${cands.length} candidates, want ${want.n_candidates}`);
+        bad++;
+      }
+      if (depths.length !== want.depths.length || depths.some((d, i) => d !== want.depths[i])) {
+        console.error(`FAIL structure k=${kk}: depth vector differs`);
+        bad++;
+      }
+      if (bad) failures += bad;
+      else console.log(`ok   structure k=${kk}   ${cands.length} candidates`);
     }
   }
 

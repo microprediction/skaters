@@ -1,6 +1,6 @@
 //! skaters-fast: an opt-in accelerated backend for skaters.
 //!
-//! This is a thin PyO3 skin over the `skaters-core` Rust crate. The pure
+//! This is a thin PyO3 skin over the `skaters` Rust crate. The pure
 //! Python package remains the reference implementation; this backend exists
 //! only to run the identical model faster.
 //!
@@ -17,8 +17,8 @@
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use skaters_core::api::{laplace as core_laplace, Forecaster};
-use skaters_core::tails::PDist;
+use skaters::api::{laplace as core_laplace, Forecaster};
+use skaters::tails::PDist;
 
 /// A single-horizon distributional prediction handle.
 ///

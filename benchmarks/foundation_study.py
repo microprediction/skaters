@@ -40,8 +40,13 @@ RESULTS = os.path.join(_HERE, f"results_foundation_{FM_TAG}.csv")
 
 N_SERIES = int(os.environ.get("FM_N", 120))     # subset size (zero-shot CPU cost)
 HIST = 1000
-TEST = int(os.environ.get("FM_TEST", 150))      # rolling one-step test window
-CTX = int(os.environ.get("FM_CTX", 256))        # context window length
+# These defaults MUST match week_study.py's WEEK_TEST/WEEK_CTX defaults. Any
+# arm can be run either through that driver (which sets FM_TEST/FM_CTX
+# explicitly) or by invoking run_arm.py directly (which falls back to these
+# defaults); a mismatch silently produces a different-context, non-comparable
+# run that summarize_canonical.py can no longer paper over -- it now raises.
+TEST = int(os.environ.get("FM_TEST", 64))       # rolling one-step test window
+CTX = int(os.environ.get("FM_CTX", 128))        # context window length
 NUM_SAMPLES = int(os.environ.get("FM_SAMPLES", 30))
 DEVICE = os.environ.get("FM_DEVICE", "cpu")     # cpu | mps (Mac Studio) | cuda
 
@@ -136,7 +141,7 @@ def _ctx_batch(ch):
 
 
 _chronos = None
-def chronos_dists(ch):
+def chronos_dists(ch, h=1):
     """Chronos-Bolt (quantile head) zero-shot. We use Bolt rather than the
     autoregressive T5 sampler: it is ~36x faster (a single forward pass) and does
     not stall, at the cost of being quantile-only -> its log-likelihood is a
@@ -148,11 +153,11 @@ def chronos_dists(ch):
             from chronos import BaseChronosPipeline
             _chronos = BaseChronosPipeline.from_pretrained(
                 "amazon/chronos-bolt-small", device_map=DEVICE, torch_dtype=torch.float32)
-        ctx = _ctx_batch(ch)
+        ctx = _ctx_batch(ch if h == 1 else ch[:len(ch) - (h - 1)])
         levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        q, _ = _chronos.predict_quantiles(inputs=ctx, prediction_length=1,
+        q, _ = _chronos.predict_quantiles(inputs=ctx, prediction_length=h,
                                           quantile_levels=levels)
-        q = q[:, 0, :].cpu().numpy()        # [B, n_levels]
+        q = q[:, h - 1, :].cpu().numpy()    # [B, n_levels] at horizon h
         return [quantile_dist(levels, q[i]) for i in range(len(q))]
     except Exception as e:                  # noqa: BLE001
         print(f"  chronos failed: {e}", flush=True); return None
@@ -229,8 +234,9 @@ def lagllama_dists(ch):
 
 
 _timesfm = None
-def timesfm_dists(ch):
-    """TimesFM 2.5 zero-shot; decile quantile head -> quantile_dist."""
+def timesfm_dists(ch, h=1):
+    """TimesFM 2.5 zero-shot; decile quantile head -> quantile_dist. For h>1 the
+    context ends h steps before each target and the horizon-h forecast is scored."""
     global _timesfm
     try:
         import timesfm
@@ -238,18 +244,19 @@ def timesfm_dists(ch):
             M = timesfm.TimesFM_2p5_200M_torch
             m = M.from_pretrained(M.DEFAULT_REPO_ID)
             m.compile(timesfm.ForecastConfig(
-                max_context=CTX, max_horizon=1, normalize_inputs=True,
+                max_context=CTX, max_horizon=h, normalize_inputs=True,
                 use_continuous_quantile_head=True, per_core_batch_size=64))
             _timesfm = m
-        n = len(ch); start = n - TEST
-        inputs = [np.asarray(ch[t - CTX:t], dtype=np.float32) for t in range(start, n)]
-        _, quant = _timesfm.forecast(horizon=1, inputs=inputs)   # [B, 1, Q]
+        n = len(ch); start = n - TEST; sh = h - 1
+        inputs = [np.asarray(ch[t - sh - CTX:t - sh], dtype=np.float32)
+                  for t in range(start, n)]
+        _, quant = _timesfm.forecast(horizon=h, inputs=inputs)   # [B, h, Q]
         Q = quant.shape[-1]
         # TimesFM emits deciles; a leading column is the mean when Q==10.
         if Q >= 10:
-            qcols, levels = quant[:, 0, 1:10], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+            qcols, levels = quant[:, h - 1, 1:10], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         else:
-            qcols = quant[:, 0, :Q]
+            qcols = quant[:, h - 1, :Q]
             levels = list(np.linspace(0.1, 0.9, Q))
         # NB forecast() pads `inputs` in place to per_core_batch_size but returns
         # exactly one row per real window; iterate over the returned rows.
@@ -258,9 +265,64 @@ def timesfm_dists(ch):
         print(f"  timesfm failed: {e}", flush=True); return None
 
 
+_timesfm3 = None
+def timesfm3_dists(ch, h=1):
+    """TimesFM 3.0 zero-shot, univariate mode; 9-decile quantile output ->
+    quantile_dist. Same windowing contract as timesfm_dists: for h>1 the
+    context ends h steps before each target and the horizon-h row is scored.
+
+    Weights (google/timesfm-3.0-pytorch) are under timesfm-non-commercial
+    -license-v1.0: research benchmarking only, no production use. The 3.0
+    API lives in the timesfm3 namespace of the same pip package; contexts
+    are a list of 1-D float32 arrays and predict_batch returns one output
+    per context with .quantiles of shape [h, 9] (deciles 0.1..0.9)."""
+    global _timesfm3
+    try:
+        from timesfm3 import TimesFM3Evaluator, ModelConfig
+        if _timesfm3 is None:
+            try:
+                from importlib.metadata import version as _pkgver
+                _v = _pkgver("timesfm")
+            except Exception:               # noqa: BLE001
+                _v = "?"
+            print(f"  timesfm package {_v}, "
+                  f"checkpoint google/timesfm-3.0-pytorch, device {DEVICE}",
+                  flush=True)
+            _timesfm3 = TimesFM3Evaluator(ModelConfig(
+                checkpoint_path="google/timesfm-3.0-pytorch",
+                per_core_batch_size=32, device=DEVICE))
+        n = len(ch); start = n - TEST; sh = h - 1
+        if start - sh - CTX < 0:
+            raise ValueError(
+                f"series too short: need >= {TEST + CTX + sh} changes "
+                f"(TEST={TEST} CTX={CTX} h={h}), got {n}")
+        inputs = [np.asarray(ch[t - sh - CTX:t - sh], dtype=np.float32)
+                  for t in range(start, n)]
+        # make_positive=False: the evaluator's benchmark default clamps
+        # forecasts nonnegative, and these are signed change series.
+        # univariate=True is a no-op for 1-D contexts but pins the intent.
+        outs = list(_timesfm3.predict_batch(
+            inputs, horizon=h, return_quantiles=True,
+            use_symmetric_averaging=False,
+            make_positive=False, univariate=True))
+        levels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        dists = []
+        for o in outs:
+            q = np.asarray(o.quantiles, dtype=float)   # [h, 9] univariate
+            if q.ndim == 3:                            # [1, h, 9] defensive
+                q = q[0]
+            dists.append(quantile_dist(levels, q[h - 1]))
+        if len(dists) != TEST:
+            raise ValueError(f"expected {TEST} outputs, got {len(dists)}")
+        return dists
+    except Exception as e:                  # noqa: BLE001
+        print(f"  timesfm3 failed: {e}", flush=True); return None
+
+
 # ---------------------------------------------------------------- runner
 _ALL_MODELS = [("Chronos", chronos_dists), ("Moirai", moirai_dists),
-               ("Lag-Llama", lagllama_dists), ("TimesFM", timesfm_dists)]
+               ("Lag-Llama", lagllama_dists), ("TimesFM", timesfm_dists),
+               ("TimesFM3", timesfm3_dists)]
 _SEL = os.environ.get("FM_MODELS", "")      # comma list; empty = all
 MODELS = [(n, f) for n, f in _ALL_MODELS if not _SEL or n in _SEL.split(",")]
 

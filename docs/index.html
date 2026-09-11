@@ -25,17 +25,32 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Results &#9662;</span>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Direct comparisons</a>
-            <a href="/sandwich.html">Collaborative use</a>
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
-        <a href="/guide.html">Guide</a>
         <a href="/papers.html">Papers</a>
+        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
@@ -71,17 +86,17 @@
 
     <p>
       On 894 continuous non-price FRED series, scored one step ahead per series,
-      <code>laplace</code> has the best held-out log-likelihood in the field, ahead of
+      <code>laplace</code> has the best held-out log-likelihood among the tested baselines, ahead of
       AutoARIMA, AutoETS, SARIMAX, conformal methods, the heavy-tail GARCH-t, and four
       zero-shot foundation models. It gives up ground only on CRPS, to the CRPS
       specialists, and on price and return series, where GARCH-t is the better choice.
-      <a href="/papers.html">The benchmarks →</a>
+      <a href="/benchmarks.html">The benchmarks →</a>
     </p>
 
     <p>
       Each language is an independent, parity-locked port, checked against the reference to
-      1e-6 (Python also has a Rust backend for speed). A fitted model serialises to JSON, so
-      one fit on a server resumes unchanged in the browser.
+      1e-6 (Python also has a Rust backend for speed). Model specifications serialise to
+      JSON, and fitted state checkpoints and resumes within a language.
       <a href="/languages.html">The languages →</a>
     </p>
 
@@ -104,7 +119,7 @@
         sits top-right: fastest, and tied for the best likelihood. The <strong>PyMC-laplace
         sandwich</strong> edges it on accuracy at ~10&times; the compute; the classical baselines
         (AutoARIMA, AutoETS, SARIMAX, GARCH-t) trade accuracy for speed.
-        <a href="/papers.html">The benchmarks →</a></figcaption>
+        <a href="/benchmarks.html">The benchmarks →</a></figcaption>
     </figure>
 
     <figure class="hero-figure">
@@ -131,15 +146,20 @@
 
 f = laplace(k=3)
 state = None
+forecast = None            # the fan issued LAST tick, aimed at this y
 for y in observations:
-    dists, state = f(y, state)
-    dists[0].mean              # point forecast
-    dists[0].std               # uncertainty
-    dists[0].quantile(0.975)   # 95th percentile
-    dists[0].logpdf(y)         # log-likelihood
-    dists[0].cdf(y)            # CDF at y</code></pre>
+    if forecast is not None:
+        forecast[0].logpdf(y)          # one-step-ahead log score
+        forecast[0].cdf(y)             # one-step-ahead PIT
+    forecast, state = f(y, state)
+    forecast[0].mean                   # point forecast for the NEXT tick
+    forecast[0].std                    # uncertainty
+    forecast[0].quantile(0.975)        # upper edge of the central 95% band</code></pre>
     <p>
-      Every skater returns <code>list[Dist]</code> &mdash; one weighted mixture per horizon
+      Score a forecast only against observations that arrive after it was issued; the
+      predictive returned alongside $y$ aims at the next tick, and the parade in
+      <code>state["pit"]</code>/<code>state["z"]</code> does this bookkeeping for you. Every
+      skater returns a list of predictive distributions, one per horizon
       $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all
       facets of the same object.
     </p>
@@ -179,9 +199,10 @@ f = laplace(k=1)</code></pre>
         <p>The same algorithm as a football move: switch the ball out to an easier problem and
           work it back to the original space to score — in your language and team.</p>
       </a>
-      <a class="card" href="/papers.html">
-        <h3>Papers &amp; benchmarks →</h3>
-        <p>The paper, and the studies vs ARIMA/ETS/GARCH/conformal and the foundation models.</p>
+      <a class="card" href="/benchmarks.html">
+        <h3>Benchmarks →</h3>
+        <p>The studies vs ARIMA/ETS/GARCH/conformal and the foundation models, and the
+          papers behind them.</p>
       </a>
       <a class="card" href="/sandwich.html">
         <h3>The sandwich →</h3>

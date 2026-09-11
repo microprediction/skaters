@@ -210,16 +210,23 @@ impl Standardize {
         }
         let mu = self.mu;
         let diff = y - mu;
-        let mu_new = mu + self.alpha * diff;
-        let var = (1.0 - self.alpha) * self.var + self.alpha * diff * diff;
-        let sigma = if var > self.eps * self.eps {
-            var.sqrt()
+        // Emit against the PRIOR state, so the forward map is the affine change
+        // of coordinates z = (y - mu) / sigma that the inverse applies. Scaling
+        // by the post-update std makes the emission self-normalized (bounded by
+        // 1/sqrt(alpha)) and the affine inverse is then not its inverse.
+        // Cold start: before the variance is informative, scale by the first
+        // nonzero residual, so the first informative emission is +-1.
+        let sigma = if self.var > self.eps * self.eps {
+            self.var.sqrt()
+        } else if diff.abs() > self.eps {
+            diff.abs()
         } else {
             self.eps
         };
-        self.mu = mu_new;
-        self.var = var;
-        diff / sigma
+        let y_prime = diff / sigma;
+        self.mu = mu + self.alpha * diff;
+        self.var = (1.0 - self.alpha) * self.var + self.alpha * diff * diff;
+        y_prime
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
@@ -553,27 +560,31 @@ pub struct Garch {
     pub omega: f64,
     pub alpha: f64,
     pub beta: f64,
+    pub mean_alpha: f64,
     pub eps: f64,
     pub var: f64,
-    pub last_y: f64,
+    pub last_dev: f64,
+    pub mu: f64,
     pub init: bool,
 }
 
-pub fn garch(omega: f64, alpha: f64, beta: f64, eps: f64) -> Transform {
+pub fn garch(omega: f64, alpha: f64, beta: f64, mean_alpha: f64, eps: f64) -> Transform {
     assert!(omega > 0.0 && alpha >= 0.0 && beta >= 0.0);
     Transform::Garch(Garch {
         omega,
         alpha,
         beta,
+        mean_alpha,
         eps,
         var: 0.0,
-        last_y: 0.0,
+        last_dev: 0.0,
+        mu: 0.0,
         init: false,
     })
 }
 
 pub fn garch_default() -> Transform {
-    garch(0.01, 0.1, 0.85, 1e-8)
+    garch(0.01, 0.1, 0.85, 0.05, 1e-8)
 }
 
 impl Garch {
@@ -587,18 +598,25 @@ impl Garch {
                 self.omega / self.eps
             };
             self.var = var0;
-            self.last_y = y;
-            return y / var0.sqrt().max(self.eps);
+            self.last_dev = 0.0;
+            self.mu = y;
+            return 0.0;
         }
-        let var = self.omega + self.alpha * self.last_y * self.last_y + self.beta * self.var;
+        // GARCH conditional variance of the DEVIATION from a running mean (not
+        // the raw value): shift-invariant, so a level series does not report a
+        // volatility of order |y|. On mean-zero returns mu stays ~0 and this
+        // reduces to the original y/sigma.
+        let dev = y - self.mu;
+        let var = self.omega + self.alpha * self.last_dev * self.last_dev + self.beta * self.var;
         let sigma = if var > self.eps * self.eps {
             var.sqrt()
         } else {
             self.eps
         };
         self.var = var;
-        self.last_y = y;
-        y / sigma
+        self.last_dev = dev;
+        self.mu += self.mean_alpha * dev;
+        dev / sigma
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
@@ -607,7 +625,7 @@ impl Garch {
         } else {
             1e-8
         };
-        dists.iter().map(|d| d.scale(sigma)).collect()
+        dists.iter().map(|d| d.affine(sigma, self.mu)).collect()
     }
 }
 
@@ -1027,14 +1045,99 @@ impl Ar {
     }
 }
 
+/// Spectral radius of the AR companion matrix (largest |characteristic root|):
+/// the h-step forecast converges iff this is < 1. Closed form for p<=2, power
+/// iteration otherwise.
+fn ar_spectral_radius(phi: &[f64]) -> f64 {
+    let p = phi.len();
+    if p == 1 {
+        return phi[0].abs();
+    }
+    if p == 2 {
+        let (a, b) = (phi[0], phi[1]);
+        let disc = a * a + 4.0 * b;
+        if disc >= 0.0 {
+            let r = disc.sqrt();
+            return ((a + r) / 2.0).abs().max(((a - r) / 2.0).abs());
+        }
+        // libm::hypot, not f64::hypot: the std method calls the platform's own
+        // libm (MSVC's differs from glibc's and Apple's) and is not guaranteed
+        // bit-identical, which broke the cross-platform digest on Windows while
+        // Linux, macOS and wasm agreed. Every other transcendental here already
+        // routes through the libm crate for exactly this reason. Python's
+        // math.hypot is also platform libm, so the 1e-6 parity tolerance covers
+        // the reference comparison; bit-identity is a Rust-to-Rust claim.
+        return libm::hypot(a / 2.0, (-disc).sqrt() / 2.0);
+    }
+    let mut v = vec![1.0_f64; p];
+    let mut rho = 0.0;
+    for _ in 0..60 {
+        let mut nv = vec![0.0_f64; p];
+        let mut s = 0.0;
+        for j in 0..p {
+            s += phi[j] * v[j];
+        }
+        nv[0] = s;
+        for i in 1..p {
+            nv[i] = v[i - 1];
+        }
+        let mut m = nv.iter().fold(0.0_f64, |acc, x| acc.max(x.abs()));
+        if m == 0.0 {
+            m = 1.0;
+        }
+        for x in nv.iter_mut() {
+            *x /= m;
+        }
+        v = nv;
+        rho = m;
+    }
+    rho
+}
+
+/// Damp AR coefficients into the stationary region for forecasting. Scaling
+/// phi_j by gamma^(j+1) scales every companion eigenvalue by gamma; a no-op when
+/// already stationary.
+fn ar_stationary(phi: &[f64]) -> Vec<f64> {
+    let margin = 0.999;
+    let rho = ar_spectral_radius(phi);
+    if rho <= margin {
+        return phi.to_vec();
+    }
+    let g = margin / rho;
+    // libm::pow, not f64::powi: powi lowers to the llvm.powi intrinsic, whose
+    // expansion is target dependent, so it is not bit-stable across platforms.
+    // pow also matches the reference more closely, since Python's `g ** (j + 1)`
+    // calls C pow rather than doing repeated multiplication.
+    (0..phi.len())
+        .map(|j| phi[j] * libm::pow(g, (j + 1) as f64))
+        .collect()
+}
+
 /// Shared AR-style inverse (used by Ar and GroupedAr).
-fn ar_inverse(dists: &[Dist], buf: &[f64], phi: &[f64], p: usize) -> Vec<Dist> {
+fn ar_inverse(dists: &[Dist], buf: &[f64], phi_raw: &[f64], p: usize) -> Vec<Dist> {
+    // Forecast with stationarity-constrained coefficients; the one-step fit is
+    // left intact, only the extrapolation is kept well-posed.
+    let phi = ar_stationary(phi_raw);
+    let n = dists.len();
+    // Impulse responses psi_0..psi_{n-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
+    let mut psi = vec![0.0_f64; n];
+    if n > 0 {
+        psi[0] = 1.0;
+    }
+    for i in 1..n {
+        let mut s = 0.0;
+        for j in 0..p {
+            if i as i64 - 1 - j as i64 >= 0 {
+                s += phi[j] * psi[i - 1 - j];
+            }
+        }
+        psi[i] = s;
+    }
     let mut recovered_means: Vec<f64> = Vec::new();
-    let mut recovered_vars: Vec<f64> = Vec::new();
-    let mut result = Vec::with_capacity(dists.len());
-    for h in 0..dists.len() {
+    let mut result = Vec::with_capacity(n);
+    let mut cum_psi2 = 0.0;
+    for h in 0..n {
         let mut ar_mean = 0.0;
-        let mut ar_var = 0.0;
         for j in 0..p {
             let lag_h = h as i64 - j as i64 - 1;
             if lag_h < 0 {
@@ -1044,18 +1147,17 @@ fn ar_inverse(dists: &[Dist], buf: &[f64], phi: &[f64], p: usize) -> Vec<Dist> {
                 }
             } else if (lag_h as usize) < recovered_means.len() {
                 ar_mean += phi[j] * recovered_means[lag_h as usize];
-                ar_var += phi[j] * phi[j] * recovered_vars[lag_h as usize];
             }
         }
         let total_mean = dists[h].mean() + ar_mean;
-        let total_var = dists[h].var() + ar_var;
+        cum_psi2 += psi[h] * psi[h];
+        let total_var = cum_psi2 * dists[h].var(); // sigma^2 * sum psi_i^2
         let total_std = if total_var > 0.0 {
             total_var.sqrt()
         } else {
             dists[h].std().max(1e-12)
         };
         recovered_means.push(total_mean);
-        recovered_vars.push(total_var);
         result.push(Dist::gaussian(total_mean, total_std));
     }
     result

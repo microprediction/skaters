@@ -2,7 +2,7 @@
 
 An opt-in accelerated backend for [skaters](https://github.com/microprediction/skaters):
 a thin [PyO3](https://pyo3.rs) skin over the parity-gated Rust core
-(`skaters-core`).
+(`skaters`).
 
 The pure Python package is the reference implementation. This backend runs the
 identical model faster.
