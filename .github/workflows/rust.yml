@@ -15,7 +15,14 @@ jobs:
     needs: vectors
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, macos-13, windows-latest]
+        # macos-13 removed: GitHub retired those hosted runners, so the job sat
+        # QUEUED forever and never started, and `digests-agree` needs `core` —
+        # one dead matrix entry blocked every PR indefinitely. Its purpose was
+        # x86 macOS, and the portable-math claim still gets an x86-vs-arm64
+        # comparison from ubuntu-latest and windows-latest (x86) against
+        # macos-latest (arm64), plus wasm. To restore x86 macOS specifically,
+        # `macos-15-intel` is the current label.
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

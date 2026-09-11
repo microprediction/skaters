@@ -71,21 +71,26 @@ MODELS = {
     "flowstate":   (".venv-flowstate", "C", {}),
     "Chronos":     (".venv-chronos",   "C", {}),
     "TimesFM":     (".venv-timesfm",   "C", {}),
+    "TimesFM3":    (".venv-timesfm3",  "C", {}),
     "TabPFN":      (".venv-tabpfn",    "C", {}),
     # laplace-calibrated sandwiches (quantile-averaged with laplace, own venv):
     "TimesFM+lap": (".venv-timesfm",   "C", {}),
+    "TimesFM3+lap": (".venv-timesfm3", "C", {}),
     "TiRex+lap":   (".venv-tirex",     "C", {}),
     "Chronos+lap": (".venv-chronos",   "C", {}),
     # adaptive residual sandwiches (FM location + laplace conditional scale):
     "TimesFM~lap": (".venv-timesfm",   "C", {}),
+    "TimesFM3~lap": (".venv-timesfm3", "C", {}),
     "TiRex~lap":   (".venv-tirex",     "C", {}),
     "Chronos~lap": (".venv-chronos",   "C", {}),
     # PIT recalibration (keep FM shape, fix calibration in z-space):
     "TimesFM@lap": (".venv-timesfm",   "C", {}),
+    "TimesFM3@lap": (".venv-timesfm3", "C", {}),
     "TiRex@lap":   (".venv-tirex",     "C", {}),
     "Chronos@lap": (".venv-chronos",   "C", {}),
     # never-worse portfolio: laplace + PIT-recalibrated FM (distribution-level):
     "TimesFM&lap": (".venv-timesfm",   "C", {}),
+    "TimesFM3&lap": (".venv-timesfm3", "C", {}),
     "TiRex&lap":   (".venv-tirex",     "C", {}),
     "Chronos&lap": (".venv-chronos",   "C", {}),
 }

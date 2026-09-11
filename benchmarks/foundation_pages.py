@@ -122,6 +122,24 @@ MODELS = {
                          "and synthetic series. This study scores version 2.5 (200M "
                          "parameters) with its continuous quantile head, which emits the "
                          "predictive spread directly."),
+    "timesfm3": dict(name="TimesFM3", key="TimesFM3", vendor="Google",
+                      license="timesfm-non-commercial-license-v1.0", arms=True,
+                      blurb="Google's next TimesFM generation; same decoder-only, "
+                            "patched-transformer family as 2.5, scored on the identical "
+                            "protocol so the two checkpoints are directly comparable.",
+                      note="Run zero-shot with a fixed 128-length context, same as 2.5. "
+                           "Research/benchmarking use only under the model's license.",
+                      links=[
+                          ("GitHub", "https://github.com/google-research/timesfm"),
+                          ("Model card", "https://huggingface.co/google/timesfm-3.0-pytorch"),
+                      ],
+                      arch="Same decoder-only, patched-transformer architecture as TimesFM "
+                           "2.5. This study scores the 3.0 checkpoint with its native "
+                           "quantile head, under the identical protocol (128-length "
+                           "context, one-step change series) used for every other model "
+                           "here, so a comparison to the 2.5 numbers on the "
+                           "<a href=\"/foundation/timesfm.html\">TimesFM page</a> is "
+                           "apples-to-apples."),
     "sundial": dict(name="Sundial", key="Sundial", vendor="Tsinghua (THUML)",
                     license="see model card", arms=False,
                     blurb="Sundial is a generative time-series model; we draw samples "
@@ -159,40 +177,12 @@ MODELS = {
                            "through granite-tsfm."),
 }
 
-NAV = """      <nav>
-        <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
-          <span class="drop">
-            <a href="/challengers.html">Standalone</a>
-            <a href="/sandwich.html">Sandwich pattern</a>
-            <a href="/sidecar.html">Sidecar pattern</a>
-          </span>
-        </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
-          <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-          </span>
-        </span>
-        <a href="/demos/">Demos</a>
-        <a href="/papers.html">Papers</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
-          <span class="drop">
-            <a href="/guide.html">Methodology</a>
-            <a href="/draws.html">Draws</a>
-            <a href="/scope.html">Scope</a>
-            <a href="/languages.html">Languages</a>
-            <a href="/heritage.html">Heritage</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/skills.html">Skills</a>
-          </span>
-        </span>
-        <a href="https://github.com/microprediction/skaters">GitHub</a>
-      </nav>"""
+# NAV comes from docs/sweep_nav.py, the single source of truth. This file used
+# to hold its own copy and rewrite only the inner <nav>, which is how the site
+# ended up serving three different menus simultaneously.
+import sys as _sys
+_sys.path.insert(0, os.path.join(ROOT, "docs"))
+from sweep_nav import NAV                      # noqa: E402
 
 
 def load_vs():

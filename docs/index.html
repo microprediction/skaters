@@ -31,6 +31,7 @@
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
@@ -38,15 +39,18 @@
             <a href="/foundation/chronos.html">Chronos</a>
             <a href="/foundation/tirex.html">TiRex</a>
             <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
+        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
@@ -82,7 +86,7 @@
 
     <p>
       On 894 continuous non-price FRED series, scored one step ahead per series,
-      <code>laplace</code> has the best held-out log-likelihood in the field, ahead of
+      <code>laplace</code> has the best held-out log-likelihood among the tested baselines, ahead of
       AutoARIMA, AutoETS, SARIMAX, conformal methods, the heavy-tail GARCH-t, and four
       zero-shot foundation models. It gives up ground only on CRPS, to the CRPS
       specialists, and on price and return series, where GARCH-t is the better choice.
@@ -91,8 +95,8 @@
 
     <p>
       Each language is an independent, parity-locked port, checked against the reference to
-      1e-6 (Python also has a Rust backend for speed). A fitted model serialises to JSON, so
-      one fit on a server resumes unchanged in the browser.
+      1e-6 (Python also has a Rust backend for speed). Model specifications serialise to
+      JSON, and fitted state checkpoints and resumes within a language.
       <a href="/languages.html">The languages →</a>
     </p>
 
@@ -142,15 +146,20 @@
 
 f = laplace(k=3)
 state = None
+forecast = None            # the fan issued LAST tick, aimed at this y
 for y in observations:
-    dists, state = f(y, state)
-    dists[0].mean              # point forecast
-    dists[0].std               # uncertainty
-    dists[0].quantile(0.975)   # 95th percentile
-    dists[0].logpdf(y)         # log-likelihood
-    dists[0].cdf(y)            # CDF at y</code></pre>
+    if forecast is not None:
+        forecast[0].logpdf(y)          # one-step-ahead log score
+        forecast[0].cdf(y)             # one-step-ahead PIT
+    forecast, state = f(y, state)
+    forecast[0].mean                   # point forecast for the NEXT tick
+    forecast[0].std                    # uncertainty
+    forecast[0].quantile(0.975)        # upper edge of the central 95% band</code></pre>
     <p>
-      Every skater returns <code>list[Dist]</code> &mdash; one weighted mixture per horizon
+      Score a forecast only against observations that arrive after it was issued; the
+      predictive returned alongside $y$ aims at the next tick, and the parade in
+      <code>state["pit"]</code>/<code>state["z"]</code> does this bookkeeping for you. Every
+      skater returns a list of predictive distributions, one per horizon
       $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all
       facets of the same object.
     </p>
@@ -193,7 +202,7 @@ f = laplace(k=1)</code></pre>
       <a class="card" href="/benchmarks.html">
         <h3>Benchmarks →</h3>
         <p>The studies vs ARIMA/ETS/GARCH/conformal and the foundation models, and the
-          <a href="/papers.html">papers</a> behind them.</p>
+          papers behind them.</p>
       </a>
       <a class="card" href="/sandwich.html">
         <h3>The sandwich →</h3>
