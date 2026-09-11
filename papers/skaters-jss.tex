@@ -1,4 +1,10 @@
 \documentclass[article]{jss}
+%% run-in headings italic, never bold (style repo, hard rule 8)
+\makeatletter
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}%
+  {3.25ex \@plus1ex \@minus.2ex}{-1em}%
+  {\normalfont\normalsize\itshape}}
+\makeatother
 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -26,9 +32,9 @@
   \url{https://skaters.microprediction.org}
 }
 
-\title{Transforms All the Way Down --- Automatic Online Distributional Forecasting by Conjugation}
+\title{Transforms All the Way Down: Automatic Online Distributional Forecasting by Conjugation}
 
-\Plaintitle{Transforms All the Way Down - Automatic Online Distributional Forecasting by Conjugation}
+\Plaintitle{Transforms All the Way Down: Automatic Online Distributional Forecasting by Conjugation}
 \Shorttitle{Transforms All the Way Down}
 
 \newcommand{\skatersabstract}{
@@ -41,7 +47,8 @@ per-series held-out log-likelihood race against classical, neural, and
 foundation-model baselines on \proglang{FRED} series; on asset prices a
 \pkg{GARCH}-$t$ model remains better, a split we report rather than average
 away. Run in \code{laplace}'s coordinates and mapped back exactly (the
-sandwich), existing models improve dramatically without retraining. The library is implemented in pure \proglang{Python}
+sandwich), the models tested close most of their held-out density gap
+without retraining. The library is implemented in pure \proglang{Python}
 (\code{pip install skaters}), zero-dependency \proglang{JavaScript}
 (\code{npm install skaters}), \proglang{R}, and a portable \proglang{Rust}
 core, held to $10^{-6}$ agreement by a shared parity suite, so models run
@@ -92,7 +99,7 @@ outside the observed residual range.
 
 Modern neural and foundation models
 \citep{salinas2020deepar,ansari2024chronos,das2024timesfm,woo2024moirai} are
-powerful distributional learners, but are built for global cross-series training
+distributional learners built for global cross-series training
 on hardware accelerators, not for a single univariate stream running in a
 browser.
 
@@ -138,8 +145,8 @@ yields three contributions developed in turn:
 The unifying premise is the No-Free-Lunch theorem \citep{wolpert1997no} taken
 seriously: every ``method'' is a prior, and averaged over all series none
 dominates. The right response is not to pick one but to make the priors
-explicit and weight them online: each candidate acts as an \emph{operational
-prior} over series behaviour, and likelihood weighting limits the practical cost
+explicit and weight them online: each candidate can be read as an
+\emph{operational prior} over series behaviour, and likelihood weighting limits the practical cost
 of a poor one by draining its weight as evidence accumulates.
 
 No-Free-Lunch also fixes the scope of our claim. We position \pkg{skaters} as a
@@ -197,7 +204,7 @@ swaps in the conditional-variance leaf (Section~\ref{sec:doob}), and
 transforms, the leaves, the ensembles) are exported for composition but no
 benchmark below uses them directly.
 
-\paragraph{The two recursions, exactly.}
+\paragraph{The two recursions.}
 Writing $T$ for a transform with state $s_t$ (Section~\ref{sec:dist}) and $g$
 for the inner skater, \emph{conjugation} is
 \begin{align*}
@@ -320,7 +327,7 @@ component sits at a large mean, silently producing $\sigma=0$ and an invalid
 predictive. Running moments use Welford's recurrence \citep{welford1962note}.
 
 %% -------------------------------------------------------------------------
-\section{The terminal-leaf ensemble: modelling the mean} \label{sec:trunk}
+\section{The terminal-leaf ensemble} \label{sec:trunk}
 
 Bayesian model averaging over a heterogeneous pool
 \citep{hoeting1999bayesian,raftery2005using} combines full predictive
@@ -358,7 +365,7 @@ differencing, a seasonal block, a Yeo--Johnson coordinate grid
 (Section~\ref{sec:coord}), and a fast/slow two-systems block.
 
 %% -------------------------------------------------------------------------
-\section{Metric-agnostic leaves: a pluggable base} \label{sec:leaf}
+\section{Metric-agnostic leaves} \label{sec:leaf}
 
 The leaf is itself a fixed Gaussian \emph{scale mixture}: components
 $\mathcal N\!\big(0, (c_k\,\hat\sigma)^2\big)$ over a fixed log-spaced
@@ -502,7 +509,7 @@ Bayesian volatility filters, a complementary justification for treating the cloc
 itself as the object to learn.
 
 %% -------------------------------------------------------------------------
-\section{Granularity: mixing time scales} \label{sec:granularity}
+\section{Mixing time scales} \label{sec:granularity}
 
 Multi-step forecasting exposes one more axis a forecaster silently commits to:
 the \emph{sampling granularity}. Natively, \code{laplace(k)} reaches horizon $h$
@@ -664,11 +671,11 @@ heavy-tail / volatility-clustering state of the art. And four conformal opponent
 \citealp{gibbs2021adaptive}), plus conformal seasonal pools (CSP,
 \citealp{manokhin2026csp}) in a fixed and a coverage-adaptive form, each
 KDE-smoothed into a density so it is scored on likelihood as well as CRPS.
-The same-phase construction these seasonal pools draw on --- forecasting from
-each phase's own component series --- appears earlier in the \pkg{NNS} package
+The same-phase construction these seasonal pools draw on, forecasting from
+each phase's own component series, appears earlier in the \pkg{NNS} package
 \citep{viole2026nns}.
 
-The protocol is a \emph{fair rolling one-step-ahead}: each baseline is fit on an
+The protocol is a \emph{rolling one-step-ahead}: each baseline is fit on an
 expanding or rolling window with periodic refit, and every method, ours and
 theirs, is turned into the \emph{same} \code{Dist} and scored on held-out
 log-likelihood \emph{and} CRPS over the same test window.
@@ -798,7 +805,7 @@ computed over different coverage) is an artefact of absolute-score averaging
 that the paired column resolves; the reversal is driven by the near-random-walk
 tail, which is exactly the martingality effect of Section~\ref{sec:martingality}.
 
-\paragraph{\pkg{GARCH}-$t$, and the price caveat.}
+\paragraph{\pkg{GARCH}-$t$ and the price caveat.}
 \pkg{GARCH}$(1,1)$-$t$ is the strongest opponent on log-likelihood, purpose-built
 for the heavy tails and volatility clustering of financial change-series. On the
 non-price universe it is the only baseline \code{laplace} does not clearly beat on
@@ -883,7 +890,7 @@ state (\code{state["pit"]}, \code{state["z"]}) usable as an anomaly monitor:
 the thresholds mean what they say
 (harness: \code{benchmarks/coverage\_study.py}).
 
-\paragraph{Conformal prediction, specifically.}
+\paragraph{Conformal prediction.}
 The conformal opponents deserve a separate word; two kinds appear here. Conformal
 seasonal pools (CSP) sample a seasonal residual pool and KDE-smooth it into a
 density, so, unlike a raw conformal predictive system (whose cumulative
@@ -1095,7 +1102,7 @@ share.
 
 \subsection{Against zero-shot foundation models} \label{sec:foundation}
 
-Pretrained time-series foundation models use a fundamentally different protocol:
+Pretrained time-series foundation models use a different protocol:
 they are applied \emph{zero-shot}, conditioning on a context window with no
 fitting. We evaluate four on 120 change-series (69 continuous):
 Chronos-Bolt \citep{ansari2024chronos}, TimesFM~2.5 \citep{das2024timesfm},
@@ -1124,7 +1131,7 @@ TimesFM (2.5-200M)    & quantile$^{*}$ & 75 / \textbf{100}\,\% & 58 / 72\,\% & $
 \caption{Per-series win-rate of \code{laplace} versus four zero-shot foundation
 models on 120 change-series (69 continuous). $^{*}$Chronos-Bolt/TimesFM
 log-likelihood is reconstructed from a quantile head and is tail-limited; read
-their CRPS as the fairer signal. \code{laplace} mean continuous logpdf:
+their CRPS, which needs no density reconstruction, as the primary signal. \code{laplace} mean continuous logpdf:
 1.51.}
 \label{tab:foundation}
 \end{table}
@@ -1152,7 +1159,7 @@ one short univariate stream is outside its design regime, and domain-level
 fine-tuning across many series remains untested here; the zero-shot result is
 the headline because zero-shot is the intended use.}
 
-\subsection{Against a tabular foundation model, pre-registered}
+\subsection{Against a tabular foundation model}
 \label{sec:tabfm}
 
 Tabular foundation models are a second pretrained family with a claim on
@@ -1237,7 +1244,7 @@ mean while the surrounding machinery supplies the lattice handling, the
 volatility clock, and the tails. The footprint table bounds what that
 would buy: the mean would have to be worth its four orders of magnitude.
 
-\subsection{The laplace sandwich} \label{sec:sandwich}
+\subsection{The \code{laplace} sandwich} \label{sec:sandwich}
 
 \code{laplace} defines a causal bijection on paths: the Rosenblatt
 transform $z_t = \Phi^{-1}(F_t(y_t))$, where $F_t$ is the predictive cdf
@@ -1264,7 +1271,7 @@ AutoARIMA         & 1.646 & 3.719 & $+0.76$ & 30/30 \\
 GARCH(1,1)        & 1.732 & 3.703 & $+0.77$ & 30/30 \\
 Prophet           & 1.636 & 3.702 & $+0.85$ & 30/30 \\
 EWMA-Gauss (control) & 2.243 & 3.795 & $+0.51$ & 29/30 \\
-\emph{laplace alone} & & \emph{3.674} & & \\
+\code{laplace} alone & & \emph{3.674} & & \\
 \hline
 \end{tabular}
 \end{center}
@@ -1292,9 +1299,8 @@ family-weighted, an epsilon indistinguishable from TabFM's and stable
 from 30 series to the full universe. Its FRED-30 calendar surplus of
 $+0.03$ does not replicate beyond that first small sample.
 
-Two readings follow. Practically, the sandwich is a deployment path: an
-existing model, however trained, can be improved without retraining it,
-by feeding it z and mapping its output back. Scientifically, it is a
+Two readings follow. Practically, the sandwich is a deployment path:
+feed an existing model z, map its output back, and retrain nothing. Scientifically, it is a
 residual test, and a pre-registered rerun of TabFM's strongest
 configuration on the full universe sharpened the verdict into two
 regimes. On continuous series the bound is tight: after four classical
@@ -1346,8 +1352,8 @@ from $0.62$ nats raw to $0.05$ sandwiched, and the residual epsilon is
 $+0.04$, positive across the whole universe rather than confined to one
 stratum. The gain still concentrates on repeat-heavy series ($+2.1$
 nats median on the near-martingale repeat stratum), the same place the
-discrete TabFM head found structure, making this the third independent
-detector of exploitable structure in the $z$ stream of lattice-valued
+discrete TabFM head found structure; this is the third independent
+detection of exploitable structure in the $z$ stream of lattice-valued
 series. Second, staleness is cheap in these coordinates: a single
 pre-test ADVI fit, frozen with no refits through all 150 test steps,
 ties \code{laplace} overall (54\% of series, median gap $0.005$ nats).
@@ -1470,9 +1476,9 @@ predictive. We also note a scope boundary: on waveform-heavy data (electrocardio
 vibration traces) the anomaly of interest is a deformed \emph{shape} rather
 than a surprising next value, and shape-native methods such as matrix-profile
 discord discovery are likely the better tool. Turning a calibrated surprise
-stream into a benchmark-competitive detector on its own turf --- levels,
-rates, and counts with stochastic dynamics --- and finding an evaluation
-worth competing on, is future research.
+stream into a benchmark-competitive detector on that turf, and finding an
+evaluation worth competing on, is future research. That turf is levels,
+rates, and counts with stochastic dynamics.
 
 The
 empirical headline supports the design: against the strongest distributional
