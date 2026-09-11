@@ -11,16 +11,13 @@ document instead of a bare repository URL (see
 
 `papers/skaters-jss.pdf` (24 pp, title page carries author, site URL, and date).
 
-Optional before uploading: the title's em-dash ("Transforms All the Way Down — Automatic
-...") could become a colon to match house style. Say the word and I'll rebuild.
-
 ## 1. Title
 
 ```
 Transforms All the Way Down: Automatic Online Distributional Forecasting by Conjugation
 ```
 
-(or keep the em-dash form exactly as in the PDF if uploading unmodified)
+(matches the PDF)
 
 ## 2. Abstract (plain text for the SSRN box)
 
@@ -32,7 +29,8 @@ into one forecast function with no exposed tuning parameters, laplace, which lea
 per-series held-out log-likelihood race against classical, neural, and foundation-model
 baselines on FRED series; on asset prices a GARCH-t model remains better, a split we
 report rather than average away. Run in laplace's coordinates and mapped back exactly
-(the sandwich), existing models improve dramatically without retraining. The library is
+(the sandwich), the models tested close most of their held-out density gap
+without retraining. The library is
 implemented in pure Python (pip install skaters), zero-dependency JavaScript (npm
 install skaters), R, and a portable Rust core, held to 1e-6 agreement by a shared parity
 suite, so models run unchanged on a server or in a browser.
