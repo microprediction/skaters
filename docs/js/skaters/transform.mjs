@@ -113,15 +113,24 @@ export function standardize(alpha = 0.05, eps = 1e-8) {
   function forward(y, state) {
     if (state === null || state === undefined) return [0.0, { mu: y, var: 0.0 }];
     const mu = state.mu;
-    let varr = state.var;
+    const varr = state.var;
     const diff = y - mu;
-    // Center against the PRIOR mean (post-update centering shrinks the residual
-    // by (1-alpha) -> overconfident intervals); standard EWMA variance recursion.
-    const muNew = mu + alpha * diff;
-    varr = (1 - alpha) * varr + alpha * diff * diff;
-    const sigma = varr > eps * eps ? Math.sqrt(varr) : eps;
+    // Emit against the PRIOR state, so the forward map is the affine change
+    // of coordinates z = (y - mu) / sigma that the inverse applies. Scaling
+    // by the post-update std makes the emission self-normalized (bounded by
+    // 1/sqrt(alpha)) and the affine inverse is then not its inverse.
+    // Cold start: before the variance is informative, scale by the first
+    // nonzero residual, so the first informative emission is +-1.
+    let sigma;
+    if (varr > eps * eps) {
+      sigma = Math.sqrt(varr);
+    } else {
+      sigma = Math.abs(diff) > eps ? Math.abs(diff) : eps;
+    }
     const yPrime = diff / sigma;
-    return [yPrime, { mu: muNew, var: varr }];
+    const muNew = mu + alpha * diff;
+    const varNew = (1 - alpha) * varr + alpha * diff * diff;
+    return [yPrime, { mu: muNew, var: varNew }];
   }
   function inverseK(dists, state) {
     const varr = state.var;

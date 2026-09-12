@@ -137,6 +137,27 @@ def make_repeat_series(n=150, seed=99):
     return out
 
 
+def make_gap_series(n=150, seed=4242):
+    """A stream with MISSING observations, to pin the missing-tick rule across
+    ports: a non-finite y never reaches the tree, the base state is not
+    advanced, and the fan is shifted so the forecast ages by one step.
+
+    Gaps cover all three branches: a leading gap (no prior forecast, so the
+    wide no-information predictive), isolated gaps, and a run longer than k
+    (so the h=k hold is reached). Encoded in JSON with the same "nan" sentinel
+    clean() uses for outputs, since JSON has no NaN literal.
+    """
+    random.seed(seed)
+    out = []
+    lvl = 0.0
+    for t in range(n):
+        lvl += random.gauss(0, 0.3)
+        out.append(lvl + 2.0 * math.sin(2 * math.pi * t / 7) + random.gauss(0, 1.0))
+    for i in (0, 12, 13, 41, 77, 78, 79, 80, 81, 121):
+        out[i] = float("nan")
+    return out
+
+
 def clean(x):
     # JS JSON.parse rejects Infinity/NaN; encode them as string sentinels.
     if x != x:
@@ -207,6 +228,33 @@ def main():
     vectors["repeat_scenarios"] = {
         name: {"k": k, "out": run_scenario(sk, rep)} for name, (k, sk) in rep_scen.items()
     }
+
+    # Missing observations: the parade's non-finite tick rule. Both k=1 (hold
+    # the previous predictive, there is no h+1 to age into) and k>1 (shift the
+    # fan) are covered.
+    gaps = make_gap_series()
+    vectors["gap_series"] = [clean(v) for v in gaps]
+    gap_scen = {
+        "pol_laplace": (1, laplace(k=1)),
+        "pol_laplace_k3": (3, laplace(k=3)),
+    }
+    vectors["gap_scenarios"] = {
+        name: {"k": k, "out": run_scenario(sk, gaps)} for name, (k, sk) in gap_scen.items()
+    }
+
+    # STRUCTURE: the candidate population itself, not its numbers. 105,798
+    # numeric probes cannot see a port that is missing a candidate -- the R port
+    # sat at 57 candidates against Python's 60 (no `seasonal_anchor`) and every
+    # individual transform still matched to 1e-6, so only the composed laplace
+    # drifted. Count and depth histogram are language-agnostic and decisive, and
+    # they also pin ORDER-sensitivity: the ensemble aligns depths and weights by
+    # candidate index, so a candidate inserted in the wrong place shows up here.
+    from skaters.api import _build_candidates
+    structure = {}
+    for kk in (1, 3):
+        cands, depths, _ = _build_candidates(kk)
+        structure[str(kk)] = {"n_candidates": len(cands), "depths": list(depths)}
+    vectors["structure"] = structure
 
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "vectors.json")

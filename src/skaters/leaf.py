@@ -302,3 +302,84 @@ def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
 
     _leaf.__name__ = f"garch_leaf(k={k})"
     return _leaf
+
+def conforming_leaf(k: int = 1, max_centers: int = 96, ref_weight: float = 0.01,
+                    warmup: int = 30):
+    """Conforming (empirical) terminal leaf, Dist-native.
+
+    Models the residual law as the smoothed empirical distribution of past
+    residuals: a Gaussian mixture with equal weights at quantile-binned sample
+    centers and Silverman bandwidth, mixed with a small expanding-Gaussian
+    reference component (weight ``ref_weight``) so the density is proper in
+    the tails and sane during warm-up. Because the output is an ordinary
+    :class:`Dist`, the lattice projection and GPD tail splice compose with it
+    unchanged. Until ``warmup`` observations arrive it falls back to a
+    centered Gaussian with the running variance.
+    """
+    import bisect as _bisect
+
+    def _leaf(y: float, state: dict | None) -> tuple[list[Dist], dict]:
+        if state is None:
+            state = {"vals": [], "n": 0, "mu": 0.0, "m2": 0.0}
+        _bisect.insort(state["vals"], y)
+        state["n"] += 1
+        n = state["n"]
+        d0 = y - state["mu"]
+        state["mu"] += d0 / n
+        state["m2"] += d0 * (y - state["mu"])
+        var = state["m2"] / (n - 1) if n > 1 else max(y * y, 1e-12)
+        std = math.sqrt(var) if var > 0 else max(abs(y), 1e-8)
+
+        if n < warmup:
+            return [Dist.gaussian(0.0, std)] * k, state
+
+        vals = state["vals"]
+        m = min(max_centers, n)
+        centers = [vals[min(n - 1, int((i + 0.5) * n / m))] for i in range(m)]
+        h = max(1.06 * std * n ** (-0.2), 1e-8 * (std if std > 0 else 1.0), 1e-12)
+        w_body = (1.0 - ref_weight) / m
+        comps = [(w_body, c, h) for c in centers]
+        comps.append((ref_weight, 0.0, std))
+        d = Dist(comps)
+        return [d] * k, state
+
+    _leaf.__name__ = f"conforming_leaf(m={max_centers})"
+    return _leaf
+
+
+def ensemble_leaf(k: int = 1, max_centers: int = 96, ref_weight: float = 0.01,
+                  eta: float = 0.8, forget: float = 0.995, warmup: int = 30):
+    """Score-weighted ensemble of the conforming and scale-mixture leaves.
+
+    Runs :func:`conforming_leaf` and :func:`scale_mixture_leaf` side by side,
+    weights them by decayed predictive log-likelihood (learning rate ``eta``,
+    geometric ``forget``), and returns their weighted :meth:`Dist.combine`.
+    The weights migrate between the parametric and empirical leaves at
+    whatever sample size and series the data support.
+    """
+    conf = conforming_leaf(k=1, max_centers=max_centers, ref_weight=ref_weight,
+                           warmup=warmup)
+    mixl = scale_mixture_leaf(k=1)
+
+    def _leaf(y: float, state: dict | None) -> tuple[list[Dist], dict]:
+        if state is None:
+            state = {"conf": None, "mix": None, "lw": [0.0, 0.0],
+                     "pend": [None, None]}
+        for i, pend in enumerate(state["pend"]):
+            if pend is not None:
+                lp = pend.logpdf(y)
+                if lp > 20.0:
+                    lp = 20.0
+                elif not (lp >= -20.0):
+                    lp = -20.0
+                state["lw"][i] = forget * state["lw"][i] + eta * lp
+        dc, state["conf"] = conf(y, state["conf"])
+        dm, state["mix"] = mixl(y, state["mix"])
+        state["pend"] = [dc[0], dm[0]]
+        mx = max(state["lw"])
+        ws = [math.exp(lw - mx) for lw in state["lw"]]
+        d = Dist.combine([dc[0], dm[0]], ws)
+        return [d] * k, state
+
+    _leaf.__name__ = "ensemble_leaf"
+    return _leaf
