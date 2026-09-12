@@ -1,16 +1,21 @@
 # Foundation-model studies — setup & running (incl. Mac Studio / MPS)
 
-Two studies, two protocols:
+The studies use separate protocols:
 
-1. **Zero-shot** (`foundation_study.py`) — no weight updates; the model conditions
-   on a sliding 256-step context window. **Done on CPU; results in the repo.**
-2. **Fine-tuned** (`foundation_finetune.py`) — fine-tune each model on the
-   series' own history, then forecast the held-out window. **GPU/MPS-bound for the
-   larger models** — this is the Mac Studio job.
+- **Zero-shot** (`foundation_study.py`) — no weight updates; the model conditions
+  on a sliding 256-step context window. **Done on CPU; results in the repo.**
+- **Per-series fine-tuned** (`foundation_finetune.py`) — fine-tune each model
+  on one series, then forecast its held-out window. **GPU/MPS-bound for larger
+  models.**
+- **Cross-series Laplace distillation** (`laplace_distill.py`,
+  `timesfm_distill.py`) — train one TimesFM LoRA adapter on predictive soft
+  targets from many complete series, then test on disjoint series.
 
-Both score every model through the same `Dist` as the eight-baseline study, and
-re-score `laplace` on the identical window. Win-rates merge across runs via
-`summarize()`.
+Every study maps model output to the same `Dist` and canonical prediction
+contracts and re-scores `laplace` on identical forecast origins. The original
+zero-shot and per-series harnesses merge win-rates with `summarize()`. Studies
+that persist per-origin predictions derive paired and Diebold-Mariano summaries
+from those stores.
 
 ## Why separate conda envs
 
@@ -81,3 +86,22 @@ python benchmarks/foundation_finetune.py summarize
 > `foundation_finetune.py` harness is kept for completeness, but the zero-shot
 > study is the headline and per-series fine-tuning is **not worth GPU time**
 > without heavy per-series regularization (which defeats the purpose).
+
+## Cross-series Laplace distillation
+
+Issue #133 tested the domain-level alternative to failed per-series fine-tuning.
+The student is TimesFM 2.5 (200M) with a 5.57 MB LoRA adapter. Teacher records
+contain the mean, q10–q90, and complete predictive; whole-series splitting keeps
+train, validation, and test disjoint.
+
+The first pilot decoded the TimesFM head incorrectly and is invalid. Fresh
+context-128 and context-256 adapters use channel 5 as the mean and channels
+`[0,1,2,3,4,6,7,8,9]` as q10–q90. The corrected primary result is negative:
+distilled minus zero-shot median dLL is **−0.155385**, median CRPS ratio is
+**1.002855**, and the adapter wins 0/15 series by LL. Context 256 does not
+reverse the decision. Direct Laplace remains the default.
+
+The corrected report, chronology, exact commands, limitations, checksums,
+teacher corpora, both fresh adapters, raw quantiles, and canonical predictions
+are in [`ISSUE133.md`](ISSUE133.md) and
+[`distill_artifacts/`](distill_artifacts/).

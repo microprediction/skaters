@@ -20,7 +20,10 @@ import time
 import urllib.parse
 import urllib.request
 
-from fred import _api_key, _HERE  # type: ignore
+try:
+    from .fred import _api_key, _HERE
+except ImportError:
+    from fred import _api_key, _HERE  # type: ignore
 
 _CACHE = os.path.join(_HERE, "data")
 _UNIVERSE_JSON = os.path.join(_CACHE, "universe_daily.json")
