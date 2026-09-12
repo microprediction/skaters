@@ -274,6 +274,21 @@ class TestPruning:
         assert len(pruned) == 1
         assert abs(pruned.mean - 5.0) < 1e-10
 
+    def test_prune_pair_selection_is_translation_invariant(self):
+        """skaters#226: the tie tolerance must depend on the mixture's own
+        spread, not on how far it sits from the origin. shift(b).prune(n)
+        must merge the same (nearest) pair as prune(n) directly, however
+        large b is -- the closest pair here (1.0, 1.01) stays 100x closer
+        than the next-nearest pair (0.0, 1.0) at any translation."""
+        d = Dist([(1, 0.0, 0.01), (1, 1.0, 0.01), (1, 1.01, 0.01)])
+        unshifted = d.prune(2)
+        shifted = d.shift(1e9).prune(2).shift(-1e9)
+        means_unshifted = sorted(m for _, m, _ in unshifted.components)
+        means_shifted = sorted(m for _, m, _ in shifted.components)
+        for a, b in zip(means_unshifted, means_shifted):
+            assert abs(a - b) < 1e-3
+        assert abs(unshifted.cdf(0.2) - shifted.cdf(0.2)) < 1e-6
+
 
 # --- Serialization ---
 

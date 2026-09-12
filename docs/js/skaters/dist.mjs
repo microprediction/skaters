@@ -135,7 +135,10 @@ export class Dist {
 
   pdf(x) {
     let total = 0.0;
-    for (const [w, m, s] of this.components) total += w * gaussianPdf(x, m, s);
+    for (const [w, m, s] of this.components) {
+      if (w <= 0.0) continue;   // skaters#222: 0 * Infinity at a discarded (s=0) atom is NaN
+      total += w * gaussianPdf(x, m, s);
+    }
     return total;
   }
 
@@ -252,7 +255,9 @@ export class Dist {
     // disagree at the ulp level (e.g. libm erf vs a polynomial) still merge
     // the same pairs in the same order. Exact argmin would amplify ulp
     // noise into macroscopically different mixtures.
-    const scale = Math.abs(comps[0][1]) + Math.abs(comps[comps.length - 1][1]) + 1e-12;
+    // Translation-invariant (skaters#226): the span of the sorted means, not
+    // the sum of their absolute locations (which inflates with translation).
+    const scale = (comps[comps.length - 1][1] - comps[0][1]) + 1e-12;
     while (comps.length > maxComponents) {
       let bestDist = Infinity;
       for (let i = 0; i < comps.length; i++)

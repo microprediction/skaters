@@ -112,7 +112,15 @@ function expand(pool, k, topN, maxDepth, transforms, costBudget) {
       existing.add(key);
       const childFn = buildFromRecipe(newRecipe, k, transforms);
       childFn.skaterName = newRecipe.join("|") + "|leaf";
-      children.push(makeEntry(childFn, newRecipe.length, newRecipe, k, childCost));
+      const child = makeEntry(childFn, newRecipe.length, newRecipe, k, childCost);
+      // Parent-relative initialization (skaters#223): a fresh log_w of 0.0
+      // is not on the same reference basis as an incumbent's cumulative sum
+      // over its whole lifetime, so prune (and the softmax combination)
+      // were comparing an unscored zero against hundreds of resolved
+      // observations. The child already inherits the parent's warm STATE
+      // via warmup; it must also inherit the parent's current log_w.
+      child.log_w = parent.log_w.slice();
+      children.push(child);
     }
   }
   return children;
