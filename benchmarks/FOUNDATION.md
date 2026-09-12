@@ -7,9 +7,9 @@ The studies use separate protocols:
 - **Per-series fine-tuned** (`foundation_finetune.py`) — fine-tune each model
   on one series, then forecast its held-out window. **GPU/MPS-bound for larger
   models.**
-- **TiRex-2 challenger** (`tirex2_issue138.py`) — public zero-shot q10–q90
-  checkpoint on a frozen M4-hourly validation/test panel, with matched-context
-  and online Laplace comparators.
+- **Cross-series Laplace distillation** (`laplace_distill.py`,
+  `timesfm_distill.py`) — train one TimesFM LoRA adapter on predictive soft
+  targets from many complete series, then test on disjoint series.
 
 Every study maps model output to the same `Dist` and canonical prediction
 contracts and re-scores `laplace` on identical forecast origins. The original
@@ -87,15 +87,21 @@ python benchmarks/foundation_finetune.py summarize
 > study is the headline and per-series fine-tuning is **not worth GPU time**
 > without heavy per-series regularization (which defeats the purpose).
 
-## TiRex-2 challenger
+## Cross-series Laplace distillation
 
-Issue #138 now has a normal `TiRex-2` registry entry and a completed frozen
-M4-hourly benchmark. On 24 series, TiRex-2 versus matched-context Laplace has
-median dLL **+0.195903**, median CRPS ratio **0.847979**, and a per-series DM
-record of 15 wins, 9 draws, and 0 losses.
+Issue #133 tested the domain-level alternative to failed per-series fine-tuning.
+The student is TimesFM 2.5 (200M) with a 5.57 MB LoRA adapter. Teacher records
+contain the mean, q10–q90, and complete predictive; whole-series splitting keeps
+train, validation, and test disjoint.
 
-“Table-R1” and “TwbFB” remain unidentified, so the contribution does not claim
-to reproduce either. The report and exact missing-information request are in
-[`ISSUE138.md`](ISSUE138.md); frozen sources, native quantiles, canonical
-scores, runtime/source hashes, and checksums are in
-[`tirex2_artifacts/`](tirex2_artifacts/).
+The first pilot decoded the TimesFM head incorrectly and is invalid. Fresh
+context-128 and context-256 adapters use channel 5 as the mean and channels
+`[0,1,2,3,4,6,7,8,9]` as q10–q90. The corrected primary result is negative:
+distilled minus zero-shot median dLL is **−0.155385**, median CRPS ratio is
+**1.002855**, and the adapter wins 0/15 series by LL. Context 256 does not
+reverse the decision. Direct Laplace remains the default.
+
+The corrected report, chronology, exact commands, limitations, checksums,
+teacher corpora, both fresh adapters, raw quantiles, and canonical predictions
+are in [`ISSUE133.md`](ISSUE133.md) and
+[`distill_artifacts/`](distill_artifacts/).

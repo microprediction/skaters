@@ -29,6 +29,13 @@ from skaters.dist import Dist
 from skaters.leaf import crps_leaf
 
 
+_PIT_DISPERSION_TARGET = 1.0 / 12.0     # Var[U] for U ~ Uniform(0,1): E[(u-0.5)^2] at perfect calibration
+_PIT_EWMA_DECAY = 0.98
+_LOSS_FAST_DECAY = 0.90
+_LOSS_SLOW_DECAY = 0.995
+_TEMP_AMBIG_EPS = 0.15 * _PIT_DISPERSION_TARGET   # |e_t| below this defers to the loss-slope tiebreak
+
+
 def terminal_leaf_ensemble(
     skaters: list,
     leaf_fn=crps_leaf,
@@ -39,6 +46,9 @@ def terminal_leaf_ensemble(
     prior_log_weights: list[float] | None = None,
     max_components: int = 20,
     forget: float = 1.0,
+    adaptive_temperature: bool = False,
+    temp_rho: float = 0.03,
+    temp_band: float = 3.0,
 ):
     """Create a terminal-leaf ensemble.
 
@@ -47,7 +57,13 @@ def terminal_leaf_ensemble(
         leaf_fn: factory for the terminal residual leaf (default :func:`crps_leaf`;
             pass ``scale_mixture_leaf`` for the likelihood objective).
         k: forecast horizon.
-        learning_rate: eta for the likelihood-based mean weighting.
+        learning_rate: eta for the likelihood-based mean weighting -- under
+            random-utility maximization this is exactly a Gumbel-logit selection
+            temperature (softmax(eta * score) is the choice probability when
+            candidate scores carry i.i.d. Gumbel(0, 1/eta) noise): larger eta ->
+            colder selection (commits to the best candidate faster), smaller eta
+            -> hotter (hedges across the pool). Also the center of the adaptive
+            band when ``adaptive_temperature`` is set.
         complexity_penalty: per-depth penalty (as in bayesian_ensemble).
         depths, prior_log_weights: optional, one per sub-model.
         max_components: prune the warm-up fallback mixture to this many.
@@ -55,6 +71,22 @@ def terminal_leaf_ensemble(
             exact cumulative updating (the ensemble converges to a fixed winner);
             values just below 1 (e.g. 0.99) keep it adaptive to regime change at
             negligible steady-state cost.
+        adaptive_temperature: opt-in. Drives eta online from the ensemble's own
+            realized one-step calibration instead of holding it fixed (see
+            skaters#213/#215): a running EWMA of the issued predictive's PIT
+            dispersion, ``e_t = EWMA((u_t - 0.5)^2) - 1/12`` (0 at perfect
+            calibration; positive when misses land in the tails more than
+            uniform predicts -> heat up / hedge; negative -> cool down / commit).
+            When |e_t| is inside a small dead band (predictive dispersion looks
+            fine), the direction instead follows the sign of a fast-vs-slow EWMA
+            spread of the issued predictive's own logpdf (improving -> commit,
+            degrading -> hedge). Off by default; when on, ``eta`` still starts
+            at ``learning_rate`` and only drifts from there.
+        temp_rho: log-space step size for the adaptive update. Fixed across all
+            series -- not meant to be tuned per series.
+        temp_band: adaptive eta is clipped to
+            ``[learning_rate / temp_band, learning_rate * temp_band]`` so it
+            cannot run away.
     """
     n = len(skaters)
     assert n > 0
@@ -76,6 +108,13 @@ def terminal_leaf_ensemble(
                 "leaf_state": [None] * k,
                 "leaf_pred": [None] * k,
                 "mean_q": [deque() for _ in range(k)],          # pending combined means per horizon
+                "adapt": {
+                    "log_eta": math.log(learning_rate),
+                    "pit_ewma": _PIT_DISPERSION_TARGET,
+                    "loss_fast": None,
+                    "loss_slow": None,
+                    "pred_q": deque(),          # pending issued h=1 predictive, for next step's signal
+                } if adaptive_temperature else None,
             }
 
         # Run all sub-models; collect their k Dists.
@@ -83,6 +122,44 @@ def terminal_leaf_ensemble(
         for i, f in enumerate(skaters):
             di, state["sub"][i] = f(y, state["sub"][i])
             all_dists.append(di)
+
+        # Adaptive selection temperature (skaters#213/#215): resolve the ISSUED
+        # predictive from one step ago against this step's y, turn its PIT
+        # dispersion (and, in the dead band, its own logpdf trend) into a
+        # heat/cool signal, and use the resulting eta_t for THIS step's weight
+        # update below. Strictly causal, same one-step lag as the qdist weighting.
+        eta_t = learning_rate
+        if adaptive_temperature:
+            ad = state["adapt"]
+            pq = ad["pred_q"]
+            if pq:
+                prev_pred = pq.popleft()
+                lp_c = prev_pred.logpdf(y)
+                if not (lp_c >= -20.0):
+                    lp_c = -20.0
+                elif lp_c > 20.0:
+                    lp_c = 20.0
+                u = prev_pred.cdf(y)
+                if not (0.0 <= u <= 1.0):
+                    u = 0.5                     # degenerate/NaN guard: no signal
+                ad["pit_ewma"] = (_PIT_EWMA_DECAY * ad["pit_ewma"]
+                                  + (1.0 - _PIT_EWMA_DECAY) * (u - 0.5) ** 2)
+                if ad["loss_fast"] is None:
+                    ad["loss_fast"] = ad["loss_slow"] = lp_c
+                else:
+                    ad["loss_fast"] = _LOSS_FAST_DECAY * ad["loss_fast"] + (1.0 - _LOSS_FAST_DECAY) * lp_c
+                    ad["loss_slow"] = _LOSS_SLOW_DECAY * ad["loss_slow"] + (1.0 - _LOSS_SLOW_DECAY) * lp_c
+                e_t = ad["pit_ewma"] - _PIT_DISPERSION_TARGET
+                dloss_t = ad["loss_fast"] - ad["loss_slow"]
+                if abs(e_t) > _TEMP_AMBIG_EPS:
+                    direction = -1.0 if e_t > 0.0 else 1.0
+                else:
+                    direction = 1.0 if dloss_t > 0.0 else (-1.0 if dloss_t < 0.0 else 0.0)
+                ad["log_eta"] += temp_rho * direction
+                lo = math.log(learning_rate / temp_band)
+                hi = math.log(learning_rate * temp_band)
+                ad["log_eta"] = min(max(ad["log_eta"], lo), hi)
+            eta_t = math.exp(ad["log_eta"])
 
         # Update model weights from the resolved one-step prediction. The `forget`
         # factor (< 1) geometrically discounts past log-evidence so the ensemble
@@ -101,7 +178,7 @@ def terminal_leaf_ensemble(
                 elif not (lp >= -20.0):
                     lp = -20.0
                 state["log_w"][i] = (forget * state["log_w"][i]
-                                     + learning_rate * lp - complexity_penalty * depths[i])
+                                     + eta_t * lp - complexity_penalty * depths[i])
             q.append(all_dists[i][0])
 
         log_w = state["log_w"]
@@ -131,7 +208,11 @@ def terminal_leaf_ensemble(
             combined.append(pred)
             mq.append(mu_h)
 
+        if adaptive_temperature:
+            state["adapt"]["pred_q"].append(combined[0])
+
         return combined, state
 
-    _skater.__name__ = f"terminal_leaf_ensemble(n={n}, k={k})"
+    _skater.__name__ = (f"terminal_leaf_ensemble(n={n}, k={k})" if not adaptive_temperature
+                        else f"terminal_leaf_ensemble(n={n}, k={k}, adaptive_temp)")
     return _skater

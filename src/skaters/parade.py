@@ -29,6 +29,19 @@ _STD_NORMAL = Dist.gaussian(0.0, 1.0)
 # quantile at 1e-12, about 7.03, and the bisection in Dist.quantile stays
 # inside its +-8 sigma bracket. No input can produce an infinite z.
 _EPS = 1e-12
+# A leading missing tick has no prior forecast to age and no observation has
+# fixed the series' scale yet, so emit a deliberately wide zero-centred
+# Gaussian rather than a confident guess. The tree is left untouched, so the
+# first finite value initializes it exactly as a true first observation would.
+_NO_INFO_STD = 1e6
+
+
+def _missing(y) -> bool:
+    """True for a tick carrying no observation (NaN, inf, or non-numeric)."""
+    try:
+        return not math.isfinite(y)
+    except (TypeError, ValueError):
+        return True
 
 
 def parade(base, k: int):
@@ -37,9 +50,34 @@ def parade(base, k: int):
     def _skater(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
             state = {"base": None, "pending": deque(maxlen=k),
-                     "pit": [None] * k, "z": [None] * k}
+                     "pit": [None] * k, "z": [None] * k, "skipped": 0}
         pend = state["pending"]
         n = len(pend)
+        # Missing observation. A non-finite y must never reach the tree: an EWMA
+        # fed NaN is poisoned permanently (mu + alpha*(nan - mu) = nan) and no
+        # amount of clean data afterwards recovers it — measured as
+        # mean=nan/std=0.0 forever at k=1, and an opaque `assert w_total > 0`
+        # inside Dist at k>1. So treat the tick as "no observation": time
+        # advanced, information did not. The base state is left exactly as it
+        # was and the fan is SHIFTED — the previous tick's horizon h+1 is this
+        # tick's horizon h — so the forecast AGES by one step instead of
+        # relabelling a stale h+1 predictive as h. Ageing is not the same as
+        # widening: on a periodic series the h=k predictive is legitimately
+        # sharper than h=1, and the shift keeps whichever predictive genuinely
+        # targets the stream position being forecast. It also keeps the
+        # parade's own bookkeeping aligned, so the next finite y is resolved
+        # against the predictive that actually aimed at it. After k consecutive
+        # gaps the longest available horizon (h=k) is held.
+        if _missing(y):
+            state["skipped"] = state.get("skipped", 0) + 1
+            state["pit"] = [None] * k
+            state["z"] = [None] * k
+            if not n:
+                return [Dist.gaussian(0.0, _NO_INFO_STD) for _ in range(k)], state
+            prev = pend[-1]
+            shifted = [prev[min(h, len(prev) - 1)] for h in range(1, k + 1)]
+            pend.append(shifted)
+            return shifted, state
         pit = [None] * k
         z = [None] * k
         for m in range(1, k + 1):

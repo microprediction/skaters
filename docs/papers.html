@@ -3,18 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>skaters — papers &amp; benchmarks</title>
-  <meta name="description" content="The paper and the benchmark studies: twelve distributional baselines, foundation models, multi-step horizons, and the martingality gradient." />
+  <title>skaters — papers</title>
+  <meta name="description" content="The skaters papers: the methods paper and the conformal information gap companion study." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="skaters" />
-  <meta property="og:title" content="skaters — papers & benchmarks" />
-  <meta property="og:description" content="The paper and the benchmark studies: twelve distributional baselines, foundation models, multi-step horizons, and the martingality gradient." />
+  <meta property="og:title" content="skaters — papers" />
+  <meta property="og:description" content="The skaters papers: the methods paper and the conformal information gap companion study." />
   <meta property="og:url" content="https://skaters.microprediction.org/papers.html" />
   <meta property="og:image" content="https://skaters.microprediction.org/assets/frontier.png" />
   <meta property="og:image:alt" content="Accuracy vs speed: laplace has the best held-out likelihood at a fraction of the baselines' runtime." />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .lede { color: #555; margin: 0 0 32px; font-size: 1.05em; }
+    .paper { margin: 0 0 34px; }
+    .paper h2 { margin: 0 0 6px; font-weight: 600; font-size: 1.3em; }
+    .paper h2 a { text-decoration: none; }
+    .paper h2 a:hover { text-decoration: underline; }
+    .paper .abstract { margin: 0 0 8px; color: #444; }
+    .paper .links a { text-decoration: none; margin-right: 16px; }
+    .paper .links a:hover { text-decoration: underline; }
+    .status { color: #888; font-size: 0.92em; font-style: italic; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -28,6 +39,7 @@
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
@@ -35,15 +47,19 @@
             <a href="/foundation/chronos.html">Chronos</a>
             <a href="/foundation/tirex.html">TiRex</a>
             <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
+        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
+            <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
@@ -57,122 +73,53 @@
   </header>
 
   <main>
-    <h1>Papers &amp; benchmarks</h1>
-    <p class="subtitle">A new practical benchmark for univariate distributional prediction —
-      simpler and lighter than Prophet, and scored where it counts: held-out likelihood.</p>
+    <h1>Papers</h1>
+    <p class="lede">Papers built on the skaters library. Sources and run logs are in the
+      <a href="https://github.com/microprediction/skaters/tree/main/papers">papers/</a> and
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">benchmarks/</a>
+      directories of the repository. The benchmark studies themselves live on the
+      <a href="/benchmarks.html">benchmarks page</a>.</p>
 
-    <h2>The paper</h2>
-    <p>
-      <strong>Transforms All the Way Down — Automatic Online Distributional
-      Forecasting by Conjugation.</strong> P. Cotton.
-    </p>
-    <p>
-      Every prediction is a full predictive distribution, assembled by composition: invertible
-      transforms chain together above a single distributional leaf, and ensembles combine such
-      chains. Because the leaf fits its shape by optimising a proper scoring rule, its objective is
-      a choice — fit the model by likelihood, then conform the predictive tail to a downstream score
-      such as CRPS. The library is written twice, in pure Python and in zero-dependency JavaScript
-      that agrees to 1e-6, so the same model runs on a server or in a browser.
-    </p>
-    <p>
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF →</a>
-      &nbsp;·&nbsp;
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX (JSS)</a>
-      &nbsp;·&nbsp;
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters.md">Markdown draft</a>
-    </p>
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">Transforms
+      all the way down: automatic online distributional forecasting by conjugation</a></h2>
+      <p class="abstract">The methods paper. Every prediction is a full predictive
+      distribution, assembled by composition: invertible transforms chain onto a single
+      distributional leaf fitted by a proper scoring rule, and the collection collapses into
+      one forecast function with no exposed tuning parameters. It leads the held-out
+      log-likelihood race against classical, neural, and foundation-model baselines on FRED
+      series, with the asset-price split reported rather than averaged away. Written twice,
+      in pure Python and zero-dependency JavaScript, held to 1e-6 agreement by a parity
+      suite.</p>
+      <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">PDF</a>
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX</a>
+      <span class="status">SSRN, 2026</span></p>
+    </div>
 
-    <h2>Benchmark 1 — the non-price universe</h2>
-    <p>
-      A fair rolling one-step-ahead comparison on the <strong>non-price</strong> FRED universe —
-      894 continuous daily change-series (57 correlated families); equity/fx/commodity returns are
-      excluded and treated separately in the price caveat below. Every method — ours and theirs — is
-      turned into the same <code>Dist</code> and scored on held-out log-likelihood <em>and</em> CRPS.
-      Per-series win-rate of <code>laplace</code>, reported <em>raw</em> and <em>family-weighted</em>
-      (one vote per correlated family):
-    </p>
-    <table>
-      <thead><tr><th>Baseline</th><th>LL (raw / fam)</th><th>CRPS (raw / fam)</th><th>mean LL</th></tr></thead>
-      <tbody>
-        <tr><td>AutoARIMA</td><td>82 / 90%</td><td>53 / 65%</td><td>2.80</td></tr>
-        <tr><td>AutoETS</td><td>97 / 99%</td><td>83 / 92%</td><td>2.79</td></tr>
-        <tr><td>SARIMAX (statsmodels)</td><td>87 / 86%</td><td>53 / 64%</td><td>2.92</td></tr>
-        <tr><td>ETS (statsmodels)</td><td>96 / 98%</td><td>81 / 90%</td><td>2.89</td></tr>
-        <tr><td>GARCH(1,1)-t (<code>arch</code>)</td><td>68 / 65%</td><td>54 / 45%</td><td>3.03</td></tr>
-        <tr><td>AutoARIMA + conformal</td><td>86 / 88%</td><td>31 / 31%</td><td>2.27</td></tr>
-        <tr><td>AutoARIMA + ACI</td><td>88 / 88%</td><td>29 / 29%</td><td>2.51</td></tr>
-        <tr><td>naive conformal</td><td>— (CDF)</td><td>92 / 93%</td><td>—</td></tr>
-        <tr><td>NF-StudentT (NeuralForecast)</td><td>100 / 100%</td><td>78 / 76%</td><td>0.82</td></tr>
-      </tbody>
-    </table>
-    <p>
-      <code>laplace</code> (mean log-likelihood <strong>3.20</strong>) wins the likelihood race
-      against every baseline on non-price series — including <strong>GARCH-t</strong>, the heavy-tail
-      SOTA (68% raw / 65% family-weighted; mean LL 3.20 vs 3.03). On CRPS it beats the mean-model
-      baselines and loses only to the CRPS-specialists (fitted conformal ~30%, GARCH-t 45%
-      family-weighted) — their home turf. <strong>No free lunch on price/returns:</strong> on
-      equity/fx/commodity return series GARCH-t has the higher log-likelihood, and we recommend it
-      there rather than averaging the two regimes into one number.
-      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">The study →</a>
-    </p>
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/conformalprediction/blob/main/papers/frontier/frontier.pdf">An
+      empirical study of the conformal information gap</a></h2>
+      <p class="abstract">The companion study, with skaters as the measurement instrument.
+      Under logarithmic loss the irreducible cost of a retained representation is a
+      conditional mutual information, the information gap. A nested ladder of transforms
+      prices each representation family prequentially on 701 economic series: conditional
+      scale is the largest and most reliable component of the gain, and scale-normalized
+      empirical pooling beats raw pooling on 87 percent of series under CRPS.</p>
+      <p class="links"><a href="https://github.com/microprediction/conformalprediction/blob/main/papers/frontier/frontier.pdf">PDF</a>
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">experiment scripts</a>
+      <span class="status">SSRN preprint, 2026; under journal review</span></p>
+    </div>
 
-    <h2>Benchmark 2 — zero-shot foundation models</h2>
-    <p>
-      A different protocol: pretrained models used zero-shot (fixed 256-context, no refit) on 120
-      change-series (69 continuous). Per-series win-rate of <code>laplace</code>:
-    </p>
-    <table>
-      <thead><tr><th>Model</th><th>density</th><th>LL (all / cont)</th><th>CRPS (all / cont)</th></tr></thead>
-      <tbody>
-        <tr><td>Moirai (1.1-R-small)</td><td>native Student-t</td><td>98 / 97%</td><td>94 / 93%</td></tr>
-        <tr><td>Lag-Llama</td><td>native Student-t</td><td>67 / 99%</td><td>65 / 94%</td></tr>
-        <tr><td>Chronos-Bolt (small)</td><td>quantile*</td><td>76 / 100%</td><td>67 / 88%</td></tr>
-        <tr><td><a href="/timesfm.html">TimesFM (2.5-200M)</a></td><td>quantile*</td><td>75 / 100%</td><td>58 / 72%</td></tr>
-      </tbody>
-    </table>
-    <p>
-      On the continuous series, <code>laplace</code> beats all four zero-shot. The native-density
-      models (Moirai, Lag-Llama) are the closest. Naive per-series <em>fine-tuning</em> doesn't
-      rescue them — it catastrophically overfits (logpdf +1.5 → −118). A zero-dependency online
-      ensemble holding its own against 200M-parameter transformers.
-      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">The foundation study →</a>
-    </p>
-
-    <h2>Challengers</h2>
-    <p>
-      Every method that has stepped up, one row each with its tape, lives on
-      its own page now, built for the ones still coming:
-      <a href="/challengers.html">Challengers</a>.
-    </p>
-
-    <h2>Related reading</h2>
-    <ul>
-      <li><strong>Why skaters ranks by likelihood, by default.</strong> A scoring
-        rule is a settlement rule — match it to the target. Why a reusable
-        density is best judged by held-out log-likelihood (locality, the wealth a
-        market pays, additivity under composition, the information gap) and where
-        CRPS is the better target instead.
-        <a href="./metrics.html">Read it →</a></li>
-      <li><strong>On Prophet.</strong> The famous critique of Facebook Prophet —
-        <em>“Is Facebook’s Prophet the Time-Series Messiah, or Just a Very Naughty Boy?”</em>
-        (P. Cotton). <a href="https://medium.com/geekculture/is-facebooks-prophet-the-time-series-messiah-or-just-a-very-naughty-boy-8b71b136bc8c">Read it →</a></li>
-      <li><strong>The sandwich.</strong> Every model improved by running in
-        laplace's coordinates: forecasters and detectors, with measured
-        lifts. <a href="./sandwich.html">Read it →</a></li>
-      <li><strong>Challengers.</strong> Prophet at three scales and TabFM
-        pre-registered: frozen universes, statements before results, and the
-        sandwich verdicts. <a href="./challengers.html">Read it →</a></li>
-      <li><strong>The 99.9% interval that is actually 99.9%.</strong> Why
-        every predictive now carries censored-ML generalized-Pareto tails,
-        and the alarm budgets that come true.
-        <a href="./tails.html">Read it →</a></li>
-      <li><strong>Anomaly detection literature map.</strong> The streaming anomaly
-        detection literature, annotated and organized around one question: who can
-        promise a false-alarm rate on a drifting stream?
-        <a href="./anomaly-literature.html">Read it →</a></li>
-      <li><strong>Benchmarks repository.</strong> All studies are reproducible end-to-end:
-        <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">skaters/benchmarks</a>.</li>
-    </ul>
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/joss/paper.md">skaters:
+      online distributional time-series forecasting by conjugation, in Python and
+      JavaScript</a></h2>
+      <p class="abstract">The short software paper describing the package itself: the
+      transform contract, the conjugation recursion, the parity-locked ports, and the
+      calibration state that turns the forecaster into an anomaly detector.</p>
+      <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/joss/paper.md">paper.md</a>
+      <span class="status">under review at the Journal of Open Source Software</span></p>
+    </div>
 
     <h2>Citation</h2>
 <pre><code>@misc{cotton2026skaters,

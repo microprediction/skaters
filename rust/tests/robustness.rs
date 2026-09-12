@@ -4,8 +4,8 @@
 //! contracts a backend must keep: bitwise determinism and serde
 //! checkpoint-resume equivalence.
 
-use skaters_core::api::{laplace, Forecaster};
-use skaters_core::tails::PDist;
+use skaters::api::{laplace, Forecaster};
+use skaters::tails::PDist;
 
 // Deterministic LCG + Box-Muller-free gaussian via sum of uniforms is NOT
 // used; mirror adversarial.mjs exactly: LCG + Box-Muller with libm.
@@ -170,8 +170,8 @@ fn search_checkpoint_resume_bit_exact() {
     // The search state (pool of live Sk values plus recipes) is plain data:
     // checkpoint past an expansion (n_obs 100) and resume bit-exactly, with
     // the infinite cost budget surviving the JSON round trip.
-    use skaters_core::search::search;
-    use skaters_core::skater::Sk;
+    use skaters::search::search;
+    use skaters::skater::Sk;
     let mut r = Lcg(19);
     let ys: Vec<f64> = (0..300).map(|_| r.gauss()).collect();
     let mut straight = Sk::Search(Box::new(search(1)));
