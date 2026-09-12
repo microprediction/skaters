@@ -1,0 +1,647 @@
+{
+  "density_reconstruction": {
+    "candidate_multipliers": [
+      0.25,
+      0.5,
+      0.75,
+      1.0,
+      1.25,
+      1.5,
+      2.0,
+      3.0
+    ],
+    "candidate_scores": {
+      "0.25": 0.6280136924406974,
+      "0.5": 1.7593344799025505,
+      "0.75": 2.2314598734662305,
+      "1.0": 2.487516433336989,
+      "1.25": 2.638497989325917,
+      "1.5": 2.7315759902005574,
+      "2.0": 2.8170202740532844,
+      "3.0": 2.8435352782007013
+    },
+    "criterion": "equal-series mean logpdf with floor -20",
+    "kind": "fixed-bandwidth Gaussian-mixture reconstruction",
+    "quantile_levels": [
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9
+    ],
+    "selected_multiplier": 3.0,
+    "selection_rows": 1536,
+    "selection_series": 24,
+    "selection_split": "validation"
+  },
+  "evaluation": {
+    "by_series": {
+      "H1": {
+        "Laplace-fixed-context": {
+          "crps": 0.011997437500000001,
+          "logpdf": 2.3186431562500003,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00994459375,
+          "logpdf": 2.638205390625,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.011962765625,
+          "logpdf": 2.3565256875,
+          "n": 64
+        }
+      },
+      "H10": {
+        "Laplace-fixed-context": {
+          "crps": 0.018728015625,
+          "logpdf": 1.73784084375,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.012532031249999999,
+          "logpdf": 2.4068794374999998,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.01666365625,
+          "logpdf": 2.1960971875,
+          "n": 64
+        }
+      },
+      "H11": {
+        "Laplace-fixed-context": {
+          "crps": 0.009836203125,
+          "logpdf": 2.6270161875,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.005138703125,
+          "logpdf": 3.205972171875,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.005515796875,
+          "logpdf": 3.2210558125,
+          "n": 64
+        }
+      },
+      "H12": {
+        "Laplace-fixed-context": {
+          "crps": 0.005051546875,
+          "logpdf": 3.123958578125,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.004379703125,
+          "logpdf": 3.33906778125,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.004792609375,
+          "logpdf": 3.293909859375,
+          "n": 64
+        }
+      },
+      "H13": {
+        "Laplace-fixed-context": {
+          "crps": 0.08649979687499999,
+          "logpdf": 0.18245971875000003,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.050922109374999996,
+          "logpdf": 0.6736593906250001,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.0577821875,
+          "logpdf": 1.026139921875,
+          "n": 64
+        }
+      },
+      "H14": {
+        "Laplace-fixed-context": {
+          "crps": 0.010309125,
+          "logpdf": 2.5354297656249996,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.01073409375,
+          "logpdf": 2.5377927031249996,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.0104104375,
+          "logpdf": 2.5371613281250003,
+          "n": 64
+        }
+      },
+      "H15": {
+        "Laplace-fixed-context": {
+          "crps": 0.006151421874999999,
+          "logpdf": 3.0138495937500003,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.004815765624999999,
+          "logpdf": 3.257780890625,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.0058230781250000006,
+          "logpdf": 3.1227849375,
+          "n": 64
+        }
+      },
+      "H16": {
+        "Laplace-fixed-context": {
+          "crps": 0.01095459375,
+          "logpdf": 2.4647794843749997,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00992140625,
+          "logpdf": 2.589876078125,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.010940765625,
+          "logpdf": 2.48792490625,
+          "n": 64
+        }
+      },
+      "H17": {
+        "Laplace-fixed-context": {
+          "crps": 0.0033709843750000003,
+          "logpdf": 3.6633769375,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.0033325312499999996,
+          "logpdf": 3.6506486249999996,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.003427171875,
+          "logpdf": 3.6706186718750002,
+          "n": 64
+        }
+      },
+      "H18": {
+        "Laplace-fixed-context": {
+          "crps": 0.00558134375,
+          "logpdf": 3.119616078125,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.0047339375,
+          "logpdf": 3.2893317968750004,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.005547234375,
+          "logpdf": 3.196176,
+          "n": 64
+        }
+      },
+      "H19": {
+        "Laplace-fixed-context": {
+          "crps": 0.008925593749999999,
+          "logpdf": 2.6802971406250005,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00818234375,
+          "logpdf": 2.80081190625,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.008577843750000001,
+          "logpdf": 2.7572884999999996,
+          "n": 64
+        }
+      },
+      "H2": {
+        "Laplace-fixed-context": {
+          "crps": 0.008802546875,
+          "logpdf": 2.6750102812499996,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.007462671875,
+          "logpdf": 2.8860520156250002,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.007966750000000002,
+          "logpdf": 2.81050759375,
+          "n": 64
+        }
+      },
+      "H20": {
+        "Laplace-fixed-context": {
+          "crps": 0.0098293125,
+          "logpdf": 2.574988734375,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.007836953125,
+          "logpdf": 2.8012441875,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.009690765624999998,
+          "logpdf": 2.64846246875,
+          "n": 64
+        }
+      },
+      "H21": {
+        "Laplace-fixed-context": {
+          "crps": 0.00623684375,
+          "logpdf": 2.995137828125,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00566384375,
+          "logpdf": 3.1169838906250003,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.013455984375,
+          "logpdf": 2.3191441875,
+          "n": 64
+        }
+      },
+      "H22": {
+        "Laplace-fixed-context": {
+          "crps": 0.003961390625,
+          "logpdf": 3.472385015625,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.003580453125,
+          "logpdf": 3.6169009062499997,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.0038696093750000002,
+          "logpdf": 3.531913265625,
+          "n": 64
+        }
+      },
+      "H23": {
+        "Laplace-fixed-context": {
+          "crps": 0.013084703125000001,
+          "logpdf": 2.2674780937500003,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.0108335,
+          "logpdf": 2.4258339062500003,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.013174937500000001,
+          "logpdf": 2.3507614375,
+          "n": 64
+        }
+      },
+      "H24": {
+        "Laplace-fixed-context": {
+          "crps": 0.009850531249999999,
+          "logpdf": 2.5610795468750003,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.010256421875000001,
+          "logpdf": 2.537935015625,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.009693078125,
+          "logpdf": 2.5928104531250002,
+          "n": 64
+        }
+      },
+      "H3": {
+        "Laplace-fixed-context": {
+          "crps": 0.01097578125,
+          "logpdf": 2.4650229999999995,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.01034965625,
+          "logpdf": 2.4982549531249996,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.01082446875,
+          "logpdf": 2.512224890625,
+          "n": 64
+        }
+      },
+      "H4": {
+        "Laplace-fixed-context": {
+          "crps": 0.006806875,
+          "logpdf": 2.9937614999999997,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00516759375,
+          "logpdf": 3.2213355156250003,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.006934796875,
+          "logpdf": 2.9560509687499996,
+          "n": 64
+        }
+      },
+      "H5": {
+        "Laplace-fixed-context": {
+          "crps": 0.009319546875,
+          "logpdf": 2.64996884375,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.0064136718750000005,
+          "logpdf": 3.010009796875,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.00850553125,
+          "logpdf": 2.7322119843749997,
+          "n": 64
+        }
+      },
+      "H6": {
+        "Laplace-fixed-context": {
+          "crps": 0.00575725,
+          "logpdf": 3.11883584375,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00534196875,
+          "logpdf": 3.20118978125,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.005530937499999999,
+          "logpdf": 3.1815683125,
+          "n": 64
+        }
+      },
+      "H7": {
+        "Laplace-fixed-context": {
+          "crps": 0.005921328125,
+          "logpdf": 3.0660091718749998,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.004207875,
+          "logpdf": 3.4198368125,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.005647984375,
+          "logpdf": 3.16291290625,
+          "n": 64
+        }
+      },
+      "H8": {
+        "Laplace-fixed-context": {
+          "crps": 0.005145796875,
+          "logpdf": 3.1732099062500003,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00438765625,
+          "logpdf": 3.3539734062499997,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.005099625,
+          "logpdf": 3.2392331875,
+          "n": 64
+        }
+      },
+      "H9": {
+        "Laplace-fixed-context": {
+          "crps": 0.0038232500000000003,
+          "logpdf": 3.545878203125,
+          "n": 64
+        },
+        "TiRex-2": {
+          "crps": 0.00289596875,
+          "logpdf": 3.765211109375,
+          "n": 64
+        },
+        "laplace": {
+          "crps": 0.0035936562500000005,
+          "logpdf": 3.6564119218749997,
+          "n": 64
+        }
+      }
+    },
+    "overall": {
+      "Laplace-fixed-context": {
+        "aggregation": "equal-series mean",
+        "central_90_coverage": 0.9518229166666666,
+        "crps": 0.011538384114583333,
+        "logpdf": 2.709418060546875,
+        "rows": 1536,
+        "series": 24
+      },
+      "TiRex-2": {
+        "aggregation": "equal-series mean",
+        "central_90_coverage": 0.9609375,
+        "crps": 0.008709810546875,
+        "logpdf": 2.9268661445312496,
+        "rows": 1536,
+        "series": 24
+      },
+      "laplace": {
+        "aggregation": "equal-series mean",
+        "central_90_coverage": 0.9153645833333334,
+        "crps": 0.010226319661458334,
+        "logpdf": 2.8149956829427083,
+        "rows": 1536,
+        "series": 24
+      }
+    },
+    "pairwise": {
+      "TiRex-2_vs_Laplace-fixed-context": {
+        "crps_series_wins": 22,
+        "dm": {
+          "draw": 9,
+          "loss": 0,
+          "n": 24,
+          "win": 15
+        },
+        "ll_series_wins": 22,
+        "mean_dll_a_minus_b": 0.21744808398437498,
+        "median_crps_ratio_a_over_b": 0.8479785870373154,
+        "median_dll_a_minus_b": 0.19590261718750002,
+        "series": 24
+      },
+      "TiRex-2_vs_laplace": {
+        "crps_series_wins": 22,
+        "dm": {
+          "draw": 22,
+          "loss": 0,
+          "n": 24,
+          "win": 2
+        },
+        "ll_series_wins": 19,
+        "mean_dll_a_minus_b": 0.11187046158854165,
+        "median_crps_ratio_a_over_b": 0.8708324792638679,
+        "median_dll_a_minus_b": 0.08907171875000008,
+        "series": 24
+      }
+    },
+    "quantile_loss": {
+      "by_level": {
+        "q10": 0.0031712222567327683,
+        "q20": 0.004313167636052923,
+        "q30": 0.005001410872509061,
+        "q40": 0.005450045694773999,
+        "q50": 0.005644799096800765,
+        "q60": 0.0055283490300254085,
+        "q70": 0.005122568676525923,
+        "q80": 0.004401076765853163,
+        "q90": 0.003150755038639806
+      },
+      "definition": "mean pinball loss; lower is better",
+      "overall": 0.004642599451990424,
+      "rows": 1536
+    }
+  },
+  "limitations": [
+    "This is a 24-series, 64-origin-per-series M4-hourly panel, not a population-wide benchmark.",
+    "Pretraining overlap is unresolved; the TiRex-2 model card lists broad public time-series corpora, so this is not evidence of contamination-free generalization.",
+    "Only one-step univariate forecasts without covariates are evaluated.",
+    "TiRex-2 provides nine central quantiles rather than a native likelihood or explicit tails; density metrics depend on the validation-frozen reconstruction.",
+    "The full-history Laplace comparator receives more history than TiRex-2 and is not an equal-information comparison.",
+    "Table-R1 and TwbFB remain unidentified; this benchmark does not claim to reproduce either one.",
+    "The protocol is registered in-repository rather than in an independent timestamped registry, and two H1 execution smokes preceded it."
+  ],
+  "persistence": {
+    "canonical_precision": "six decimal places",
+    "canonical_scores": "predictions_issue138.csv",
+    "quantile_score_source": "persisted raw-quantile CSV",
+    "raw_quantile_precision": "17 significant digits",
+    "raw_quantiles": "raw_quantiles_issue138.csv",
+    "score_source": "canonical persisted CSV"
+  },
+  "protocol": {
+    "amendments": [
+      {
+        "amended_at_utc": "2026-07-28T18:24:14Z",
+        "description": "Added the already executed CPU device and batch size so the runner can reject protocol/runtime mismatches. No model, data, split, density, metric, or result choice changed.",
+        "kind": "reproducibility enforcement"
+      }
+    ],
+    "comparators": {
+      "Laplace-fixed-context": "Fresh Laplace state per origin, updated with exactly the same preceding 128 changes.",
+      "TiRex-2": "Native q10..q90 from exactly the preceding 128 changes.",
+      "laplace": "Causal online Laplace using up to the retained 1000-change history; reported separately because information differs."
+    },
+    "context_length": 128,
+    "covariates": "none",
+    "density_reconstruction": {
+      "candidate_spacing_multipliers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+        1.25,
+        1.5,
+        2.0,
+        3.0
+      ],
+      "kind": "fixed-bandwidth Gaussian-mixture reconstruction from ordered q10..q90",
+      "selection": "One global multiplier maximizing equal-series validation mean logpdf with a -20 floor; freeze it before test scoring.",
+      "tail_semantics": "No explicit tail law is supplied by TiRex-2. The reconstructed density is an evaluation convention, not a native TiRex-2 likelihood."
+    },
+    "frozen_at_utc": "2026-07-28T17:10:30Z",
+    "horizon": 1,
+    "identifiers": {
+      "Table-R1": "unresolved from Issue 138 and public source searches as of 2026-07-28",
+      "TwbFB": "unresolved from Issue 138 and public source searches as of 2026-07-28"
+    },
+    "limitations": [
+      "This is a 24-series, 64-origin-per-series M4-hourly panel, not a population-wide benchmark.",
+      "Pretraining overlap is unresolved; the TiRex-2 model card lists broad public time-series corpora, so this is not evidence of contamination-free generalization.",
+      "Only one-step univariate forecasts without covariates are evaluated.",
+      "TiRex-2 provides nine central quantiles rather than a native likelihood or explicit tails; density metrics depend on the validation-frozen reconstruction.",
+      "The full-history Laplace comparator receives more history than TiRex-2 and is not an equal-information comparison.",
+      "Table-R1 and TwbFB remain unidentified; this benchmark does not claim to reproduce either one.",
+      "The protocol is registered in-repository rather than in an independent timestamped registry, and two H1 execution smokes preceded it."
+    ],
+    "max_history": 1000,
+    "metrics": {
+      "aggregation": "Equal-series means for overall logpdf, CRPS, and coverage; paired per-series medians and means for effect summaries.",
+      "canonical": [
+        "per-step floored logpdf",
+        "per-step CRPS",
+        "central 90 percent coverage",
+        "per-series Diebold-Mariano win/draw/loss"
+      ],
+      "quantile_preserving": [
+        "mean pinball loss overall",
+        "mean pinball loss by q10..q90"
+      ]
+    },
+    "model": "NX-AI/TiRex-2",
+    "model_revision": "05e5b26db52bfb256f1ae1bdf785589850482de3",
+    "primary_comparison": "TiRex-2 versus Laplace-fixed-context",
+    "quantile_levels": [
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9
+    ],
+    "question": "How does the public TiRex-2 checkpoint perform against causal Laplace forecasts on a small frozen M4-hourly panel under a matched one-step protocol?",
+    "related_issue": 138,
+    "runtime": {
+      "batch_size": 128,
+      "device": "cpu"
+    },
+    "schema": "tirex2-issue138-v1",
+    "secondary_comparison": "TiRex-2 versus full-history online laplace",
+    "series": 24,
+    "source": {
+      "bytes": 2347115,
+      "name": "M4 hourly training source",
+      "preprocessing": "Use at most the final 1000 changes per series. Strictly positive levels become log differences; otherwise first differences, matching benchmarks/corpus.py.",
+      "selection": "First 24 qualifying rows in source order after the repository's causal level-to-change transform.",
+      "sha256": "ea59b7783573c49077a835ab6465c7d66f1474783360f310988a9a737fbca62f",
+      "url": "https://raw.githubusercontent.com/Mcompetitions/M4-methods/master/Dataset/Train/Hourly-train.csv"
+    },
+    "splits": {
+      "target_exclusion": "Each model input ends immediately before the realized target.",
+      "test": "final 64 origins, not used for density selection",
+      "validation": "64 origins immediately before the test window"
+    },
+    "status": "Protocol fixed before the full 24-series benchmark. Two adapter smokes on H1 (2 and 128 final origins) preceded this file and were used only to verify execution and throughput; their scores were not used to choose protocol settings.",
+    "test_length": 64,
+    "test_time_augmentation": {
+      "tta_diff": false,
+      "tta_sign_flip": false
+    },
+    "validation_length": 64
+  },
+  "protocol_sha256": "138f430287d73498de980600e316e0a7f5fb5d8b6af9188fba3a5c30077e1c49",
+  "schema": "tirex2-issue138-v1"
+}
