@@ -13,7 +13,7 @@ State round-trips through JSON bit-exactly — a skater is a fold. New exports
 into its `toDict()` form and throws, naming the path, on anything JSON would
 silently damage (a function, `Map`, `Set`, typed array, foreign class,
 `undefined`, or non-finite number); the second rebuilds the `Dist`s without
-renormalising. `Dist.fromDict` now goes through `Dist.fromNormalized`, which
+renormalising. `Dist.fromDict` now goes through `Dist.trusted`, a constructor path that
 keeps weights that already sum to one bit-for-bit (the old path divided by a
 total that was one only up to rounding and moved the last bit on a fraction of
 mixtures). Two skaters held non-plain state and are fixed: `sticky` kept its
@@ -24,7 +24,10 @@ recipe by the wrapper). A new release gate, `parity/roundtrip.mjs`, checkpoints
 every exported skater every 100 steps over a 620-step series, restores it
 through `JSON.parse(JSON.stringify(...))`, and requires the restored copy to
 match the original byte-for-byte in both predictives and state for the next
-25 steps. Numerics are unchanged: parity is byte-identical.
+25 steps. The parity checker also runs every scenario a second time across
+a JSON restore at the burn-in step, against vectors the Python generator
+produced across a pickle restore. Numerics are unchanged: parity is
+byte-identical.
 
 ## 0.13.0
 

@@ -78,7 +78,7 @@ function isDistDict(v) {
 }
 
 // Inverse of stateToJSON. A {components: [[w, m, s], ...]} object becomes a
-// Dist without renormalising (Dist.fromNormalized), a {spliced: true, ...}
+// Dist without renormalising (Dist.trusted), a {spliced: true, ...}
 // object becomes a SplicedDist; everything else is copied as is.
 export function stateFromJSON(obj) {
   if (obj === null || typeof obj !== "object") return obj;
