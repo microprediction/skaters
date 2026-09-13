@@ -5,6 +5,27 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## Unreleased
+
+State round-trips through JSON bit-exactly — a skater is a fold. New exports
+`stateToJSON(state)`, `stateFromJSON(obj)` and `assertPlainState(state)`
+(`state.mjs`): the first turns every `Dist` (and the GPD-spliced predictive)
+into its `toDict()` form and throws, naming the path, on anything JSON would
+silently damage (a function, `Map`, `Set`, typed array, foreign class,
+`undefined`, or non-finite number); the second rebuilds the `Dist`s without
+renormalising. `Dist.fromDict` now goes through `Dist.fromNormalized`, which
+keeps weights that already sum to one bit-for-bit (the old path divided by a
+total that was one only up to rounding and moved the last bit on a fraction of
+mixtures). Two skaters held non-plain state and are fixed: `sticky` kept its
+frequency table in a `Map` (now an array of `[value, weight]` pairs in
+first-seen order, so the tie-break still matches Python's dict), and `search`
+kept the pool's skater closures in state (now rebuilt from each entry's
+recipe by the wrapper). A new release gate, `parity/roundtrip.mjs`, checkpoints
+every exported skater every 100 steps over a 620-step series, restores it
+through `JSON.parse(JSON.stringify(...))`, and requires the restored copy to
+match the original byte-for-byte in both predictives and state for the next
+25 steps. Numerics are unchanged: parity is byte-identical.
+
 ## 0.13.0
 
 GPD tails by default — the conditional tail fit. Every `laplace` predictive now

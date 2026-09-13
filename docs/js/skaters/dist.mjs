@@ -298,10 +298,36 @@ export class Dist {
       if (!fn) throw new Error("spliced dist: import tails.mjs before fromDict");
       return fn(d);
     }
-    return new Dist(d.components.map((c) => c.slice()));
+    return Dist.fromNormalized(d.components.map((c) => c.slice()));
+  }
+
+  // The exact inverse of toDict. Weights that already sum to one, to within
+  // 1e-9 of the compensated sum, are kept bit-for-bit: renormalising a
+  // normalised mixture divides by a total that is one only up to rounding,
+  // which can move the last bit and break a checkpoint/restore round trip.
+  // Anything else goes through the normalising constructor. Mirrors
+  // Dist.from_dict in the Python package.
+  static fromNormalized(components) {
+    if (!components || components.length === 0) {
+      throw new Error("Dist requires at least one component");
+    }
+    const wTotal = fsum(components.map((c) => c[0]));
+    if (!(Math.abs(wTotal - 1.0) <= 1e-9)) return new Dist(components);
+    const d = Object.create(Dist.prototype);
+    d.components = components;
+    return d;
   }
 
   get length() {
     return this.components.length;
   }
+}
+
+// Classes allowed inside skater state (see state.mjs). Dist is one; extended
+// dist types register themselves alongside their decoder.
+const _distClasses = [Dist];
+export function registerDistClass(cls) { if (!_distClasses.includes(cls)) _distClasses.push(cls); }
+export function isDistInstance(v) {
+  for (const cls of _distClasses) if (v instanceof cls) return true;
+  return false;
 }

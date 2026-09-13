@@ -10,7 +10,7 @@
 //
 // Constants and operation order mirror tails.py for 1e-6 parity.
 
-import { erf, Dist, registerDistDecoder } from "./dist.mjs";
+import { erf, Dist, registerDistDecoder, registerDistClass } from "./dist.mjs";
 
 const EPS = 1e-12;
 const LOG_SQRT2PI = 0.5 * Math.log(2.0 * Math.PI);
@@ -326,3 +326,4 @@ export function gpdtails(base, k, level = 0.98, nexc = 500, warmup = 500, rateAl
 }
 
 registerDistDecoder("spliced", (d) => SplicedDist.fromDict(d));
+registerDistClass(SplicedDist);

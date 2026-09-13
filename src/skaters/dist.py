@@ -299,10 +299,23 @@ class Dist:
 
     @staticmethod
     def from_dict(d: dict):
+        """The exact inverse of ``to_dict``.
+
+        Weights that already sum to one, to within 1e-9 of the compensated
+        sum, are kept bit-for-bit: renormalising a normalised mixture divides
+        by a total that is one only up to rounding, which can move the last
+        bit and break a checkpoint/restore round trip. Anything else goes
+        through the normalising constructor. Validation runs either way.
+        Mirrored by ``Dist.fromNormalized`` in the JS port.
+        """
         if d.get("spliced"):
             from skaters.tails import SplicedDist   # local: avoid cycle
             return SplicedDist.from_dict(d)
-        return Dist([tuple(c) for c in d["components"]])
+        comps = [tuple(c) for c in d["components"]]
+        out = Dist(comps)
+        if abs(sum(w for w, _, _ in comps) - 1.0) <= 1e-9:
+            out.components = comps
+        return out
 
     # --- Dunder ---
 

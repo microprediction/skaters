@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- `Dist.from_dict` is now the exact inverse of `to_dict`: weights that already
+  sum to one (to within 1e-9 of the compensated sum) are kept bit-for-bit
+  instead of being divided by a total that is one only up to rounding, which
+  moved the last bit on a fraction of mixtures and broke checkpoint/restore
+  round trips. Loose weights still normalise; validation still runs. Mirrored
+  in the JS port (`Dist.fromNormalized`).
+- JS port: skater state is plain data that round-trips through JSON
+  bit-exactly, enforced for every exported skater by a new gate
+  (`parity/roundtrip.mjs`, run from `tests/test_js_parity.py`). New exports
+  `stateToJSON`, `stateFromJSON`, `assertPlainState`. `sticky` keeps its
+  frequency table as an array of pairs instead of a Map; `search` keeps no
+  closures in its pool (skaters are rebuilt from the recipe). Numerics are
+  unchanged; parity vectors are byte-identical.
+
 - `Dist` validates its inputs (#200): negative or nonfinite weights, nonfinite
   means, and negative or nonfinite stds now raise `ValueError` instead of
   producing an object whose pdf can go negative while logpdf silently ignores
