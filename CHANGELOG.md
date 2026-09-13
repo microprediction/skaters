@@ -15,6 +15,12 @@
   frequency table as an array of pairs instead of a Map; `search` keeps no
   closures in its pool (skaters are rebuilt from the recipe). Numerics are
   unchanged; parity vectors are byte-identical.
+- JS port: the spliced-tail decoder is registered by a named call rather than
+  a bare side-effect import, which bundlers drop under `sideEffects: false`.
+  A consumer that only rehydrates checkpoints got a bundle with no spliced
+  support and a restore that threw. The round-trip gate now covers it with a
+  cold-start decode from `state.mjs` alone, and rejects undeclared bare
+  side-effect imports. Duplicate `get length()` removed from `dist.mjs`.
 - The parity check now includes a serialise, deserialise, continue cycle in
   both ports: `parity/gen_vectors.py` pickles and restores every scenario's
   state at the burn-in step and requires the restored copy to reproduce the

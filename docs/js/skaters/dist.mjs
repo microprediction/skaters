@@ -327,9 +327,6 @@ export class Dist {
     return new Dist(components);
   }
 
-  get length() {
-    return this.components.length;
-  }
 }
 
 // Classes allowed inside skater state (see state.mjs). Dist is one; extended
