@@ -30,7 +30,8 @@ class Dist:
 
     __slots__ = ("components",)
 
-    def __init__(self, components: list[tuple[float, float, float]]):
+    def __init__(self, components: list[tuple[float, float, float]], *,
+                 _trusted: bool = False):
         """Create from a list of (weight, mean, std) tuples.
 
         Weights must be nonnegative with a positive total; they are
@@ -49,12 +50,26 @@ class Dist:
                 raise ValueError(f"component mean must be finite, got {m}")
             if not (math.isfinite(s) and s >= 0.0):
                 raise ValueError(f"component std must be finite and >= 0, got {s}")
+        if _trusted:
+            # Dist.trusted: already-normalised weights, kept bit for bit.
+            self.components = [tuple(c) for c in components]
+            return
         # builtin sum, not a += loop: sum() compensates float error (Neumaier),
         # and the normalization must stay bit-identical to the parity vectors.
         w_total = sum(w for w, _, _ in components)
         if not w_total > 0.0:
             raise ValueError("total component weight must be positive")
         self.components = [(w / w_total, m, s) for w, m, s in components]
+
+    @classmethod
+    def trusted(cls, components: list[tuple[float, float, float]]) -> Dist:
+        """Trusted-input construction: components taken as given, bit for bit.
+
+        Validates each component but does not renormalise. For the inverse
+        of ``to_dict`` and for callers that have already normalised.
+        Mirrors ``Dist.trusted`` in the JS port.
+        """
+        return cls(components, _trusted=True)
 
     # --- Constructors ---
 
@@ -299,10 +314,22 @@ class Dist:
 
     @staticmethod
     def from_dict(d: dict):
+        """The exact inverse of ``to_dict``.
+
+        Weights that already sum to one, to within 1e-9 of the compensated
+        sum, are kept bit-for-bit: renormalising a normalised mixture divides
+        by a total that is one only up to rounding, which can move the last
+        bit and break a checkpoint/restore round trip. Anything else goes
+        through the normalising constructor. Validation runs either way.
+        Mirrored by ``Dist.fromDict`` in the JS port.
+        """
         if d.get("spliced"):
             from skaters.tails import SplicedDist   # local: avoid cycle
             return SplicedDist.from_dict(d)
-        return Dist([tuple(c) for c in d["components"]])
+        comps = [tuple(c) for c in d["components"]]
+        if abs(sum(w for w, _, _ in comps) - 1.0) <= 1e-9:
+            return Dist.trusted(comps)
+        return Dist(comps)
 
     # --- Dunder ---
 

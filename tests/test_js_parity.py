@@ -42,6 +42,23 @@ def test_js_adversarial_gate():
         check=True, cwd=ROOT)
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_state_roundtrip():
+    """A skater is a fold: for every exported JS skater, state must survive
+    stateFromJSON(JSON.parse(JSON.stringify(stateToJSON(state)))) bit-exactly,
+    on the restore step and on every step after it, and hold nothing JSON
+    would damage (functions, Map, Set, foreign classes, non-finite numbers).
+    See parity/roundtrip.mjs."""
+    result = subprocess.run(
+        ["node", os.path.join(ROOT, "parity", "roundtrip.mjs")],
+        capture_output=True, text=True, cwd=ROOT,
+    )
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr)
+    assert result.returncode == 0, "JS state round-trip gate failed"
+
+
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
 def test_rust_parity():
     """The Rust core (rust/) must reproduce the Python numerics: regenerate

@@ -12,6 +12,8 @@ Run:  python parity/gen_vectors.py   (writes parity/vectors.json)
 
 from __future__ import annotations
 import json
+import pickle
+from collections import deque
 import math
 import os
 import random
@@ -175,11 +177,77 @@ def probe_dist(d):
              d.quantile(Q_LO), d.quantile(Q_HI), d.crps(PROBE))]
 
 
-def run_scenario(skater, series):
+# Skaters whose Python state cannot be pickled: search keeps recipe-built
+# closures in its pool (the JS port rebuilds them from the recipe instead).
+ROUNDTRIP_EXEMPT = {"search_default"}
+
+
+def state_snapshot(o):
+    """Canonical, comparable image of a skater state.
+
+    Exact on floats (``float.hex`` keeps the sign of zero and NaN apart),
+    strict on container type and deque maxlen, and reads Dist and SplicedDist
+    through ``to_dict`` so cached scratch attributes do not count. Pickled
+    bytes are NOT a usable equality: pickle memoises tuples and strings by
+    identity, so two states equal value for value can pickle differently.
+    """
+    if o is None or isinstance(o, (bool, int, str)):
+        return (type(o).__name__, o)
+    if isinstance(o, float):
+        return ("float", o.hex())
+    if isinstance(o, dict):
+        return ("dict", tuple((state_snapshot(k), state_snapshot(v)) for k, v in o.items()))
+    if isinstance(o, deque):
+        return ("deque", o.maxlen, tuple(state_snapshot(v) for v in o))
+    if isinstance(o, (list, tuple)):
+        return (type(o).__name__, tuple(state_snapshot(v) for v in o))
+    if isinstance(o, (set, frozenset)):
+        return (type(o).__name__, tuple(sorted(state_snapshot(v) for v in o)))
+    if hasattr(o, "to_dict"):
+        return (type(o).__name__, state_snapshot(o.to_dict()))
+    if hasattr(o, "__dict__"):
+        return (type(o).__name__, state_snapshot(vars(o)))
+    if hasattr(o, "__slots__"):
+        return (type(o).__name__, tuple((n, state_snapshot(getattr(o, n))) for n in o.__slots__ if hasattr(o, n)))
+    raise TypeError(f"cannot snapshot {type(o).__name__} in skater state")
+
+
+def state_diff(a, b, path="$"):
+    """First path at which two snapshots differ, or None."""
+    if a == b:
+        return None
+    if isinstance(a, tuple) and isinstance(b, tuple) and len(a) == len(b) and a[:1] == b[:1]:
+        for i, (x, y) in enumerate(zip(a, b)):
+            d = state_diff(x, y, f"{path}/{i}")
+            if d is not None:
+                return d
+    return f"{path}: {a!r:.80} != {b!r:.80}"
+
+
+def run_scenario(skater, series, name=None):
+    """Run the skater over the series and probe every post-burn-in predictive.
+
+    Serialise, deserialise, continue: at the burn-in step the state is pickled
+    and restored, and the restored copy is stepped beside the original for the
+    rest of the series. Both must agree exactly (state_snapshot equality of
+    every predictive and of the two states), or the vectors are not
+    generated. The JS checker does the same through JSON on its side, so the
+    parity check itself includes a restore in both ports.
+    """
     state = None
+    twin = None
     out = []
     for i, y in enumerate(series):
         dists, state = skater(y, state)
+        if twin is not None:
+            tdists, twin = skater(y, twin)
+            if state_snapshot(tdists) != state_snapshot(dists):
+                raise AssertionError(f"{name}: predictive differs after pickle restore at step {i}")
+            sa, sb = state_snapshot(state), state_snapshot(twin)
+            if sa != sb:
+                raise AssertionError(f"{name}: state differs after pickle restore at step {i}: {state_diff(sa, sb)}")
+        if i == BURN - 1 and name not in ROUNDTRIP_EXEMPT:
+            twin = pickle.loads(pickle.dumps(state))
         if i >= BURN:
             out.append([probe_dist(d) for d in dists])
     return out
@@ -190,7 +258,7 @@ def main():
     vectors = {"series": series, "burn": BURN, "probe": PROBE,
                "q_lo": Q_LO, "q_hi": Q_HI, "scenarios": {}}
     for name, k, skater in build_scenarios():
-        vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series)}
+        vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
 
     # Periodicity detector: dump the ranked (lag, acf) scores per step.
     pd = period_detector()
@@ -226,7 +294,7 @@ def main():
         "sticky_ema": (1, sticky(conjugate(leaf(k=1), ema_transform(0.1), k=1), k=1)),
     }
     vectors["repeat_scenarios"] = {
-        name: {"k": k, "out": run_scenario(sk, rep)} for name, (k, sk) in rep_scen.items()
+        name: {"k": k, "out": run_scenario(sk, rep, name)} for name, (k, sk) in rep_scen.items()
     }
 
     # Missing observations: the parade's non-finite tick rule. Both k=1 (hold
@@ -239,7 +307,7 @@ def main():
         "pol_laplace_k3": (3, laplace(k=3)),
     }
     vectors["gap_scenarios"] = {
-        name: {"k": k, "out": run_scenario(sk, gaps)} for name, (k, sk) in gap_scen.items()
+        name: {"k": k, "out": run_scenario(sk, gaps, name)} for name, (k, sk) in gap_scen.items()
     }
 
     # STRUCTURE: the candidate population itself, not its numbers. 105,798

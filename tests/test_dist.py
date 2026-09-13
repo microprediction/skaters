@@ -2,6 +2,8 @@
 
 import math
 import random
+
+import pytest
 from skaters.dist import Dist
 
 
@@ -289,6 +291,27 @@ class TestSerialization:
         data = d.to_dict()
         assert "components" in data
         assert len(data["components"]) == 1
+
+    def test_roundtrip_is_bit_exact(self):
+        # from_dict(to_dict()) must not move a bit: a checkpointed skater
+        # state has to restore to the same numbers. Renormalising already
+        # normalised weights divides by a total that is 1 only up to
+        # rounding, which fails this on a fraction of random mixtures.
+        import json
+        import random
+        rng = random.Random(7)
+        for _ in range(500):
+            n = rng.randint(1, 9)
+            comps = [(rng.random() + 1e-3, rng.gauss(0, 4), 0.1 + rng.random()) for _ in range(n)]
+            d = Dist(comps)
+            back = Dist.from_dict(json.loads(json.dumps(d.to_dict())))
+            assert back.components == d.components   # exact tuple equality
+
+    def test_from_dict_still_normalises_loose_weights(self):
+        d = Dist.from_dict({"components": [[1.0, 0.0, 1.0], [3.0, 1.0, 1.0]]})
+        assert d.components[0][0] == 0.25
+        with pytest.raises(ValueError):
+            Dist.from_dict({"components": [[-1.0, 0.0, 1.0], [2.0, 0.0, 1.0]]})
 
 
 # --- Repr ---
