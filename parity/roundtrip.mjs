@@ -13,6 +13,8 @@
 //
 // Run: node parity/roundtrip.mjs      (exits non-zero on any violation)
 
+import { execFileSync } from "child_process";
+import { readFileSync } from "fs";
 import { buildScenarios, buildRepeatScenarios } from "./scenarios.mjs";
 import { stateToJSON, stateFromJSON, assertPlainState } from "../docs/js/skaters/state.mjs";
 import { Dist } from "../docs/js/skaters/dist.mjs";
@@ -153,8 +155,53 @@ function distRoundTrip() {
   if (loose.components[0][0] !== 0.25) fail("Dist.fromDict did not normalise unnormalised weights");
 }
 
+// A reader that only rehydrates checkpoints imports state.mjs and nothing
+// else. In a fresh module registry it must still decode a spliced dist: the
+// registration has to be a named call state.mjs makes itself, not a bare
+// side-effect import, which a bundler drops because the package declares
+// sideEffects:false (esbuild: ignored-bare-import). The decoder then goes
+// missing and every spliced restore fails.
+function coldStartDecode() {
+  const url = new URL("../docs/js/skaters/state.mjs", import.meta.url).href;
+  const src = `
+    import { stateFromJSON } from ${JSON.stringify(url)};
+    const spliced = {"spliced":true,"body":{"components":[[1.0,0.0,1.0]]},
+      "t_lo":-2.0,"t_up":2.0,"zeta_lo":0.02,"zeta_up":0.02,
+      "g_lo":0.1,"s_lo":0.5,"g_up":0.1,"s_up":0.5};
+    const back = stateFromJSON({ pending: [[spliced]] });
+    process.stdout.write(back.pending[0][0].constructor.name);
+  `;
+  let out;
+  try {
+    out = execFileSync(process.execPath, ["--input-type=module", "-e", src], { encoding: "utf8" });
+  } catch (e) {
+    fail(`cold-start restore from state.mjs alone threw: ${String(e.stderr || e.message).split("\n")[0]}`);
+    return;
+  }
+  if (!/SplicedDist$/.test(out.trim())) fail(`cold-start restore gave ${out.trim()}, want SplicedDist`);
+}
+
+// Every bare side-effect import inside the package must name a module the
+// package.json sideEffects list keeps, or a bundler drops it.
+function bareImportsAreDeclared() {
+  const dir = new URL("../docs/js/skaters/", import.meta.url);
+  const pkg = JSON.parse(readFileSync(new URL("package.json", dir), "utf8"));
+  if (pkg.sideEffects === true) return;   // everything kept
+  const declared = Array.isArray(pkg.sideEffects) ? pkg.sideEffects : [];
+  for (const file of ["state.mjs", "index.mjs", "api.mjs", "dist.mjs", "tails.mjs", "spec.mjs"]) {
+    const text = readFileSync(new URL(file, dir), "utf8");
+    for (const m of text.matchAll(/^\s*import\s+"(\.[^"]+)"/gm)) {
+      if (!declared.includes(m[1])) {
+        fail(`${file}: bare import "${m[1]}" is not in package.json sideEffects; a bundler drops it`);
+      }
+    }
+  }
+}
+
 function main() {
   distRoundTrip();
+  coldStartDecode();
+  bareImportsAreDeclared();
 
   const series = makeSeries(N, 12345);
   const repeat = makeRepeatSeries(N, 99);
@@ -188,7 +235,7 @@ function main() {
     console.error(`ROUND-TRIP GATE FAILED: ${failures} violation(s) across ${scenarios.length} skaters`);
     process.exit(1);
   }
-  console.log(`ROUND-TRIP GATE OK: ${scenarios.length} skaters, ${N} steps each, checkpoint every ${EVERY}, ${secs}s`);
+  console.log(`ROUND-TRIP GATE OK: cold-start decode, ${scenarios.length} skaters, ${N} steps each, checkpoint every ${EVERY}, ${secs}s`);
 }
 
 main();

@@ -6,8 +6,8 @@
   sum to one (to within 1e-9 of the compensated sum) are kept bit-for-bit
   instead of being divided by a total that is one only up to rounding, which
   moved the last bit on a fraction of mixtures and broke checkpoint/restore
-  round trips. Loose weights still normalise; validation still runs. Mirrored
-  in the JS port (`Dist.fromNormalized`).
+  round trips. Loose weights still normalise; validation still runs. Both ports
+  construct through a trusted-input path, `Dist.trusted`.
 - JS port: skater state is plain data that round-trips through JSON
   bit-exactly, enforced for every exported skater by a new gate
   (`parity/roundtrip.mjs`, run from `tests/test_js_parity.py`). New exports
@@ -15,6 +15,21 @@
   frequency table as an array of pairs instead of a Map; `search` keeps no
   closures in its pool (skaters are rebuilt from the recipe). Numerics are
   unchanged; parity vectors are byte-identical.
+- JS port: the spliced-tail decoder is registered by a named call rather than
+  a bare side-effect import, which bundlers drop under `sideEffects: false`.
+  A consumer that only rehydrates checkpoints got a bundle with no spliced
+  support and a restore that threw. The round-trip gate now covers it with a
+  cold-start decode from `state.mjs` alone, and rejects undeclared bare
+  side-effect imports. Duplicate `get length()` removed from `dist.mjs`.
+- The parity check now includes a serialise, deserialise, continue cycle in
+  both ports: `parity/gen_vectors.py` pickles and restores every scenario's
+  state at the burn-in step and requires the restored copy to reproduce the
+  original exactly before writing vectors; `parity/check.mjs` runs every
+  scenario a second time with a JSON restore at the same step. A Python gate
+  (`tests/test_state_roundtrip.py`) checkpoints every parity scenario through
+  pickle every 50 steps and holds the restored copy to identical predictives
+  and identical pickled bytes for the next 25 steps. `search` is exempt on
+  the Python side: its pool still holds closures.
 
 - `Dist` validates its inputs (#200): negative or nonfinite weights, nonfinite
   means, and negative or nonfinite stds now raise `ValueError` instead of

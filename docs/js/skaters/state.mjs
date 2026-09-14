@@ -17,7 +17,14 @@
 // every exported skater to this contract.
 
 import { Dist, isDistInstance } from "./dist.mjs";
-import "./tails.mjs";   // registers the spliced decoder so restore never depends on import order
+import { registerSplicedDist } from "./tails.mjs";
+
+// Restoring a checkpoint must not depend on import order, or on whether the
+// consumer also runs a skater. A reader that only rehydrates states imports
+// this module and nothing else, so the spliced decoder is registered here, by
+// a named call a bundler cannot drop. (A bare `import "./tails.mjs"` is
+// dropped: the package declares sideEffects:false.)
+registerSplicedDist();
 
 function isPlainObject(v) {
   const p = Object.getPrototypeOf(v);
@@ -78,7 +85,7 @@ function isDistDict(v) {
 }
 
 // Inverse of stateToJSON. A {components: [[w, m, s], ...]} object becomes a
-// Dist without renormalising (Dist.fromNormalized), a {spliced: true, ...}
+// Dist without renormalising (Dist.trusted), a {spliced: true, ...}
 // object becomes a SplicedDist; everything else is copied as is.
 export function stateFromJSON(obj) {
   if (obj === null || typeof obj !== "object") return obj;

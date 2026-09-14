@@ -325,5 +325,15 @@ export function gpdtails(base, k, level = 0.98, nexc = 500, warmup = 500, rateAl
   };
 }
 
-registerDistDecoder("spliced", (d) => SplicedDist.fromDict(d));
-registerDistClass(SplicedDist);
+// Teach Dist.fromDict and the state walker about SplicedDist. Exported as a
+// function, not left as a bare module side effect: the package declares
+// sideEffects:false, so a bundler drops `import "./tails.mjs"` written purely
+// for its registration (esbuild warns ignored-bare-import and the spliced
+// decoder silently goes missing). Callers that need the decoder without
+// running a skater import this by name and call it; state.mjs does. Idempotent.
+export function registerSplicedDist() {
+  registerDistDecoder("spliced", (d) => SplicedDist.fromDict(d));
+  registerDistClass(SplicedDist);
+}
+
+registerSplicedDist();
