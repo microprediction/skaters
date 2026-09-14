@@ -533,20 +533,27 @@ function arSpectralRadius(phi) {
     }
     return Math.hypot(a / 2.0, Math.sqrt(-disc) / 2.0);
   }
-  let v = new Array(p).fill(1.0), rho = 0.0;
-  for (let it = 0; it < 60; it++) {
-    let s = 0.0;
-    for (let j = 0; j < p; j++) s += phi[j] * v[j];
-    const nv = new Array(p);
-    nv[0] = s;
-    for (let i = 1; i < p; i++) nv[i] = v[i - 1];
-    let m = 0.0;
-    for (const x of nv) m = Math.max(m, Math.abs(x));
-    if (m === 0.0) m = 1.0;
-    v = nv.map((x) => x / m);
-    rho = m;
+  // Power iteration from a single seed can silently miss the true dominant
+  // eigenvalue if that seed happens to be (near-)orthogonal to it. Two seeds
+  // unlikely to BOTH align with a non-dominant eigenvector; take the max.
+  let best = 0.0;
+  for (const seed of [new Array(p).fill(1.0), Array.from({ length: p }, (_, i) => (i % 2 === 0 ? 1.0 : -1.0))]) {
+    let v = seed.slice(), rho = 0.0;
+    for (let it = 0; it < 60; it++) {
+      let s = 0.0;
+      for (let j = 0; j < p; j++) s += phi[j] * v[j];
+      const nv = new Array(p);
+      nv[0] = s;
+      for (let i = 1; i < p; i++) nv[i] = v[i - 1];
+      let m = 0.0;
+      for (const x of nv) m = Math.max(m, Math.abs(x));
+      if (m === 0.0) m = 1.0;
+      v = nv.map((x) => x / m);
+      rho = m;
+    }
+    best = Math.max(best, rho);
   }
-  return rho;
+  return best;
 }
 
 // Damp AR coefficients into the stationary region for forecasting. Scaling
@@ -572,7 +579,7 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
 
   function forward(y, state) {
     if (state === null || state === undefined) {
-      state = { buffer: [], phi: new Array(p).fill(0.0), P: initP(), n: 0 };
+      state = { buffer: [], phi: new Array(p).fill(0.0), phiUsed: new Array(p).fill(0.0), P: initP(), n: 0 };
     }
     const buf = state.buffer;
     const phi = state.phi;
@@ -581,14 +588,25 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
     if (buf.length >= p) {
       const x = new Array(p);
       for (let i = 0; i < p; i++) x[i] = buf[buf.length - 1 - i];
-      const prediction = fsum(Array.from({ length: p }, (_, i) => phi[i] * x[i]));
+
+      // Emitted residual uses `phiUsed` -- the stationarity-projected
+      // coefficients as of the end of the previous tick -- not the raw RLS
+      // estimate, so forward's emission and inverseK's reconstruction always
+      // agree on which predictor produced the residual (skaters#232).
+      const phiUsed = state.phiUsed;
+      const prediction = fsum(Array.from({ length: p }, (_, i) => phiUsed[i] * x[i]));
       residual = y - prediction;
+
+      // RLS update keeps fitting the RAW (unconstrained) least-squares
+      // problem with its own prediction error.
+      const rawPrediction = fsum(Array.from({ length: p }, (_, i) => phi[i] * x[i]));
+      const rawResidual = y - rawPrediction;
       const P = state.P;
       const Px = matVec(P, x, p);
       const denom = lam + dot(x, Px, p);
       if (Math.abs(denom) > 1e-15) {
         const K = Px.map((px) => px / denom);
-        for (let i = 0; i < p; i++) phi[i] += K[i] * residual;
+        for (let i = 0; i < p; i++) phi[i] += K[i] * rawResidual;
         for (let i = 0; i < p; i++) {
           for (let j = 0; j < p; j++) {
             P[i * p + j] = (P[i * p + j] - K[i] * Px[j]) / lam;
@@ -607,6 +625,9 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
         }
         if (bad || pmax > 1e10) { const np = initP(); for (let m = 0; m < P.length; m++) P[m] = np[m]; }
       }
+      // Re-project after every update so forward's next emission and
+      // inverseK always agree on the same constrained coefficients.
+      state.phiUsed = arStationary(phi.slice());
     } else {
       residual = y;
     }
@@ -617,9 +638,9 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
 
   function inverseK(dists, state) {
     const buf = state.buffer.slice();
-    // Forecast with stationarity-constrained coefficients; the one-step fit in
-    // `state` is left intact, only the extrapolation is kept well-posed.
-    const phi = arStationary(state.phi);
+    // Same coefficients forward() already emitted residuals under
+    // (skaters#232) -- maintained incrementally there, not re-derived here.
+    const phi = state.phiUsed;
     const H = dists.length;
     // Impulse responses psi_0..psi_{H-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
     const psi = [1.0];
@@ -687,7 +708,7 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
 
   function forward(y, state) {
     if (state === null || state === undefined) {
-      state = { buffer: [], theta: new Array(nGroups).fill(0.0), P: eye(nGroups, ridge), n: 0 };
+      state = { buffer: [], theta: new Array(nGroups).fill(0.0), phiUsed: new Array(maxLag).fill(0.0), P: eye(nGroups, ridge), n: 0 };
     }
     const buf = state.buffer;
     const th = state.theta;
@@ -695,14 +716,25 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
     let residual;
     if (buf.length >= maxLag) {
       const x = groupRegressor(buf, groups, nGroups, maxLag);
-      const prediction = fsum(Array.from({ length: nGroups }, (_, g) => th[g] * x[g]));
+
+      // Emitted residual uses the previous tick's stationarity-projected,
+      // per-lag coefficients -- same fix as ar() (skaters#232).
+      const phiUsed = state.phiUsed;
+      const lagX = new Array(maxLag);
+      for (let j = 0; j < maxLag; j++) lagX[j] = buf[buf.length - 1 - j];
+      const prediction = fsum(Array.from({ length: maxLag }, (_, j) => phiUsed[j] * lagX[j]));
       residual = y - prediction;
+
+      // RLS update keeps fitting the RAW group-level least-squares problem
+      // with its own prediction error.
+      const rawPrediction = fsum(Array.from({ length: nGroups }, (_, g) => th[g] * x[g]));
+      const rawResidual = y - rawPrediction;
       const P = state.P;
       const Px = matVec(P, x, nGroups);
       const denom = lam + dot(x, Px, nGroups);
       if (Math.abs(denom) > 1e-15) {
         const K = Px.map((px) => px / denom);
-        for (let g = 0; g < nGroups; g++) th[g] += K[g] * residual;
+        for (let g = 0; g < nGroups; g++) th[g] += K[g] * rawResidual;
         for (let i = 0; i < nGroups; i++) {
           for (let j = 0; j < nGroups; j++) {
             P[i * nGroups + j] = (P[i * nGroups + j] - K[i] * Px[j]) / lam;
@@ -719,6 +751,9 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
         }
         if (bad || pmax > 1e10) { const np = eye(nGroups, ridge); for (let m = 0; m < P.length; m++) P[m] = np[m]; }
       }
+      const rawPhi = [];
+      for (let j = 0; j < maxLag; j++) rawPhi.push(th[groups[j]]);
+      state.phiUsed = arStationary(rawPhi);
     } else {
       residual = y;
     }
@@ -729,11 +764,9 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
 
   function inverseK(dists, state) {
     const buf = state.buffer.slice();
-    const th = state.theta;
-    const rawPhi = [];
-    for (let j = 0; j < maxLag; j++) rawPhi.push(th[groups[j]]);
-    // Constrain to stationarity for a well-posed forecast (same fix as `ar`).
-    const phi = arStationary(rawPhi);
+    // Same coefficients forward() already emitted residuals under
+    // (skaters#232) -- maintained incrementally there, not re-derived here.
+    const phi = state.phiUsed;
     const H = dists.length;
     const psi = [1.0];
     for (let i = 1; i < H; i++) {
