@@ -52,19 +52,23 @@ def period_detector(
         buf.append(y)
         state["n"] += 1
 
-        # Update running mean and variance
-        diff = y - state["mean"]
+        # Update running mean and variance. `diff` and `mu_pre` are both
+        # against the PRE-update mean, matching ema_cov's convention;
+        # cross-correlation below reuses this same reference mean for BOTH
+        # the current and lagged term, instead of mixing the pre-update mean
+        # (for `diff`/`var`) with the just-updated mean (for `cross`).
+        mu_pre = state["mean"]
+        diff = y - mu_pre
         state["mean"] += alpha * diff
-        state["var"] = (1 - alpha) * (state["var"] + alpha * diff * diff)
+        state["var"] = (1 - alpha) * state["var"] + alpha * diff * diff
 
-        mu = state["mean"]
         var = state["var"]
 
         # Update cross-correlation for each lag
         for L in lags:
             if len(buf) > L:
                 y_lagged = buf[-(L + 1)]
-                cross = (y - mu) * (y_lagged - mu)
+                cross = diff * (y_lagged - mu_pre)
                 state["cross"][L] = (1 - alpha) * state["cross"][L] + alpha * cross
 
         # Trim buffer

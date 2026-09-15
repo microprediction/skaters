@@ -37,6 +37,6 @@ def ema_cov(y: list[float], state: dict | None, alpha: float = 0.05) -> tuple[li
         mean[i] += alpha * delta[i]
     for i in range(n):
         for j in range(n):
-            cov[i * n + j] = (1 - alpha) * (cov[i * n + j] + alpha * delta[i] * delta[j])
+            cov[i * n + j] = (1 - alpha) * cov[i * n + j] + alpha * delta[i] * delta[j]
 
     return list(mean), list(cov), state

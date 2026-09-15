@@ -16,17 +16,20 @@ export function periodDetector(lags = null, alpha = 0.01, minObservations = 50) 
     buf.push(y);
     state.n += 1;
 
-    const diff = y - state.mean;
+    // `diff` is against the PRE-update mean; cross-correlation below reuses
+    // this same reference mean for both the current and lagged term, rather
+    // than mixing pre-update (var) with just-updated (cross) means.
+    const muPre = state.mean;
+    const diff = y - muPre;
     state.mean += alpha * diff;
-    state.var = (1 - alpha) * (state.var + alpha * diff * diff);
+    state.var = (1 - alpha) * state.var + alpha * diff * diff;
 
-    const mu = state.mean;
     const varr = state.var;
 
     for (const L of lags) {
       if (buf.length > L) {
         const yLagged = buf[buf.length - 1 - L];
-        const cross = (y - mu) * (yLagged - mu);
+        const cross = diff * (yLagged - muPre);
         state.cross[L] = (1 - alpha) * state.cross[L] + alpha * cross;
       }
     }

@@ -61,12 +61,15 @@ impl PeriodDetector {
         self.buffer.push_back(y);
         self.n += 1;
 
-        // Update running mean and variance
-        let diff = y - self.mean;
+        // Update running mean and variance. `diff` is against the PRE-update
+        // mean; cross-correlation below reuses this same reference mean for
+        // both the current and lagged term, rather than mixing pre-update
+        // (var) with just-updated (cross) means.
+        let mu_pre = self.mean;
+        let diff = y - mu_pre;
         self.mean += self.alpha * diff;
-        self.var = (1.0 - self.alpha) * (self.var + self.alpha * diff * diff);
+        self.var = (1.0 - self.alpha) * self.var + self.alpha * diff * diff;
 
-        let mu = self.mean;
         let var = self.var;
 
         // Update cross-correlation for each lag
@@ -74,7 +77,7 @@ impl PeriodDetector {
         for (li, &lag) in self.lags.iter().enumerate() {
             if nb > lag {
                 let y_lagged = self.buffer[nb - (lag + 1)];
-                let cross = (y - mu) * (y_lagged - mu);
+                let cross = diff * (y_lagged - mu_pre);
                 self.cross[li] = (1.0 - self.alpha) * self.cross[li] + self.alpha * cross;
             }
         }
