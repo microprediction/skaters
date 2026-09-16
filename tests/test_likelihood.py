@@ -73,7 +73,11 @@ def test_scale_mixture_is_a_dist_with_zero_means():
 
 
 def test_scale_mixture_matches_gaussian_on_gaussian():
-    series = [random.Random(1).gauss(0, 1) for _ in range(2500)]
+    # One generator, seeded once. `[random.Random(1).gauss(0, 1) for _ in ...]`
+    # reseeds a fresh Random(1) every iteration and yields 2500 copies of the
+    # same constant, not Gaussian noise (skaters#234 review).
+    r = random.Random(1)
+    series = [r.gauss(0, 1) for _ in range(2500)]
     g = _mean_logpdf(lambda: leaf(1), series)
     sm = _mean_logpdf(lambda: scale_mixture_leaf(1), series)
     assert sm > g - 0.01    # no meaningful likelihood cost on light tails
