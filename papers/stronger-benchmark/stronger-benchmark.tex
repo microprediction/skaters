@@ -61,20 +61,51 @@ frozen at pretraining. An online forecaster carries state, and revises it with
 every observation it sees. Benchmarks for the first kind contain no example of
 the second.
 
-The arms they do contain are naive, seasonal naive, and automated ARIMA, ETS and
-Theta, sometimes ensembled. Of the 132 entries on the \citet{aksu2024gifteval}
-leaderboard, five are not neural. All five refit from scratch on each window:
-the predict path is handed an array, fits, forecasts, and keeps nothing.
+Table~\ref{tab:arms} lists the non-neural arms of the studies that rank these
+models. The set barely moves between them: naive, seasonal naive, and the three
+\pkg{statsforecast} calls, sometimes with the \pkg{SCUM} ensemble of
+\citet{petropoulos2020scum}. Each study also carries deep models, but those are
+trained per dataset and serve as competitors rather than as references.
 
-The gap is not only statefulness. Those five issue prediction intervals from a
-Gaussian residual variance, which the harness reads off as quantiles, so their
-predictive is symmetric by construction with no skew and no tail. A cheap method
-that is simultaneously online and distributional is absent.
-\pkg{NPTS} is training-free, fully distributional, and ships inside
-\pkg{GluonTS}, which these harnesses already import. It appears in none of them.
+\begin{table}[t!]
+\centering
+\begin{tabular}{llcc}
+\toprule
+Study & Non-neural arms & Online & Density \\
+\midrule
+\citet{aksu2024gifteval}    & Naive, SNaive, AutoARIMA, AutoETS, AutoTheta       & no & no \\
+\citet{ansari2024chronos}   & the above, plus the \pkg{SCUM} ensemble             & no & no \\
+\citet{ansari2025chronos2}  & the above; task-specific deep models dropped        & no & no \\
+\citet{das2024timesfm}      & ETS, ARIMA, \pkg{CatBoost}                          & no & no \\
+\citet{auer2025tirex}       & AutoARIMA, AutoTheta, SNaive                        & no & no \\
+\citet{woo2024moirai}       & AutoARIMA, SNaive                                   & no & no \\
+\citet{shchur2025fevbench}  & Naive, SNaive, Drift, the three above, ensemble     & no & no \\
+\bottomrule
+\end{tabular}
+\caption{Non-neural arms in the studies that rank time-series foundation
+models. \emph{Online} means the method carries state between forecasts rather
+than refitting. \emph{Density} means it issues a predictive density rather than
+a point or a quantile vector. No arm in any study is either.}
+\label{tab:arms}
+\end{table}
+
+None of these arms is online. The \pkg{statsforecast} predict path is handed an
+array, fits, forecasts, and keeps nothing, so every window starts over. In
+\citet{ansari2024chronos} and in the Monash tables of \citet{das2024timesfm}
+there is a single forecast origin per series, so the question does not arise.
+
+None of them issues a density either. Their quantiles come from a Gaussian
+residual-variance interval, which the harness reads off level by level, so the
+predictive is symmetric by construction with no skew and no tail. The ensemble
+is worse: its quantiles are a per-level median across members, which is not a
+distribution at all.
+
+\pkg{NPTS} would fill the gap. It is training-free, fully distributional, and
+ships inside \pkg{GluonTS}, which these harnesses already import. It appears in
+none of the studies in Table~\ref{tab:arms}.
 
 This paper supplies such an arm and reports what it does to the comparison. The
-contribution is deliberately small: a reference, a protocol, and two tables.
+contribution is deliberately small: a reference, a protocol, and four tables.
 
 %% -------------------------------------------------------------------------
 \section{\code{laplace}: an online distributional forecaster}\label{sec:reference}
@@ -83,11 +114,33 @@ contribution is deliberately small: a reference, a protocol, and two tables.
 exposes no tunable hyperparameters. One parameter-free call returns a predictive
 density.
 
-The method is built by conjugation: invertible transforms nest onto a single
-distributional leaf fitted by a proper scoring rule, and the composition
-collapses to one forecast function. \citet{gneiting2007strictly} give the
-scoring-rule machinery. The construction is described elsewhere and is not the
-subject here.
+The predictive object is a weighted mixture of Gaussians. That choice buys
+three things a reference arm needs: the mixture is closed under affine maps and
+under mixing, it admits a closed-form CRPS, and it approximates heavy tails as a
+scale mixture. A density can therefore be pushed through an invertible map and
+scored against a proper rule \citep{gneiting2007strictly} without sampling.
+
+A \emph{transform} is a stateful causal map that consumes one observation and
+emits one transformed value, paired with an inverse that rebuilds predictive
+distributions for future observations from the transformed coordinate, given the
+state it has accumulated. Differencing, standardisation, online autoregression,
+\pkg{GARCH}-style scaling, seasonal differencing and the Yeo--Johnson
+coordinates are all transforms. \emph{Conjugation} composes one with an inner
+forecaster: the observation is transformed, the inner model issues a density in
+the new coordinate, and the inverse carries that density back. Multi-step
+uncertainty accumulates through the inverse rather than by simulation.
+
+\code{laplace} is one fixed composition of these parts, with no knob exposed.
+Candidate models enter it only as mean forecasters, weighted online by
+predictive likelihood, so that a shaped leaf governs the tail rather than the
+dispersion of candidate means. A lattice projection places atoms on the exact
+values a grid-quoted series revisits, and vanishes identically on continuous
+data. Beyond one step the predictive mixes over decimated clocks, since the fine
+clock wins short horizons and a coarse one wins long. A conditional tail fit
+splices the extreme quantiles, which a bulk fit leaves too thin.
+
+\citet{cotton2026transforms} derives all of this. We restate only what a reader
+needs to judge the comparison.
 
 Two properties matter for a reference arm, and neither is accuracy. The first is
 cost. Adding \code{laplace} to a leaderboard is a \code{pip install} and one
@@ -104,9 +157,16 @@ per implementation. A number one person publishes therefore recomputes on
 another person's hardware, which is the property a denominator needs and a
 pretrained checkpoint behind an inference stack does not have.
 
-\code{laplace} is a \emph{floor}. A pretrained model that does not clear it has
-not yet earned the comparison, and one that does has cleared something cheap. We
-do not propose it as state of the art. We propose it as the denominator.
+A denominator sets what a skill score means, and a weak one flatters everything
+divided by it. That is the argument for this particular arm.
+
+Sections~\ref{sec:classic} and \ref{sec:results} measure how strong it is.
+\code{laplace} takes the per-series log-likelihood against every classical arm
+in Table~\ref{tab:arms}, and against TimesFM 3.0 in every stratum tested.
+\citet{cotton2026transforms} reports the same ordering against neural and
+foundation-model baselines across the non-price \proglang{FRED} universe;
+\pkg{GARCH}-$t$ on asset prices is the one arm that escapes, and that split is
+reported rather than averaged away.
 
 %% -------------------------------------------------------------------------
 \section{Protocol}\label{sec:protocol}
@@ -137,6 +197,43 @@ five thousand, jointly with patch size, which the arms it is compared against do
 not receive.
 
 %% -------------------------------------------------------------------------
+\section{Against the classic arms}\label{sec:classic}
+
+The arms of Table~\ref{tab:arms} are the denominator every published skill
+score divides by, so their strength sets what a skill score means.
+Table~\ref{tab:classic} scores \code{laplace} against them on the non-price
+\proglang{FRED} universe.
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{lccccr}
+\toprule
+ & \multicolumn{2}{c}{LL win} & \multicolumn{2}{c}{CRPS win} & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Arm & raw & family & raw & family & $N$ \\
+\midrule
+AutoARIMA (\pkg{statsforecast}) & $87\,\%$ & $87\,\%$ & $58\,\%$ & $63\,\%$ & $1688$ \\
+AutoETS (\pkg{statsforecast})   & $95\,\%$ & $94\,\%$ & $77\,\%$ & $78\,\%$ & $1688$ \\
+Theta (\proglang{R})            & $92\,\%$ & $95\,\%$ & $74\,\%$ & $79\,\%$ & $1917$ \\
+auto.arima (\proglang{R})       & $84\,\%$ & $85\,\%$ & $51\,\%$ & $60\,\%$ & $1917$ \\
+\bottomrule
+\end{tabular}
+\caption{Share of series on which \code{laplace} scores better, over $5{,}397$
+continuous non-price \proglang{FRED} series in $1{,}213$ correlated families.
+The family figure averages within a family first, so that a cluster of related
+series counts once. $N$ is the subset each arm covers under its compute budget.}
+\label{tab:classic}
+\end{table}
+
+On log-likelihood the margin is wide: the closest arm loses on $84\,\%$ of
+series and the widest on $95\,\%$. On CRPS the arms do better, which is the
+expected pattern, since CRPS is forgiving of a mis-shaped tail that a log score
+punishes.
+
+This is the sense in which the incumbent denominators are soft. A skill score
+computed against them credits a model for clearing a bar that a dependency-free
+online method clears by a wide margin on the same data.
+
 \section{Against TimesFM 3.0}\label{sec:results}
 
 Table~\ref{tab:raw} scores TimesFM 3.0 \citep{das2024timesfm} zero-shot against
@@ -242,8 +339,8 @@ levels including the first and ninety-ninth.
 
 And no baseline carries state, which is the hole of Section~\ref{sec:intro}.
 Each setting is defensible for the task those suites set themselves. Together
-they define a regime, and a cheap online method cannot compete inside it or be
-seen to.
+they define a regime, and an online distributional method cannot compete inside
+it or be seen to.
 
 %% -------------------------------------------------------------------------
 \section{Scope}\label{sec:scope}

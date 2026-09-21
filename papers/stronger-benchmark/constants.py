@@ -23,6 +23,16 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SUMMARY = os.path.join(ROOT, "benchmarks", "canonical_summary_vs_laplace.csv")
 SRC = os.path.join(ROOT, "src")
+SHARED = os.path.join(ROOT, "benchmarks", "comparisons", "_shared_R25_nonprice.csv")
+
+# The arms these foundation-model studies actually carry, as named in this
+# project's own horse race. The paper reports laplace against exactly these.
+CLASSIC_ARMS = {
+    "AutoARIMA@25": "AutoARIMA (statsforecast)",
+    "AutoETS@25": "AutoETS (statsforecast)",
+    "Theta-R@25": "Theta (R forecast)",
+    "auto.arima-R@25": "auto.arima (R forecast)",
+}
 NOZZLE_LOG = os.path.join(ROOT, "benchmarks", "_nozzle_study.log")
 
 STRATA = ["daily:econ", "daily:price", "weekly:econ", "monthly:econ", "m4-hourly:econ"]
@@ -90,6 +100,46 @@ def nozzle():
     }
 
 
+def classic_baselines():
+    """laplace against the classic arms, through the existing horse-race helper.
+
+    Reuses benchmarks/horserace_summary.py rather than re-deriving win rates:
+    that module owns the continuity filter and the family clustering, and a
+    hand-rolled scoring loop in this file would be a second definition free to
+    drift from the one the rest of the repository uses.
+    """
+    import csv as _csv
+    import math as _math
+    sys.path.insert(0, os.path.join(ROOT, "benchmarks"))
+    sys.path.insert(0, os.path.join(ROOT, "src"))
+    import horserace_summary as hs
+    from study import _rfrac
+    from fred_universe import family
+
+    rows = {}
+    with open(SHARED) as fh:
+        for r in _csv.DictReader(fh):
+            lp = float(r["logpdf"]) if r["logpdf"] not in ("", "nan") else float("nan")
+            rows.setdefault(r["series"], {})[r["method"]] = (lp, float(r["crps"]))
+    cont = [s for s in rows if "laplace" in rows[s] and _rfrac(s) < 0.05]
+
+    out = {}
+    for key, pretty in CLASSIC_ARMS.items():
+        ll_raw, ll_fam, n = hs.winrate(rows, cont, key, 0, False)
+        cr_raw, cr_fam, _ = hs.winrate(rows, cont, key, 1, True)
+        vals = [rows[s][key][0] for s in cont
+                if key in rows[s] and not _math.isnan(rows[s][key][0])]
+        out[key] = {"label": pretty, "n_series": n,
+                    "ll_raw": ll_raw, "ll_fam": ll_fam,
+                    "crps_raw": cr_raw, "crps_fam": cr_fam,
+                    "mean_ll": sum(vals) / len(vals) if vals else float("nan")}
+    lap = [rows[s]["laplace"][0] for s in cont]
+    out["_laplace"] = {"label": "laplace", "n_series": len(cont),
+                       "mean_ll": sum(lap) / len(lap),
+                       "n_families": len({family(s) for s in cont})}
+    return out
+
+
 def package_size():
     """Bytes of pure-Python source that ship in the package.
 
@@ -128,9 +178,13 @@ def main():
     noz = nozzle()
     der = derived(h2h, noz)
     pkg = package_size()
+    try:
+        classic = classic_baselines()
+    except Exception as exc:                       # noqa: BLE001
+        classic = {"_error": f"{type(exc).__name__}: {exc}"}
     if "--json" in sys.argv:
         print(json.dumps({"head_to_head": h2h, "nozzle": noz, "derived": der,
-                          "package": pkg}, indent=2))
+                          "package": pkg, "classic": classic}, indent=2))
         return
     print("HEAD TO HEAD, TimesFM3 vs laplace (source: canonical_summary_vs_laplace.csv)\n")
     print(f"{'stratum':22s} {'n':>6s}  {'w/d/l':>18s}  {'med dLL':>8s}  {'loss%':>6s}")
@@ -152,6 +206,21 @@ def main():
     print(f"  median per-point spread {noz['median_spread']:.4f}")
     print(f"  local vs grid           {noz['local_vs_grid']:+.4f}")
     print(f"  narrow vs grid          {noz['narrow_vs_grid']:+.4f}")
+    if "_error" not in classic:
+        lap = classic["_laplace"]
+        print("\nLAPLACE VS THE CLASSIC ARMS "
+              "({} continuous series, {} families)\n".format(
+                  lap["n_series"], lap["n_families"]))
+        print("  {:28s}{:>14s}{:>15s}{:>7s}".format("arm", "LL raw/fam",
+                                                    "CRPS raw/fam", "N"))
+        for k, v in classic.items():
+            if k.startswith("_"):
+                continue
+            ll = "{:.0f}/{:.0f}%".format(v["ll_raw"], v["ll_fam"])
+            cr = "{:.0f}/{:.0f}%".format(v["crps_raw"], v["crps_fam"])
+            print("  {:28s}{:>14s}{:>15s}{:>7d}".format(
+                v["label"], ll, cr, v["n_series"]))
+
     print(f"\nPACKAGE SIZE\n\n  {pkg['n_files']} .py files, {pkg['bytes']} bytes "
           f"= {pkg['kb_rounded']} KB\n")
     print("DERIVED CLAIMS\n")

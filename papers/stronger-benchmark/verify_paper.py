@@ -102,6 +102,30 @@ def main():
         if abs(store_val - paper_val) > 1e-6:
             bad.append(f"prose    {name}: paper {paper_val} vs store {store_val}")
 
+    # the classic-arms table
+    try:
+        classic = constants.classic_baselines()
+    except Exception as exc:                       # noqa: BLE001
+        bad.append(f"prose    classic_baselines() failed: {type(exc).__name__}: {exc}")
+        classic = None
+    if classic:
+        for key, rec in classic.items():
+            if key.startswith("_"):
+                continue
+            arm = rec["label"].split(" (")[0]
+            pct = r"\$(\d+)\\,\\%\$"
+            pat = (re.escape(arm) + r"[^\n]*?" + pct + r" & " + pct + r" & "
+                   + pct + r" & " + pct + r" & \$(\d+)\$")
+            m2 = re.search(pat, text)
+            if not m2:
+                bad.append(f"classic  {arm}: row not found in the paper")
+                continue
+            want = (round(rec["ll_raw"]), round(rec["ll_fam"]),
+                    round(rec["crps_raw"]), round(rec["crps_fam"]), rec["n_series"])
+            got = tuple(int(g) for g in m2.groups())
+            if got != want:
+                bad.append(f"classic  {arm}: paper {got} vs store {want}")
+
     pkg = constants.package_size()
     m = re.search(r"\$(\d+)\$\\,KB of source across \$(\d+)\$", text)
     if not m:
