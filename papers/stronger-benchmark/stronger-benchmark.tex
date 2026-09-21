@@ -17,6 +17,11 @@
 
 \setlength{\emergencystretch}{3em}
 
+%% table marks: ran it / inherited it / both
+\newcommand{\F}{$\bullet$}
+\newcommand{\I}{$\circ$}
+\newcommand{\B}{$\odot$}
+
 \author{
   Peter Cotton\thanks{\email{peter.cotton@microprediction.com}}\\
   \url{https://skaters.microprediction.org}
@@ -61,48 +66,91 @@ frozen at pretraining. An online forecaster carries state, and revises it with
 every observation it sees. Benchmarks for the first kind contain no example of
 the second.
 
-Table~\ref{tab:arms} lists the non-neural arms of the studies that rank these
-models. The set barely moves between them: naive, seasonal naive, and the three
-\pkg{statsforecast} calls, sometimes with the \pkg{SCUM} ensemble of
-\citet{petropoulos2020scum}. Each study also carries deep models, but those are
-trained per dataset and serve as competitors rather than as references.
+Table~\ref{tab:arms} enumerates the classic arms of eleven studies, read from
+the papers rather than from their leaderboards: GIFT-Eval
+\citep{aksu2024gifteval}, Chronos \citep{ansari2024chronos}, Chronos-2
+\citep{ansari2025chronos2}, TimesFM \citep{das2024timesfm}, TiRex
+\citep{auer2025tirex}, Moirai \citep{woo2024moirai}, Moirai-MoE
+\citep{liu2024moiraimoe}, fev-bench \citep{shchur2025fevbench}, Lag-Llama
+\citep{rasul2023lagllama}, TimeGPT-1 \citep{garza2023timegpt}, and the Monash
+archive \citep{godahewa2021monash}, which supplies several of the others'
+baseline tables. Eighteen distinct methods appear across the eleven, and nine of
+those appear in exactly one paper. The working set is much smaller.
 
 \begin{table}[t!]
 \centering
-\begin{tabular}{llcc}
+\small
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{lccccccccc c}
 \toprule
-Study & Non-neural arms & Online & Density \\
+Study & ETS & ARIMA & Theta & SNv & Nv & SES & TBATS & DHR & SCUM & $n$ \\
 \midrule
-\citet{aksu2024gifteval}    & Naive, SNaive, AutoARIMA, AutoETS, AutoTheta       & no & no \\
-\citet{ansari2024chronos}   & the above, plus the \pkg{SCUM} ensemble             & no & no \\
-\citet{ansari2025chronos2}  & the above; task-specific deep models dropped        & no & no \\
-\citet{das2024timesfm}      & ETS, ARIMA, \pkg{CatBoost}                          & no & no \\
-\citet{auer2025tirex}       & AutoARIMA, AutoTheta, SNaive                        & no & no \\
-\citet{woo2024moirai}       & AutoARIMA, SNaive                                   & no & no \\
-\citet{shchur2025fevbench}  & Naive, SNaive, Drift, the three above, ensemble     & no & no \\
+GIFT-Eval  & \F & \F & \F & \F & \F & & & & & 5 \\
+Chronos    & \F & \F & \F & \F & \F & & & & \F & 6 \\
+Chronos-2  & \I & \I & \I & \I & \I & & & & \I & 6 \\
+TimesFM    & \I & \I & \I & & \F & \I & \I & \I & & 7 \\
+TiRex      & & \I & \I & \I & & & & & & 3 \\
+Moirai     & \I & \B & \I & \F & \F & \I & \I & \I & & 8 \\
+Moirai-MoE & \I & \I & \I & \F & & \I & & & & 5 \\
+fev-bench  & \F & \F & \F & \F & \F & & & & \F & 7 \\
+Lag-Llama  & \F & \F & & & & & & & & 5 \\
+TimeGPT-1  & \F & & \F & \F & & & & & & 10 \\
+Monash     & \F & \F & \F & & & \F & \F & \F & & 6 \\
+\midrule
+carried by & 10 & 10 & 10 & 8 & 6 & 4 & 3 & 3 & 3 & \\
 \bottomrule
 \end{tabular}
-\caption{Non-neural arms in the studies that rank time-series foundation
-models. \emph{Online} means the method carries state between forecasts rather
-than refitting. \emph{Density} means it issues a predictive density rather than
-a point or a quantile vector. No arm in any study is either.}
+\caption{Classic arms by study. \F\ the authors ran it; \I\ the number is
+inherited from another paper's table or from a leaderboard; \B\ both, in
+different experiments. $n$ counts every classic arm the study carries, including
+those outside these columns. Tables inherited from
+\citet{godahewa2021monash} print ARIMA and its harmonic-regression variant as
+one column applied to disjoint frequency groups; both are marked here. Omitted columns, each carried by one or two studies:
+DynOptTheta, Croston, \pkg{NPTS}, AutoCES, ADIDA, IMAPA, Drift, HistoricAverage,
+ZeroModel.}
 \label{tab:arms}
 \end{table}
 
-None of these arms is online. The \pkg{statsforecast} predict path is handed an
-array, fits, forecasts, and keeps nothing, so every window starts over. In
-\citet{ansari2024chronos} and in the Monash tables of \citet{das2024timesfm}
-there is a single forecast origin per series, so the question does not arise.
+Three methods carry the field: automated ETS, ARIMA and Theta each appear in ten
+of the eleven. With seasonal naive they form a quartet that is the complete
+classic roster of six studies. No method appears in all eleven, though Theta
+does if its dynamically optimized variant is treated as the same model, which
+\citet{garza2023timegpt} declines to do by listing both.
 
-None of them issues a density either. Their quantiles come from a Gaussian
-residual-variance interval, which the harness reads off level by level, so the
-predictive is symmetric by construction with no skew and no tail. The ensemble
-is worse: its quantiles are a per-level median across members, which is not a
-distribution at all.
+Five of the eleven ran no classical model at all for at least one headline
+comparison. \citet{ansari2025chronos2} takes its classic numbers from
+\citet{shchur2025fevbench} and the \citet{aksu2024gifteval} leaderboard;
+\citet{auer2025tirex} takes its from the same leaderboard and from
+\citet{ansari2024chronos}; and \citet{das2024timesfm},
+\citet{woo2024moirai} and \citet{liu2024moiraimoe} inherit a
+\citet{godahewa2021monash} table, the last at two removes.
 
-\pkg{NPTS} would fill the gap. It is training-free, fully distributional, and
-ships inside \pkg{GluonTS}, which these harnesses already import. It appears in
-none of the studies in Table~\ref{tab:arms}.
+That matters because of what a Monash number is. Those models were run once, at
+library defaults, and the archive says so. Its ETS is forced non-seasonal above
+period 24 because the implementation cannot take longer cycles, and its harmonic
+regression is pinned to a single Fourier term. The table also reports point
+error only, so an inherited ETS column is a 2021 point-MAE number sitting beside
+a modern probabilistic score.
+
+The arms that are run fare little better. \citet{ansari2024chronos} used library
+defaults with no tuning. \citet{aksu2024gifteval} truncates statistical arms to
+1000 observations and replaces any that exceeds a one-day limit with seasonal
+naive. \citet{shchur2025fevbench} truncates to the same 1000 and caps the
+seasonal period at 200, and reports that its ensemble and automated ARIMA each
+failed four of a hundred tasks.
+
+Statefulness and shape are separate matters, and neither is present. No arm in
+any of the eleven carries state between forecasts: the \pkg{statsforecast}
+predict path is handed an array, fits, forecasts, and keeps nothing. Seasonal
+naive, meanwhile, is a point forecaster serving as the probabilistic normalizer
+in seven of the eleven, and as the substituted score when another arm times out
+in two of them.
+
+\pkg{NPTS} would close both gaps. It is training-free, natively distributional
+because it is a sampling distribution, and ships in both \pkg{GluonTS} and
+\pkg{AutoGluon}, which these studies import for their datasets, their metrics
+and their deep baselines. It appears in one of the eleven
+\citep{rasul2023lagllama}.
 
 This paper supplies such an arm and reports what it does to the comparison. The
 contribution is deliberately small: a reference, a protocol, and four tables.
