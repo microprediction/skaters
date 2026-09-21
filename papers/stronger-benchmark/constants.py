@@ -22,6 +22,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SUMMARY = os.path.join(ROOT, "benchmarks", "canonical_summary_vs_laplace.csv")
+SRC = os.path.join(ROOT, "src")
 NOZZLE_LOG = os.path.join(ROOT, "benchmarks", "_nozzle_study.log")
 
 STRATA = ["daily:econ", "daily:price", "weekly:econ", "monthly:econ", "m4-hourly:econ"]
@@ -89,6 +90,24 @@ def nozzle():
     }
 
 
+def package_size():
+    """Bytes of pure-Python source that ship in the package.
+
+    The paper quotes this, so it is measured rather than remembered. Counts
+    every .py under src/, excluding bytecode caches. An earlier draft carried a
+    figure that appears nowhere in this repository.
+    """
+    total = n = 0
+    for dirpath, dirnames, filenames in os.walk(SRC):
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+        for fn in filenames:
+            if fn.endswith(".py"):
+                total += os.path.getsize(os.path.join(dirpath, fn))
+                n += 1
+    return {"bytes": total, "kb": total / 1024, "kb_rounded": round(total / 1024),
+            "n_files": n}
+
+
 def derived(h2h, noz):
     """Cross-claims the prose makes. Each is checked, not asserted."""
     worst_stratum_gap = max(abs(r["med_dLL"]) for r in h2h.values())
@@ -108,8 +127,10 @@ def main():
     h2h = head_to_head()
     noz = nozzle()
     der = derived(h2h, noz)
+    pkg = package_size()
     if "--json" in sys.argv:
-        print(json.dumps({"head_to_head": h2h, "nozzle": noz, "derived": der}, indent=2))
+        print(json.dumps({"head_to_head": h2h, "nozzle": noz, "derived": der,
+                          "package": pkg}, indent=2))
         return
     print("HEAD TO HEAD, TimesFM3 vs laplace (source: canonical_summary_vs_laplace.csv)\n")
     print(f"{'stratum':22s} {'n':>6s}  {'w/d/l':>18s}  {'med dLL':>8s}  {'loss%':>6s}")
@@ -131,7 +152,9 @@ def main():
     print(f"  median per-point spread {noz['median_spread']:.4f}")
     print(f"  local vs grid           {noz['local_vs_grid']:+.4f}")
     print(f"  narrow vs grid          {noz['narrow_vs_grid']:+.4f}")
-    print("\nDERIVED CLAIMS\n")
+    print(f"\nPACKAGE SIZE\n\n  {pkg['n_files']} .py files, {pkg['bytes']} bytes "
+          f"= {pkg['kb_rounded']} KB\n")
+    print("DERIVED CLAIMS\n")
     for k, v in der.items():
         print(f"  {k:46s} {v}")
 

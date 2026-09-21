@@ -102,6 +102,16 @@ def main():
         if abs(store_val - paper_val) > 1e-6:
             bad.append(f"prose    {name}: paper {paper_val} vs store {store_val}")
 
+    pkg = constants.package_size()
+    m = re.search(r"\$(\d+)\$\\,KB of source across \$(\d+)\$", text)
+    if not m:
+        bad.append("prose    package size sentence not found in the paper")
+    else:
+        if int(m.group(1)) != pkg["kb_rounded"]:
+            bad.append(f"prose    package KB: paper {m.group(1)} vs measured {pkg['kb_rounded']}")
+        if int(m.group(2)) != pkg["n_files"]:
+            bad.append(f"prose    package files: paper {m.group(2)} vs measured {pkg['n_files']}")
+
     claimed = re.search(r"falls by as much as\s+([\w-]+)\s+points", text)
     drop = round(constants.derived(h2h, noz)["max_loss_rate_drop"] * 100)
     words = {39: "thirty-nine"}
@@ -113,7 +123,7 @@ def main():
         for b in bad:
             print("  " + b)
         return 1
-    print(f"OK: {len(rows)} table rows and {len(checks) + 1} prose figures match the store.")
+    print(f"OK: {len(rows)} table rows and {len(checks) + 3} prose figures match the store.")
     return 0
 
 

@@ -32,13 +32,14 @@ pretraining. An online forecaster carries state and revises it at every
 observation. Benchmarks for the first kind contain no example of the second: of
 the 132 entries on the \proglang{GIFT-Eval} leaderboard, five are not neural, and
 all five refit from scratch on each window. We propose \code{laplace}, a
-136\,KB zero-dependency online distributional forecaster with no pretraining and
-no tunable parameters, as the missing reference. Scored one step ahead on
+zero-dependency online distributional forecaster with no pretraining and no
+tunable parameters, as the missing reference. Scored one step ahead on
 held-out log density over an 18{,}815-series \proglang{FRED} panel, it beats
 TimesFM 3.0 on the median series in every stratum by roughly half a nat, and a
 post-hoc portfolio that sees only the model's own issued density recovers most
-of the gap without retraining. The reference costs a \code{pip install} to
-include.
+of the gap without retraining. The reference costs a \code{pip install} to include, and a
+\proglang{Rust} core with a bit-exact parity suite makes its numbers recompute
+on other hardware.
 }
 
 \begin{document}
@@ -78,11 +79,9 @@ contribution is deliberately small: a reference, a protocol, and two tables.
 %% -------------------------------------------------------------------------
 \section{The reference}\label{sec:reference}
 
-\code{laplace} is an online distributional forecaster written in pure
-\proglang{Python}. It weighs 136\,KB, imports nothing, requires no GPU, performs
-no fitting step, and exposes no tunable hyperparameters. One parameter-free call
-returns a predictive density. It runs unchanged in a browser through the
-\proglang{JavaScript} port.
+\code{laplace} is an online distributional forecaster. It imports nothing,
+requires no GPU, performs no fitting step, and exposes no tunable
+hyperparameters. One parameter-free call returns a predictive density.
 
 The method is built by conjugation: invertible transforms nest onto a single
 distributional leaf fitted by a proper scoring rule, and the composition
@@ -90,14 +89,24 @@ collapses to one forecast function. \citet{gneiting2007strictly} give the
 scoring-rule machinery. The construction is described elsewhere and is not the
 subject here.
 
-What matters for a benchmark is the cost of including it. Adding \code{laplace}
-to a leaderboard is a \code{pip install} and one function call, with no weights
-to download, no device to allocate, and no context length to choose. It is a
-\emph{floor}: a pretrained model that does not clear it has not yet earned the
-comparison, and one that does has cleared something cheap.
+Two properties matter for a reference arm, and neither is accuracy. The first is
+cost. Adding \code{laplace} to a leaderboard is a \code{pip install} and one
+function call, with no weights to download, no device to allocate, and no
+context length to choose. The pure-\proglang{Python} implementation, $280$\,KB of source across $28$
+files, is the reference, and a \proglang{Rust} core steps it at roughly $14$ microseconds
+per observation, twenty times the \proglang{Python} rate. A reference that is
+slow over a large panel does not get included.
 
-We do not propose \code{laplace} as state of the art. We propose it as the
-denominator.
+The second is reproducibility across machines. The \proglang{Rust} core uses
+portable mathematics (\pkg{libm}) and produces identical bits on x86 and ARM,
+and a shared parity suite checks roughly $100{,}000$ probe values to $10^{-6}$
+per implementation. A number one person publishes therefore recomputes on
+another person's hardware, which is the property a denominator needs and a
+pretrained checkpoint behind an inference stack does not have.
+
+\code{laplace} is a \emph{floor}. A pretrained model that does not clear it has
+not yet earned the comparison, and one that does has cleared something cheap. We
+do not propose it as state of the art. We propose it as the denominator.
 
 %% -------------------------------------------------------------------------
 \section{Protocol}\label{sec:protocol}
