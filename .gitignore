@@ -278,3 +278,10 @@ benchmarks/preds_surrogate_big/
 
 # GIFT-Eval distillation workspace: a vendored clone plus its downloaded data.
 benchmarks/gifteval_distill/
+
+# stronger-benchmark paper: the PDF is a build artifact of compile.sh
+papers/stronger-benchmark/*.aux
+papers/stronger-benchmark/*.log
+papers/stronger-benchmark/*.bbl
+papers/stronger-benchmark/*.blg
+papers/stronger-benchmark/*.out

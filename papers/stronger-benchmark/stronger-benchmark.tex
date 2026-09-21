@@ -1,0 +1,295 @@
+\documentclass[article]{jss}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{color}
+\usepackage{natbib}
+
+%% Fallbacks so the paper also builds against a minimal jss.cls.
+\providecommand{\proglang}[1]{\textsf{#1}}
+\providecommand{\pkg}[1]{\textbf{#1}}
+\providecommand{\code}[1]{\texttt{#1}}
+
+\setlength{\emergencystretch}{3em}
+
+\author{
+  Peter Cotton\thanks{\email{peter.cotton@microprediction.com}}\\
+  \url{https://skaters.microprediction.org}
+}
+
+\title{A Stronger Univariate Benchmark for Foundational Time-Series Model Evaluation}
+\Plaintitle{A Stronger Univariate Benchmark for Foundational Time-Series Model Evaluation}
+\Shorttitle{A Stronger Univariate Benchmark}
+
+\newcommand{\paperabstract}{
+A foundation model forecasts from a fixed window, with weights frozen at
+pretraining. An online forecaster carries state and revises it at every
+observation. Benchmarks for the first kind contain no example of the second: of
+the 132 entries on the \proglang{GIFT-Eval} leaderboard, five are not neural, and
+all five refit from scratch on each window. We propose \code{laplace}, a
+136\,KB zero-dependency online distributional forecaster with no pretraining and
+no tunable parameters, as the missing reference. Scored one step ahead on
+held-out log density over an 18{,}815-series \proglang{FRED} panel, it beats
+TimesFM 3.0 on the median series in every stratum by roughly half a nat, and a
+post-hoc portfolio that sees only the model's own issued density recovers most
+of the gap without retraining. The reference costs a \code{pip install} to
+include.
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\paperabstract
+\end{abstract}
+
+\noindent\textbf{Keywords:} time series, foundation models, benchmarking,
+probabilistic forecasting, proper scoring rules, online learning.
+
+%% -------------------------------------------------------------------------
+\section{The missing arm}\label{sec:intro}
+
+A foundation model forecasts from a fixed window of recent history, with weights
+frozen at pretraining. An online forecaster carries state, and revises it with
+every observation it sees. Benchmarks for the first kind contain no example of
+the second.
+
+The arms they do contain are naive, seasonal naive, and automated ARIMA, ETS and
+Theta, sometimes ensembled. Of the 132 entries on the \citet{aksu2024gifteval}
+leaderboard, five are not neural. All five refit from scratch on each window:
+the predict path is handed an array, fits, forecasts, and keeps nothing.
+
+The gap is not only statefulness. Those five issue prediction intervals from a
+Gaussian residual variance, which the harness reads off as quantiles, so their
+predictive is symmetric by construction with no skew and no tail. A cheap method
+that is simultaneously online and distributional is absent.
+\pkg{NPTS} is training-free, fully distributional, and ships inside
+\pkg{GluonTS}, which these harnesses already import. It appears in none of them.
+
+This paper supplies such an arm and reports what it does to the comparison. The
+contribution is deliberately small: a reference, a protocol, and two tables.
+
+%% -------------------------------------------------------------------------
+\section{The reference}\label{sec:reference}
+
+\code{laplace} is an online distributional forecaster written in pure
+\proglang{Python}. It weighs 136\,KB, imports nothing, requires no GPU, performs
+no fitting step, and exposes no tunable hyperparameters. One parameter-free call
+returns a predictive density. It runs unchanged in a browser through the
+\proglang{JavaScript} port.
+
+The method is built by conjugation: invertible transforms nest onto a single
+distributional leaf fitted by a proper scoring rule, and the composition
+collapses to one forecast function. \citet{gneiting2007strictly} give the
+scoring-rule machinery. The construction is described elsewhere and is not the
+subject here.
+
+What matters for a benchmark is the cost of including it. Adding \code{laplace}
+to a leaderboard is a \code{pip install} and one function call, with no weights
+to download, no device to allocate, and no context length to choose. It is a
+\emph{floor}: a pretrained model that does not clear it has not yet earned the
+comparison, and one that does has cleared something cheap.
+
+We do not propose \code{laplace} as state of the art. We propose it as the
+denominator.
+
+%% -------------------------------------------------------------------------
+\section{Protocol}\label{sec:protocol}
+
+Every arm sees the same series, the same windows and the same scoring rule. The
+context is 128 observations, the test window rolls one step ahead, and no arm is
+fitted to the evaluation data. The score is held-out log predictive density,
+differenced per series so that each series' intrinsic difficulty cancels.
+
+We report the median of that difference and the per-series win, draw and loss
+counts from a Diebold--Mariano test with HAC standard errors and a draw band,
+following \citet{diebold1995comparing}. We do not report a pooled mean.
+Averaging a log density across heterogeneous series estimates nothing, because a
+few near-constant series dominate the sum; \citet{koning2005m3} made the
+corresponding argument about the M3 competition, and \citet{hewamalage2023evaluation}
+prescribe per-series testing.
+
+The context is fixed rather than growing. Several foundation models degrade
+beyond the window they were pretrained on, and most of them silently truncate
+over-long input rather than raising, so feeding four thousand points to a model
+configured for two thousand scores a two-thousand-context model without saying
+so. A protocol that lets context grow needs a declared per-model cap, set at the
+documented architectural maximum, and recorded per arm.
+
+Recording it matters for a second reason. The \citet{woo2024moirai} benchmark
+numbers come from a per-dataset search over context lengths from one thousand to
+five thousand, jointly with patch size, which the arms it is compared against do
+not receive.
+
+%% -------------------------------------------------------------------------
+\section{Results}\label{sec:results}
+
+Table~\ref{tab:raw} scores TimesFM 3.0 \citep{das2024timesfm} zero-shot against
+the reference on an 18{,}815-series \proglang{FRED} panel. Negative favours the
+reference.
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{lrccr}
+\toprule
+Stratum & $N$ & Win / draw / loss & Median $\Delta$LL & Loss rate \\
+\midrule
+Daily, economic       & $2{,}179$ & $66 / 923 / 1{,}190$      & $-0.854$ & $54.6\,\%$ \\
+Daily, price/returns  & $7{,}633$ & $15 / 4{,}593 / 3{,}025$  & $-0.616$ & $39.6\,\%$ \\
+Weekly, economic      & $3{,}013$ & $517 / 1{,}481 / 1{,}015$ & $-0.520$ & $33.7\,\%$ \\
+Monthly, economic     & $5{,}576$ & $193 / 3{,}592 / 1{,}791$ & $-0.647$ & $32.1\,\%$ \\
+M4-hourly, seasonal   & $414$     & $8 / 241 / 165$           & $-0.543$ & $39.9\,\%$ \\
+\bottomrule
+\end{tabular}
+\caption{TimesFM 3.0 against \code{laplace}, one step ahead on held-out log
+density, 128-length context. $\Delta$LL is the per-series difference, model
+minus reference, reported as a median. The loss rate is the share of series on
+which the model loses.}
+\label{tab:raw}
+\end{table}
+
+The model loses on the majority of series in every stratum, by a median of
+roughly half a nat. Half a nat is a large gap in log-likelihood terms.
+
+Table~\ref{tab:wrapped} repeats the comparison with the model wrapped in a
+post-hoc portfolio that combines its own issued predictive with the reference.
+The wrap requires no retraining and no access to model internals; it sees only
+the density the model published.
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{lrccr}
+\toprule
+Stratum & $N$ & Win / draw / loss & Median $\Delta$LL & Loss rate \\
+\midrule
+Daily, economic       & $2{,}179$ & $76 / 1{,}383 / 720$     & $-0.094$ & $33.0\,\%$ \\
+Daily, price/returns  & $7{,}633$ & $152 / 7{,}136 / 345$    & $-0.008$ & $4.5\,\%$ \\
+Weekly, economic      & $3{,}011$ & $467 / 2{,}045 / 499$    & $-0.049$ & $16.6\,\%$ \\
+Monthly, economic     & $5{,}195$ & $350 / 4{,}480 / 365$    & $-0.056$ & $7.0\,\%$ \\
+M4-hourly, seasonal   & $414$     & $58 / 352 / 4$           & $-0.007$ & $1.0\,\%$ \\
+\bottomrule
+\end{tabular}
+\caption{The same model wrapped in a never-worse portfolio with the reference.
+The loss rate falls by as much as thirty-nine points; the median stays negative
+in every stratum.}
+\label{tab:wrapped}
+\end{table}
+
+Two readings follow. The wrapped model is safe to deploy, since its loss rate
+collapses. It is still not competitive, since the median remains negative
+everywhere.
+
+The second reading is the more useful one. If a post-hoc combination that sees
+only the published density recovers most of the gap, then at this horizon the
+pretraining is contributing less than the raw comparison suggests, and what it
+does contribute survives a wrapper.
+
+%% -------------------------------------------------------------------------
+\section{The reconstruction moves the answer more than the model does}\label{sec:nozzle}
+
+A quantile-only model does not emit a density, and a density must exist before a
+log score does. Something must build one from the quantiles, and that something
+is a modelling choice independent of the model being scored.
+
+Fix TimesFM 3.0 and fix $3{,}200$ held-out test points, then vary only the
+reconstruction across four methods. The mean log density moves from $-0.373$ to
+$+2.104$. The mean per-point spread is $3.13$ nats, which exceeds the entire
+measured gap between the model and the reference in every stratum of
+Table~\ref{tab:raw}. Two methods already in independent use elsewhere differ by
+$0.62$ nats.
+
+The choice therefore belongs in the protocol, stated rather than assumed. It is
+not peculiar to this study: the \citet{aksu2024gifteval} submission interface
+requires a mean and nine deciles, so a model emitting a genuine density must
+reduce it before scoring and a model emitting samples must convert.
+
+The conversion has teeth. That interface's interval score asks for the
+$2.5$th and $97.5$th percentiles, and a sample forecast returns a nearest order
+statistic without interpolation, so at the twenty samples the reference
+\pkg{Chronos} notebook uses, those two quantiles are the minimum and the maximum
+of twenty draws.
+
+%% -------------------------------------------------------------------------
+\section{Horizon, grid, and statefulness}\label{sec:suites}
+
+The results above do not contradict any published leaderboard, because no
+published leaderboard occupies this regime. Three settings separate them.
+
+The horizon never reaches one step. The shortest prediction length in
+\citet{aksu2024gifteval} is six, and \citet{shchur2025fevbench} use domain
+horizons such as thirty and one hundred sixty-eight.
+
+The scoring rule is a nine-point grid. What these suites report as CRPS is a
+mean of weighted quantile losses at the deciles, so nothing outside the tenth
+and ninetieth percentile enters any published score.
+\citet{ansari2025chronos2} call that grid a defect and move to twenty-one
+levels including the first and ninety-ninth.
+
+And no baseline carries state, which is the hole of Section~\ref{sec:intro}.
+Each setting is defensible for the task those suites set themselves. Together
+they define a regime, and a cheap online method cannot compete inside it or be
+seen to.
+
+%% -------------------------------------------------------------------------
+\section{Scope}\label{sec:scope}
+
+Everything measured here is univariate and one step ahead. A single pretrained
+model amortized across many related series can exploit cross-series and panel
+structure that no univariate method reaches by construction, and that is where
+pretraining should pay for itself most directly. This paper does not make that
+comparison, and it is the more decisive one.
+
+The protocol is assembled from standard parts. Proper scoring rules are the norm
+in this literature; prequential test-then-train evaluation is textbook; paired
+per-series testing was urged on the field by \citet{koning2005m3} and is already
+the headline aggregation in \citet{shchur2025fevbench}; normalizing by a cheap
+reference is universal. The assembly is what is new.
+
+Leakage is controlled in this literature by dataset name rather than by time.
+\citet{ansari2024chronos} state the temporal standard, that evaluation data
+should begin after the last pretraining observation, and then decline it as a
+minimal risk. \citet{meyer2025leakage} and \citet{oreshkin2026simulation} report
+that a corpus used in TimesFM pretraining reappears in its Monash evaluation;
+their pretraining table lists Traffic at $862$ series and $15{,}122{,}928$
+observations, and the Monash archive file \citep{zenodo-traffic-hourly} holds
+$862$ series of exactly $17{,}544$ steps.
+
+A calibration framing would have to engage \citet{adler2026calibrated}, who find
+these models better calibrated than automated ARIMA and N-BEATS on standard
+datasets. Nothing here contradicts that. Calibration on a decile grid and
+sharpness of a full density are different measurements.
+
+Finally, the panel is \proglang{FRED}, and \proglang{FRED} is the universe these
+models' pretraining corpora almost entirely omit: the corpus of
+\citet{woo2024moirai} is $0.09\,\%$ economic by observation, and the entire
+economics domain of \citet{aksu2024gifteval} is the M4 collection. Whether the
+gap survives on the energy and transport data these models were built for is an
+open question, and \citet{wang2026spectral} suggest it will not.
+
+%% -------------------------------------------------------------------------
+\section{Reproduction}\label{sec:repro}
+
+The paper directory holds four files. \code{constants.py} derives every number
+in Sections~\ref{sec:results} and \ref{sec:nozzle} from a version-controlled
+store. \code{verify\_paper.py} re-derives each one, compares it against the
+tables above, and exits non-zero on drift. \code{REPRODUCE.md} gives three
+tiers: the figures check in seconds from committed files, the summaries rebuild
+from per-step records in minutes, and the records regenerate from raw data in
+days.
+
+The data vintage is published as a release asset in the repository
+\code{skaters-\allowbreak benchmarking-\allowbreak data}. \proglang{FRED} revises series, so a fresh
+pull returns different vintages and will not reproduce these numbers. The archive carries $210{,}574$ public-domain series; commercial index
+series are excluded and listed, which costs the price stratum and nothing else.
+
+%% -------------------------------------------------------------------------
+\bibliographystyle{plainnat}
+\bibliography{benchmark}
+
+\end{document}

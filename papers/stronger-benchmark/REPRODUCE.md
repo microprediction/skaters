@@ -32,6 +32,13 @@ environment per foundation model, because their dependency sets conflict.
 python papers/stronger-benchmark/constants.py
 ```
 
+To build the PDF, which runs the drift check first and refuses to compile on a
+mismatch:
+
+```bash
+./papers/stronger-benchmark/compile.sh
+```
+
 Every figure quoted in the paper is printed by that script, computed from
 `benchmarks/canonical_summary_vs_laplace.csv` and
 `benchmarks/_nozzle_study.log`, both of which are committed. No number in the
@@ -45,7 +52,8 @@ thing a typed markdown table cannot guarantee on its own:
 python papers/stronger-benchmark/verify_paper.py
 ```
 
-That parses every results table and the quoted figures out of `paper.md`,
+That parses every results table and the quoted figures out of
+`stronger-benchmark.tex`,
 re-derives each from the store, and exits non-zero on any mismatch. Expected
 output is one line reporting 10 table rows and 6 prose figures matching.
 

@@ -1,4 +1,4 @@
-"""Every number in paper.md, computed from the store. Nothing is retyped.
+"""Every number in the paper, computed from the store. Nothing is retyped.
 
     python papers/stronger-benchmark/constants.py            # human-readable
     python papers/stronger-benchmark/constants.py --json     # machine-readable

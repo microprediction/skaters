@@ -1,8 +1,8 @@
-"""Check every number in paper.md against constants.py. Exits non-zero on drift.
+"""Check every number in the paper against constants.py. Exits non-zero on drift.
 
     python papers/stronger-benchmark/verify_paper.py
 
-The paper's tables are markdown, so they are typed. This closes that gap: the
+The paper's tables are LaTeX, so they are typed. This closes that gap: the
 prose is only trustworthy if a script re-derives each cell from the store and
 compares. A referee runs this instead of taking the Reproducibility section's
 word for it.
@@ -16,12 +16,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import constants  # noqa: E402
 
-PAPER = os.path.join(HERE, "paper.md")
+PAPER = os.path.join(HERE, "stronger-benchmark.tex")
 LABEL_TO_KEY = {
-    "daily, economic": "daily:econ",
-    "daily, price/returns": "daily:price",
-    "weekly, economic": "weekly:econ",
-    "monthly, economic": "monthly:econ",
+    "Daily, economic": "daily:econ",
+    "Daily, price/returns": "daily:price",
+    "Weekly, economic": "weekly:econ",
+    "Monthly, economic": "monthly:econ",
     "M4-hourly, seasonal": "m4-hourly:econ",
 }
 MINUS = "−"
@@ -32,20 +32,35 @@ def _num(s):
 
 
 def parse_tables(text):
-    """Yield (label, n, win, draw, loss, dLL, loss_rate) for every results row."""
+    """Yield (label, n, win, draw, loss, dLL, loss_rate) for every results row.
+
+    Rows look like:
+      Daily, economic & $2{,}179$ & $66 / 923 / 1{,}190$ & $-0.854$ & $54.6\\,\\%$ \\\\
+    """
+    def clean(c):
+        c = c.replace("{,}", "").replace("$", "").replace("\\,", "")
+        c = c.replace("\\%", "").replace(MINUS, "-").strip()
+        return c
+
     out = []
     for line in text.splitlines():
         line = line.strip()
-        if not line.startswith("|"):
+        if "&" not in line or not line.endswith("\\\\"):
             continue
-        cells = [c.strip() for c in line.strip("|").split("|")]
-        if len(cells) != 5 or cells[0] not in LABEL_TO_KEY:
+        cells = [clean(c) for c in line[:-2].split("&")]
+        if len(cells) != 5:
+            continue
+        label = cells[0].strip()
+        if label not in LABEL_TO_KEY:
             continue
         wdl = [p.strip() for p in cells[2].split("/")]
         if len(wdl) != 3:
             continue
-        out.append((cells[0], _num(cells[1]), int(_num(wdl[0])), int(_num(wdl[1])),
-                    int(_num(wdl[2])), _num(cells[3]), _num(cells[4])))
+        try:
+            out.append((label, float(cells[1]), int(wdl[0]), int(wdl[1]),
+                        int(wdl[2]), float(cells[3]), float(cells[4])))
+        except ValueError:
+            continue
     return out
 
 
@@ -94,7 +109,7 @@ def main():
         bad.append(f"prose    max loss-rate drop: paper '{claimed.group(1)}' vs store {drop}")
 
     if bad:
-        print("DRIFT DETECTED between paper.md and the store:\n")
+        print("DRIFT DETECTED between the paper and the store:\n")
         for b in bad:
             print("  " + b)
         return 1
