@@ -107,19 +107,46 @@ Six percent of configurations, 27 to 31% of scored instances, 69% of series. The
 leaderboard takes a geometric mean over configurations. Never quote one of these
 without saying which.
 
-### The TimesFM Traffic overlap
+### The TimesFM Traffic overlap: confirmed, but not ours
 
-The ICML paper says the evaluation datasets were intentionally held out. Its
-Table 1 lists Traffic Hourly at 862 series and 15,122,928 observations. Monash
-traffic hourly is 862 Caltrans series at 17,544 hourly steps, and the product is
-exactly 15,122,928. The paper acknowledges the analogous overlap for the Informer
-group but not this one.
+CONFIRMED. The ICML paper says its evaluation datasets were intentionally held
+out. Its Table 1 lists Traffic at 862 series and 15,122,928 observations. The
+Monash archive's own file, counted from Zenodo record 4656132, holds 862 series
+of exactly 17,544 steps. Electricity and Weather match their long-horizon-suite
+dimensions the same way, and the paper's single citation for all three resolves
+to the Informer benchmark. The separately listed 15-minute traffic row is a
+different dataset with its own citation.
 
-Check one is done. The Monash archive's own data file, from its Zenodo record,
-holds 862 series each of exactly 17,544 steps, so the product matches Table 1 to
-the digit. Two checks remain: that the Table 1 row denotes the Caltrans corpus
-rather than the separately listed 15-minute traffic data, and that no later
-version of the paper addresses the overlap. NOT PUBLISHABLE until both land.
+The authors excluded those same series from the Informer evaluation and said so,
+while the Monash evaluation retained them. The Traffic row first appears in
+version four and is carried into the camera-ready. The zero-shot claim
+strengthened across versions. There is no erratum.
+
+NOT A DISCOVERY. Meyer et al. (arXiv:2510.13654 v3) reported it in February and
+called it anecdotal. Oreshkin et al. (arXiv:2601.00970) make the same point
+about the long-horizon suite. Cite both. What we add is the arithmetic, the
+version history, and the authors' own Informer-group exclusion.
+
+### Context limits, for the cap policy
+
+No published study takes cross-model context sensitivity as its subject, so caps
+must be read off model cards and configuration files. Documented architectural
+maxima: TimesFM 512, 2048, 16384 and 15360 across versions; Chronos T5 512;
+Chronos-Bolt 2048; Chronos-2 8192 after a two-stage extension from 2048; TiRex
+2048; Sundial 2880; Lag-Llama 2048. Moirai declares 512 patch tokens rather than
+timesteps, so its timestep limit depends on patch size. Toto and TabPFN-TS
+declare no architectural cap.
+
+Most of these silently left-truncate over-long input rather than raising, so
+over-feeding a model scores a smaller-context model without warning. Chronos is
+the one first-party degradation statement: training context helps up to 1024,
+then saturates or worsens. Moirai's published numbers come from a per-dataset
+search over context and patch size that competitor arms do not receive.
+
+Two circulating claims failed checking and must not be cited. The often-repeated
+finding that longer context hurt Moirai on electricity appears in neither the
+Moirai nor the ProbTS paper. And a widely-quoted inverse-scaling figure belongs
+to PatchTST, not to any foundation model.
 
 ## Novelty. What is actually ours.
 

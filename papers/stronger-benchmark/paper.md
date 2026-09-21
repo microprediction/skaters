@@ -140,6 +140,19 @@ TimesFM 3.0 is scored zero-shot under one protocol: a 128-length context, a
 rolling one-step-ahead test window, no fitting, held-out log density on the same
 series and windows as the reference.
 
+The context is fixed rather than growing, and that is deliberate. Several of
+these models degrade beyond the window they were pretrained on, and most of them
+silently truncate over-long input rather than raising. Feeding four thousand
+points to a model whose configuration caps it at two thousand scores a
+two-thousand-context model without saying so. Any protocol that lets context
+grow therefore needs a declared per-model cap, set at the documented
+architectural maximum or at the pretraining context, and recorded per arm.
+
+Recording it matters for a second reason. Moirai's published benchmark numbers
+come from a per-dataset search over context lengths from one thousand to five
+thousand, jointly with patch size, which the arms it is compared against do not
+receive.
+
 | stratum | n series | win / draw / loss | median ΔLL | loss rate |
 |---|---|---|---|---|
 | daily, economic | 2,179 | 66 / 923 / 1,190 | −0.854 | 54.6% |
@@ -202,6 +215,26 @@ suspected contamination is perfectly confounded with M4's short, seasonal,
 curated character, and the result cannot separate them. And two of the flips
 rest on point estimates whose intervals cross zero.
 
+The deeper problem is that leakage in this literature is controlled by dataset
+name rather than by audit or by time. Chronos writes down the temporal standard,
+that evaluation data should begin after the last pretraining observation, then
+declines to meet it and judges the risk minimal. Name matching also fails when
+one file carries two names. Meyer and colleagues report that TimesFM appears to
+pretrain on the Monash traffic hourly data it then evaluates on, and Oreshkin
+and colleagues make the same observation about the long-horizon suite. Both
+predate this paper and the finding is theirs.
+
+What we add is the documentation. The pretraining table lists Traffic at 862
+series and 15,122,928 observations. The Monash archive's own data file holds 862
+series of exactly 17,544 steps, whose product is that figure, and the Electricity
+and Weather rows match their long-horizon-suite dimensions the same way. The
+paper's single citation for all three points to the Informer benchmark.
+
+The authors knew about the overlap, because they excluded those same series from the
+Informer group and said so, while the evaluation on Monash retained them under a
+blanket held-out claim. The row first appears in the fourth version and is
+carried into the camera-ready, with no erratum.
+
 ## 8. What this does not settle
 
 Everything here is univariate and one step ahead. A single pretrained model
@@ -219,11 +252,10 @@ fev-bench. Normalising against a cheap reference is universal.
 What this paper contributes is the observation that the standard configuration excludes a class
 of method, and the measurement of what changes when it does not.
 
-A growing context also cuts both ways. Long-context studies show several of
-these models degrading beyond their pretraining window, so an uncapped context
-would evaluate them outside the regime they were built for. The results above
-use a fixed 128-length context for that reason, and a protocol that lets context
-grow needs a declared per-model cap.
+A growing context also cuts both ways, which is why the protocol above fixes it
+and section 5 states the cap policy. No published study takes cross-model
+context sensitivity as its subject, so the cap has to be read off model cards
+and configuration files rather than off measured optima.
 
 Finally, a calibration framing would have to engage published evidence that
 these models are better calibrated than automated ARIMA and N-BEATS on standard

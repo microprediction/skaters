@@ -184,3 +184,39 @@ Reproducing its numbers needs that store.
 across devices. Tier 3 re-runs should reproduce the signs, the win/draw/loss
 pattern and the median gaps, not the trailing digits. Tier 1 and Tier 2 are
 exact, because they read stored records rather than recomputing inference.
+
+---
+
+## 6. Re-checking the pretraining overlap in section 7
+
+The claim that one corpus appears on both sides of a published zero-shot result
+rests on counting a public file. It needs no store and no model.
+
+```bash
+curl -sL -o traffic_hourly.zip \
+  "https://zenodo.org/records/4656132/files/traffic_hourly_dataset.zip?download=1"
+unzip -q traffic_hourly.zip
+python3 - <<'EOF'
+import glob
+f = glob.glob('*.tsf')[0]
+n, lens, in_data = 0, set(), False
+for line in open(f, encoding='utf-8', errors='replace'):
+    if not in_data:
+        in_data = line.strip().lower() == '@data'
+        continue
+    if line.strip():
+        n += 1
+        lens.add(line.split(':')[-1].count(',') + 1)
+print(n, 'series,', sorted(lens), 'steps, product', n * max(lens))
+EOF
+```
+
+Expected: `862 series, [17544] steps, product 15122928`. Every series has the
+same length, so the product is not an artifact of averaging. Compare against the
+Traffic row of Table 1 in arXiv:2310.10688 v4.
+
+Note the HuggingFace route no longer works. `Monash-University/monash_tsf` ships
+a loading script, which recent versions of `datasets` refuse to execute.
+
+The finding itself is not ours. Meyer et al. (arXiv:2510.13654) and Oreshkin et
+al. (arXiv:2601.00970) reported it first, and the paper cites them.
