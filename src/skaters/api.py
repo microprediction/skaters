@@ -55,9 +55,15 @@ def _build_candidates(k: int, leaf_fn=leaf):
     Every search policy considers ALL of these. The policy only
     affects how they are weighted, not which ones are included.
 
-    The terminal distribution of every candidate is ``leaf_fn`` — by default
-    the Gaussian scale-mixture leaf, which models the residual's departure
-    from N(0,1). Pass ``leaf_fn=leaf`` for the plain Gaussian leaf.
+    Each candidate's own residual model is ``leaf_fn``: the plain Gaussian
+    ``leaf`` by default. Pass ``leaf_fn=scale_mixture_leaf`` explicitly for
+    the Gaussian scale-mixture leaf. This is the internal per-candidate
+    model the likelihood-weighted trunk scores and combines; it is distinct
+    from the FINAL residual model selected by ``laplace(leaf=...)`` /
+    ``objective``, which is applied by ``terminal_leaf_ensemble`` on top of
+    the combined trunk. (skaters#234: an earlier docstring claimed the
+    scale-mixture leaf was the default here; it never was, and a full-
+    pipeline comparison found no advantage in changing it.)
 
     Returns (candidates, depths, groups), where groups maps a logical
     block name to the list of candidate indices in that block. Policies
