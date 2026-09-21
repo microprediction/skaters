@@ -1,0 +1,9 @@
+study,method,n_steps,cov_central90,cal_median
+daily:econ,laplace,13120,0.9158,0.5329
+daily:econ,surrogate,13120,0.9127,0.4467
+daily:price,laplace,12480,0.9127,0.5067
+daily:price,surrogate,12480,0.9076,0.4844
+monthly:econ,laplace,25600,0.9224,0.5133
+monthly:econ,surrogate,25600,0.9050,0.4884
+weekly:econ,laplace,25600,0.9062,0.5307
+weekly:econ,surrogate,25600,0.9111,0.3959

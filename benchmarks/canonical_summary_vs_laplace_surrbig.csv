@@ -1,0 +1,5 @@
+study,model,n_series,win,draw,loss,med_dLL,q25_dLL,q75_dLL,med_crps_ratio
+daily:econ,surrogate,205,23,115,67,-0.1424,-0.6350,0.0459,0.9618
+daily:price,surrogate,195,18,166,11,-0.0722,-0.2297,0.0151,0.9939
+monthly:econ,surrogate,400,62,263,75,-0.0880,-0.3651,0.0631,0.9739
+weekly:econ,surrogate,400,78,194,128,-0.1167,-1.7927,0.0741,0.9737
