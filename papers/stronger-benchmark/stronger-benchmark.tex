@@ -54,7 +54,7 @@ on other hardware.
 probabilistic forecasting, proper scoring rules, online learning.
 
 %% -------------------------------------------------------------------------
-\section{The missing arm}\label{sec:intro}
+\section{Introduction}\label{sec:intro}
 
 A foundation model forecasts from a fixed window of recent history, with weights
 frozen at pretraining. An online forecaster carries state, and revises it with
@@ -77,11 +77,11 @@ This paper supplies such an arm and reports what it does to the comparison. The
 contribution is deliberately small: a reference, a protocol, and two tables.
 
 %% -------------------------------------------------------------------------
-\section{The reference}\label{sec:reference}
+\section{\code{laplace}: an online distributional forecaster}\label{sec:reference}
 
-\code{laplace} is an online distributional forecaster. It imports nothing,
-requires no GPU, performs no fitting step, and exposes no tunable
-hyperparameters. One parameter-free call returns a predictive density.
+\code{laplace} imports nothing, requires no GPU, performs no fitting step, and
+exposes no tunable hyperparameters. One parameter-free call returns a predictive
+density.
 
 The method is built by conjugation: invertible transforms nest onto a single
 distributional leaf fitted by a proper scoring rule, and the composition
@@ -137,7 +137,7 @@ five thousand, jointly with patch size, which the arms it is compared against do
 not receive.
 
 %% -------------------------------------------------------------------------
-\section{Results}\label{sec:results}
+\section{Against TimesFM 3.0}\label{sec:results}
 
 Table~\ref{tab:raw} scores TimesFM 3.0 \citep{das2024timesfm} zero-shot against
 the reference on an 18{,}815-series \proglang{FRED} panel. Negative favours the
