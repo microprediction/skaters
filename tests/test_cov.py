@@ -2,6 +2,7 @@
 
 import math
 import random
+import pytest
 from skaters.cov.running import running_cov
 from skaters.cov.ema_cov import ema_cov
 from skaters.cov.shrinkage import ledoit_wolf_cov
@@ -67,6 +68,20 @@ class TestEmaCov:
                 [random.gauss(0, 1), random.gauss(0, 1)], state, alpha=0.02
             )
         assert abs(cov2[1]) < abs(cov1[1])  # correlation should decrease
+
+    def test_steady_state_variance_is_unbiased(self):
+        """With delta pinned constant every tick (mean forced back to 0 so
+        `y - mean` never drifts), the EMA variance must converge to the true
+        delta^2, not (1-alpha) times it. A stray extra (1-alpha) factor on
+        the whole update (`(1-alpha)*(cov + alpha*d*d)` instead of
+        `(1-alpha)*cov + alpha*d*d`) understates variance by exactly
+        (1-alpha) in steady state -- 5% at the default alpha=0.05."""
+        alpha = 0.05
+        state = {"mean": [0.0], "cov": [0.0], "n": 1}
+        for _ in range(5000):
+            state["mean"] = [0.0]
+            _, cov, state = ema_cov([2.0], state, alpha=alpha)
+        assert cov[0] == pytest.approx(4.0, rel=1e-6)
 
 
 class TestLedoitWolf:

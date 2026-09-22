@@ -121,7 +121,7 @@ impl EmaCov {
         for i in 0..n {
             for j in 0..n {
                 self.cov[i * n + j] =
-                    (1.0 - alpha) * (self.cov[i * n + j] + alpha * delta[i] * delta[j]);
+                    (1.0 - alpha) * self.cov[i * n + j] + alpha * delta[i] * delta[j];
             }
         }
         (self.mean.clone(), self.cov.clone())
