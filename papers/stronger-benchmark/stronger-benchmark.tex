@@ -364,17 +364,19 @@ series and the widest on $95\,\%$. On CRPS the arms do better, which is the
 expected pattern, since CRPS is forgiving of a mis-shaped tail that a log score
 punishes.
 
-The re-estimation cadence in the caption is the one setting that could flatter
-these numbers, because \pkg{statsforecast} freezes the innovation variance
-between refits and the interval inherits a stale scale. Re-estimating at every
-step instead, on twenty series, moves AutoARIMA by a median of $0.005$ nats and
-AutoETS by $-0.000$. The margins here are $0.31$ to $0.59$ nats, so the cadence
-does not account for them.
-
-These arms are nonetheless stronger than the ones the studies of
-Table~\ref{tab:arms} run. Their harnesses re-estimate at each window, but the
-forecast for step $j$ of a window conditions only on data up to the window
-origin, so inside a window of length $h$ the baseline never sees the
+These arms are stronger than the ones the studies of Table~\ref{tab:arms}
+run.\footnote{The two differ in which half of the model goes stale.
+\pkg{statsforecast}'s \code{refit} argument freezes the fitted coefficients
+between refits but hands \code{forward} the current history, so the arms here
+are coefficient-stale and conditioning-current. The frozen parameters include
+the innovation variance, so the interval inherits a scale up to $25$ steps old,
+which is the one setting that could flatter Table~\ref{tab:classic}.
+Re-estimating at every step instead, on twenty paired series, moves AutoARIMA by
+a median of $0.005$ nats and AutoETS by $-0.000$, against margins of $0.31$ to
+$0.59$ nats. The published harnesses are the mirror image: they re-estimate at
+every window and freeze the conditioning.} Their harnesses re-estimate at each
+window, but the forecast for step $j$ of a window conditions only on data up to
+the window origin, so inside a window of length $h$ the baseline never sees the
 observations it is forecasting past. Four of the eleven use a single origin per
 series.
 
