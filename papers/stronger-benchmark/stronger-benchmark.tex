@@ -121,8 +121,8 @@ both rows are marked.}
 \label{tab:arms}
 \end{table}
 
-Three methods carry the field: automated ETS, ARIMA and Theta each appear in ten
-of the eleven. With seasonal naive they form a quartet that is the complete
+Three methods dominate. Automated ETS, ARIMA and Theta each appear in ten of the
+eleven. With seasonal naive they form a quartet that is the complete
 classic roster of six studies. No method appears in all eleven, though Theta
 does if its dynamically optimized variant is treated as the same model, which
 \citet{garza2023timegpt} declines to do by listing both.
@@ -218,7 +218,7 @@ another person's hardware, which is the property a denominator needs and a
 pretrained checkpoint behind an inference stack does not have.
 
 A denominator sets what a skill score means, and a weak one flatters everything
-divided by it. That is the argument for this particular arm.
+divided by it.
 
 Sections~\ref{sec:classic} and \ref{sec:results} measure how strong it is.
 \code{laplace} takes the per-series log-likelihood against every classical arm
@@ -347,14 +347,12 @@ in every stratum.}
 \label{tab:wrapped}
 \end{table}
 
-Two readings follow. The wrapped model is safe to deploy, since its loss rate
-collapses. It is still not competitive, since the median remains negative
-everywhere.
+The wrapped model is safe to deploy, since its loss rate collapses. It remains
+behind the reference, since the median stays negative in every stratum.
 
-The second reading is the more useful one. If a post-hoc combination that sees
-only the published density recovers most of the gap, then at this horizon the
-pretraining is contributing less than the raw comparison suggests, and what it
-does contribute survives a wrapper.
+A post-hoc combination that sees only the published density recovers most of the
+gap. At this horizon the pretraining is therefore contributing less than the raw
+comparison suggests, and what it does contribute survives a wrapper.
 
 %% -------------------------------------------------------------------------
 \section{The reconstruction moves the answer more than the model does}\label{sec:nozzle}
@@ -375,11 +373,10 @@ not peculiar to this study: the \citet{aksu2024gifteval} submission interface
 requires a mean and nine deciles, so a model emitting a genuine density must
 reduce it before scoring and a model emitting samples must convert.
 
-The conversion has teeth. That interface's interval score asks for the
-$2.5$th and $97.5$th percentiles, and a sample forecast returns a nearest order
-statistic without interpolation, so at the twenty samples the reference
-\pkg{Chronos} notebook uses, those two quantiles are the minimum and the maximum
-of twenty draws.
+That interface's interval score asks for the $2.5$th and $97.5$th percentiles,
+and a sample forecast returns a nearest order statistic without interpolation.
+At the twenty samples the reference \pkg{Chronos} notebook uses, those two
+quantiles are the minimum and the maximum of twenty draws.
 
 %% -------------------------------------------------------------------------
 \section{Horizon, grid, and statefulness}\label{sec:suites}
@@ -399,8 +396,7 @@ levels including the first and ninety-ninth.
 
 And no baseline carries state, which is the hole of Section~\ref{sec:intro}.
 Each setting is defensible for the task those suites set themselves. Together
-they define a regime, and an online distributional method cannot compete inside
-it or be seen to.
+they define a regime in which an online distributional method cannot compete.
 
 %% -------------------------------------------------------------------------
 \section{Scope}\label{sec:scope}
@@ -410,12 +406,6 @@ model amortized across many related series can exploit cross-series and panel
 structure that no univariate method reaches by construction, and that is where
 pretraining should pay for itself most directly. This paper does not make that
 comparison, and it is the more decisive one.
-
-The protocol is assembled from standard parts. Proper scoring rules are the norm
-in this literature; prequential test-then-train evaluation is textbook; paired
-per-series testing was urged on the field by \citet{koning2005m3} and is already
-the headline aggregation in \citet{shchur2025fevbench}; normalizing by a cheap
-reference is universal. The assembly is what is new.
 
 Leakage is controlled in this literature by dataset name rather than by time.
 \citet{ansari2024chronos} state the temporal standard, that evaluation data
