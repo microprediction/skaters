@@ -126,6 +126,21 @@ def main():
             if got != want:
                 bad.append(f"classic  {arm}: paper {got} vs store {want}")
 
+    perf = constants.performance()["models"]
+    def _perf(model, regime):
+        return perf.get(model, {}).get(regime)
+    for model, regime, want in [
+        ("laplace (Rust) k=1", "warm", 0.012),
+        ("laplace (Python) k=1", "warm", 0.251),
+        ("Chronos-Bolt-small", "warm", 7.44),
+        ("TimesFM-2.5-200M", "warm", 329.83),
+    ]:
+        got = _perf(model, regime)
+        if got is None:
+            bad.append(f"perf     {model} {regime}: missing from perf_results.json")
+        elif abs(round(got, 3 if want < 1 else 2) - want) > 1e-9:
+            bad.append(f"perf     {model} {regime}: paper {want} vs store {got:.4f}")
+
     pkg = constants.package_size()
     m = re.search(r"\$(\d+)\$\\,KB of source across \$(\d+)\$", text)
     if not m:

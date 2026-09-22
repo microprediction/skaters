@@ -12,7 +12,10 @@
 
 %% Fallbacks so the paper also builds against a minimal jss.cls.
 \providecommand{\proglang}[1]{\textsf{#1}}
-\providecommand{\pkg}[1]{\textbf{#1}}
+\providecommand{\pkg}[1]{\textit{#1}}
+%% jss.cls defines \pkg as bold. Twelve package names in running text is too
+%% much bold, so soften it to italic for this paper.
+\renewcommand{\pkg}[1]{\textit{#1}}
 \providecommand{\code}[1]{\texttt{#1}}
 
 \setlength{\emergencystretch}{3em}
@@ -206,9 +209,46 @@ Two properties matter for a reference arm, and neither is accuracy. The first is
 cost. Adding \code{laplace} to a leaderboard is a \code{pip install} and one
 function call, with no weights to download, no device to allocate, and no
 context length to choose. The pure-\proglang{Python} implementation, $280$\,KB of source across $28$
-files, is the reference, and a \proglang{Rust} core steps it at roughly $14$ microseconds
-per observation, twenty times the \proglang{Python} rate. A reference that is
-slow over a large panel does not get included.
+files, is the reference; a \proglang{Rust} core runs the same arithmetic about
+twenty times faster.
+
+Table~\ref{tab:perf} gives the runtime, and the two regimes disagree. Cold is
+one forecast for a series not seen before, which is what a benchmark harness
+asks for. Warm is one new observation on a series already tracked, which is what
+a deployment asks for.
+
+\begin{table}[t!]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+ & \multicolumn{2}{c}{cold (ms)} & warm (ms) \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-4}
+Model & batch 1 & batch 64 & \\
+\midrule
+\code{laplace} (\proglang{Rust})   & $3.39$   & ---     & $0.012$ \\
+\code{laplace} (\proglang{Python}) & $67.08$  & ---     & $0.251$ \\
+AutoETS (refit)                     & $1.93$   & ---     & $1.93$ \\
+Prophet (refit)                     & $29.97$  & ---     & $29.97$ \\
+AutoARIMA (refit)                   & $62.13$  & ---     & $62.13$ \\
+Chronos-Bolt-small                  & $7.44$   & $0.72$  & $7.44$ \\
+TiRex                               & $96.47$  & $76.34$ & $95.68$ \\
+TimesFM-2.5-200M                    & $323.44$ & $5.10$  & $329.83$ \\
+\bottomrule
+\end{tabular}
+\caption{Milliseconds per forecast, context $256$, horizon $12$, $64$ series,
+one thread, Apple silicon, \pkg{skaters} $0.16.0$. Foundation models batch in
+the cold regime, so the batched column is reported alongside the per-series one.
+In the warm regime \code{laplace} performs one state update; a stateless model
+re-runs its forward pass over a shifted window and a refitting baseline
+re-estimates from scratch, so for those the warm cost equals the cold cost.}
+\label{tab:perf}
+\end{table}
+
+Warm is the regime that separates the arms. One online update costs $0.012$
+milliseconds, against $7.44$ for the cheapest foundation model here and $329.83$
+for the largest. A reference that is slow over a large panel does not get
+included.
 
 The second is reproducibility across machines. The \proglang{Rust} core uses
 portable mathematics (\pkg{libm}) and produces identical bits on x86 and ARM,

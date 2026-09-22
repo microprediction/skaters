@@ -23,6 +23,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SUMMARY = os.path.join(ROOT, "benchmarks", "canonical_summary_vs_laplace.csv")
 SRC = os.path.join(ROOT, "src")
+PERF = os.path.join(ROOT, "benchmarks", "perf_results.json")
 SHARED = os.path.join(ROOT, "benchmarks", "comparisons", "_shared_R25_nonprice.csv")
 
 # The arms these foundation-model studies actually carry, as named in this
@@ -98,6 +99,26 @@ def nozzle():
         "narrow_vs_grid": g(r"narrow vs grid, mean logpdf diff: ([-+][\d.]+)"),
         "worst_gap": abs(g(r"narrow vs grid, mean logpdf diff: ([-+][\d.]+)")),
     }
+
+
+def performance():
+    """Runtime per forecast, from benchmarks/perf_results.json.
+
+    Produced by benchmarks/perf_compare.py. Two regimes, because they disagree:
+    COLD is one forecast for an unseen series given its history, which is what a
+    benchmark harness does; WARM is one new observation on a series already
+    tracked, which is what a deployment does. Foundation models batch in COLD,
+    so the batched column is reported rather than only the per-series one.
+    """
+    with open(PERF) as fh:
+        blob = json.load(fh)
+    rows = {}
+    for r in blob["rows"]:
+        ms = r["ms"]
+        if ms != ms:                      # NaN: the arm did not run
+            continue
+        rows.setdefault(r["model"], {})[r["regime"]] = ms
+    return {"meta": blob["meta"], "models": rows}
 
 
 def classic_baselines():
@@ -178,13 +199,15 @@ def main():
     noz = nozzle()
     der = derived(h2h, noz)
     pkg = package_size()
+    perf = performance()
     try:
         classic = classic_baselines()
     except Exception as exc:                       # noqa: BLE001
         classic = {"_error": f"{type(exc).__name__}: {exc}"}
     if "--json" in sys.argv:
         print(json.dumps({"head_to_head": h2h, "nozzle": noz, "derived": der,
-                          "package": pkg, "classic": classic}, indent=2))
+                          "package": pkg, "classic": classic,
+                          "performance": perf}, indent=2))
         return
     print("HEAD TO HEAD, TimesFM3 vs laplace (source: canonical_summary_vs_laplace.csv)\n")
     print(f"{'stratum':22s} {'n':>6s}  {'w/d/l':>18s}  {'med dLL':>8s}  {'loss%':>6s}")
@@ -223,7 +246,18 @@ def main():
 
     print(f"\nPACKAGE SIZE\n\n  {pkg['n_files']} .py files, {pkg['bytes']} bytes "
           f"= {pkg['kb_rounded']} KB\n")
-    print("DERIVED CLAIMS\n")
+    m = perf["meta"]
+    print("\nRUNTIME ms/forecast  (v{}, {}, context {}, {} series, {})\n".format(
+        m["version"], m["machine"], m["context"], m["series"], m["date"]))
+    print("  {:26s}{:>12s}{:>12s}{:>10s}".format(
+        "model", "cold b=1", "cold b=64", "warm"))
+    for name, reg in sorted(perf["models"].items(), key=lambda kv: kv[1].get("warm", 1e9)):
+        f = lambda k: ("{:12.3f}".format(reg[k]) if k in reg else "{:>12s}".format("-"))
+        print("  {:26s}{}{}{:>10s}".format(
+            name[:26], f("cold b=1") if "cold b=1" in reg else f("cold"),
+            f("cold b=64"),
+            "{:.3f}".format(reg["warm"]) if "warm" in reg else "-"))
+    print("\nDERIVED CLAIMS\n")
     for k, v in der.items():
         print(f"  {k:46s} {v}")
 
