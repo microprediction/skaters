@@ -353,7 +353,9 @@ auto.arima (\proglang{R})       & $84\,\%$ & $85\,\%$ & $51\,\%$ & $60\,\%$ & $1
 \caption{Share of series on which \code{laplace} scores better, over $5{,}397$
 continuous non-price \proglang{FRED} series in $1{,}213$ correlated families.
 The family figure averages within a family first, so that a cluster of related
-series counts once. $N$ is the subset each arm covers under its compute budget.}
+series counts once. $N$ is the subset each arm covers under its compute budget.
+Every arm forecasts one step ahead at every point, conditioned on all data up to
+that point, with coefficients re-estimated every $25$ steps.}
 \label{tab:classic}
 \end{table}
 
@@ -361,6 +363,20 @@ On log-likelihood the margin is wide: the closest arm loses on $84\,\%$ of
 series and the widest on $95\,\%$. On CRPS the arms do better, which is the
 expected pattern, since CRPS is forgiving of a mis-shaped tail that a log score
 punishes.
+
+The re-estimation cadence in the caption is the one setting that could flatter
+these numbers, because \pkg{statsforecast} freezes the innovation variance
+between refits and the interval inherits a stale scale. Re-estimating at every
+step instead, on twenty series, moves AutoARIMA by a median of $0.005$ nats and
+AutoETS by $-0.000$. The margins here are $0.31$ to $0.59$ nats, so the cadence
+does not account for them.
+
+These arms are nonetheless stronger than the ones the studies of
+Table~\ref{tab:arms} run. Their harnesses re-estimate at each window, but the
+forecast for step $j$ of a window conditions only on data up to the window
+origin, so inside a window of length $h$ the baseline never sees the
+observations it is forecasting past. Four of the eleven use a single origin per
+series.
 
 This is the sense in which the incumbent denominators are soft. A skill score
 computed against them credits a model for clearing a bar that a dependency-free
