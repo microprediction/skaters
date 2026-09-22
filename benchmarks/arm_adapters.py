@@ -342,6 +342,93 @@ def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None, h=1):
 # make_registry(h) builds the same roster at forecast horizon h (h=1 = the
 # canonical one-step study). Every adapter and sandwich takes an h that defaults
 # to 1, so REGISTRY (h=1) is byte-for-byte the original behaviour.
+# ---- NPTS: the training-free distributional baseline the field ships but omits -
+# GluonTS and AutoGluon both ship NPTS, and both are imported by the benchmarks
+# that omit it. It resamples past values under a recency kernel, so it is
+# distributional by construction and needs no fitting.
+def npts_dists(ch, h=1):
+    """TEST per-step predictives from GluonTS NPTS on the change series.
+
+    Seasonality is off: these are one-step changes, where a seasonal index over
+    the raw clock has no meaning. The predictive is a weighted resample of past
+    changes, converted by the same sample_dist every sampling arm uses.
+    """
+    try:
+        import numpy as _np
+        import pandas as _pd
+        from gluonts.model.npts import NPTSPredictor
+    except Exception:                                  # noqa: BLE001
+        return None
+    ch = _np.asarray(ch, float)
+    n = len(ch)
+    lo = n - fs.TEST
+    if lo < 8:
+        return None
+    pred = NPTSPredictor(prediction_length=h, use_seasonal_model=False,
+                         use_default_time_features=False)
+    idx0 = _pd.Period("2000-01-01", freq="D")
+    out = []
+    for j in range(lo, n):
+        hist = ch[max(0, j - fs.CTX):j]
+        ts = _pd.Series(hist, index=_pd.period_range(idx0, periods=len(hist), freq="D"))
+        try:
+            fc = pred.predict_time_series(ts, num_samples=500)
+        except Exception:                              # noqa: BLE001
+            return None
+        samp = _np.asarray(fc.samples, float).reshape(h, -1)[h - 1]
+        out.append(fs.sample_dist(samp))
+    return out
+
+
+# ---- PyMC-forecast: a Bayesian challenger, through the canonical protocol -----
+# The original study (pymc_forecast_sandwich_study.py) wrote its own schema to
+# its own CSV and never entered the canonical store, so its numbers were not
+# comparable with the arms here. This adapter reuses that study's model and fit
+# unchanged and converts only the OUTPUT to a canonical Dist, via the same
+# sample_dist every sampling arm uses.
+PYMC_REFIT = int(os.environ.get("PYMC_REFIT", 10))   # ADVI fits are ~90s each
+PYMC_TRAIN = int(os.environ.get("PYMC_TRAIN", 248))  # trailing lag-rows per fit
+
+
+def pymc_dists(ch, h=1):
+    """TEST per-step predictives from a Student-t regression on lagged changes.
+
+    One ADVI fit costs roughly ninety seconds, so refitting at every test step
+    would be over an hour per series. The cadence is PYMC_REFIT steps, stated
+    here rather than hidden: parameters are up to that many steps stale, the
+    lag covariates are always current, which is the same arrangement the
+    statsforecast arms run under.
+    """
+    try:
+        import numpy as _np
+        import pymc_forecast_sandwich_study as _st
+        from tabfm_wide_study import lag_rows as _lag_rows
+    except Exception:                                  # noqa: BLE001
+        return None
+    ch = _np.asarray(ch, float)
+    n = len(ch)
+    lo = n - fs.TEST
+    if lo - h - _st.LAGS - PYMC_TRAIN < 0:
+        return None
+    out, params = [], None
+    for k, j in enumerate(range(lo, n)):
+        if k % PYMC_REFIT == 0:
+            tr_lo = j - PYMC_TRAIN
+            Xtr, ytr = _lag_rows(ch, tr_lo, j, _st.LAGS, h)
+            try:
+                params = _st._fit_zreg(ytr, Xtr, seed=abs(hash((int(j), n))) % 10**6)
+            except Exception:                          # noqa: BLE001
+                return None
+        a, b, sg, nu = params
+        x = ch[j - h - _st.LAGS + 1:j - h + 1]
+        mu = a + b @ x
+        # posterior predictive draws: one Student-t draw per posterior draw
+        g = _np.random.default_rng(int(j))
+        samp = mu + sg * g.standard_t(_np.clip(nu, 2.1, 200.0))
+        out.append(fs.sample_dist(samp))
+    return out
+
+
 def make_registry(h=1):
     return {
         "laplace":     lambda ch: laplace_dists(ch, h),
@@ -349,6 +436,8 @@ def make_registry(h=1):
         "TiRex":       lambda ch: tirex_dists(ch, h),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
+        "PyMC":        lambda ch: pymc_dists(ch, h),
+        "NPTS":        lambda ch: npts_dists(ch, h),
         "Chronos":     lambda ch: fs.chronos_dists(ch, h),
         "TimesFM":     lambda ch: fs.timesfm_dists(ch, h),
         "TimesFM3":    lambda ch: fs.timesfm3_dists(ch, h),
@@ -371,6 +460,11 @@ def make_registry(h=1):
         "TimesFM3&lap": portfolio_sandwich(fs.timesfm3_dists, h=h),
         "TiRex&lap":   portfolio_sandwich(tirex_dists, h=h),
         "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
+        "PyMC+lap":    _sandwich(pymc_dists, h),
+        "PyMC~lap":    _resid_sandwich(pymc_dists, h),
+        "PyMC@lap":    pit_sandwich(pymc_dists, h),
+        "PyMC&lap":    portfolio_sandwich(pymc_dists, h=h),
+        "NPTS&lap":    portfolio_sandwich(npts_dists, h=h),
     }
 
 
