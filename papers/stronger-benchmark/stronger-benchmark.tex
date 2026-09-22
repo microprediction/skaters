@@ -21,6 +21,7 @@
 \newcommand{\F}{$\bullet$}
 \newcommand{\I}{$\circ$}
 \newcommand{\B}{$\odot$}
+\newcommand{\rh}[1]{\rotatebox{45}{\makebox[0pt][l]{\small #1}}}
 
 \author{
   Peter Cotton\thanks{\email{peter.cotton@microprediction.com}}\\
@@ -80,34 +81,43 @@ those appear in exactly one paper. The working set is much smaller.
 \begin{table}[t!]
 \centering
 \small
-\setlength{\tabcolsep}{4.5pt}
-\begin{tabular}{lccccccccc c}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{lccccccccccc@{\hspace{10pt}}c}
 \toprule
-Study & ETS & ARIMA & Theta & SNv & Nv & SES & TBATS & DHR & SCUM & $n$ \\
+\addlinespace[4.2em]
+Method & \rh{GIFT-Eval} & \rh{Chronos} & \rh{Chronos-2} & \rh{TimesFM} & \rh{TiRex}
+ & \rh{Moirai} & \rh{Moirai-MoE} & \rh{fev-bench} & \rh{Lag-Llama}
+ & \rh{TimeGPT-1} & \rh{Monash} & $n$ \\
 \midrule
-GIFT-Eval  & \F & \F & \F & \F & \F & & & & & 5 \\
-Chronos    & \F & \F & \F & \F & \F & & & & \F & 6 \\
-Chronos-2  & \I & \I & \I & \I & \I & & & & \I & 6 \\
-TimesFM    & \I & \I & \I & & \F & \I & \I & \I & & 7 \\
-TiRex      & & \I & \I & \I & & & & & & 3 \\
-Moirai     & \I & \B & \I & \F & \F & \I & \I & \I & & 8 \\
-Moirai-MoE & \I & \I & \I & \F & & \I & & & & 5 \\
-fev-bench  & \F & \F & \F & \F & \F & & & & \F & 7 \\
-Lag-Llama  & \F & \F & & & & & & & & 5 \\
-TimeGPT-1  & \F & & \F & \F & & & & & & 10 \\
-Monash     & \F & \F & \F & & & \F & \F & \F & & 6 \\
+(Auto)ETS        & \F & \F & \I & \I &    & \I & \I & \F & \F & \F & \F & 10 \\
+(Auto)ARIMA      & \F & \F & \I & \I & \I & \B & \I & \F & \F &    & \F & 10 \\
+(Auto)Theta      & \F & \F & \I & \I & \I & \I & \I & \F &    & \F & \F & 10 \\
+Seasonal naive   & \F & \F & \I &    & \I & \F & \F & \F &    & \F &    & 8 \\
+Naive            & \F & \F & \I & \F &    & \F &    & \F &    &    &    & 6 \\
+SES              &    &    &    & \I &    & \I & \I &    &    &    & \F & 4 \\
+TBATS            &    &    &    & \I &    & \I &    &    &    &    & \F & 3 \\
+DHR-ARIMA        &    &    &    & \I &    & \I &    &    &    &    & \F & 3 \\
+SCUM ensemble    &    & \F & \I &    &    &    &    & \F &    &    &    & 3 \\
+DynOptTheta      &    &    &    &    &    &    &    &    & \F & \F &    & 2 \\
+Croston          &    &    &    &    &    &    &    &    & \F & \F &    & 2 \\
+AutoCES          &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+ADIDA            &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+IMAPA            &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+Drift            &    &    &    &    &    &    &    & \F &    &    &    & 1 \\
+HistoricAverage  &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+ZeroModel        &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
 \midrule
-carried by & 10 & 10 & 10 & 8 & 6 & 4 & 3 & 3 & 3 & \\
+\pkg{NPTS}       &    &    &    &    &    &    &    &    & \F &    &    & 1 \\
+\code{laplace}   &    &    &    &    &    &    &    &    &    &    &    & 0 \\
 \bottomrule
 \end{tabular}
-\caption{Classic arms by study. \F\ the authors ran it; \I\ the number is
-inherited from another paper's table or from a leaderboard; \B\ both, in
-different experiments. $n$ counts every classic arm the study carries, including
-those outside these columns. Tables inherited from
-\citet{godahewa2021monash} print ARIMA and its harmonic-regression variant as
-one column applied to disjoint frequency groups; both are marked here. Omitted columns, each carried by one or two studies:
-DynOptTheta, Croston, \pkg{NPTS}, AutoCES, ADIDA, IMAPA, Drift, HistoricAverage,
-ZeroModel.}
+\caption{Every classic arm in eleven studies. \F\ the authors ran it; \I\ the
+number is inherited from another paper's table or from a leaderboard; \B\ both,
+in different experiments. $n$ counts the studies carrying each method. The two
+rows below the rule are the methods that carry state and issue a density.
+Tables inherited from \citet{godahewa2021monash} print ARIMA and its
+harmonic-regression variant as one column applied to disjoint frequency groups;
+both rows are marked.}
 \label{tab:arms}
 \end{table}
 
@@ -146,11 +156,13 @@ naive, meanwhile, is a point forecaster serving as the probabilistic normalizer
 in seven of the eleven, and as the substituted score when another arm times out
 in two of them.
 
-\pkg{NPTS} would close both gaps. It is training-free, natively distributional
-because it is a sampling distribution, and ships in both \pkg{GluonTS} and
+The last two rows of Table~\ref{tab:arms} are the methods in this literature
+that carry state and issue a density. \pkg{NPTS} is training-free and is a
+sampling distribution by construction, and it ships in both \pkg{GluonTS} and
 \pkg{AutoGluon}, which these studies import for their datasets, their metrics
-and their deep baselines. It appears in one of the eleven
-\citep{rasul2023lagllama}.
+and their deep baselines. It is carried by one of the eleven
+\citep{rasul2023lagllama}. We have not scored it, so we claim only that it is
+available and almost always absent, not that it is strong.
 
 This paper supplies such an arm and reports what it does to the comparison. The
 contribution is deliberately small: a reference, a protocol, and four tables.
