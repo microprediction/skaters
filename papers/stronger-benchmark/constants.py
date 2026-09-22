@@ -24,6 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SUMMARY = os.path.join(ROOT, "benchmarks", "canonical_summary_vs_laplace.csv")
 SRC = os.path.join(ROOT, "src")
 PERF = os.path.join(ROOT, "benchmarks", "perf_results.json")
+COVERAGE = os.path.join(ROOT, "benchmarks", "canonical_summary_coverage.csv")
 SHARED = os.path.join(ROOT, "benchmarks", "comparisons", "_shared_R25_nonprice.csv")
 
 # The arms these foundation-model studies actually carry, as named in this
@@ -119,6 +120,37 @@ def performance():
             continue
         rows.setdefault(r["model"], {})[r["regime"]] = ms
     return {"meta": blob["meta"], "models": rows}
+
+
+def panel_steps():
+    """Scored one-step forecasts in the panel, summed over strata."""
+    with open(COVERAGE) as fh:
+        return sum(int(r["n_steps"]) for r in csv.DictReader(fh)
+                   if r["method"] == "laplace")
+
+
+def panel_cost():
+    """Wall clock to score the whole panel one step at a time.
+
+    This is the regime a benchmark actually runs: a forecast at every step of
+    every series. An online method pays one state update per step. A stateless
+    model re-runs its forward pass per step, which is its cold cost, so the
+    batch-64 column is the fair version for an offline sweep that can run many
+    series in lockstep.
+    """
+    perf = performance()["models"]
+    steps = panel_steps()
+    out = {}
+    for name, reg in perf.items():
+        per_step = reg.get("warm")
+        if per_step is None:
+            continue
+        row = {"ms_per_step": per_step, "seconds": per_step * steps / 1000.0}
+        if "cold b=64" in reg:
+            row["ms_per_step_b64"] = reg["cold b=64"]
+            row["seconds_b64"] = reg["cold b=64"] * steps / 1000.0
+        out[name] = row
+    return {"steps": steps, "models": out}
 
 
 def classic_baselines():
@@ -246,6 +278,26 @@ def main():
 
     print(f"\nPACKAGE SIZE\n\n  {pkg['n_files']} .py files, {pkg['bytes']} bytes "
           f"= {pkg['kb_rounded']} KB\n")
+    pc = panel_cost()
+    print("\nCOST OF SCORING THE PANEL AT EVERY STEP "
+          "({:,} one-step forecasts)\n".format(pc["steps"]))
+    print("  {:26s}{:>12s}{:>14s}{:>14s}".format(
+        "model", "ms/step", "batch 1", "batch 64"))
+
+    def human(sec):
+        if sec < 90:
+            return "{:.0f} s".format(sec)
+        if sec < 5400:
+            return "{:.0f} min".format(sec / 60)
+        if sec < 172800:
+            return "{:.1f} h".format(sec / 3600)
+        return "{:.1f} d".format(sec / 86400)
+
+    for name, r in sorted(pc["models"].items(), key=lambda kv: kv[1]["seconds"]):
+        b64 = human(r["seconds_b64"]) if "seconds_b64" in r else "-"
+        print("  {:26s}{:12.3f}{:>14s}{:>14s}".format(
+            name[:26], r["ms_per_step"], human(r["seconds"]), b64))
+
     m = perf["meta"]
     print("\nRUNTIME ms/forecast  (v{}, {}, context {}, {} series, {})\n".format(
         m["version"], m["machine"], m["context"], m["series"], m["date"]))

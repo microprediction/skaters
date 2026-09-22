@@ -141,6 +141,14 @@ def main():
         elif abs(round(got, 3 if want < 1 else 2) - want) > 1e-9:
             bad.append(f"perf     {model} {regime}: paper {want} vs store {got:.4f}")
 
+    pc = constants.panel_cost()
+    m = re.search(r"\$([\d{,}]+)\$ one-step forecasts", text)
+    want_steps = "{:,}".format(pc["steps"]).replace(",", "{,}")
+    if not m:
+        bad.append("panel    step-count sentence not found")
+    elif m.group(1) != want_steps:
+        bad.append(f"panel    steps: paper {m.group(1)} vs store {want_steps}")
+
     pkg = constants.package_size()
     m = re.search(r"\$(\d+)\$\\,KB of source across \$(\d+)\$", text)
     if not m:
