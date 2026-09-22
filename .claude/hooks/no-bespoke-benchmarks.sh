@@ -30,8 +30,11 @@ if printf '%s' "$cmd" | grep -qE 'benchmarks/(run_arm|study|summarize_canonical|
   exit 0
 fi
 
-# Signals of a scoring run: the shared scorer, or writing a results file.
-if printf '%s' "$cmd" | grep -qE 'bench_core|roll_dist_scores|score_dist|arm_adapters|import[[:space:]]+opponents|results_[A-Za-z0-9_]*\.csv|preds/[A-Za-z0-9_]+__'; then
+# Signals of a scoring run, as CODE rather than prose: an import statement, a
+# call to the shared scorer, or a redirect into a results file. Prose that names
+# these modules ("importing bench_core") is documentation and must pass.
+if printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_])(import[[:space:]]+(bench_core|opponents|arm_adapters|horserace_summary)|from[[:space:]]+(bench_core|opponents|arm_adapters|horserace_summary)[[:space:]]+import|roll_dist_scores[[:space:]]*\(|score_dist[[:space:]]*\(|_statsforecast_predict[[:space:]]*\()' \
+   || printf '%s' "$cmd" | grep -qE '>[[:space:]]*[^[:space:]|]*results_[A-Za-z0-9_]*\.csv'; then
   reason='Blocked: this looks like a benchmark or scoring run outside the canonical pipeline.
 
 This repo has one pipeline and results from anywhere else are not comparable:
