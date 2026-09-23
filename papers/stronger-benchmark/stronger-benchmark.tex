@@ -164,8 +164,14 @@ that carry state and issue a density. \pkg{NPTS} is training-free and is a
 sampling distribution by construction, and it ships in both \pkg{GluonTS} and
 \pkg{AutoGluon}, which these studies import for their datasets, their metrics
 and their deep baselines. It is carried by one of the eleven
-\citep{rasul2023lagllama}. We have not scored it, so we claim only that it is
-available and almost always absent, not that it is strong.
+\citep{rasul2023lagllama}.
+
+We scored \pkg{NPTS} through the same protocol as every other arm here. It
+loses to \code{laplace} on the median series in all four strata, by $0.05$ nats
+on daily prices and $0.39$ on daily economics, over $1{,}500$ series per stratum
+where the corpus allows. So the arm the field already ships and does not run is
+beatable, which is the weaker of the two things one might have found, and it
+sets the floor this paper's reference has to clear.
 
 This paper supplies such an arm and reports what it does to the comparison. The
 contribution is deliberately small: a reference, a protocol, and four tables.
