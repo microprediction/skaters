@@ -962,6 +962,11 @@ pub struct Ar {
     pub decay: f64,
     pub buffer: Vec<f64>,
     pub phi: Vec<f64>,
+    /// Stationarity-projected coefficients, re-derived after every update.
+    /// Used for BOTH the emitted residual and `inverse_k`'s reconstruction,
+    /// so the two always agree on which predictor produced the residual
+    /// (skaters#232) -- `phi` alone drives the raw RLS fit.
+    pub phi_used: Vec<f64>,
     pub pmat: Vec<f64>,
     pub n: u64,
 }
@@ -977,6 +982,7 @@ pub fn ar(order: usize, lam: f64, ridge: f64, decay: f64) -> Transform {
         decay,
         buffer: Vec::new(),
         phi: vec![0.0; order],
+        phi_used: vec![0.0; order],
         pmat: Vec::new(),
         n: 0,
     };
@@ -1009,15 +1015,22 @@ impl Ar {
         if self.buffer.len() >= p {
             let bl = self.buffer.len();
             let x: Vec<f64> = (0..p).map(|i| self.buffer[bl - 1 - i]).collect();
-            let prediction = fsum((0..p).map(|i| self.phi[i] * x[i]));
+
+            // Emitted residual uses `phi_used` -- the stationarity-projected
+            // coefficients as of the end of the previous tick.
+            let prediction = fsum((0..p).map(|i| self.phi_used[i] * x[i]));
             residual = y - prediction;
 
+            // RLS keeps fitting the RAW (unconstrained) least-squares problem
+            // with its own prediction error.
+            let raw_prediction = fsum((0..p).map(|i| self.phi[i] * x[i]));
+            let raw_residual = y - raw_prediction;
             let px = mat_vec(&self.pmat, &x, p);
             let denom = self.lam + dot(&x, &px, p);
             if denom.abs() > 1e-15 {
                 let kg: Vec<f64> = px.iter().map(|v| v / denom).collect();
                 for i in 0..p {
-                    self.phi[i] += kg[i] * residual;
+                    self.phi[i] += kg[i] * raw_residual;
                 }
                 for i in 0..p {
                     for j in 0..p {
@@ -1030,6 +1043,9 @@ impl Ar {
                     self.pmat = self.init_p();
                 }
             }
+            // Re-project after every update so the next forward() call and
+            // inverse_k always agree on the same constrained coefficients.
+            self.phi_used = ar_stationary(&self.phi);
         } else {
             residual = y;
         }
@@ -1041,7 +1057,7 @@ impl Ar {
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
-        ar_inverse(dists, &self.buffer, &self.phi, self.p)
+        ar_inverse(dists, &self.buffer, &self.phi_used, self.p)
     }
 }
 
@@ -1069,29 +1085,43 @@ fn ar_spectral_radius(phi: &[f64]) -> f64 {
         // the reference comparison; bit-identity is a Rust-to-Rust claim.
         return libm::hypot(a / 2.0, (-disc).sqrt() / 2.0);
     }
-    let mut v = vec![1.0_f64; p];
-    let mut rho = 0.0;
-    for _ in 0..60 {
-        let mut nv = vec![0.0_f64; p];
-        let mut s = 0.0;
-        for j in 0..p {
-            s += phi[j] * v[j];
+    // Power iteration from a single seed can silently miss the true dominant
+    // eigenvalue if that seed happens to be (near-)orthogonal to it. Two
+    // seeds unlikely to BOTH align with a non-dominant eigenvector; take the
+    // max (skaters#232 comment: phi=[3,-2,0,0,0] seeded at all-ones converges
+    // to 1 instead of the true radius 2).
+    let mut best = 0.0_f64;
+    for seed in [
+        vec![1.0_f64; p],
+        (0..p)
+            .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+            .collect::<Vec<f64>>(),
+    ] {
+        let mut v = seed;
+        let mut rho = 0.0;
+        for _ in 0..60 {
+            let mut nv = vec![0.0_f64; p];
+            let mut s = 0.0;
+            for j in 0..p {
+                s += phi[j] * v[j];
+            }
+            nv[0] = s;
+            for i in 1..p {
+                nv[i] = v[i - 1];
+            }
+            let mut m = nv.iter().fold(0.0_f64, |acc, x| acc.max(x.abs()));
+            if m == 0.0 {
+                m = 1.0;
+            }
+            for x in nv.iter_mut() {
+                *x /= m;
+            }
+            v = nv;
+            rho = m;
         }
-        nv[0] = s;
-        for i in 1..p {
-            nv[i] = v[i - 1];
-        }
-        let mut m = nv.iter().fold(0.0_f64, |acc, x| acc.max(x.abs()));
-        if m == 0.0 {
-            m = 1.0;
-        }
-        for x in nv.iter_mut() {
-            *x /= m;
-        }
-        v = nv;
-        rho = m;
+        best = best.max(rho);
     }
-    rho
+    best
 }
 
 /// Damp AR coefficients into the stationary region for forecasting. Scaling
@@ -1113,11 +1143,10 @@ fn ar_stationary(phi: &[f64]) -> Vec<f64> {
         .collect()
 }
 
-/// Shared AR-style inverse (used by Ar and GroupedAr).
-fn ar_inverse(dists: &[Dist], buf: &[f64], phi_raw: &[f64], p: usize) -> Vec<Dist> {
-    // Forecast with stationarity-constrained coefficients; the one-step fit is
-    // left intact, only the extrapolation is kept well-posed.
-    let phi = ar_stationary(phi_raw);
+/// Shared AR-style inverse (used by Ar and GroupedAr). `phi` must already be
+/// the stationarity-projected coefficients the caller's forward() emitted
+/// residuals under (skaters#232) -- not re-derived here from the raw fit.
+fn ar_inverse(dists: &[Dist], buf: &[f64], phi: &[f64], p: usize) -> Vec<Dist> {
     let n = dists.len();
     // Impulse responses psi_0..psi_{n-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
     let mut psi = vec![0.0_f64; n];
@@ -1195,6 +1224,9 @@ pub struct GroupedAr {
     pub n_groups: usize,
     pub buffer: Vec<f64>,
     pub theta: Vec<f64>,
+    /// Expanded, stationarity-projected per-lag coefficients, re-derived
+    /// after every update (see `Ar::phi_used`).
+    pub phi_used: Vec<f64>,
     pub pmat: Vec<f64>,
     pub n: u64,
 }
@@ -1217,6 +1249,7 @@ pub fn grouped_ar(max_lag: usize, lam: f64, ridge: f64) -> Transform {
         n_groups,
         buffer: Vec::new(),
         theta: vec![0.0; n_groups],
+        phi_used: vec![0.0; max_lag],
         pmat,
         n: 0,
     })
@@ -1233,15 +1266,23 @@ impl GroupedAr {
             for j in 0..self.max_lag {
                 x[self.groups[j]] += self.buffer[bl - 1 - j];
             }
-            let prediction = fsum((0..ng).map(|g| self.theta[g] * x[g]));
+
+            // Emitted residual uses the previous tick's stationarity-projected,
+            // per-lag coefficients -- same fix as Ar (skaters#232).
+            let lag_x: Vec<f64> = (0..self.max_lag).map(|j| self.buffer[bl - 1 - j]).collect();
+            let prediction = fsum((0..self.max_lag).map(|j| self.phi_used[j] * lag_x[j]));
             residual = y - prediction;
 
+            // RLS keeps fitting the RAW group-level least-squares problem
+            // with its own prediction error.
+            let raw_prediction = fsum((0..ng).map(|g| self.theta[g] * x[g]));
+            let raw_residual = y - raw_prediction;
             let px = mat_vec(&self.pmat, &x, ng);
             let denom = self.lam + dot(&x, &px, ng);
             if denom.abs() > 1e-15 {
                 let kg: Vec<f64> = px.iter().map(|v| v / denom).collect();
                 for g in 0..ng {
-                    self.theta[g] += kg[g] * residual;
+                    self.theta[g] += kg[g] * raw_residual;
                 }
                 for i in 0..ng {
                     for j in 0..ng {
@@ -1257,6 +1298,8 @@ impl GroupedAr {
                     }
                 }
             }
+            let raw_phi: Vec<f64> = (0..self.max_lag).map(|j| self.theta[self.groups[j]]).collect();
+            self.phi_used = ar_stationary(&raw_phi);
         } else {
             residual = y;
         }
@@ -1268,9 +1311,8 @@ impl GroupedAr {
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
-        let phi: Vec<f64> = (0..self.max_lag)
-            .map(|j| self.theta[self.groups[j]])
-            .collect();
-        ar_inverse(dists, &self.buffer, &phi, self.max_lag)
+        // Same coefficients forward() already emitted residuals under
+        // (skaters#232) -- maintained incrementally there, not re-derived here.
+        ar_inverse(dists, &self.buffer, &self.phi_used, self.max_lag)
     }
 }
