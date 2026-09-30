@@ -244,6 +244,7 @@ benchmarks/overnight_horserace.log
 # (benchmarks/canonical_summary_*.csv) ARE committed — they are the chart source
 # (the lost-run lesson: never gitignore chart source data).
 benchmarks/preds/
+benchmarks/preds_fc/
 
 # arXiv staging: tarball is the artifact, intermediates are not
 papers/arxiv/*.aux

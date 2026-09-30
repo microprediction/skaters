@@ -429,8 +429,92 @@ def pymc_dists(ch, h=1):
     return out
 
 
+# ---- Forecastability decomposition (issue #250): pooled-law arms ---------------
+# Three state-blind predictives scored beside laplace on the same test steps, so
+# the forecastability profile and its conformal share are paired differences of
+# stored per-step log scores (summarize_canonical's dLL vs laplace):
+#   F_hat = L_lap - L_unc,  X_cps = L_cps - L_unc,  left = L_lap - L_cps.
+# Each reuses bench_core.conformal_dist, the conformal shape the foils already
+# use. cps/cpsz share laplace(h)'s h-step mean, so they differ from laplace only
+# in shape. cpsz standardizes by a separate simple scale model (EWMA of squared
+# h-step residuals, as conformal_infogap._streams), NOT laplace's sd, which would
+# import conditional-shape machinery into a pooled arm. A pool holds only what is
+# resolved at the issue time j-h. "(W)" names cap the pool at the most recent W
+# values; the bare name is expanding. Report all.
+FC_MIN = 50                                     # smallest pool a law is quoted from
+FC_ALPHA = 0.03                                 # scale EWMA rate
+FC_FLOOR = 0.0025                               # scale^2 floor, x expanding mean square
+
+
+_ISSUED = [None, None]                          # (key, issued): cps/cpsz share one pass
+
+
+def _lap_issued(ch, h):
+    """issued[j] = laplace's h-step Dist for target j, made after consuming ch[j-h].
+    Same stepping as laplace_dists."""
+    key = (h, len(ch), tuple(float(x) for x in ch))
+    if _ISSUED[0] == key:
+        return _ISSUED[1]
+    f = laplace(h); st = None; issued = [None] * len(ch)
+    for i, yv in enumerate(ch):
+        d, st = f(yv, st)
+        if i + h < len(ch):
+            issued[i + h] = d[h - 1]
+    _ISSUED[0], _ISSUED[1] = key, issued
+    return issued
+
+
+def _pooled_dists(ch, h, kind, win=0):
+    import bench_core as bc
+    ch = np.asarray(ch, float)
+    n = len(ch)
+    lo = n - fs.TEST
+    if kind != "unc":
+        issued = _lap_issued(ch, h)
+        r = [None] * n; z = [None] * n; sc = [0.0] * n
+        v = None; g = 0.0; nr = 0
+        for s in range(n):
+            u = s - h                           # residual u resolves at origin s-h
+            if u >= 0 and r[u] is not None:
+                nr += 1
+                g += (r[u] * r[u] - g) / nr
+                v = r[u] * r[u] if v is None else (1 - FC_ALPHA) * v + FC_ALPHA * r[u] * r[u]
+            if issued[s] is not None:
+                r[s] = ch[s] - issued[s].mean
+                sc[s] = math.sqrt(max(v, FC_FLOOR * g)) if v is not None else 0.0
+                if sc[s] > 0 and math.isfinite(sc[s]):
+                    z[s] = r[s] / sc[s]
+    out = []
+    for j in range(lo, n):
+        cut = j - h + 1                         # targets < cut have resolved at issue
+        if kind == "unc":
+            pool = ch[:cut]
+            point, scale = 0.0, 1.0
+        elif kind == "cps":
+            pool = np.array([x for x in r[:cut] if x is not None])
+            point, scale = issued[j].mean, 1.0
+        else:
+            if not sc[j] > 0:
+                return None
+            pool = np.array([x for x in z[:cut] if x is not None])
+            point, scale = issued[j].mean, sc[j]
+        if win:
+            pool = pool[-win:]
+        if len(pool) < FC_MIN:
+            return None
+        out.append(bc.conformal_dist(point, pool, scale=scale))
+    return out
+
+
 def make_registry(h=1):
     return {
+        # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
+        "unc":         lambda ch: _pooled_dists(ch, h, "unc"),
+        "cps":         lambda ch: _pooled_dists(ch, h, "cps"),
+        "cpsz":        lambda ch: _pooled_dists(ch, h, "cpsz"),
+        "unc(250)":    lambda ch: _pooled_dists(ch, h, "unc", 250),
+        "cps(250)":    lambda ch: _pooled_dists(ch, h, "cps", 250),
+        "cpsz(250)":   lambda ch: _pooled_dists(ch, h, "cpsz", 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
