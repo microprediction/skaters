@@ -211,10 +211,11 @@ def arm_electricity():
                         rows.append([a / 4 for a in acc])
                         acc = [0.0] * len(ids)
                         k = 0
-        with open(hourly, "w", newline="") as f:
+        with open(hourly + ".part", "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(ids)
             w.writerows(rows)
+        os.replace(hourly + ".part", hourly)      # never leave a partial cache
     with open(hourly, newline="") as f:
         r = csv.reader(f)
         ids = next(r)
@@ -250,7 +251,8 @@ def arm_metr_la():
         with h5py.File(os.path.join(CACHE, "metr_la.h5")) as f:
             X = f["data"]["block0_values"][:].astype(float)
             ids = [s.decode() for s in f["data"]["axis0"][:]]
-        np.savez_compressed(npz, X=X, ids=np.array(ids))
+        np.savez_compressed(npz + ".part.npz", X=X, ids=np.array(ids))
+        os.replace(npz + ".part.npz", npz)
     import numpy as np
     d = np.load(npz)
     X, ids = d["X"], [str(s) for s in d["ids"]]
