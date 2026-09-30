@@ -36,7 +36,12 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 # CANON_SUFFIX names the output (e.g. "_h4") so it does not clobber the k=1 files.
 PREDS = os.environ.get("CANON_PREDS", os.path.join(_HERE, "preds"))
 SUFFIX = os.environ.get("CANON_SUFFIX", "")
-BASELINE = "laplace"
+# CANON_BASELINE pairs every model against another arm instead (e.g. cps for the
+# #250 cpsz-vs-cps gap, lap_grid for the matched conformalization pair). The
+# output files carry the baseline name so they never overwrite the laplace ones.
+BASELINE = os.environ.get("CANON_BASELINE", "laplace")
+if BASELINE != "laplace":
+    SUFFIX = f"{SUFFIX}_vs_{BASELINE}"
 _COLS = ("y", "q05", "q50", "q95", "logpdf", "crps")
 
 

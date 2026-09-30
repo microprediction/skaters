@@ -468,7 +468,7 @@ def _pooled_dists(ch, h, kind, win=0):
     import bench_core as bc
     ch = np.asarray(ch, float)
     n = len(ch)
-    lo = n - fs.TEST
+    lo = n - TEST
     if kind != "unc":
         issued = _lap_issued(ch, h)
         r = [None] * n; z = [None] * n; sc = [0.0] * n
@@ -506,6 +506,40 @@ def _pooled_dists(ch, h, kind, win=0):
     return out
 
 
+# Matched pre/post conformalization pair (#250 review): cps differs from laplace
+# in shape AND construction, so it cannot isolate the conformal step. lap_grid is
+# laplace's h-step predictive read off a fixed quantile grid (identity rank map);
+# lap_conf is the same grid after the state-blind rank map, the pooled empirical
+# law of laplace's past PITs. Same Dist, same grid: they differ only in the map.
+FC_LEVELS = [0.005, 0.01] + [round(0.02 + 0.024 * i, 3) for i in range(41)] + [0.99, 0.995]
+
+
+def _lap_rank_dists(ch, h, conformal):
+    ch = np.asarray(ch, float)
+    n = len(ch)
+    lo = n - TEST
+    issued = _lap_issued(ch, h)
+    u = [None] * n
+    for s in range(n):
+        if issued[s] is not None:
+            u[s] = min(max(issued[s].cdf(float(ch[s])), 1e-6), 1 - 1e-6)
+    out = []
+    for j in range(lo, n):
+        d = issued[j]
+        if d is None:
+            return None
+        if conformal:
+            pool = np.array([x for x in u[:j - h + 1] if x is not None])
+            if len(pool) < FC_MIN:
+                return None
+            ps = np.clip(np.quantile(pool, FC_LEVELS), 1e-6, 1 - 1e-6)
+        else:
+            ps = FC_LEVELS
+        qs = np.maximum.accumulate([d.quantile(float(p)) for p in ps])
+        out.append(fs.quantile_dist(FC_LEVELS, list(qs)))
+    return out
+
+
 def make_registry(h=1):
     return {
         # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
@@ -515,6 +549,8 @@ def make_registry(h=1):
         "unc(250)":    lambda ch: _pooled_dists(ch, h, "unc", 250),
         "cps(250)":    lambda ch: _pooled_dists(ch, h, "cps", 250),
         "cpsz(250)":   lambda ch: _pooled_dists(ch, h, "cpsz", 250),
+        "lap_grid":    lambda ch: _lap_rank_dists(ch, h, False),
+        "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
         "laplace":     lambda ch: laplace_dists(ch, h),
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
