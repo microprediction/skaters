@@ -514,7 +514,7 @@ def _pooled_dists(ch, h, kind, win=0):
 FC_LEVELS = [0.005, 0.01] + [round(0.02 + 0.024 * i, 3) for i in range(41)] + [0.99, 0.995]
 
 
-def _lap_rank_dists(ch, h, conformal):
+def _lap_rank_dists(ch, h, conformal, win=0):
     ch = np.asarray(ch, float)
     n = len(ch)
     lo = n - TEST
@@ -530,6 +530,8 @@ def _lap_rank_dists(ch, h, conformal):
             return None
         if conformal:
             pool = np.array([x for x in u[:j - h + 1] if x is not None])
+            if win:
+                pool = pool[-win:]
             if len(pool) < FC_MIN:
                 return None
             ps = np.clip(np.quantile(pool, FC_LEVELS), 1e-6, 1 - 1e-6)
@@ -551,6 +553,7 @@ def make_registry(h=1):
         "cpsz(250)":   lambda ch: _pooled_dists(ch, h, "cpsz", 250),
         "lap_grid":    lambda ch: _lap_rank_dists(ch, h, False),
         "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
+        "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),

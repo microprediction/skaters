@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 aa = pytest.importorskip("arm_adapters")
 
 ARMS = ["laplace", "unc", "cps", "cpsz", "unc(250)", "cps(250)", "cpsz(250)",
-        "lap_grid", "lap_conf"]
+        "lap_grid", "lap_conf", "lap_conf(250)"]
 PROBES = [-2.0, -0.5, 0.0, 0.7, 2.5]
 
 
