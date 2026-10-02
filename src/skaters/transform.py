@@ -455,16 +455,22 @@ def holt_linear(alpha: float = 0.1, beta: float = 0.05):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         """Inverse: forecast is level + h * trend + residual.
 
-        Variance accumulates across horizons (independent residuals).
+        Variance follows the forward recursion (ETS(A,A,N) innovations form): an
+        innovation j steps before the target entered the level with weight alpha
+        and raised the trend by alpha*beta on each of the j steps since, so
+        c_0 = 1, c_j = alpha + alpha*beta*j and
+        Var(y_{t+h+1}) = sum_{j<=h} c_j^2 var_{h-j} (issue #242).
         """
         level = state["level"]
         trend = state["trend"]
         result = []
-        cumsum_var = 0.0
         for h, d in enumerate(dists):
-            cumsum_var += d.var
             forecast = level + (h + 1) * trend + d.mean
-            std = math.sqrt(cumsum_var) if cumsum_var > 0 else max(d.std, 1e-12)
+            total_var = 0.0
+            for j in range(h + 1):
+                c = 1.0 if j == 0 else alpha + alpha * beta * j
+                total_var += c * c * dists[h - j].var
+            std = math.sqrt(total_var) if total_var > 0 else max(d.std, 1e-12)
             result.append(Dist.gaussian(forecast, std))
         return result
 
@@ -1086,9 +1092,11 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
         For j <= h, y_{t+h-j} is a previously recovered prediction.
 
         The mean follows the AR recursion. The h-step forecast VARIANCE is the
-        MA(inf) form ``sigma^2 * sum_{i<h} psi_i^2`` (psi the impulse responses),
-        NOT ``sum_j phi_j^2 var_{h-j}`` -- the latter assumes the lagged forecasts
-        are independent and, since a stationary AR(2) can have |phi_1| > 1
+        MA(inf) convolution ``sum_{i<=h} psi_{h-i}^2 * var_i`` (psi the impulse
+        responses, var_i the i-th horizon's innovation variance), which lets each
+        horizon carry its own innovation variance (issue #245). It is NOT
+        ``sum_j phi_j^2 var_{h-j}`` -- that assumes the lagged forecasts are
+        independent and, since a stationary AR(2) can have |phi_1| > 1
         (e.g. phi=[1.99,-0.99]), inflates the variance by phi_1^2 each step until
         it explodes. The MA form converges for any stationary AR.
         """
@@ -1106,7 +1114,6 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
 
         recovered_means = []
         result = []
-        cum_psi2 = 0.0
         for h in range(H):
             ar_mean = 0.0
             for j in range(p):
@@ -1119,8 +1126,12 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
                     ar_mean += phi[j] * recovered_means[lag_h]
 
             total_mean = dists[h].mean + ar_mean
-            cum_psi2 += psi[h] * psi[h]
-            total_var = cum_psi2 * dists[h].var     # sigma^2 * sum psi_i^2
+            # Var(y_{t+h+1}) = sum_i psi_{h-i}^2 var_i: each future innovation enters
+            # with its own variance (issue #245). Plain accumulation in this order in
+            # every port, so the three implementations round identically.
+            total_var = 0.0
+            for i in range(h + 1):
+                total_var += psi[h - i] * psi[h - i] * dists[i].var
             total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
 
             recovered_means.append(total_mean)
@@ -1221,7 +1232,6 @@ def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
                            for j in range(max_lag) if i - 1 - j >= 0))
         recovered_means = []
         result = []
-        cum_psi2 = 0.0
         for h in range(H):
             ar_mean = 0.0
             for j in range(max_lag):
@@ -1233,8 +1243,9 @@ def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
                 elif lag_h < len(recovered_means):
                     ar_mean += phi[j] * recovered_means[lag_h]
             total_mean = dists[h].mean + ar_mean
-            cum_psi2 += psi[h] * psi[h]
-            total_var = cum_psi2 * dists[h].var   # sigma^2 * sum psi_i^2
+            total_var = 0.0                       # sum_i psi_{h-i}^2 var_i (issue #245, as in ar)
+            for i in range(h + 1):
+                total_var += psi[h - i] * psi[h - i] * dists[i].var
             total_std = math.sqrt(total_var) if total_var > 0 else max(dists[h].std, 1e-12)
             recovered_means.append(total_mean)
             result.append(Dist.gaussian(total_mean, total_std))

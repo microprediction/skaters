@@ -105,16 +105,17 @@ def test_scale_mixture_leaf_scale_includes_latest_observation():
     assert any(abs(s - sigma) <= 1e-9 * sigma for _, _, s in comps), (sigma, [s for _, _, s in comps])
 
 
-@pytest.mark.xfail(strict=True, reason="#239: garch_leaf emits sqrt(h_t) (built from r_{t-1}) as the forecast for r_{t+1}")
 def test_garch_leaf_scale_is_next_step_conditional_variance():
     """After consuming r_t the leaf forecasts r_{t+1}; its scale must be
-    sqrt(omega + alpha r_t^2 + beta h_t), with (omega, alpha, beta, h_t) read from
-    the leaf's own state before the call."""
+    sqrt(omega + alpha r_t^2 + beta h_t). The state before the call holds
+    h_{t-1} ("h") and r_{t-1}^2 ("last_r2"), so h_t is one GARCH step from them.
+    The step index is chosen so no refit happens inside the call (n % 40 != 0)."""
     f = garch_leaf(1)
     st = None
-    for y in _series(400):                     # past min_obs, several refits
+    for y in _series(400):                     # past min_obs, several refits; next n = 401
         _, st = f(y, st)
-    om, al, be, h_t = st["omega"], st["alpha"], st["beta"], st["h"]
+    om, al, be = st["omega"], st["alpha"], st["beta"]
+    h_t = om + al * st["last_r2"] + be * st["h"]
     r_t = 3.0
     (d,), _ = f(r_t, copy.deepcopy(st))
     expected = math.sqrt(om + al * r_t * r_t + be * h_t)
@@ -123,7 +124,6 @@ def test_garch_leaf_scale_is_next_step_conditional_variance():
         (expected, sorted(s for _, _, s in comps))
 
 
-@pytest.mark.xfail(strict=True, reason="#239: a 6-sigma shock moves the next sd 0.82 -> 0.89 (mixture weights only); the scale itself lags one step")
 def test_garch_leaf_reacts_to_a_shock_immediately():
     """Behavioural form of the same contract: a 6-sigma shock must widen the
     very next predictive, not the one after."""

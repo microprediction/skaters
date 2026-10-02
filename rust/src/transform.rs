@@ -536,12 +536,16 @@ impl Holt {
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
         let mut result = Vec::with_capacity(dists.len());
-        let mut cumsum_var = 0.0;
         for (h, d) in dists.iter().enumerate() {
-            cumsum_var += d.var();
             let forecast = self.level + (h + 1) as f64 * self.trend + d.mean();
-            let std = if cumsum_var > 0.0 {
-                cumsum_var.sqrt()
+            // ETS(A,A,N): c_0 = 1, c_j = alpha + alpha*beta*j; Var = sum_j c_j^2 var_{h-j} (issue #242).
+            let mut total_var = 0.0;
+            for j in 0..=h {
+                let c = if j == 0 { 1.0 } else { self.alpha + self.alpha * self.beta * j as f64 };
+                total_var += c * c * dists[h - j].var();
+            }
+            let std = if total_var > 0.0 {
+                total_var.sqrt()
             } else {
                 d.std().max(1e-12)
             };
@@ -1135,7 +1139,6 @@ fn ar_inverse(dists: &[Dist], buf: &[f64], phi_raw: &[f64], p: usize) -> Vec<Dis
     }
     let mut recovered_means: Vec<f64> = Vec::new();
     let mut result = Vec::with_capacity(n);
-    let mut cum_psi2 = 0.0;
     for h in 0..n {
         let mut ar_mean = 0.0;
         for j in 0..p {
@@ -1150,8 +1153,11 @@ fn ar_inverse(dists: &[Dist], buf: &[f64], phi_raw: &[f64], p: usize) -> Vec<Dis
             }
         }
         let total_mean = dists[h].mean() + ar_mean;
-        cum_psi2 += psi[h] * psi[h];
-        let total_var = cum_psi2 * dists[h].var(); // sigma^2 * sum psi_i^2
+        // Var(y_{t+h+1}) = sum_i psi_{h-i}^2 var_i (issue #245); same order as Python/JS.
+        let mut total_var = 0.0;
+        for i in 0..=h {
+            total_var += psi[h - i] * psi[h - i] * dists[i].var();
+        }
         let total_std = if total_var > 0.0 {
             total_var.sqrt()
         } else {

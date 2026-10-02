@@ -117,8 +117,6 @@ FORWARD_LINEAR = {
 VAR_XFAIL = {
     "drift": "#242-class: drift mu is a random walk driven by future innovations (c_j = 1 + alpha*j); "
              "inverse uses c_j = 1. Ratio 0.97-1.00 at alpha=0.01; <5% at the default alpha=0.002 over 13 steps.",
-    "holt_linear": "#242: inverse sums every residual variance with coefficient 1; ETS(A,A,N) says "
-                   "c_j = alpha + alpha*beta*j. Ratio 2.5-4.6x at alpha=0.3, beta=0.2.",
     "ema_transform": "#242-class: inverse shifts by the frozen level; ETS(A,N,N) says Var_h = v_h + alpha^2 sum v_i. "
                      "Ratio 0.52-0.80 at alpha=0.3 (fast_slow uses 0.3 and 0.5).",
     "theta": "#242-class: inverse accumulates residual variance with coefficient 1; SES response is alpha. "
@@ -130,7 +128,9 @@ VAR_XFAIL = {
 }
 MEAN_XFAIL = {
     "drift": "#242-class: nonzero innovation means move mu; inverse ignores it (<=0.02 here).",
-    "holt_linear": "#242: earlier innovation means move level and trend; inverse adds only the current one.",
+    "holt_linear": "#242 mean part, deliberately NOT changed with the variance fix: propagating earlier "
+                   "innovation means through level and trend would alter laplace's multi-step means via "
+                   "the fast_slow chains (standardize feeds a nonzero mean). Separate decision.",
     "ema_transform": "#242-class: earlier innovation means move the level; inverse adds only the current one.",
     "theta": "#242-class: earlier innovation means move SES and slope; inverse adds only the current one.",
     "seasonal_anchor": "#242-class: earlier innovation means move the phase-EMA; inverse ignores it.",
@@ -171,14 +171,11 @@ def _ar_state(phi, buf):
     return {"buffer": list(buf), "phi": list(phi), "P": [1.0] * (p * p), "n": len(buf)}
 
 
-AR245 = _xf("#245: Var = v_h * sum_j psi_j^2 instead of sum_i psi_{h-i}^2 v_i. "
-            "phi=0.5, v=[1,4,9]: 11.81 vs 10.06 exact; v=[9,4,1]: 1.31 vs 2.56 exact.")
-
-
-@AR245
 @pytest.mark.parametrize("sched", list(SCHEDULES))
 @pytest.mark.parametrize("phi", [[0.5], [0.9], [0.5, -0.3]], ids=["ar1_0.5", "ar1_0.9", "ar2"])
 def test_ar_inverse_variance_is_psi_convolution(phi, sched):
+    """Issue #245 (fixed): Var = sum_i psi_{h-i}^2 v_i. Before the fix, phi=0.5 and
+    v=[1,4,9] gave 11.81 against 10.06 exact; v=[9,4,1] gave 1.31 against 2.56."""
     v = SCHEDULES[sched]
     _, inv = ar(order=len(phi))
     st = _ar_state(phi, [0.2, -0.1][:len(phi)])
@@ -202,7 +199,6 @@ def test_ar_inverse_mean_is_ar_recursion(phi):
         assert _close(out[h].mean, m), (h, out[h].mean, m)
 
 
-@AR245
 @pytest.mark.parametrize("sched", list(SCHEDULES))
 def test_grouped_ar_inverse_variance_is_psi_convolution(sched):
     """grouped_ar(max_lag=3): lag 1 -> group 0, lags 2-3 -> group 1 (per its docstring)."""

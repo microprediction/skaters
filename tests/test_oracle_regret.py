@@ -96,7 +96,6 @@ def test_holt_chain_calibrated_at_h1():
     assert ks < 0.05 and reg < 0.03, (ks, reg)
 
 
-@pytest.mark.xfail(strict=True, reason="#242: holt_linear.inverse_k sums every residual variance with coefficient 1; ETS(A,A,N) says c_j = alpha + alpha*beta*j")
 def test_holt_chain_calibrated_at_h5():
     ks, reg = _holt_pit_and_regret(*_holt_setup(), h=5)
     assert ks < 0.05 and reg < 0.03, (ks, reg)
@@ -118,17 +117,14 @@ def _unit_scale(d):
     return s[1]
 
 
-GARCH244 = pytest.mark.xfail(strict=True, reason="#244: the refit criterion lets r_t enter its own h_t, so it rewards large alpha and small omega. Fit lands on the grid corner (0.20, 0.72) for truth (0.08, 0.90); under the lagged likelihood the truth wins (5169 vs 5426 on 3000 points).")
-
-
-@GARCH244
 def test_garch_leaf_recovers_alpha_beta():
+    """Issue #244 (fixed). Before the fix the refit landed on the grid corner
+    (0.20, 0.72) for truth (0.08, 0.90), because r_t entered its own h_t."""
     _, _, _, st, (om, al, be) = _garch_setup()
     # grid is 0.02-step in alpha near 0.08 and 0.04-step in beta near 0.90
     assert abs(st["alpha"] - al) <= 0.05 and abs(st["beta"] - be) <= 0.06, (st["alpha"], st["beta"])
 
 
-@GARCH244
 def test_garch_leaf_on_iid_data_picks_smallest_alpha():
     """iid N(0,1) has no ARCH effect: a correct QMLE picks the smallest alpha on the
     grid. A criterion that lets r_t into h_t prefers large alpha even here."""
@@ -146,7 +142,6 @@ def _corr(a, b):
     return sum((x - ma) * (y - mb) for x, y in zip(a, b)) / (sa * sb)
 
 
-@pytest.mark.xfail(strict=True, reason="#239: emitted variance tracks h_t (the variance of the observation just seen) better than h_{t+1}")
 def test_garch_leaf_variance_tracks_next_step_not_current():
     r, h_next, issued, _, _ = _garch_setup()
     burn = 1000

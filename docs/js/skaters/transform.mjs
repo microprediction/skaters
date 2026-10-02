@@ -285,12 +285,16 @@ export function holtLinear(alpha = 0.1, beta = 0.05) {
     const level = state.level;
     const trend = state.trend;
     const result = [];
-    let cumsumVar = 0.0;
     for (let h = 0; h < dists.length; h++) {
       const d = dists[h];
-      cumsumVar += d.var;
       const forecast = level + (h + 1) * trend + d.mean;
-      const std = cumsumVar > 0 ? Math.sqrt(cumsumVar) : Math.max(d.std, 1e-12);
+      // ETS(A,A,N): c_0 = 1, c_j = alpha + alpha*beta*j; Var = sum_j c_j^2 var_{h-j} (issue #242).
+      let totalVar = 0.0;
+      for (let j = 0; j <= h; j++) {
+        const c = j === 0 ? 1.0 : alpha + alpha * beta * j;
+        totalVar += c * c * dists[h - j].var;
+      }
+      const std = totalVar > 0 ? Math.sqrt(totalVar) : Math.max(d.std, 1e-12);
       result.push(Dist.gaussian(forecast, std));
     }
     return result;
@@ -630,7 +634,6 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
     }
     const recoveredMeans = [];
     const result = [];
-    let cumPsi2 = 0.0;
     for (let h = 0; h < H; h++) {
       let arMean = 0.0;
       for (let j = 0; j < p; j++) {
@@ -643,8 +646,9 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
         }
       }
       const totalMean = dists[h].mean + arMean;
-      cumPsi2 += psi[h] * psi[h];
-      const totalVar = cumPsi2 * dists[h].var; // sigma^2 * sum psi_i^2
+      // Var(y_{t+h+1}) = sum_i psi_{h-i}^2 var_i (issue #245); same order as Python/Rust.
+      let totalVar = 0.0;
+      for (let i = 0; i <= h; i++) totalVar += psi[h - i] * psi[h - i] * dists[i].var;
       const totalStd = totalVar > 0 ? Math.sqrt(totalVar) : Math.max(dists[h].std, 1e-12);
       recoveredMeans.push(totalMean);
       result.push(Dist.gaussian(totalMean, totalStd));
@@ -743,7 +747,6 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
     }
     const recoveredMeans = [];
     const result = [];
-    let cumPsi2 = 0.0;
     for (let h = 0; h < H; h++) {
       let arMean = 0.0;
       for (let j = 0; j < maxLag; j++) {
@@ -756,8 +759,9 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
         }
       }
       const totalMean = dists[h].mean + arMean;
-      cumPsi2 += psi[h] * psi[h];
-      const totalVar = cumPsi2 * dists[h].var; // sigma^2 * sum psi_i^2
+      // Var(y_{t+h+1}) = sum_i psi_{h-i}^2 var_i (issue #245); same order as Python/Rust.
+      let totalVar = 0.0;
+      for (let i = 0; i <= h; i++) totalVar += psi[h - i] * psi[h - i] * dists[i].var;
       const totalStd = totalVar > 0 ? Math.sqrt(totalVar) : Math.max(dists[h].std, 1e-12);
       recoveredMeans.push(totalMean);
       result.push(Dist.gaussian(totalMean, totalStd));
