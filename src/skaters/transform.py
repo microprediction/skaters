@@ -224,12 +224,14 @@ def ema_transform(alpha: float = 0.05):
         level = state["level"]
         out = []
         add = 0.0            # alpha^2 * sum_{i<h} var_i: the level's accumulated response
+        shift = level        # level + alpha * sum_{i<h} mean_i: earlier innovation means move the level too
         for d in dists:
             if add > 0.0:
-                out.append(Dist([(w, m + level, math.sqrt(s * s + add)) for w, m, s in d.components]))
+                out.append(Dist([(w, m + shift, math.sqrt(s * s + add)) for w, m, s in d.components]))
             else:
-                out.append(d.shift(level))
+                out.append(d.shift(shift))
             add += alpha * alpha * d.var
+            shift += alpha * d.mean
         return out
 
     return forward, inverse_k
@@ -372,14 +374,16 @@ def theta(alpha: float = 0.1):
         slope = state.get("slope", 0.0)
         result = []
         for h, d in enumerate(dists):
-            forecast = ses + (h + 1) * slope / 2 + d.mean
+            forecast = ses + (h + 1) * slope / 2
             # SES: an innovation j steps before the target reaches it through the
-            # level with weight alpha, so c_0 = 1, c_j = alpha and
-            # Var(y_{t+h+1}) = sum_j c_j^2 var_{h-j} (issue #253). The running-OLS
-            # slope's response is O(1/t) (~1e-3 at t=60) and is dropped.
+            # level with weight alpha, so c_0 = 1, c_j = alpha; the same weights
+            # carry the innovation means and Var(y_{t+h+1}) = sum_j c_j^2 var_{h-j}
+            # (issue #253). The running-OLS slope's response is O(1/t) (~1e-3 at
+            # t=60) and is dropped.
             total_var = 0.0
             for j in range(h + 1):
                 c = 1.0 if j == 0 else alpha
+                forecast += c * dists[h - j].mean
                 total_var += c * c * dists[h - j].var
             std = math.sqrt(total_var) if total_var > 0 else max(d.std, 1e-12)
             result.append(Dist.gaussian(forecast, std))
@@ -443,15 +447,21 @@ def drift(alpha: float = 0.002, shrinkage: float = 0.001):
         mu = state["mu"]
         rho = decay + alpha                 # 1 - shrinkage: persistence of the drift estimate
         result = []
-        cumsum_mean = 0.0
         for h, d in enumerate(dists):
-            cumsum_mean += d.mean
-            # Total prediction: anchor + (h+1)*drift + cumulative residual
-            total_mean = anchor + (h + 1) * mu + cumsum_mean
+            # Total prediction: anchor + (h+1)*drift + the innovations' responses.
             # The drift estimate is itself driven by the innovations
             # (mu <- rho*mu + alpha*eps), so the innovation at t+i+1 reaches
             # y_{t+h+1} directly (1) and through the drift on each later step:
-            # c = 1 + alpha * sum_{m<h-i} rho^m (issue #257).
+            # c = 1 + alpha * sum_{m<h-i} rho^m (issue #257), for means and variances.
+            # The drift estimate shrinks toward zero each step (mu_{t+j} = rho^j mu_t),
+            # so its deterministic contribution is mu * sum_{j<=h} rho^j, which is
+            # (h+1)*mu only without shrinkage.
+            drift_sum = 0.0
+            f = 1.0
+            for _ in range(h + 1):
+                drift_sum += f
+                f *= rho
+            total_mean = anchor + mu * drift_sum
             total_var = 0.0
             for i in range(h + 1):
                 acc = 0.0
@@ -460,6 +470,7 @@ def drift(alpha: float = 0.002, shrinkage: float = 0.001):
                     acc += f
                     f *= rho
                 c = 1.0 + alpha * acc
+                total_mean += c * dists[i].mean
                 total_var += c * c * dists[i].var
             total_std = math.sqrt(total_var) if total_var > 0 else max(d.std, 1e-12)
             result.append(Dist.gaussian(total_mean, total_std))
@@ -518,10 +529,11 @@ def holt_linear(alpha: float = 0.1, beta: float = 0.05):
         trend = state["trend"]
         result = []
         for h, d in enumerate(dists):
-            forecast = level + (h + 1) * trend + d.mean
+            forecast = level + (h + 1) * trend
             total_var = 0.0
             for j in range(h + 1):
                 c = 1.0 if j == 0 else alpha + alpha * beta * j
+                forecast += c * dists[h - j].mean      # same weights carry the innovation means
                 total_var += c * c * dists[h - j].var
             std = math.sqrt(total_var) if total_var > 0 else max(d.std, 1e-12)
             result.append(Dist.gaussian(forecast, std))
@@ -716,6 +728,7 @@ def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
         # the naive term (1 - weight) and the EMA term (weight * alpha) (issue #258).
         rec_resp: list[list[float]] = []
         ema_resp = [[0.0] * H for _ in range(period)]
+        ema_mean = list(state["ema"])       # phase EMAs as they will stand after the recovered values
         out = []
         for h in range(H):
             p = (state["n"] + h) % period
@@ -727,7 +740,7 @@ def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
             else:
                 snaive = recovered_means[lag_idx]
                 sn_resp = rec_resp[lag_idx]
-            e = state["ema"][p]
+            e = ema_mean[p]
             a_mean = _anchor(e, snaive)
             a_resp = [0.0] * H
             for i in range(h):
@@ -738,12 +751,15 @@ def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
                 a_var += a_resp[i] * a_resp[i] * dists[i].var
             r = list(a_resp)
             r[h] = 1.0
-            recovered_means.append(dists[h].mean + a_mean)
+            r_mean = dists[h].mean + a_mean
+            recovered_means.append(r_mean)
             rec_resp.append(r)
             if e is None:
                 ema_resp[p] = list(r)
+                ema_mean[p] = r_mean
             else:
                 ema_resp[p] = [(1.0 - alpha) * ema_resp[p][i] + alpha * r[i] for i in range(H)]
+                ema_mean[p] = e + alpha * (r_mean - e)
             if a_var > 0.0:
                 out.append(Dist([(w, m + a_mean, math.sqrt(s * s + a_var))
                                  for w, m, s in dists[h].components]))

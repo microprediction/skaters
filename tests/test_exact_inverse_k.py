@@ -18,15 +18,15 @@ Every schedule has UNEQUAL per-horizon variances and NONZERO means. The old
 tests fed the same Dist at every horizon, which is the one input on which a
 wrong variance formula agrees with the right one.
 
-Strict xfails are the open ledger. Variance propagation is fixed everywhere
+Variance and mean propagation both follow the forward recursion everywhere
 (#245 ar/grouped_ar, #242 holt, #253 theta, #254 ema, #255 fractional_difference,
-#256 ou, #257 drift, #258 seasonal_anchor); the remaining xfails are the MEAN
-part of the #242 class: earlier innovation means are not carried through the
-learned state. That is left alone on purpose, because propagating them would
-change laplace's multi-step means through the fast_slow chains (standardize feeds
-a nonzero mean into the outer transform). Variance fixes do not reach laplace's
-output beyond its warm-up fallback: the trunk scores candidates on their one-step
-predictive and the terminal leaf re-supplies the h-step scale (terminal.py).
+#256 ou, #257 drift, #258 seasonal_anchor). theta's variance is held to 3% because
+the running-OLS slope's O(1/t) response is dropped; theta's deterministic path is
+the Theta method's own forecast function, not the recursion's, and stays a strict
+xfail by design. The mean part changes laplace's
+multi-step means through the fast_slow chains (standardize feeds a nonzero mean
+into the outer transform), which is why it was evaluated on the harness
+separately from the variance part.
 """
 import math
 import pytest
@@ -115,16 +115,7 @@ FORWARD_LINEAR = {
 }
 
 VAR_XFAIL = {}   # every forward-linear inverse now matches its own forward recursion
-MEAN_XFAIL = {
-    "drift": "#257 mean part, not changed: nonzero innovation means move mu; inverse ignores it (<=0.02 here).",
-    "drift_shrink": "#257 mean part, not changed (see drift).",
-    "holt_linear": "#242 mean part, deliberately NOT changed with the variance fix: propagating earlier "
-                   "innovation means through level and trend would alter laplace's multi-step means via "
-                   "the fast_slow chains (standardize feeds a nonzero mean). Separate decision.",
-    "ema_transform": "#242-class: earlier innovation means move the level; inverse adds only the current one.",
-    "theta": "#242-class: earlier innovation means move SES and slope; inverse adds only the current one.",
-    "seasonal_anchor": "#242-class: earlier innovation means move the phase-EMA; inverse ignores it.",
-}
+MEAN_XFAIL = {}   # earlier innovation means are carried through the learned state too
 
 
 def _params(xfails):
@@ -132,7 +123,7 @@ def _params(xfails):
 
 
 @pytest.mark.parametrize("sched", list(SCHEDULES))
-@pytest.mark.parametrize("name", _params(MEAN_XFAIL))
+@pytest.mark.parametrize("name", [n for n in _params(MEAN_XFAIL) if n != "theta"])
 def test_inverse_mean_matches_forward_recursion(name, sched):
     tx = FORWARD_LINEAR[name]()
     st = dgp.forward_state(tx, _history())
@@ -165,6 +156,23 @@ def test_theta_inverse_variance_is_ses_closed_form(sched):
     out = tx[1](_dists(MEANS, v), st)
     for h, e in enumerate(dgp.ets_ann_var(0.2, v)):
         assert _close(out[h].var, e), (h, out[h].var, e)
+
+
+@_xf("By design: the Theta method's point forecast ses + h*b/2 (Assimakopoulos & "
+     "Nikolopoulos 2000, as the docstring states) is not the forward recursion's own "
+     "zero-innovation path (with eps = 0, ses moves by alpha*b/2 per step and the OLS "
+     "slope re-estimates). The innovation means ARE carried with the SES weights; the "
+     "deterministic path differs by ~0.05 at h = 1 here. A forecast-function change, "
+     "not a propagation fix, and it would move laplace's theta candidates' means.")
+@pytest.mark.parametrize("sched", list(SCHEDULES))
+def test_theta_inverse_mean_matches_forward_recursion(sched):
+    v = SCHEDULES[sched]
+    tx = theta(0.2)
+    st = dgp.forward_state(tx, _history())
+    mean_o, _, _ = dgp.propagated_moments(tx, st, MEANS, v)
+    out = tx[1](_dists(MEANS, v), st)
+    for h in range(H):
+        assert _close(out[h].mean, mean_o[h], 1e-7), (h, out[h].mean, mean_o[h])
 
 
 @pytest.mark.parametrize("sched", list(SCHEDULES))
