@@ -22,9 +22,9 @@ Strict xfails are the open ledger. Variance propagation is fixed everywhere
 (#245 ar/grouped_ar, #242 holt, #253 theta, #254 ema, #255 fractional_difference,
 #256 ou, #257 drift, #258 seasonal_anchor); the remaining xfails are the MEAN
 part of the #242 class: earlier innovation means are not carried through the
-learned state. That is left alone on purpose, because propagating them would
-change laplace's multi-step means through the fast_slow chains (standardize feeds
-a nonzero mean into the outer transform). Variance fixes do not reach laplace's
+learned state. That was implemented and evaluated on branch exp/mean-propagation
+(Python only) and not adopted: median paired dLL 0.0000 on every harness cell,
+DM losses >= wins in 3 of 4, so laplace keeps the frozen-state mean contract. Variance fixes do not reach laplace's
 output beyond its warm-up fallback: the trunk scores candidates on their one-step
 predictive and the terminal leaf re-supplies the h-step scale (terminal.py).
 """
@@ -115,16 +115,8 @@ FORWARD_LINEAR = {
 }
 
 VAR_XFAIL = {}   # every forward-linear inverse now matches its own forward recursion
-MEAN_XFAIL = {
-    "drift": "#257 mean part, not changed: nonzero innovation means move mu; inverse ignores it (<=0.02 here).",
-    "drift_shrink": "#257 mean part, not changed (see drift).",
-    "holt_linear": "#242 mean part, deliberately NOT changed with the variance fix: propagating earlier "
-                   "innovation means through level and trend would alter laplace's multi-step means via "
-                   "the fast_slow chains (standardize feeds a nonzero mean). Separate decision.",
-    "ema_transform": "#242-class: earlier innovation means move the level; inverse adds only the current one.",
-    "theta": "#242-class: earlier innovation means move SES and slope; inverse adds only the current one.",
-    "seasonal_anchor": "#242-class: earlier innovation means move the phase-EMA; inverse ignores it.",
-}
+MEAN_XFAIL = {n: "Mean part of the #242 class, evaluated on branch exp/mean-propagation (d5b5f1e) and NOT adopted: harness 200 econ series x {daily, weekly} x {h5, h13}, median paired dLL 0.0000 everywhere, DM losses >= wins in 3 of 4 cells, CRPS ratio 1.0000. The documented contract stays: transform state frozen at the origin, only the current horizon's innovation mean enters."
+              for n in ("drift", "drift_shrink", "holt_linear", "ema_transform", "theta", "seasonal_anchor")}
 
 
 def _params(xfails):
