@@ -64,11 +64,13 @@ def precision_weighted_ensemble(skaters: list, k: int = 1, floor: float = 1e-6):
             weights = []
             for i in range(n):
                 mse = running_mse_get(state["stats"][i][h])
-                if math.isfinite(mse) and mse > 0:
-                    w = 1.0 / mse
-                else:
-                    w = floor
-                weights.append(max(w, floor))
+                # running_mse_get returns inf exactly when immature (fewer than
+                # two resolved errors); a MATURE perfect forecaster legitimately
+                # returns mse == 0.0 and must get the highest precision, not the
+                # floor. `floor` doubles as the precision cap here (1/floor) so
+                # a near-zero mse cannot blow the weight up to literal infinity.
+                w = 1.0 / max(mse, floor) if math.isfinite(mse) else floor
+                weights.append(w)
 
             # Combine distributional predictions at this horizon
             horizon_dists = [all_dists[i][h] for i in range(n)]

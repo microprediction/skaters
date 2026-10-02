@@ -425,6 +425,9 @@ pub struct HorizonTail {
     pub lo: Tail,
     pub warm: Vec<f64>,
     pub n: i64,
+    /// Resolved z's left out of the warm-up sample at this horizon (see step()).
+    #[serde(default)]
+    pub skipped: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -457,6 +460,7 @@ pub fn gpdtails(base: Sk, k: usize, level: f64, nexc: usize, warmup: usize) -> G
                 lo: tail_new(),
                 warm: Vec::new(),
                 n: 0,
+                skipped: 0,
             })
             .collect(),
     }
@@ -478,6 +482,12 @@ impl GpdTails {
             let z = phi_inv(u.max(EPS).min(1.0 - EPS));
             let th = &mut self.tails[m - 1];
             if th.up.t.is_none() {
+                // Leave the trunk's warm-up fallback PITs (first 2m resolved z's at
+                // m >= 2) out of the threshold sample; m = 1 untouched. See tails.py.
+                if m >= 2 && th.skipped < 2 * m {
+                    th.skipped += 1;
+                    continue;
+                }
                 th.warm.push(z);
                 if th.warm.len() >= self.warmup {
                     let mut w = th.warm.clone();

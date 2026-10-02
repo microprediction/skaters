@@ -34,7 +34,16 @@ ARMS = {
     "weekly":    dict(m=52, gap=(5, 10),   min_changes=300, test=200),
     "monthly":   dict(m=12, gap=(25, 45),  min_changes=300, test=200),
     "m4-hourly": dict(m=24, gap=None,      min_changes=500, test=300),
+    # Nulls with zero true forecastability (issue #250 review). Each copies the
+    # length and title of a daily econ series, so any skill measured on them is
+    # the baseline-estimation overhead at real lengths. perm-daily keeps each
+    # series' marginal law and destroys its temporal order.
+    "null-gauss":   dict(m=5, gap=None, min_changes=500, test=300),
+    "null-t4":      dict(m=5, gap=None, min_changes=500, test=300),
+    "null-laplace": dict(m=5, gap=None, min_changes=500, test=300),
+    "perm-daily":   dict(m=5, gap=None, min_changes=500, test=300),
 }
+NULL_N = int(os.environ.get("NULL_N", 500))       # daily econ series each null copies
 
 _M4_URL = ("https://raw.githubusercontent.com/Mcompetitions/M4-methods/"
            "master/Dataset/Train/Hourly-train.csv")
@@ -104,11 +113,51 @@ def _iter_m4_hourly():
                 yield sid, "M4 hourly", ch
 
 
+def _daily_econ(n):
+    """First n daily econ series (offline cache if present), for the null arms."""
+    import fred_universe as fu
+    cache = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "preds", "_corpus_daily.jsonl")
+    if os.path.exists(cache):
+        rows = (json.loads(line) for line in open(cache))
+        src = ((r["sid"], r["title"], r["ch"]) for r in rows)
+    else:
+        src = _iter_fred("daily", 4000)
+    k = 0
+    for sid, title, ch in src:
+        if fu.asset_class(title or "") in ("equity", "fx", "commodity"):
+            continue
+        yield sid, title, ch
+        k += 1
+        if k >= n:
+            return
+
+
+def _iter_null(arm):
+    import random
+    import zlib
+    for sid, title, ch in _daily_econ(NULL_N):
+        g = random.Random(zlib.crc32(f"{arm}:{sid}".encode()))
+        n = len(ch)
+        if arm == "perm-daily":
+            x = list(ch)
+            g.shuffle(x)
+        elif arm == "null-gauss":
+            x = [g.gauss(0.0, 1.0) for _ in range(n)]
+        elif arm == "null-t4":
+            x = [g.gauss(0.0, 1.0) / (g.gammavariate(2.0, 2.0) / 4.0) ** 0.5 for _ in range(n)]
+        else:
+            x = [g.expovariate(1.0) - g.expovariate(1.0) for _ in range(n)]
+        yield f"{arm}:{sid}", title, x
+
+
 def iter_arm(arm, limit=1000):
     """Yield (sid, title, changes) for a named corpus arm."""
     if arm not in ARMS:
         raise KeyError(f"unknown arm {arm!r}; have {sorted(ARMS)}")
-    if arm == "m4-hourly":
+    if arm in ("null-gauss", "null-t4", "null-laplace", "perm-daily"):
+        yield from _iter_null(arm)
+    elif arm == "m4-hourly":
         yield from _iter_m4_hourly()
     else:
         yield from _iter_fred(arm, limit)

@@ -310,7 +310,16 @@ fn expand(
 
             let sk = build_from_recipe(&new_recipe, k, transforms);
             let depth = new_recipe.len();
-            children.push(make_entry(sk, depth, new_recipe, k, child_cost));
+            let mut child = make_entry(sk, depth, new_recipe, k, child_cost);
+            // Parent-relative initialization (skaters#223): a fresh log_w of
+            // 0.0 is not on the same reference basis as an incumbent's
+            // cumulative sum over its whole lifetime, so prune (and the
+            // softmax combination) were comparing an unscored zero against
+            // hundreds of resolved observations. The child already inherits
+            // the parent's warm state via warmup; it must also inherit the
+            // parent's current log_w.
+            child.log_w = parent.log_w.clone();
+            children.push(child);
         }
     }
     children

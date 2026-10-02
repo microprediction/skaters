@@ -1,0 +1,178 @@
+"""Check every number in the paper against constants.py. Exits non-zero on drift.
+
+    python papers/stronger-benchmark/verify_paper.py
+
+The paper's tables are LaTeX, so they are typed. This closes that gap: the
+prose is only trustworthy if a script re-derives each cell from the store and
+compares. A referee runs this instead of taking the Reproducibility section's
+word for it.
+"""
+from __future__ import annotations
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import constants  # noqa: E402
+
+PAPER = os.path.join(HERE, "stronger-benchmark.tex")
+LABEL_TO_KEY = {
+    "Daily, economic": "daily:econ",
+    "Daily, price/returns": "daily:price",
+    "Weekly, economic": "weekly:econ",
+    "Monthly, economic": "monthly:econ",
+    "M4-hourly, seasonal": "m4-hourly:econ",
+}
+MINUS = "−"
+
+
+def _num(s):
+    return float(s.replace(",", "").replace(MINUS, "-").replace("%", "").strip())
+
+
+def parse_tables(text):
+    """Yield (label, n, win, draw, loss, dLL, loss_rate) for every results row.
+
+    Rows look like:
+      Daily, economic & $2{,}179$ & $66 / 923 / 1{,}190$ & $-0.854$ & $54.6\\,\\%$ \\\\
+    """
+    def clean(c):
+        c = c.replace("{,}", "").replace("$", "").replace("\\,", "")
+        c = c.replace("\\%", "").replace(MINUS, "-").strip()
+        return c
+
+    out = []
+    for line in text.splitlines():
+        line = line.strip()
+        if "&" not in line or not line.endswith("\\\\"):
+            continue
+        cells = [clean(c) for c in line[:-2].split("&")]
+        if len(cells) != 5:
+            continue
+        label = cells[0].strip()
+        if label not in LABEL_TO_KEY:
+            continue
+        wdl = [p.strip() for p in cells[2].split("/")]
+        if len(wdl) != 3:
+            continue
+        try:
+            out.append((label, float(cells[1]), int(wdl[0]), int(wdl[1]),
+                        int(wdl[2]), float(cells[3]), float(cells[4])))
+        except ValueError:
+            continue
+    return out
+
+
+def main():
+    text = open(PAPER).read()
+    rows = parse_tables(text)
+    if len(rows) != 10:
+        print(f"FAIL: expected 10 result rows (5 raw + 5 wrapped), found {len(rows)}")
+        for r in rows:
+            print("   parsed:", r)
+        return 1
+
+    h2h = constants.head_to_head()
+    noz = constants.nozzle()
+    bad = []
+
+    for i, (label, n, w, d, l, dll, lr) in enumerate(rows):
+        rec = h2h[LABEL_TO_KEY[label]]
+        wrapped = i >= 5
+        p = "wrapped_" if wrapped else ""
+        exp = (rec[p + "n_series"], rec[p + "win"], rec[p + "draw"], rec[p + "loss"],
+               rec[p + "med_dLL"], rec[p + "loss_rate"] * 100)
+        tag = "wrapped" if wrapped else "raw"
+        if (n, w, d, l) != exp[:4]:
+            bad.append(f"{tag:8s} {label:22s} counts: paper {(n,w,d,l)} vs store {exp[:4]}")
+        if abs(dll - round(exp[4], 3)) > 5e-4:
+            bad.append(f"{tag:8s} {label:22s} med_dLL: paper {dll} vs store {exp[4]:.4f}")
+        if abs(lr - exp[5]) > 0.05:
+            bad.append(f"{tag:8s} {label:22s} loss_rate: paper {lr}% vs store {exp[5]:.2f}%")
+
+    checks = [
+        ("held-out test points", noz["n_points"], 3200),
+        ("worst nozzle mean logpdf", round(min(noz["methods"].values()), 3), -0.373),
+        ("best nozzle mean logpdf", round(max(noz["methods"].values()), 3), 2.104),
+        ("mean per-point spread", round(noz["mean_spread"], 2), 3.13),
+        ("local vs grid", round(abs(noz["local_vs_grid"]), 2), 0.62),
+    ]
+    for name, store_val, paper_val in checks:
+        if abs(store_val - paper_val) > 1e-6:
+            bad.append(f"prose    {name}: paper {paper_val} vs store {store_val}")
+
+    # the classic-arms table
+    try:
+        classic = constants.classic_baselines()
+    except Exception as exc:                       # noqa: BLE001
+        bad.append(f"prose    classic_baselines() failed: {type(exc).__name__}: {exc}")
+        classic = None
+    if classic:
+        for key, rec in classic.items():
+            if key.startswith("_"):
+                continue
+            arm = rec["label"].split(" (")[0]
+            pct = r"\$(\d+)\\,\\%\$"
+            pat = (re.escape(arm) + r"[^\n]*?" + pct + r" & " + pct + r" & "
+                   + pct + r" & " + pct + r" & \$(\d+)\$")
+            m2 = re.search(pat, text)
+            if not m2:
+                bad.append(f"classic  {arm}: row not found in the paper")
+                continue
+            want = (round(rec["ll_raw"]), round(rec["ll_fam"]),
+                    round(rec["crps_raw"]), round(rec["crps_fam"]), rec["n_series"])
+            got = tuple(int(g) for g in m2.groups())
+            if got != want:
+                bad.append(f"classic  {arm}: paper {got} vs store {want}")
+
+    perf = constants.performance()["models"]
+    def _perf(model, regime):
+        return perf.get(model, {}).get(regime)
+    for model, regime, want in [
+        ("laplace (Rust) k=1", "warm", 0.012),
+        ("laplace (Python) k=1", "warm", 0.251),
+        ("Chronos-Bolt-small", "warm", 7.44),
+        ("TimesFM-2.5-200M", "warm", 329.83),
+    ]:
+        got = _perf(model, regime)
+        if got is None:
+            bad.append(f"perf     {model} {regime}: missing from perf_results.json")
+        elif abs(round(got, 3 if want < 1 else 2) - want) > 1e-9:
+            bad.append(f"perf     {model} {regime}: paper {want} vs store {got:.4f}")
+
+    pc = constants.panel_cost()
+    m = re.search(r"\$([\d{,}]+)\$ one-step forecasts", text)
+    want_steps = "{:,}".format(pc["steps"]).replace(",", "{,}")
+    if not m:
+        bad.append("panel    step-count sentence not found")
+    elif m.group(1) != want_steps:
+        bad.append(f"panel    steps: paper {m.group(1)} vs store {want_steps}")
+
+    pkg = constants.package_size()
+    m = re.search(r"\$(\d+)\$\\,KB of source across \$(\d+)\$", text)
+    if not m:
+        bad.append("prose    package size sentence not found in the paper")
+    else:
+        if int(m.group(1)) != pkg["kb_rounded"]:
+            bad.append(f"prose    package KB: paper {m.group(1)} vs measured {pkg['kb_rounded']}")
+        if int(m.group(2)) != pkg["n_files"]:
+            bad.append(f"prose    package files: paper {m.group(2)} vs measured {pkg['n_files']}")
+
+    claimed = re.search(r"falls by as much as\s+([\w-]+)\s+points", text)
+    drop = round(constants.derived(h2h, noz)["max_loss_rate_drop"] * 100)
+    words = {39: "thirty-nine"}
+    if claimed and claimed.group(1) != words.get(drop, str(drop)):
+        bad.append(f"prose    max loss-rate drop: paper '{claimed.group(1)}' vs store {drop}")
+
+    if bad:
+        print("DRIFT DETECTED between the paper and the store:\n")
+        for b in bad:
+            print("  " + b)
+        return 1
+    print(f"OK: {len(rows)} table rows and {len(checks) + 3} prose figures match the store.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

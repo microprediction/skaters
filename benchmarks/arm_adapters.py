@@ -89,11 +89,12 @@ def fixed_bandwidth_quantile_dist(
 
 
 # ------------------------------------------------------------------ laplace baseline
-def laplace_dists(ch, h=1):
+def laplace_dists(ch, h=1, tails="gpd"):
     """Per-step laplace predictive over the test window (the h-step forecast made
     h observations earlier). Mirrors foundation_study.laplace_scores but returns
-    the Dist objects so the canonical store records laplace per step too."""
-    f = laplace(h); st = None; queue = []; out = []
+    the Dist objects so the canonical store records laplace per step too.
+    `tails` is passed through to laplace (``"gaussian"`` = no GPD splice)."""
+    f = laplace(h, tails=tails); st = None; queue = []; out = []
     start = len(ch) - TEST
     for i, yv in enumerate(ch):
         if len(queue) >= h and i >= start:
@@ -466,14 +467,228 @@ def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None, h=1):
 # make_registry(h) builds the same roster at forecast horizon h (h=1 = the
 # canonical one-step study). Every adapter and sandwich takes an h that defaults
 # to 1, so REGISTRY (h=1) is byte-for-byte the original behaviour.
+# ---- NPTS: the training-free distributional baseline the field ships but omits -
+# GluonTS and AutoGluon both ship NPTS, and both are imported by the benchmarks
+# that omit it. It resamples past values under a recency kernel, so it is
+# distributional by construction and needs no fitting.
+def npts_dists(ch, h=1):
+    """TEST per-step predictives from GluonTS NPTS on the change series.
+
+    Seasonality is off: these are one-step changes, where a seasonal index over
+    the raw clock has no meaning. The predictive is a weighted resample of past
+    changes, converted by the same sample_dist every sampling arm uses.
+    """
+    try:
+        import numpy as _np
+        import pandas as _pd
+        from gluonts.model.npts import NPTSPredictor
+    except Exception:                                  # noqa: BLE001
+        return None
+    ch = _np.asarray(ch, float)
+    n = len(ch)
+    lo = n - fs.TEST
+    if lo < 8:
+        return None
+    pred = NPTSPredictor(prediction_length=h, use_seasonal_model=False,
+                         use_default_time_features=False)
+    idx0 = _pd.Period("2000-01-01", freq="D")
+    out = []
+    for j in range(lo, n):
+        hist = ch[max(0, j - fs.CTX):j]
+        ts = _pd.Series(hist, index=_pd.period_range(idx0, periods=len(hist), freq="D"))
+        try:
+            fc = pred.predict_time_series(ts, num_samples=500)
+        except Exception:                              # noqa: BLE001
+            return None
+        samp = _np.asarray(fc.samples, float).reshape(h, -1)[h - 1]
+        out.append(fs.sample_dist(samp))
+    return out
+
+
+# ---- PyMC-forecast: a Bayesian challenger, through the canonical protocol -----
+# The original study (pymc_forecast_sandwich_study.py) wrote its own schema to
+# its own CSV and never entered the canonical store, so its numbers were not
+# comparable with the arms here. This adapter reuses that study's model and fit
+# unchanged and converts only the OUTPUT to a canonical Dist, via the same
+# sample_dist every sampling arm uses.
+PYMC_REFIT = int(os.environ.get("PYMC_REFIT", 10))   # ADVI fits are ~90s each
+PYMC_TRAIN = int(os.environ.get("PYMC_TRAIN", 248))  # trailing lag-rows per fit
+
+
+def pymc_dists(ch, h=1):
+    """TEST per-step predictives from a Student-t regression on lagged changes.
+
+    One ADVI fit costs roughly ninety seconds, so refitting at every test step
+    would be over an hour per series. The cadence is PYMC_REFIT steps, stated
+    here rather than hidden: parameters are up to that many steps stale, the
+    lag covariates are always current, which is the same arrangement the
+    statsforecast arms run under.
+    """
+    try:
+        import numpy as _np
+        import pymc_forecast_sandwich_study as _st
+        from tabfm_wide_study import lag_rows as _lag_rows
+    except Exception:                                  # noqa: BLE001
+        return None
+    ch = _np.asarray(ch, float)
+    n = len(ch)
+    lo = n - fs.TEST
+    if lo - h - _st.LAGS - PYMC_TRAIN < 0:
+        return None
+    out, params = [], None
+    for k, j in enumerate(range(lo, n)):
+        if k % PYMC_REFIT == 0:
+            tr_lo = j - PYMC_TRAIN
+            Xtr, ytr = _lag_rows(ch, tr_lo, j, _st.LAGS, h)
+            try:
+                params = _st._fit_zreg(ytr, Xtr, seed=abs(hash((int(j), n))) % 10**6)
+            except Exception:                          # noqa: BLE001
+                return None
+        a, b, sg, nu = params
+        x = ch[j - h - _st.LAGS + 1:j - h + 1]
+        mu = a + b @ x
+        # posterior predictive draws: one Student-t draw per posterior draw
+        g = _np.random.default_rng(int(j))
+        samp = mu + sg * g.standard_t(_np.clip(nu, 2.1, 200.0))
+        out.append(fs.sample_dist(samp))
+    return out
+
+
+# ---- Forecastability decomposition (issue #250): pooled-law arms ---------------
+# Three state-blind predictives scored beside laplace on the same test steps, so
+# the forecastability profile and its conformal share are paired differences of
+# stored per-step log scores (summarize_canonical's dLL vs laplace):
+#   F_hat = L_lap - L_unc,  X_cps = L_cps - L_unc,  left = L_lap - L_cps.
+# Each reuses bench_core.conformal_dist, the conformal shape the foils already
+# use. cps/cpsz share laplace(h)'s h-step mean, so they differ from laplace only
+# in shape. cpsz standardizes by a separate simple scale model (EWMA of squared
+# h-step residuals, as conformal_infogap._streams), NOT laplace's sd, which would
+# import conditional-shape machinery into a pooled arm. A pool holds only what is
+# resolved at the issue time j-h. "(W)" names cap the pool at the most recent W
+# values; the bare name is expanding. Report all.
+FC_MIN = 50                                     # smallest pool a law is quoted from
+FC_ALPHA = 0.03                                 # scale EWMA rate
+FC_FLOOR = 0.0025                               # scale^2 floor, x expanding mean square
+
+
+_ISSUED = [None, None]                          # (key, issued): cps/cpsz share one pass
+
+
+def _lap_issued(ch, h):
+    """issued[j] = laplace's h-step Dist for target j, made after consuming ch[j-h].
+    Same stepping as laplace_dists."""
+    key = (h, len(ch), tuple(float(x) for x in ch))
+    if _ISSUED[0] == key:
+        return _ISSUED[1]
+    f = laplace(h); st = None; issued = [None] * len(ch)
+    for i, yv in enumerate(ch):
+        d, st = f(yv, st)
+        if i + h < len(ch):
+            issued[i + h] = d[h - 1]
+    _ISSUED[0], _ISSUED[1] = key, issued
+    return issued
+
+
+def _pooled_dists(ch, h, kind, win=0):
+    import bench_core as bc
+    ch = np.asarray(ch, float)
+    n = len(ch)
+    lo = n - TEST
+    if kind != "unc":
+        issued = _lap_issued(ch, h)
+        r = [None] * n; z = [None] * n; sc = [0.0] * n
+        v = None; g = 0.0; nr = 0
+        for s in range(n):
+            u = s - h                           # residual u resolves at origin s-h
+            if u >= 0 and r[u] is not None:
+                nr += 1
+                g += (r[u] * r[u] - g) / nr
+                v = r[u] * r[u] if v is None else (1 - FC_ALPHA) * v + FC_ALPHA * r[u] * r[u]
+            if issued[s] is not None:
+                r[s] = ch[s] - issued[s].mean
+                sc[s] = math.sqrt(max(v, FC_FLOOR * g)) if v is not None else 0.0
+                if sc[s] > 0 and math.isfinite(sc[s]):
+                    z[s] = r[s] / sc[s]
+    out = []
+    for j in range(lo, n):
+        cut = j - h + 1                         # targets < cut have resolved at issue
+        if kind == "unc":
+            pool = ch[:cut]
+            point, scale = 0.0, 1.0
+        elif kind == "cps":
+            pool = np.array([x for x in r[:cut] if x is not None])
+            point, scale = issued[j].mean, 1.0
+        else:
+            if not sc[j] > 0:
+                return None
+            pool = np.array([x for x in z[:cut] if x is not None])
+            point, scale = issued[j].mean, sc[j]
+        if win:
+            pool = pool[-win:]
+        if len(pool) < FC_MIN:
+            return None
+        out.append(bc.conformal_dist(point, pool, scale=scale))
+    return out
+
+
+# Matched pre/post conformalization pair (#250 review): cps differs from laplace
+# in shape AND construction, so it cannot isolate the conformal step. lap_grid is
+# laplace's h-step predictive read off a fixed quantile grid (identity rank map);
+# lap_conf is the same grid after the state-blind rank map, the pooled empirical
+# law of laplace's past PITs. Same Dist, same grid: they differ only in the map.
+FC_LEVELS = [0.005, 0.01] + [round(0.02 + 0.024 * i, 3) for i in range(41)] + [0.99, 0.995]
+
+
+def _lap_rank_dists(ch, h, conformal, win=0):
+    ch = np.asarray(ch, float)
+    n = len(ch)
+    lo = n - TEST
+    issued = _lap_issued(ch, h)
+    u = [None] * n
+    for s in range(n):
+        if issued[s] is not None:
+            u[s] = min(max(issued[s].cdf(float(ch[s])), 1e-6), 1 - 1e-6)
+    out = []
+    for j in range(lo, n):
+        d = issued[j]
+        if d is None:
+            return None
+        if conformal:
+            pool = np.array([x for x in u[:j - h + 1] if x is not None])
+            if win:
+                pool = pool[-win:]
+            if len(pool) < FC_MIN:
+                return None
+            ps = np.clip(np.quantile(pool, FC_LEVELS), 1e-6, 1 - 1e-6)
+        else:
+            ps = FC_LEVELS
+        qs = np.maximum.accumulate([d.quantile(float(p)) for p in ps])
+        out.append(fs.quantile_dist(FC_LEVELS, list(qs)))
+    return out
+
+
 def make_registry(h=1):
     return {
+        # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
+        "unc":         lambda ch: _pooled_dists(ch, h, "unc"),
+        "cps":         lambda ch: _pooled_dists(ch, h, "cps"),
+        "cpsz":        lambda ch: _pooled_dists(ch, h, "cpsz"),
+        "unc(250)":    lambda ch: _pooled_dists(ch, h, "unc", 250),
+        "cps(250)":    lambda ch: _pooled_dists(ch, h, "cps", 250),
+        "cpsz(250)":   lambda ch: _pooled_dists(ch, h, "cpsz", 250),
+        "lap_grid":    lambda ch: _lap_rank_dists(ch, h, False),
+        "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
+        "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
+        # ablation: laplace without the GPD tail splice (tails.py degenerate-threshold check)
+        "laplace(gaussian-tails)": lambda ch: laplace_dists(ch, h, tails="gaussian"),
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
         "TiRex-2":     lambda ch: tirex2_dists(ch, h),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
+        "PyMC":        lambda ch: pymc_dists(ch, h),
+        "NPTS":        lambda ch: npts_dists(ch, h),
         "Chronos":     lambda ch: fs.chronos_dists(ch, h),
         "TimesFM":     lambda ch: fs.timesfm_dists(ch, h),
         "TimesFM3":    lambda ch: fs.timesfm3_dists(ch, h),
@@ -496,6 +711,11 @@ def make_registry(h=1):
         "TimesFM3&lap": portfolio_sandwich(fs.timesfm3_dists, h=h),
         "TiRex&lap":   portfolio_sandwich(tirex_dists, h=h),
         "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
+        "PyMC+lap":    _sandwich(pymc_dists, h),
+        "PyMC~lap":    _resid_sandwich(pymc_dists, h),
+        "PyMC@lap":    pit_sandwich(pymc_dists, h),
+        "PyMC&lap":    portfolio_sandwich(pymc_dists, h=h),
+        "NPTS&lap":    portfolio_sandwich(npts_dists, h=h),
     }
 
 
