@@ -109,26 +109,41 @@ def fractional_difference(d: float = 0.4, window: int = 50):
         where y_{t-j} are known (from buffer) for j >= h, and are the
         recovered means for j < h (previous horizons).
 
-        The shift is deterministic (known past), so it just shifts the Dist.
-        The variance passes through unchanged (linear operation with unit
-        coefficient on y'_t).
+        Known past values only shift the Dist. Recovered earlier horizons are
+        uncertain and feed back through the same weights, so the variance does
+        NOT pass through unchanged (issue #255): each recovered value carries a
+        row of responses to the future innovations, built by the same recursion
+        as its mean, and Var(y_{t+h+1}) = sum_i c_{h,i}^2 var_i.
         """
+        H = len(dists)
         buf = list(state["buffer"])
+        cbuf: list = [None] * len(buf)       # innovation-response rows (None = known value)
         result = []
-        for d_in in dists:
+        for h, d_in in enumerate(dists):
             buf.append(0.0)  # placeholder for recovered mean
+            cbuf.append(None)
             n = len(buf)
-            # The deterministic shift from known/recovered past values
             shift = 0.0
+            coef = [0.0] * H
+            coef[h] = 1.0
             for j in range(1, min(n, window)):
                 shift -= w_fwd[j] * buf[n - 1 - j]
+                cj = cbuf[n - 1 - j]
+                if cj is not None:
+                    for i in range(h):
+                        coef[i] -= w_fwd[j] * cj[i]
             # Recovered mean: x_prime_mean + shift (since w_fwd[0] = 1)
             recovered_mean = d_in.mean + shift
             buf[-1] = recovered_mean
-            # Variance passes through (linear op with unit coeff on x')
-            result.append(Dist.gaussian(recovered_mean, d_in.std))
+            cbuf[-1] = coef
+            total_var = 0.0
+            for i in range(h + 1):
+                total_var += coef[i] * coef[i] * dists[i].var
+            std = math.sqrt(total_var) if total_var > 0 else max(d_in.std, 1e-12)
+            result.append(Dist.gaussian(recovered_mean, std))
             if len(buf) > window:
                 buf.pop(0)
+                cbuf.pop(0)
         return result
 
     return forward, inverse_k
@@ -183,7 +198,9 @@ def ema_transform(alpha: float = 0.05):
     """Exponential moving average as a bijective transform.
 
     Forward:   y'_t = y_t - level_t   (residual from EMA)
-    Inverse:   Shift each Dist by the current level.
+    Inverse:   Shift each Dist by the current level and convolve in the level's own
+               innovation response: Var(y_{t+h+1}) = var_h + alpha^2 sum_{i<h} var_i
+               (ETS(A,N,N); issue #254). Component-wise, so the leaf's shape is kept.
 
     This reframes EMA as a change of reference frame: the inner model
     predicts centered residuals, and the inverse adds back the level.
@@ -205,7 +222,15 @@ def ema_transform(alpha: float = 0.05):
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         level = state["level"]
-        return [d.shift(level) for d in dists]
+        out = []
+        add = 0.0            # alpha^2 * sum_{i<h} var_i: the level's accumulated response
+        for d in dists:
+            if add > 0.0:
+                out.append(Dist([(w, m + level, math.sqrt(s * s + add)) for w, m, s in d.components]))
+            else:
+                out.append(d.shift(level))
+            add += alpha * alpha * d.var
+        return out
 
     return forward, inverse_k
 
@@ -259,7 +284,17 @@ def ou_transform(kappa: float = 0.1, alpha: float = 0.02):
         out = []
         for h, d in enumerate(dists, start=1):
             center = m + (phi ** h) * (ylast - m)
-            if phi < 1.0 - 1e-9:
+            # Var(y_{t+h}) = sum_{i<h} phi^{2(h-1-i)} var_i: each future innovation
+            # decays from its own time (issue #256). Expressed as a scale on this
+            # horizon's Dist so the leaf's mixture shape is kept. For equal
+            # variances this is the old sqrt(sum_j phi^2j), and sqrt(h) as phi -> 1.
+            v_h = d.var
+            if v_h > 0.0:
+                tot = 0.0
+                for i in range(h):
+                    tot += (phi ** (2 * (h - 1 - i))) * dists[i].var
+                g = math.sqrt(tot / v_h)
+            elif phi < 1.0 - 1e-9:
                 g = math.sqrt((1.0 - phi ** (2 * h)) / (1.0 - phi * phi))
             else:
                 g = math.sqrt(h)               # phi -> 1: random-walk variance growth
@@ -336,11 +371,17 @@ def theta(alpha: float = 0.1):
         ses = state["ses"]
         slope = state.get("slope", 0.0)
         result = []
-        cumsum_var = 0.0
         for h, d in enumerate(dists):
-            cumsum_var += d.var
             forecast = ses + (h + 1) * slope / 2 + d.mean
-            std = math.sqrt(cumsum_var) if cumsum_var > 0 else max(d.std, 1e-12)
+            # SES: an innovation j steps before the target reaches it through the
+            # level with weight alpha, so c_0 = 1, c_j = alpha and
+            # Var(y_{t+h+1}) = sum_j c_j^2 var_{h-j} (issue #253). The running-OLS
+            # slope's response is O(1/t) (~1e-3 at t=60) and is dropped.
+            total_var = 0.0
+            for j in range(h + 1):
+                c = 1.0 if j == 0 else alpha
+                total_var += c * c * dists[h - j].var
+            std = math.sqrt(total_var) if total_var > 0 else max(d.std, 1e-12)
             result.append(Dist.gaussian(forecast, std))
         return result
 
@@ -400,15 +441,27 @@ def drift(alpha: float = 0.002, shrinkage: float = 0.001):
         """
         anchor = state["last"]
         mu = state["mu"]
+        rho = decay + alpha                 # 1 - shrinkage: persistence of the drift estimate
         result = []
         cumsum_mean = 0.0
-        cumsum_var = 0.0
         for h, d in enumerate(dists):
             cumsum_mean += d.mean
-            cumsum_var += d.var
             # Total prediction: anchor + (h+1)*drift + cumulative residual
             total_mean = anchor + (h + 1) * mu + cumsum_mean
-            total_std = math.sqrt(cumsum_var) if cumsum_var > 0 else max(d.std, 1e-12)
+            # The drift estimate is itself driven by the innovations
+            # (mu <- rho*mu + alpha*eps), so the innovation at t+i+1 reaches
+            # y_{t+h+1} directly (1) and through the drift on each later step:
+            # c = 1 + alpha * sum_{m<h-i} rho^m (issue #257).
+            total_var = 0.0
+            for i in range(h + 1):
+                acc = 0.0
+                f = 1.0
+                for _ in range(h - i):
+                    acc += f
+                    f *= rho
+                c = 1.0 + alpha * acc
+                total_var += c * c * dists[i].var
+            total_std = math.sqrt(total_var) if total_var > 0 else max(d.std, 1e-12)
             result.append(Dist.gaussian(total_mean, total_std))
         return result
 
@@ -654,23 +707,43 @@ def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         buf = state["buffer"]
+        H = len(dists)
         recovered_means: list[float] = []
-        recovered_vars: list[float] = []
+        # Innovation-response rows: how each recovered value, and each phase's EMA,
+        # depends on the future innovations. The forward updates a phase's EMA from
+        # every value of that phase, recovered ones included, so an anchor at
+        # h >= period responds to the recovered value one period back through both
+        # the naive term (1 - weight) and the EMA term (weight * alpha) (issue #258).
+        rec_resp: list[list[float]] = []
+        ema_resp = [[0.0] * H for _ in range(period)]
         out = []
-        for h in range(len(dists)):
+        for h in range(H):
             p = (state["n"] + h) % period
             lag_idx = h - period
             if lag_idx < 0:
                 buf_idx = len(buf) - period + h
                 snaive = buf[buf_idx] if 0 <= buf_idx < len(buf) else buf[-1]
-                snaive_var = 0.0
+                sn_resp = None
             else:
                 snaive = recovered_means[lag_idx]
-                snaive_var = recovered_vars[lag_idx]
-            a_mean = _anchor(state["ema"][p], snaive)
-            a_var = ((1.0 - weight) ** 2) * snaive_var
+                sn_resp = rec_resp[lag_idx]
+            e = state["ema"][p]
+            a_mean = _anchor(e, snaive)
+            a_resp = [0.0] * H
+            for i in range(h):
+                sn = sn_resp[i] if sn_resp is not None else 0.0
+                a_resp[i] = (weight * ema_resp[p][i] + (1.0 - weight) * sn) if e is not None else sn
+            a_var = 0.0
+            for i in range(h):
+                a_var += a_resp[i] * a_resp[i] * dists[i].var
+            r = list(a_resp)
+            r[h] = 1.0
             recovered_means.append(dists[h].mean + a_mean)
-            recovered_vars.append(dists[h].var + a_var)
+            rec_resp.append(r)
+            if e is None:
+                ema_resp[p] = list(r)
+            else:
+                ema_resp[p] = [(1.0 - alpha) * ema_resp[p][i] + alpha * r[i] for i in range(H)]
             if a_var > 0.0:
                 out.append(Dist([(w, m + a_mean, math.sqrt(s * s + a_var))
                                  for w, m, s in dists[h].components]))

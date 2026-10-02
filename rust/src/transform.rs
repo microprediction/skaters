@@ -157,20 +157,44 @@ impl FracDiff {
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+        // Recovered horizons feed back through the same weights, so each carries a
+        // row of responses to the future innovations and Var = sum_i c_i^2 var_i
+        // (issue #255).
+        let hn = dists.len();
         let mut buf = self.buffer.clone();
-        let mut result = Vec::with_capacity(dists.len());
-        for d_in in dists {
+        let mut cbuf: Vec<Option<Vec<f64>>> = vec![None; buf.len()];
+        let mut result = Vec::with_capacity(hn);
+        for (h, d_in) in dists.iter().enumerate() {
             buf.push(0.0);
+            cbuf.push(None);
             let n = buf.len();
             let mut shift = 0.0;
+            let mut coef = vec![0.0; hn];
+            coef[h] = 1.0;
             for j in 1..n.min(self.window) {
                 shift -= self.w_fwd[j] * buf[n - 1 - j];
+                if let Some(cj) = &cbuf[n - 1 - j] {
+                    for i in 0..h {
+                        coef[i] -= self.w_fwd[j] * cj[i];
+                    }
+                }
             }
             let recovered_mean = d_in.mean() + shift;
             buf[n - 1] = recovered_mean;
-            result.push(Dist::gaussian(recovered_mean, d_in.std()));
+            let mut total_var = 0.0;
+            for i in 0..=h {
+                total_var += coef[i] * coef[i] * dists[i].var();
+            }
+            cbuf[n - 1] = Some(coef);
+            let std = if total_var > 0.0 {
+                total_var.sqrt()
+            } else {
+                d_in.std().max(1e-12)
+            };
+            result.push(Dist::gaussian(recovered_mean, std));
             if buf.len() > self.window {
                 buf.remove(0);
+                cbuf.remove(0);
             }
         }
         result
@@ -272,7 +296,24 @@ impl EmaT {
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
-        dists.iter().map(|d| d.shift(self.level)).collect()
+        let level = self.level;
+        let mut out = Vec::with_capacity(dists.len());
+        // alpha^2 * sum_{i<h} var_i: the level's accumulated response (ETS(A,N,N), issue #254)
+        let mut add = 0.0;
+        for d in dists {
+            if add > 0.0 {
+                out.push(Dist::new(
+                    d.components
+                        .iter()
+                        .map(|&(w, m, s)| (w, m + level, (s * s + add).sqrt()))
+                        .collect(),
+                ));
+            } else {
+                out.push(d.shift(level));
+            }
+            add += self.alpha * self.alpha * d.var();
+        }
+        out
     }
 }
 
@@ -334,7 +375,16 @@ impl Ou {
         for (h0, d) in dists.iter().enumerate() {
             let h = (h0 + 1) as f64;
             let center = m + libm::pow(phi, h) * (ylast - m);
-            let g = if phi < 1.0 - 1e-9 {
+            // Var = sum_{i<=h0} phi^{2(h0-i)} var_i, as a scale on this horizon's Dist
+            // (issue #256); equals the old sqrt(sum_j phi^2j) for equal variances.
+            let v_h = d.var();
+            let g = if v_h > 0.0 {
+                let mut tot = 0.0;
+                for i in 0..=h0 {
+                    tot += libm::pow(phi, (2 * (h0 - i)) as f64) * dists[i].var();
+                }
+                (tot / v_h).sqrt()
+            } else if phi < 1.0 - 1e-9 {
                 ((1.0 - libm::pow(phi, 2.0 * h)) / (1.0 - phi * phi)).sqrt()
             } else {
                 h.sqrt()
@@ -415,12 +465,16 @@ impl Theta {
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
         let mut result = Vec::with_capacity(dists.len());
-        let mut cumsum_var = 0.0;
         for (h, d) in dists.iter().enumerate() {
-            cumsum_var += d.var();
             let forecast = self.ses + (h + 1) as f64 * self.slope / 2.0 + d.mean();
-            let std = if cumsum_var > 0.0 {
-                cumsum_var.sqrt()
+            // SES: c_0 = 1, c_j = alpha; Var = sum_j c_j^2 var_{h-j} (issue #253).
+            let mut total_var = 0.0;
+            for j in 0..=h {
+                let c = if j == 0 { 1.0 } else { self.alpha };
+                total_var += c * c * dists[h - j].var();
+            }
+            let std = if total_var > 0.0 {
+                total_var.sqrt()
             } else {
                 d.std().max(1e-12)
             };
@@ -473,15 +527,27 @@ impl Drift {
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
         let anchor = self.last;
         let mu = self.mu;
+        let rho = self.decay + self.alpha; // 1 - shrinkage: persistence of the drift estimate
         let mut result = Vec::with_capacity(dists.len());
         let mut cumsum_mean = 0.0;
-        let mut cumsum_var = 0.0;
         for (h, d) in dists.iter().enumerate() {
             cumsum_mean += d.mean();
-            cumsum_var += d.var();
             let total_mean = anchor + (h + 1) as f64 * mu + cumsum_mean;
-            let total_std = if cumsum_var > 0.0 {
-                cumsum_var.sqrt()
+            // c = 1 + alpha * sum_{m<h-i} rho^m: direct plus through the drift
+            // estimate (issue #257).
+            let mut total_var = 0.0;
+            for i in 0..=h {
+                let mut acc = 0.0;
+                let mut f = 1.0;
+                for _ in 0..(h - i) {
+                    acc += f;
+                    f *= rho;
+                }
+                let c = 1.0 + self.alpha * acc;
+                total_var += c * c * dists[i].var();
+            }
+            let total_std = if total_var > 0.0 {
+                total_var.sqrt()
             } else {
                 d.std().max(1e-12)
             };
@@ -779,12 +845,18 @@ impl SeasonalAnchor {
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
         let buf = &self.buffer;
         let period = self.period;
+        let hn = dists.len();
         let mut recovered_means: Vec<f64> = Vec::new();
-        let mut recovered_vars: Vec<f64> = Vec::new();
-        let mut result = Vec::with_capacity(dists.len());
-        for h in 0..dists.len() {
+        // Innovation-response rows of recovered values and of each phase's EMA: the
+        // forward updates the EMA from recovered values too, so an anchor at
+        // h >= period responds to the value one period back through (1 - weight)
+        // and weight * alpha (issue #258).
+        let mut rec_resp: Vec<Vec<f64>> = Vec::new();
+        let mut ema_resp: Vec<Vec<f64>> = vec![vec![0.0; hn]; period];
+        let mut result = Vec::with_capacity(hn);
+        for h in 0..hn {
             let p = (self.n + h) % period;
-            let (snaive, snaive_var);
+            let (snaive, sn_resp): (f64, Option<Vec<f64>>);
             if h < period {
                 let buf_idx = buf.len() as i64 - period as i64 + h as i64;
                 snaive = if buf_idx >= 0 && (buf_idx as usize) < buf.len() {
@@ -792,16 +864,39 @@ impl SeasonalAnchor {
                 } else {
                     *buf.last().unwrap_or(&0.0)
                 };
-                snaive_var = 0.0;
+                sn_resp = None;
             } else {
                 let lag_idx = h - period;
                 snaive = recovered_means[lag_idx];
-                snaive_var = recovered_vars[lag_idx];
+                sn_resp = Some(rec_resp[lag_idx].clone());
             }
-            let a_mean = self.anchor_of(self.ema[p], snaive);
-            let a_var = (1.0 - self.weight) * (1.0 - self.weight) * snaive_var;
+            let e = self.ema[p];
+            let a_mean = self.anchor_of(e, snaive);
+            let mut a_resp = vec![0.0; hn];
+            for i in 0..h {
+                let sn = match &sn_resp {
+                    Some(v) => v[i],
+                    None => 0.0,
+                };
+                a_resp[i] = match e {
+                    Some(_) => self.weight * ema_resp[p][i] + (1.0 - self.weight) * sn,
+                    None => sn,
+                };
+            }
+            let mut a_var = 0.0;
+            for i in 0..h {
+                a_var += a_resp[i] * a_resp[i] * dists[i].var();
+            }
+            let mut r = a_resp.clone();
+            r[h] = 1.0;
             recovered_means.push(dists[h].mean() + a_mean);
-            recovered_vars.push(dists[h].var() + a_var);
+            rec_resp.push(r.clone());
+            ema_resp[p] = match e {
+                None => r.clone(),
+                Some(_) => (0..hn)
+                    .map(|i| (1.0 - self.alpha) * ema_resp[p][i] + self.alpha * r[i])
+                    .collect(),
+            };
             if a_var > 0.0 {
                 result.push(Dist::new(
                     dists[h]

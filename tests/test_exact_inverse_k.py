@@ -18,16 +18,15 @@ Every schedule has UNEQUAL per-horizon variances and NONZERO means. The old
 tests fed the same Dist at every horizon, which is the one input on which a
 wrong variance formula agrees with the right one.
 
-Strict xfails are the open ledger. Each reason states the defect and its size
-on the "bumpy" schedule (ratio = inverse variance / oracle variance at h=1..4).
-Two classes:
-  #245-class: correct for equal variances, wrong for unequal ones (ar, grouped_ar, ou).
-  #242-class: the inverse is not the multi-step inverse of its own forward
-              recursion, so it is wrong even for equal variances (holt, theta,
-              ema, drift, seasonal_anchor, fractional_difference).
-None of these reaches laplace's output: the trunk scores candidates on their
-one-step predictive and the terminal leaf re-supplies the h-step scale
-(terminal.py). They are defects of the public conjugate() API.
+Strict xfails are the open ledger. Variance propagation is fixed everywhere
+(#245 ar/grouped_ar, #242 holt, #253 theta, #254 ema, #255 fractional_difference,
+#256 ou, #257 drift, #258 seasonal_anchor); the remaining xfails are the MEAN
+part of the #242 class: earlier innovation means are not carried through the
+learned state. That is left alone on purpose, because propagating them would
+change laplace's multi-step means through the fast_slow chains (standardize feeds
+a nonzero mean into the outer transform). Variance fixes do not reach laplace's
+output beyond its warm-up fallback: the trunk scores candidates on their one-step
+predictive and the terminal leaf re-supplies the h-step scale (terminal.py).
 """
 import math
 import pytest
@@ -106,6 +105,7 @@ def test_oracle_matches_cumsum_for_difference(sched):
 FORWARD_LINEAR = {
     "difference":            lambda: difference(),
     "drift":                 lambda: drift(alpha=0.01, shrinkage=0.0),
+    "drift_shrink":          lambda: drift(alpha=0.01, shrinkage=0.002),
     "holt_linear":           lambda: holt_linear(0.3, 0.2),
     "ema_transform":         lambda: ema_transform(0.3),
     "theta":                 lambda: theta(0.2),
@@ -114,20 +114,10 @@ FORWARD_LINEAR = {
     "fractional_difference": lambda: fractional_difference(0.4, window=20),
 }
 
-VAR_XFAIL = {
-    "drift": "#242-class: drift mu is a random walk driven by future innovations (c_j = 1 + alpha*j); "
-             "inverse uses c_j = 1. Ratio 0.97-1.00 at alpha=0.01; <5% at the default alpha=0.002 over 13 steps.",
-    "ema_transform": "#242-class: inverse shifts by the frozen level; ETS(A,N,N) says Var_h = v_h + alpha^2 sum v_i. "
-                     "Ratio 0.52-0.80 at alpha=0.3 (fast_slow uses 0.3 and 0.5).",
-    "theta": "#242-class: inverse accumulates residual variance with coefficient 1; SES response is alpha. "
-             "Ratio 4.3-8.0x at alpha=0.2.",
-    "seasonal_anchor": "#242-class: phase-EMA is frozen in the inverse but updated by recovered values in the "
-                       "forward (response weight + weight*alpha = 0.65 vs 0.5). Ratio 0.88 at h=period.",
-    "fractional_difference": "#242-class: docstring says variance passes through unchanged, but recovered "
-                             "horizons feed back with weights w_j. Ratio 0.40-0.81 at d=0.4.",
-}
+VAR_XFAIL = {}   # every forward-linear inverse now matches its own forward recursion
 MEAN_XFAIL = {
-    "drift": "#242-class: nonzero innovation means move mu; inverse ignores it (<=0.02 here).",
+    "drift": "#257 mean part, not changed: nonzero innovation means move mu; inverse ignores it (<=0.02 here).",
+    "drift_shrink": "#257 mean part, not changed (see drift).",
     "holt_linear": "#242 mean part, deliberately NOT changed with the variance fix: propagating earlier "
                    "innovation means through level and trend would alter laplace's multi-step means via "
                    "the fast_slow chains (standardize feeds a nonzero mean). Separate decision.",
@@ -154,7 +144,7 @@ def test_inverse_mean_matches_forward_recursion(name, sched):
 
 
 @pytest.mark.parametrize("sched", list(SCHEDULES))
-@pytest.mark.parametrize("name", _params(VAR_XFAIL))
+@pytest.mark.parametrize("name", [n for n in _params(VAR_XFAIL) if n != "theta"])
 def test_inverse_variance_matches_forward_recursion(name, sched):
     tx = FORWARD_LINEAR[name]()
     st = dgp.forward_state(tx, _history())
@@ -163,6 +153,32 @@ def test_inverse_variance_matches_forward_recursion(name, sched):
     out = tx[1](_dists(MEANS, v), st)
     for h in range(H):
         assert _close(out[h].var, var_o[h], 1e-7), (name, h, out[h].var, var_o[h])
+
+
+@pytest.mark.parametrize("sched", list(SCHEDULES))
+def test_theta_inverse_variance_is_ses_closed_form(sched):
+    """theta = SES + half OLS slope. The inverse carries the SES response alpha
+    exactly (c_0 = 1, c_j = alpha, i.e. the ETS(A,N,N) form, issue #253)."""
+    v = SCHEDULES[sched]
+    tx = theta(0.2)
+    st = dgp.forward_state(tx, _history())
+    out = tx[1](_dists(MEANS, v), st)
+    for h, e in enumerate(dgp.ets_ann_var(0.2, v)):
+        assert _close(out[h].var, e), (h, out[h].var, e)
+
+
+@pytest.mark.parametrize("sched", list(SCHEDULES))
+def test_theta_inverse_variance_near_forward_recursion(sched):
+    """The running-OLS slope also responds to future innovations, by O(1/t)
+    (~1e-3 at t=60). That term is dropped, so agreement with the full forward
+    recursion is to 3%, not 1e-7."""
+    v = SCHEDULES[sched]
+    tx = theta(0.2)
+    st = dgp.forward_state(tx, _history())
+    _, var_o, _ = dgp.propagated_moments(tx, st, MEANS, v)
+    out = tx[1](_dists(MEANS, v), st)
+    for h in range(H):
+        assert abs(out[h].var / var_o[h] - 1.0) < 0.03, (h, out[h].var, var_o[h])
 
 
 # --------------------------------------------------- frozen-coefficient closed forms
@@ -232,10 +248,9 @@ def _ou_var(v):
     return [sum(OU_PHI ** (2 * (h - i)) * v[i] for i in range(h + 1)) for h in range(len(v))]
 
 
-@_xf("#245-class: ou inverse scales v_h by sqrt(sum_j phi^2j) instead of convolving "
-     "sum_i phi^2(h-i) v_i. Under its own frozen-m docstring contract.")
 @pytest.mark.parametrize("sched", list(SCHEDULES))
 def test_ou_inverse_variance_under_its_frozen_m_contract(sched):
+    """Issue #256 (fixed): the per-horizon scale now gives sum_i phi^2(h-i) v_i."""
     v = SCHEDULES[sched]
     _, inv = ou_transform(kappa=1.0 - OU_PHI, alpha=0.05)
     out = inv(_dists(MEANS, v), OU_STATE)
