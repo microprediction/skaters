@@ -42,11 +42,12 @@ DEVICE = os.environ.get("FM_DEVICE", "cpu")
 
 
 # ------------------------------------------------------------------ laplace baseline
-def laplace_dists(ch, h=1):
+def laplace_dists(ch, h=1, tails="gpd"):
     """Per-step laplace predictive over the test window (the h-step forecast made
     h observations earlier). Mirrors foundation_study.laplace_scores but returns
-    the Dist objects so the canonical store records laplace per step too."""
-    f = laplace(h); st = None; queue = []; out = []
+    the Dist objects so the canonical store records laplace per step too.
+    `tails` is passed through to laplace (``"gaussian"`` = no GPD splice)."""
+    f = laplace(h, tails=tails); st = None; queue = []; out = []
     start = len(ch) - TEST
     for i, yv in enumerate(ch):
         if len(queue) >= h and i >= start:
@@ -555,6 +556,8 @@ def make_registry(h=1):
         "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
         "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
+        # ablation: laplace without the GPD tail splice (tails.py degenerate-threshold check)
+        "laplace(gaussian-tails)": lambda ch: laplace_dists(ch, h, tails="gaussian"),
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
