@@ -1,0 +1,1163 @@
+{
+  "by_regime": {
+    "fred-econ": {
+      "Laplace-fixed-context": {
+        "aggregation": "per-series-equal",
+        "crps": 0.0071407812499999996,
+        "ll": 5.127982582031251,
+        "n": 256,
+        "series": 4
+      },
+      "Laplace-gmm-body": {
+        "aggregation": "per-series-equal",
+        "crps": 0.00717343359375,
+        "ll": 5.09751894921875,
+        "n": 256,
+        "series": 4
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "aggregation": "per-series-equal",
+        "crps": 0.0071824921875,
+        "ll": 4.743513125,
+        "n": 256,
+        "series": 4
+      },
+      "TimesFM-laplace-qd": {
+        "aggregation": "per-series-equal",
+        "crps": 0.007389292968750001,
+        "ll": 3.38312047265625,
+        "n": 256,
+        "series": 4
+      },
+      "TimesFM-zero-shot": {
+        "aggregation": "per-series-equal",
+        "crps": 0.007362515625000001,
+        "ll": 3.5463460234375,
+        "n": 256,
+        "series": 4
+      },
+      "laplace": {
+        "aggregation": "per-series-equal",
+        "crps": 0.0071541796875,
+        "ll": 5.138262671874999,
+        "n": 256,
+        "series": 4
+      }
+    },
+    "fred-price-return": {
+      "Laplace-fixed-context": {
+        "aggregation": "per-series-equal",
+        "crps": 0.5164293984374998,
+        "ll": 1.6919202929687502,
+        "n": 256,
+        "series": 4
+      },
+      "Laplace-gmm-body": {
+        "aggregation": "per-series-equal",
+        "crps": 0.51120917578125,
+        "ll": 1.74174139453125,
+        "n": 256,
+        "series": 4
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "aggregation": "per-series-equal",
+        "crps": 0.5124504492187499,
+        "ll": 1.6994269218749998,
+        "n": 256,
+        "series": 4
+      },
+      "TimesFM-laplace-qd": {
+        "aggregation": "per-series-equal",
+        "crps": 0.5269489726562501,
+        "ll": 1.24728877734375,
+        "n": 256,
+        "series": 4
+      },
+      "TimesFM-zero-shot": {
+        "aggregation": "per-series-equal",
+        "crps": 0.53140209765625,
+        "ll": 1.2070513007812498,
+        "n": 256,
+        "series": 4
+      },
+      "laplace": {
+        "aggregation": "per-series-equal",
+        "crps": 0.5148809609375,
+        "ll": 1.7947914062499999,
+        "n": 256,
+        "series": 4
+      }
+    },
+    "garch-returns": {
+      "Laplace-fixed-context": {
+        "aggregation": "per-series-equal",
+        "crps": 0.76496653125,
+        "ll": -1.761696484375,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-gmm-body": {
+        "aggregation": "per-series-equal",
+        "crps": 0.766176125,
+        "ll": -1.7555992968750003,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "aggregation": "per-series-equal",
+        "crps": 0.76616396875,
+        "ll": -1.7541629531249998,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-laplace-qd": {
+        "aggregation": "per-series-equal",
+        "crps": 0.81765571875,
+        "ll": -2.1232511718750002,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-zero-shot": {
+        "aggregation": "per-series-equal",
+        "crps": 0.8082060625,
+        "ll": -2.08068446875,
+        "n": 64,
+        "series": 1
+      },
+      "laplace": {
+        "aggregation": "per-series-equal",
+        "crps": 0.76669265625,
+        "ll": -1.7593631875,
+        "n": 64,
+        "series": 1
+      }
+    },
+    "m4-hourly": {
+      "Laplace-fixed-context": {
+        "aggregation": "per-series-equal",
+        "crps": 0.007300453125000001,
+        "ll": 2.942640828125,
+        "n": 192,
+        "series": 3
+      },
+      "Laplace-gmm-body": {
+        "aggregation": "per-series-equal",
+        "crps": 0.007217130208333333,
+        "ll": 2.9533244010416673,
+        "n": 192,
+        "series": 3
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "aggregation": "per-series-equal",
+        "crps": 0.007218171875000001,
+        "ll": 2.9695084375,
+        "n": 192,
+        "series": 3
+      },
+      "TimesFM-laplace-qd": {
+        "aggregation": "per-series-equal",
+        "crps": 0.006747515625,
+        "ll": 2.6640989270833333,
+        "n": 192,
+        "series": 3
+      },
+      "TimesFM-zero-shot": {
+        "aggregation": "per-series-equal",
+        "crps": 0.0054471197916666665,
+        "ll": 2.9308350052083334,
+        "n": 192,
+        "series": 3
+      },
+      "laplace": {
+        "aggregation": "per-series-equal",
+        "crps": 0.007229458333333333,
+        "ll": 2.963357,
+        "n": 192,
+        "series": 3
+      }
+    },
+    "random-walk-price-change": {
+      "Laplace-fixed-context": {
+        "aggregation": "per-series-equal",
+        "crps": 0.081290859375,
+        "ll": 0.48132523437499997,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-gmm-body": {
+        "aggregation": "per-series-equal",
+        "crps": 0.081602828125,
+        "ll": 0.47760871875,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "aggregation": "per-series-equal",
+        "crps": 0.08150774999999999,
+        "ll": 0.47667978125,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-laplace-qd": {
+        "aggregation": "per-series-equal",
+        "crps": 0.0848481875,
+        "ll": 0.11146859375,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-zero-shot": {
+        "aggregation": "per-series-equal",
+        "crps": 0.08538246875,
+        "ll": 0.15452349999999998,
+        "n": 64,
+        "series": 1
+      },
+      "laplace": {
+        "aggregation": "per-series-equal",
+        "crps": 0.081637984375,
+        "ll": 0.47467725,
+        "n": 64,
+        "series": 1
+      }
+    },
+    "seasonal-ar-economic": {
+      "Laplace-fixed-context": {
+        "aggregation": "per-series-equal",
+        "crps": 0.44476523437500004,
+        "ll": -1.1886263750000001,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-gmm-body": {
+        "aggregation": "per-series-equal",
+        "crps": 0.44409873437499997,
+        "ll": -1.188782828125,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "aggregation": "per-series-equal",
+        "crps": 0.444634,
+        "ll": -1.1983186874999998,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-laplace-qd": {
+        "aggregation": "per-series-equal",
+        "crps": 0.46059629687500003,
+        "ll": -1.84092146875,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-zero-shot": {
+        "aggregation": "per-series-equal",
+        "crps": 0.44699064062499994,
+        "ll": -1.706293890625,
+        "n": 64,
+        "series": 1
+      },
+      "laplace": {
+        "aggregation": "per-series-equal",
+        "crps": 0.44387771875,
+        "ll": -1.20924396875,
+        "n": 64,
+        "series": 1
+      }
+    },
+    "sticky-repeating": {
+      "Laplace-fixed-context": {
+        "aggregation": "per-series-equal",
+        "crps": 0.2093555625,
+        "ll": -0.46354782812500006,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-gmm-body": {
+        "aggregation": "per-series-equal",
+        "crps": 0.209046359375,
+        "ll": -0.18700537500000003,
+        "n": 64,
+        "series": 1
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "aggregation": "per-series-equal",
+        "crps": 0.2080416875,
+        "ll": -0.45751300000000017,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-laplace-qd": {
+        "aggregation": "per-series-equal",
+        "crps": 0.222296984375,
+        "ll": -0.724036484375,
+        "n": 64,
+        "series": 1
+      },
+      "TimesFM-zero-shot": {
+        "aggregation": "per-series-equal",
+        "crps": 0.22634915625000002,
+        "ll": -0.7776801093750001,
+        "n": 64,
+        "series": 1
+      },
+      "laplace": {
+        "aggregation": "per-series-equal",
+        "crps": 0.20995475,
+        "ll": -0.20979020312499994,
+        "n": 64,
+        "series": 1
+      }
+    }
+  },
+  "evaluation": {
+    "adapter_bytes": 5566182,
+    "adapter_files": [
+      "adapter_config.json",
+      "adapter_model.safetensors"
+    ],
+    "batch_size": 32,
+    "data_sha256": "f951d704d9489816ad733969a15c427ad2d27ac2f324d0281adf6a357a157ceb",
+    "device": "mps",
+    "distilled_seconds": 11.328596832987387,
+    "dtype": "torch.float32",
+    "fixed_context_laplace_seconds": 69.64181579096476,
+    "model": "google/timesfm-2.5-200m-transformers",
+    "model_revision": "5a9806b9b291fad9233b5249d88263f1846304d3",
+    "quantile_postprocessing": {
+      "native_crossing_rows": {
+        "TimesFM-laplace-qd": 960,
+        "TimesFM-zero-shot": 960
+      },
+      "raw_storage": "native q10..q90 channels before ordering repair",
+      "scoring": "row-wise PAVA isotonic projection before density reconstruction"
+    },
+    "reconstruction": {
+      "candidate_multipliers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+        1.25,
+        1.5,
+        2.0,
+        3.0
+      ],
+      "candidate_scores": {
+        "0.25": -0.33594787621153815,
+        "0.5": 0.09840919746962518,
+        "0.75": 0.3248306326668314,
+        "1": 0.4129201022110567,
+        "1.25": 0.4425185145257842,
+        "1.5": 0.45267963448209364,
+        "2": 0.4533534278319471,
+        "3": 0.4148491593866413
+      },
+      "criterion": "equal-series mean logpdf with floor -20",
+      "kind": "fixed-bandwidth Gaussian-mixture reconstruction",
+      "quantile_levels": [
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9
+      ],
+      "selected_multiplier": 2.0,
+      "selection_rows": 384,
+      "selection_series": 6,
+      "selection_split": "validation"
+    },
+    "schema": "timesfm-distill-evaluation-v2",
+    "source_tree": {
+      "files": {
+        "benchmarks/corpus.py": "d5b488d9c9e67526840aa172d8972d7e7311ad5ab62b7d0dc244d25e46281ef2",
+        "benchmarks/fred.py": "3449d4852b6cea9e490f57ece3a4872f57891b55eb0569f1215fa517caf1688a",
+        "benchmarks/fred_universe.py": "c2fc51f16ddc213028415194019b50bb8036314c2177745db88eb1dce1685ef5",
+        "benchmarks/laplace_distill.py": "c436d691f5c1e4570a846d679bdf30bf5cc45f7811fe1cee898e5312758d305e",
+        "benchmarks/predictions.py": "a77d86d5dbbfc2be2538f2bf106c9045d1f4be182652d2434b175d6968d9904a",
+        "benchmarks/timesfm_distill.py": "72e0ab67bef78ef8892e4006712b89096a3b319ac6ab2e2a9a007ad0c3958054",
+        "src/skaters/__init__.py": "04cae0aca6c3de644c775358d47ca3773372413e5d085b7d41e6e076bd59af0c",
+        "src/skaters/anomaly.py": "986a4c95137aa6eb1728235ed25f9fb4cc1440f2455e000f669f790a29081e8b",
+        "src/skaters/api.py": "32e9a2347c6e5ef2b7fff26c5369a68222922d7b74dbd4ba8e42e7fe83ca22c3",
+        "src/skaters/bayesian.py": "27f60b4d4b387b1d40469deae73e02d557b549ad1d219f96b7610da921456b47",
+        "src/skaters/conjugate.py": "df5b9baa292b5b7fc01ca96563f52a4c39826fe0c90a3967dbb8abfcd7910c18",
+        "src/skaters/conventions.py": "6820aed0631f6ce8a65c5d87218e86da8eb84602cc20cd232f2219644617753f",
+        "src/skaters/dist.py": "a40b96e34f5d96ab352c0f4a483f25176aa2f4d41b51470959cc17708b67a48b",
+        "src/skaters/ema.py": "7f04424b761fa9526ba93d11ecf8a6fbf168634d588f639f2373d6f649f08abe",
+        "src/skaters/ensemble.py": "31f90af7e37fe72df05cfe63b275e16330a22df8115f13f83083c9e7582524bd",
+        "src/skaters/leaf.py": "2a28d9477c7de0b6f7709680d44102297da00fdc59f3a191fe63f34a2fddfe4b",
+        "src/skaters/markov.py": "64ce6d985af6e17ed44bf239f159ce7114abaf45396477af70b32743ee449fcf",
+        "src/skaters/multiscale.py": "a56b399cb954d203bcd7c61773f4b6e0895b0837f7ff52c0c12cb2748a881efa",
+        "src/skaters/parade.py": "d1d9bb99a8acc15ed9d6cdbf11aea8fed8d9980479e62e3d1404f156c4b439b7",
+        "src/skaters/periodicity.py": "0c4c18b475ce6777e994c568e7f4e148bd333a071ca57b2bb414986c7104a1a3",
+        "src/skaters/pushforward.py": "54cfee9b14cdea9c172fc659115224291a6b1c8b1f41cdb922af13eeec38d968",
+        "src/skaters/runstats.py": "4be80ef91bf1a04cb243f1212d0714c68822ada95e91d01363f09897042e1d8f",
+        "src/skaters/search.py": "f6e390aa8bc47f2dc18a4019986d733c79a7250bdefde9d621ffaa4421decead",
+        "src/skaters/spec.py": "40b8ed85c47c40896e9161fedd7d8a4b726f93d116696fbf8bbde0557d83f473",
+        "src/skaters/sticky.py": "5935c723d390ad987334c7b0384f9c34e3f953ffc9592994d9358d032f01e7f4",
+        "src/skaters/tails.py": "fd3961249a3683e9563a43b0ea5028d436ccc0cfceafea0d87158483d47b35d3",
+        "src/skaters/terminal.py": "a171645157aeda0f2dc412cfb77bc37b7811ffd11f46976e00925c5e3046603e",
+        "src/skaters/transform.py": "289c2ad904c2677c044ae9f09b6180e4cd290443e60b92c9cc2b706fa249da62"
+      },
+      "sha256": "45bb7b3b7160df28551dd478af129e41ed7f6d341743961f018552a42ca48838"
+    },
+    "test_contexts": 960,
+    "zero_shot_seconds": 11.250601749983616
+  },
+  "overall": {
+    "Laplace-fixed-context": {
+      "aggregation": "per-series-equal",
+      "crps": 0.24110401770833328,
+      "ll": 2.2116659020833334,
+      "n": 960,
+      "series": 15
+    },
+    "Laplace-gmm-body": {
+      "aggregation": "per-series-equal",
+      "crps": 0.2397403916666666,
+      "ll": 2.237549053125,
+      "n": 960,
+      "series": 15
+    },
+    "Laplace-q-fixed-bandwidth": {
+      "aggregation": "per-series-equal",
+      "crps": 0.24003557916666668,
+      "ll": 2.116464709375,
+      "n": 960,
+      "series": 15
+    },
+    "TimesFM-laplace-qd": {
+      "aggregation": "per-series-equal",
+      "crps": 0.24953285312499998,
+      "ll": 1.4624795500000003,
+      "n": 960,
+      "series": 15
+    },
+    "TimesFM-zero-shot": {
+      "aggregation": "per-series-equal",
+      "crps": 0.24922187604166668,
+      "ll": 1.5597306229166665,
+      "n": 960,
+      "series": 15
+    },
+    "laplace": {
+      "aggregation": "per-series-equal",
+      "crps": 0.24079946979166672,
+      "ll": 2.2612378135416664,
+      "n": 960,
+      "series": 15
+    }
+  },
+  "paired": {
+    "fred-econ": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          -0.019899144531248414,
+          0.0030667968749999996
+        ],
+        "median_crps_ratio": 0.9981621504030063,
+        "median_dll": -0.006552257812499018
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          -0.07695476171874971,
+          0.013776523437499688
+        ],
+        "median_crps_ratio": 0.9986149993550507,
+        "median_dll": -0.022434515625000095
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          -0.45425987890624986,
+          -0.05607408203124975
+        ],
+        "median_crps_ratio": 0.9984351083673861,
+        "median_dll": -0.11558441406249975
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -2.5013901210937495,
+          -0.5059964921875001
+        ],
+        "median_crps_ratio": 1.0409150181147562,
+        "median_dll": -1.2522444140625
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -2.26082034765625,
+          -0.4680776445312499
+        ],
+        "median_crps_ratio": 1.0482510939378131,
+        "median_dll": -1.13698134375
+      }
+    },
+    "fred-price-return": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          -0.17335039453125,
+          -0.014392710937500164
+        ],
+        "median_crps_ratio": 0.9986456465970821,
+        "median_dll": -0.0848719921875003
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          -0.10975388671874997,
+          0.00634088281250067
+        ],
+        "median_crps_ratio": 0.9978078009756672,
+        "median_dll": -0.05036299218749951
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          -0.19258821093750023,
+          0.0048452890624997025
+        ],
+        "median_crps_ratio": 0.9981386706833055,
+        "median_dll": -0.0923784375000003
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -0.5806200898437504,
+          -0.4703650078124999
+        ],
+        "median_crps_ratio": 1.0239257960336128,
+        "median_dll": -0.5034824687500001
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -0.7336232343750001,
+          -0.4512299257812502
+        ],
+        "median_crps_ratio": 1.030060282914551,
+        "median_dll": -0.5971130546875001
+      }
+    },
+    "garch-returns": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          -0.002333296875000057,
+          -0.002333296875000057
+        ],
+        "median_crps_ratio": 0.9977486089296294,
+        "median_dll": -0.002333296875000057
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          0.0037638906249997106,
+          0.0037638906249997106
+        ],
+        "median_crps_ratio": 0.9993262864254805,
+        "median_dll": 0.0037638906249997106
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          0.005200234375000168,
+          0.005200234375000168
+        ],
+        "median_crps_ratio": 0.9993104309847105,
+        "median_dll": 0.005200234375000168
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -0.36388798437500025,
+          -0.36388798437500025
+        ],
+        "median_crps_ratio": 1.066471306441446,
+        "median_dll": -0.36388798437500025
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -0.3213212812499999,
+          -0.3213212812499999
+        ],
+        "median_crps_ratio": 1.0541460856727751,
+        "median_dll": -0.3213212812499999
+      }
+    },
+    "m4-hourly": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          -0.03784304687499995,
+          -0.0016715234374999888
+        ],
+        "median_crps_ratio": 1.0124077239795548,
+        "median_dll": -0.016880625000000204
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          -0.020906999999999787,
+          0.010352273437500337
+        ],
+        "median_crps_ratio": 0.9965438635193765,
+        "median_dll": 0.00898834375000046
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          0.0034710156250001845,
+          0.00897831250000003
+        ],
+        "median_crps_ratio": 0.9964917763561046,
+        "median_dll": 0.006444343750000137
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -0.48259810937500003,
+          -0.02882005468749993
+        ],
+        "median_crps_ratio": 0.8933101698654313,
+        "median_dll": -0.12506210937499995
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -0.18094865625,
+          0.1402579218750002
+        ],
+        "median_crps_ratio": 0.789135843321813,
+        "median_dll": 0.016184515625000007
+      }
+    },
+    "overall": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          -0.05061389062499955,
+          0.002967445312500011
+        ],
+        "median_crps_ratio": 0.9985589047676237,
+        "median_dll": -0.012391421874998088
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          -0.05404119531249996,
+          0.015142031249999688
+        ],
+        "median_crps_ratio": 0.9980247385566255,
+        "median_dll": 0.0037638906249997106
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          -0.1754106953125001,
+          0.005822289062500152
+        ],
+        "median_crps_ratio": 0.9984047330908884,
+        "median_dll": 0.0004976875000002323
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -0.6895578828125,
+          -0.3997476484375002
+        ],
+        "median_crps_ratio": 1.037664828439871,
+        "median_dll": -0.51424628125
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -0.6358841015625001,
+          -0.32073751562499997
+        ],
+        "median_crps_ratio": 1.032120599536927,
+        "median_dll": -0.49034781250000015
+      }
+    },
+    "random-walk-price-change": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          0.006647984374999971,
+          0.006647984374999971
+        ],
+        "median_crps_ratio": 0.9957479964423729,
+        "median_dll": 0.006647984374999971
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          0.002931468749999999,
+          0.002931468749999999
+        ],
+        "median_crps_ratio": 0.9995693640617276,
+        "median_dll": 0.002931468749999999
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          0.0020025312499999948,
+          0.0020025312499999948
+        ],
+        "median_crps_ratio": 0.9984047330908884,
+        "median_dll": 0.0020025312499999948
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -0.36320865625,
+          -0.36320865625
+        ],
+        "median_crps_ratio": 1.0393224201892846,
+        "median_dll": -0.36320865625
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -0.32015375,
+          -0.32015375
+        ],
+        "median_crps_ratio": 1.0458669380885237,
+        "median_dll": -0.32015375
+      }
+    },
+    "seasonal-ar-economic": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          0.02061759374999994,
+          0.02061759374999994
+        ],
+        "median_crps_ratio": 1.001999459732963,
+        "median_dll": 0.02061759374999994
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          0.02046114062500015,
+          0.02046114062500015
+        ],
+        "median_crps_ratio": 1.0004979200704698,
+        "median_dll": 0.02046114062500015
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          0.010925281250000252,
+          0.010925281250000252
+        ],
+        "median_crps_ratio": 1.0017038053906597,
+        "median_dll": 0.010925281250000252
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -0.6316774999999999,
+          -0.6316774999999999
+        ],
+        "median_crps_ratio": 1.037664828439871,
+        "median_dll": -0.6316774999999999
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -0.49704992187499997,
+          -0.49704992187499997
+        ],
+        "median_crps_ratio": 1.0070130167465179,
+        "median_dll": -0.49704992187499997
+      }
+    },
+    "sticky-repeating": {
+      "Laplace-fixed-context": {
+        "dll_quartiles": [
+          -0.2537576250000001,
+          -0.2537576250000001
+        ],
+        "median_crps_ratio": 0.9971461112453993,
+        "median_dll": -0.2537576250000001
+      },
+      "Laplace-gmm-body": {
+        "dll_quartiles": [
+          0.022784828124999906,
+          0.022784828124999906
+        ],
+        "median_crps_ratio": 0.9956733980774428,
+        "median_dll": 0.022784828124999906
+      },
+      "Laplace-q-fixed-bandwidth": {
+        "dll_quartiles": [
+          -0.24772279687500023,
+          -0.24772279687500023
+        ],
+        "median_crps_ratio": 0.9908882151987511,
+        "median_dll": -0.24772279687500023
+      },
+      "TimesFM-laplace-qd": {
+        "dll_quartiles": [
+          -0.51424628125,
+          -0.51424628125
+        ],
+        "median_crps_ratio": 1.0587852114562781,
+        "median_dll": -0.51424628125
+      },
+      "TimesFM-zero-shot": {
+        "dll_quartiles": [
+          -0.5678899062500001,
+          -0.5678899062500001
+        ],
+        "median_crps_ratio": 1.078085426740762,
+        "median_dll": -0.5678899062500001
+      }
+    }
+  },
+  "pairwise": {
+    "Laplace-fixed-context_vs_Laplace-gmm-body": {
+      "crps": {
+        "Laplace-fixed-context": 6,
+        "Laplace-gmm-body": 9,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-fixed-context": 0,
+        "Laplace-gmm-body": 1,
+        "draw": 14
+      },
+      "effect": {
+        "a": "Laplace-fixed-context",
+        "b": "Laplace-gmm-body",
+        "median_crps_ratio_a_over_b": 1.001422290435746,
+        "median_dll_a_minus_b": -0.006097187499999768
+      },
+      "ll": {
+        "Laplace-fixed-context": 5,
+        "Laplace-gmm-body": 10,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-fixed-context_vs_Laplace-q-fixed-bandwidth": {
+      "crps": {
+        "Laplace-fixed-context": 6,
+        "Laplace-q-fixed-bandwidth": 9,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-fixed-context": 1,
+        "Laplace-q-fixed-bandwidth": 0,
+        "draw": 14
+      },
+      "effect": {
+        "a": "Laplace-fixed-context",
+        "b": "Laplace-q-fixed-bandwidth",
+        "median_crps_ratio_a_over_b": 1.001795119698697,
+        "median_dll_a_minus_b": 0.002025296875000304
+      },
+      "ll": {
+        "Laplace-fixed-context": 8,
+        "Laplace-q-fixed-bandwidth": 7,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-fixed-context_vs_TimesFM-laplace-qd": {
+      "crps": {
+        "Laplace-fixed-context": 12,
+        "TimesFM-laplace-qd": 3,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-fixed-context": 12,
+        "TimesFM-laplace-qd": 0,
+        "draw": 3
+      },
+      "effect": {
+        "a": "Laplace-fixed-context",
+        "b": "TimesFM-laplace-qd",
+        "median_crps_ratio_a_over_b": 0.9656292015211396,
+        "median_dll_a_minus_b": 0.48875467187499977
+      },
+      "ll": {
+        "Laplace-fixed-context": 14,
+        "TimesFM-laplace-qd": 1,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-fixed-context_vs_TimesFM-zero-shot": {
+      "crps": {
+        "Laplace-fixed-context": 12,
+        "TimesFM-zero-shot": 3,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-fixed-context": 12,
+        "TimesFM-zero-shot": 0,
+        "draw": 3
+      },
+      "effect": {
+        "a": "Laplace-fixed-context",
+        "b": "TimesFM-zero-shot",
+        "median_crps_ratio_a_over_b": 0.970271660105685,
+        "median_dll_a_minus_b": 0.33043446875000093
+      },
+      "ll": {
+        "Laplace-fixed-context": 13,
+        "TimesFM-zero-shot": 2,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-gmm-body_vs_Laplace-q-fixed-bandwidth": {
+      "crps": {
+        "Laplace-gmm-body": 7,
+        "Laplace-q-fixed-bandwidth": 8,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-gmm-body": 1,
+        "Laplace-q-fixed-bandwidth": 1,
+        "draw": 13
+      },
+      "effect": {
+        "a": "Laplace-gmm-body",
+        "b": "Laplace-q-fixed-bandwidth",
+        "median_crps_ratio_a_over_b": 1.0000158663817351,
+        "median_dll_a_minus_b": 0.004860937500000162
+      },
+      "ll": {
+        "Laplace-gmm-body": 12,
+        "Laplace-q-fixed-bandwidth": 3,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-gmm-body_vs_TimesFM-laplace-qd": {
+      "crps": {
+        "Laplace-gmm-body": 13,
+        "TimesFM-laplace-qd": 2,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-gmm-body": 14,
+        "TimesFM-laplace-qd": 0,
+        "draw": 1
+      },
+      "effect": {
+        "a": "Laplace-gmm-body",
+        "b": "TimesFM-laplace-qd",
+        "median_crps_ratio_a_over_b": 0.9641821642685128,
+        "median_dll_a_minus_b": 0.5289569374999998
+      },
+      "ll": {
+        "Laplace-gmm-body": 14,
+        "TimesFM-laplace-qd": 1,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-gmm-body_vs_TimesFM-zero-shot": {
+      "crps": {
+        "Laplace-gmm-body": 12,
+        "TimesFM-zero-shot": 3,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-gmm-body": 12,
+        "TimesFM-zero-shot": 0,
+        "draw": 3
+      },
+      "effect": {
+        "a": "Laplace-gmm-body",
+        "b": "TimesFM-zero-shot",
+        "median_crps_ratio_a_over_b": 0.9618636311865816,
+        "median_dll_a_minus_b": 0.36077106250000013
+      },
+      "ll": {
+        "Laplace-gmm-body": 13,
+        "TimesFM-zero-shot": 2,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-q-fixed-bandwidth_vs_TimesFM-laplace-qd": {
+      "crps": {
+        "Laplace-q-fixed-bandwidth": 13,
+        "TimesFM-laplace-qd": 2,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-q-fixed-bandwidth": 14,
+        "TimesFM-laplace-qd": 0,
+        "draw": 1
+      },
+      "effect": {
+        "a": "Laplace-q-fixed-bandwidth",
+        "b": "TimesFM-laplace-qd",
+        "median_crps_ratio_a_over_b": 0.9642661945267695,
+        "median_dll_a_minus_b": 0.4515042187499998
+      },
+      "ll": {
+        "Laplace-q-fixed-bandwidth": 14,
+        "TimesFM-laplace-qd": 1,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "Laplace-q-fixed-bandwidth_vs_TimesFM-zero-shot": {
+      "crps": {
+        "Laplace-q-fixed-bandwidth": 12,
+        "TimesFM-zero-shot": 3,
+        "draw": 0
+      },
+      "dm": {
+        "Laplace-q-fixed-bandwidth": 12,
+        "TimesFM-zero-shot": 0,
+        "draw": 3
+      },
+      "effect": {
+        "a": "Laplace-q-fixed-bandwidth",
+        "b": "TimesFM-zero-shot",
+        "median_crps_ratio_a_over_b": 0.9642167148170515,
+        "median_dll_a_minus_b": 0.335922734375
+      },
+      "ll": {
+        "Laplace-q-fixed-bandwidth": 13,
+        "TimesFM-zero-shot": 2,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "TimesFM-zero-shot_vs_TimesFM-laplace-qd": {
+      "crps": {
+        "TimesFM-laplace-qd": 6,
+        "TimesFM-zero-shot": 9,
+        "draw": 0
+      },
+      "dm": {
+        "TimesFM-laplace-qd": 1,
+        "TimesFM-zero-shot": 5,
+        "draw": 9
+      },
+      "effect": {
+        "a": "TimesFM-zero-shot",
+        "b": "TimesFM-laplace-qd",
+        "median_crps_ratio_a_over_b": 0.997594197771095,
+        "median_dll_a_minus_b": 0.13462757812499992
+      },
+      "ll": {
+        "TimesFM-laplace-qd": 4,
+        "TimesFM-zero-shot": 11,
+        "draw": 0
+      },
+      "n": 15
+    },
+    "laplace_vs_Laplace-fixed-context": {
+      "crps": {
+        "Laplace-fixed-context": 8,
+        "draw": 0,
+        "laplace": 7
+      },
+      "dm": {
+        "Laplace-fixed-context": 0,
+        "draw": 14,
+        "laplace": 1
+      },
+      "effect": {
+        "a": "laplace",
+        "b": "Laplace-fixed-context",
+        "median_crps_ratio_a_over_b": 1.0014431749849666,
+        "median_dll_a_minus_b": 0.012391421874998088
+      },
+      "ll": {
+        "Laplace-fixed-context": 4,
+        "draw": 0,
+        "laplace": 11
+      },
+      "n": 15
+    },
+    "laplace_vs_Laplace-gmm-body": {
+      "crps": {
+        "Laplace-gmm-body": 12,
+        "draw": 0,
+        "laplace": 3
+      },
+      "dm": {
+        "Laplace-gmm-body": 5,
+        "draw": 10,
+        "laplace": 0
+      },
+      "effect": {
+        "a": "laplace",
+        "b": "Laplace-gmm-body",
+        "median_crps_ratio_a_over_b": 1.0019791708231913,
+        "median_dll_a_minus_b": -0.0037638906249997106
+      },
+      "ll": {
+        "Laplace-gmm-body": 10,
+        "draw": 0,
+        "laplace": 5
+      },
+      "n": 15
+    },
+    "laplace_vs_Laplace-q-fixed-bandwidth": {
+      "crps": {
+        "Laplace-q-fixed-bandwidth": 12,
+        "draw": 0,
+        "laplace": 3
+      },
+      "dm": {
+        "Laplace-q-fixed-bandwidth": 0,
+        "draw": 14,
+        "laplace": 1
+      },
+      "effect": {
+        "a": "laplace",
+        "b": "Laplace-q-fixed-bandwidth",
+        "median_crps_ratio_a_over_b": 1.001597815851867,
+        "median_dll_a_minus_b": -0.0004976875000002323
+      },
+      "ll": {
+        "Laplace-q-fixed-bandwidth": 8,
+        "draw": 0,
+        "laplace": 7
+      },
+      "n": 15
+    },
+    "laplace_vs_TimesFM-laplace-qd": {
+      "crps": {
+        "TimesFM-laplace-qd": 2,
+        "draw": 0,
+        "laplace": 13
+      },
+      "dm": {
+        "TimesFM-laplace-qd": 0,
+        "draw": 2,
+        "laplace": 13
+      },
+      "effect": {
+        "a": "laplace",
+        "b": "TimesFM-laplace-qd",
+        "median_crps_ratio_a_over_b": 0.96370231754265,
+        "median_dll_a_minus_b": 0.51424628125
+      },
+      "ll": {
+        "TimesFM-laplace-qd": 1,
+        "draw": 0,
+        "laplace": 14
+      },
+      "n": 15
+    },
+    "laplace_vs_TimesFM-zero-shot": {
+      "crps": {
+        "TimesFM-zero-shot": 3,
+        "draw": 0,
+        "laplace": 12
+      },
+      "dm": {
+        "TimesFM-zero-shot": 0,
+        "draw": 3,
+        "laplace": 12
+      },
+      "effect": {
+        "a": "laplace",
+        "b": "TimesFM-zero-shot",
+        "median_crps_ratio_a_over_b": 0.9688790248432808,
+        "median_dll_a_minus_b": 0.49034781250000015
+      },
+      "ll": {
+        "TimesFM-zero-shot": 2,
+        "draw": 0,
+        "laplace": 13
+      },
+      "n": 15
+    }
+  },
+  "persistence": {
+    "canonical_precision": "six decimal places",
+    "canonical_scores": "predictions_issue133_context256.csv",
+    "raw_quantile_precision": "17 significant digits",
+    "raw_quantile_semantics": "native q10..q90 channels before ordering repair",
+    "raw_quantiles": "raw_quantiles_issue133_context256.csv",
+    "score_source": "canonical persisted CSV",
+    "scoring_quantile_semantics": "row-wise PAVA isotonic projection before density reconstruction"
+  }
+}

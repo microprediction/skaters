@@ -38,6 +38,7 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
@@ -135,16 +136,28 @@
 
     <h2>Featured bouts</h2>
     <p>
-      The above caveats notwithstanding, Laplace does seem to outperform as
-      a practical generalist model: fast, light, and with no dependencies.
+      Laplace also outperforms as a practical generalist model: fast, light,
+      and with no dependencies.
     </p>
     <div class="card-grid">
       <div class="card">
-        <h3>TimesFM &mdash; David v Goliath</h3>
+        <h3>TimesFM &mdash; zero-shot and corrected distillation</h3>
         <p>Google&rsquo;s 200M-parameter foundation model: 69 of 69
-          continuous series on likelihood, a 2.26-nat median gap, and
-          where Goliath actually wins (predicting zeros).
-          <a href="/timesfm.html">The bout &rarr;</a></p>
+          continuous series lost on zero-shot likelihood. A corrected,
+          series-disjoint Laplace q-grid LoRA then lost &minus;0.155385 median
+          dLL to its zero-shot base and won 0/15 series by likelihood. The
+          earlier positive pilot used the wrong output channels and is invalid.
+          <a href="/timesfm.html">Both bouts &rarr;</a></p>
+      </div>
+
+      <div class="card">
+        <h3>TiRex-2 &mdash; frozen M4-hourly panel</h3>
+        <p>NX-AI&rsquo;s public q10&ndash;q90 checkpoint beat matched-context
+          Laplace by +0.195903 median dLL on 22/24 series in a small,
+          frozen-source benchmark. Pretraining overlap is unresolved, and the
+          issue&rsquo;s &ldquo;Table-R1&rdquo; and &ldquo;TwbFB&rdquo; remain
+          unidentified.
+          <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/ISSUE138.md">The result &rarr;</a></p>
       </div>
       <div class="card">
         <h3>TabFM &mdash; David v Godzilla</h3>

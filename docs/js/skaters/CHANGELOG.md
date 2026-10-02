@@ -5,6 +5,39 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## Unreleased
+
+State round-trips through JSON bit-exactly — a skater is a fold. New exports
+`stateToJSON(state)`, `stateFromJSON(obj)` and `assertPlainState(state)`
+(`state.mjs`): the first turns every `Dist` (and the GPD-spliced predictive)
+into its `toDict()` form and throws, naming the path, on anything JSON would
+silently damage (a function, `Map`, `Set`, typed array, foreign class,
+`undefined`, or non-finite number); the second rebuilds the `Dist`s without
+renormalising. `Dist.fromDict` now goes through `Dist.trusted`, a constructor path that
+keeps weights that already sum to one bit-for-bit (the old path divided by a
+total that was one only up to rounding and moved the last bit on a fraction of
+mixtures). Two skaters held non-plain state and are fixed: `sticky` kept its
+frequency table in a `Map` (now an array of `[value, weight]` pairs in
+first-seen order, so the tie-break still matches Python's dict), and `search`
+kept the pool's skater closures in state (now rebuilt from each entry's
+recipe by the wrapper). A new release gate, `parity/roundtrip.mjs`, checkpoints
+every exported skater every 100 steps over a 620-step series, restores it
+through `JSON.parse(JSON.stringify(...))`, and requires the restored copy to
+match the original byte-for-byte in both predictives and state for the next
+25 steps, plus a cold-start check: a fresh process that imports `state.mjs`
+and nothing else must still decode a spliced dist. The spliced decoder is now
+registered by a named `registerSplicedDist()` call rather than a bare
+`import "./tails.mjs"`, which a bundler drops because the package declares
+`sideEffects: false` (esbuild reports `ignored-bare-import`); a consumer that
+only rehydrates checkpoints, never running a skater, previously got a bundle
+with no spliced support and every restore threw. The gate also fails on any
+bare side-effect import the package does not declare. Removed a duplicate
+`get length()` in `dist.mjs`, where the second definition silently won.
+The parity checker also runs every scenario a second time across
+a JSON restore at the burn-in step, against vectors the Python generator
+produced across a pickle restore. Numerics are unchanged: parity is
+byte-identical.
+
 ## 0.13.0
 
 GPD tails by default — the conditional tail fit. Every `laplace` predictive now

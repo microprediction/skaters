@@ -22,8 +22,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Install test deps
-        run: pip install pytest
+      - name: Install test deps (NumPy exercises optional benchmark helpers)
+        run: pip install pytest numpy
       - name: Run tests (incl. JS parity — node is present so it must not skip)
         env:
           PYTHONPATH: src

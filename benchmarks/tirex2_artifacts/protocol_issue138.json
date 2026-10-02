@@ -1,0 +1,103 @@
+{
+  "amendments": [
+    {
+      "amended_at_utc": "2026-07-28T18:24:14Z",
+      "description": "Added the already executed CPU device and batch size so the runner can reject protocol/runtime mismatches. No model, data, split, density, metric, or result choice changed.",
+      "kind": "reproducibility enforcement"
+    }
+  ],
+  "comparators": {
+    "Laplace-fixed-context": "Fresh Laplace state per origin, updated with exactly the same preceding 128 changes.",
+    "TiRex-2": "Native q10..q90 from exactly the preceding 128 changes.",
+    "laplace": "Causal online Laplace using up to the retained 1000-change history; reported separately because information differs."
+  },
+  "context_length": 128,
+  "covariates": "none",
+  "density_reconstruction": {
+    "candidate_spacing_multipliers": [
+      0.25,
+      0.5,
+      0.75,
+      1.0,
+      1.25,
+      1.5,
+      2.0,
+      3.0
+    ],
+    "kind": "fixed-bandwidth Gaussian-mixture reconstruction from ordered q10..q90",
+    "selection": "One global multiplier maximizing equal-series validation mean logpdf with a -20 floor; freeze it before test scoring.",
+    "tail_semantics": "No explicit tail law is supplied by TiRex-2. The reconstructed density is an evaluation convention, not a native TiRex-2 likelihood."
+  },
+  "frozen_at_utc": "2026-07-28T17:10:30Z",
+  "horizon": 1,
+  "identifiers": {
+    "Table-R1": "unresolved from Issue 138 and public source searches as of 2026-07-28",
+    "TwbFB": "unresolved from Issue 138 and public source searches as of 2026-07-28"
+  },
+  "limitations": [
+    "This is a 24-series, 64-origin-per-series M4-hourly panel, not a population-wide benchmark.",
+    "Pretraining overlap is unresolved; the TiRex-2 model card lists broad public time-series corpora, so this is not evidence of contamination-free generalization.",
+    "Only one-step univariate forecasts without covariates are evaluated.",
+    "TiRex-2 provides nine central quantiles rather than a native likelihood or explicit tails; density metrics depend on the validation-frozen reconstruction.",
+    "The full-history Laplace comparator receives more history than TiRex-2 and is not an equal-information comparison.",
+    "Table-R1 and TwbFB remain unidentified; this benchmark does not claim to reproduce either one.",
+    "The protocol is registered in-repository rather than in an independent timestamped registry, and two H1 execution smokes preceded it."
+  ],
+  "max_history": 1000,
+  "metrics": {
+    "aggregation": "Equal-series means for overall logpdf, CRPS, and coverage; paired per-series medians and means for effect summaries.",
+    "canonical": [
+      "per-step floored logpdf",
+      "per-step CRPS",
+      "central 90 percent coverage",
+      "per-series Diebold-Mariano win/draw/loss"
+    ],
+    "quantile_preserving": [
+      "mean pinball loss overall",
+      "mean pinball loss by q10..q90"
+    ]
+  },
+  "model": "NX-AI/TiRex-2",
+  "model_revision": "05e5b26db52bfb256f1ae1bdf785589850482de3",
+  "primary_comparison": "TiRex-2 versus Laplace-fixed-context",
+  "quantile_levels": [
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9
+  ],
+  "question": "How does the public TiRex-2 checkpoint perform against causal Laplace forecasts on a small frozen M4-hourly panel under a matched one-step protocol?",
+  "related_issue": 138,
+  "runtime": {
+    "batch_size": 128,
+    "device": "cpu"
+  },
+  "schema": "tirex2-issue138-v1",
+  "secondary_comparison": "TiRex-2 versus full-history online laplace",
+  "series": 24,
+  "source": {
+    "bytes": 2347115,
+    "name": "M4 hourly training source",
+    "preprocessing": "Use at most the final 1000 changes per series. Strictly positive levels become log differences; otherwise first differences, matching benchmarks/corpus.py.",
+    "selection": "First 24 qualifying rows in source order after the repository's causal level-to-change transform.",
+    "sha256": "ea59b7783573c49077a835ab6465c7d66f1474783360f310988a9a737fbca62f",
+    "url": "https://raw.githubusercontent.com/Mcompetitions/M4-methods/master/Dataset/Train/Hourly-train.csv"
+  },
+  "splits": {
+    "target_exclusion": "Each model input ends immediately before the realized target.",
+    "test": "final 64 origins, not used for density selection",
+    "validation": "64 origins immediately before the test window"
+  },
+  "status": "Protocol fixed before the full 24-series benchmark. Two adapter smokes on H1 (2 and 128 final origins) preceded this file and were used only to verify execution and throughput; their scores were not used to choose protocol settings.",
+  "test_length": 64,
+  "test_time_augmentation": {
+    "tta_diff": false,
+    "tta_sign_flip": false
+  },
+  "validation_length": 64
+}

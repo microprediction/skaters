@@ -8,6 +8,7 @@ import { buildScenarios, buildRepeatScenarios, buildGapScenarios } from "./scena
 import { periodDetector } from "../docs/js/skaters/periodicity.mjs";
 import { buildCandidates } from "../docs/js/skaters/api.mjs";
 import { runningCov, emaCov, ledoitWolfCov } from "../docs/js/skaters/cov.mjs";
+import { stateToJSON, stateFromJSON } from "../docs/js/skaters/state.mjs";
 
 const ATOL = 1e-6;
 const RTOL = 1e-6;
@@ -30,12 +31,17 @@ function probeDist(d, probe, qLo, qHi) {
   return [d.mean, d.std, d.logpdf(probe), d.cdf(probe), d.quantile(qLo), d.quantile(qHi), d.crps(probe)];
 }
 
-function runScenario(skater, series, burn, probe, qLo, qHi) {
+// Serialise, deserialise, continue: with `restoreAt` set, the state is taken
+// through JSON at that step and the run continues from the restored copy. The
+// Python generator does the same through pickle on its side, so every parity
+// scenario is checked both straight through and across a restore.
+function runScenario(skater, series, burn, probe, qLo, qHi, restoreAt = -1) {
   let state = null;
   const out = [];
   for (let i = 0; i < series.length; i++) {
     const [dists, st] = skater(series[i], state);
     state = st;
+    if (i === restoreAt) state = stateFromJSON(JSON.parse(JSON.stringify(stateToJSON(state))));
     if (i >= burn) out.push(dists.map((d) => probeDist(d, probe, qLo, qHi)));
   }
   return out;
@@ -57,30 +63,32 @@ function main() {
       missing.push(name);
       continue;
     }
-    const got = runScenario(sc.skater, series, burn, probe, qLo, qHi);
     const expOut = expected.out;
-    let scenarioFails = 0;
-    for (let step = 0; step < expOut.length; step++) {
-      for (let h = 0; h < expOut[step].length; h++) {
-        for (let j = 0; j < 7; j++) {
-          checked++;
-          if (!close(got[step][h][j], expOut[step][h][j])) {
-            scenarioFails++;
-            if (scenarioFails <= 3) {
-              console.error(
-                `  MISMATCH ${name} step=${step + burn} h=${h} ${LABELS[j]}: ` +
-                  `js=${got[step][h][j]} py=${decode(expOut[step][h][j])}`
-              );
+    for (const [label, restoreAt] of [[name, -1], [`${name} (restored@${burn - 1})`, burn - 1]]) {
+      const got = runScenario(sc.skater, series, burn, probe, qLo, qHi, restoreAt);
+      let scenarioFails = 0;
+      for (let step = 0; step < expOut.length; step++) {
+        for (let h = 0; h < expOut[step].length; h++) {
+          for (let j = 0; j < 7; j++) {
+            checked++;
+            if (!close(got[step][h][j], expOut[step][h][j])) {
+              scenarioFails++;
+              if (scenarioFails <= 3) {
+                console.error(
+                  `  MISMATCH ${label} step=${step + burn} h=${h} ${LABELS[j]}: ` +
+                    `js=${got[step][h][j]} py=${decode(expOut[step][h][j])}`
+                );
+              }
             }
           }
         }
       }
-    }
-    if (scenarioFails > 0) {
-      failures += scenarioFails;
-      console.error(`FAIL ${name}: ${scenarioFails} mismatches`);
-    } else {
-      console.log(`ok   ${name}`);
+      if (scenarioFails > 0) {
+        failures += scenarioFails;
+        console.error(`FAIL ${label}: ${scenarioFails} mismatches`);
+      } else {
+        console.log(`ok   ${label}`);
+      }
     }
   }
 
@@ -91,7 +99,7 @@ function main() {
     for (const [name, expected] of Object.entries(vectors.repeat_scenarios)) {
       const sk = repScen.get(name);
       if (!sk) { missing.push(name); continue; }
-      const got = runScenario(sk, rep, burn, probe, qLo, qHi);
+      const got = runScenario(sk, rep, burn, probe, qLo, qHi, burn - 1);   // across a restore
       let f = 0;
       for (let step = 0; step < expected.out.length; step++) {
         for (let h = 0; h < expected.out[step].length; h++) {
@@ -117,7 +125,7 @@ function main() {
     for (const [name, expected] of Object.entries(vectors.gap_scenarios)) {
       const sk = gapScen.get(name);
       if (!sk) { missing.push(`gap:${name}`); continue; }
-      const got = runScenario(sk, gaps, burn, probe, qLo, qHi);
+      const got = runScenario(sk, gaps, burn, probe, qLo, qHi, burn - 1);   // across a restore
       let f = 0;
       for (let step = 0; step < expected.out.length; step++) {
         for (let h = 0; h < expected.out[step].length; h++) {

@@ -44,6 +44,7 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
@@ -94,7 +95,9 @@
       Zero-dependency ES modules covering the whole library. Runs in the
       browser (the <a href="/demos/">demos</a> are this build) and in Node;
       parity is enforced at 105,000+ values on every test run, alongside
-      adversarial release gates shared with Python.
+      adversarial release gates shared with Python and a state round-trip
+      gate: every exported skater is checkpointed through JSON and must
+      resume bit-exactly (<code>stateToJSON</code>, <code>stateFromJSON</code>).
     </p>
 
     <h2>R</h2>
