@@ -500,7 +500,9 @@ def npts_dists(ch, h=1):
             fc = pred.predict_time_series(ts, num_samples=500)
         except Exception:                              # noqa: BLE001
             return None
-        samp = _np.asarray(fc.samples, float).reshape(h, -1)[h - 1]
+        # fc.samples is (num_samples, prediction_length): take horizon h-1 across
+        # all sample paths. (The former reshape(h, -1)[h-1] mixed paths for h > 1.)
+        samp = _np.asarray(fc.samples, float)[:, h - 1]
         out.append(fs.sample_dist(samp))
     return out
 

@@ -29,5 +29,9 @@ for r in $(seq 13 $((13 + N_CPU - 1))); do
 done
 
 echo "[fleet] launched ${#pids[@]} workers (1 mps + $N_CPU cpu), pids: ${pids[*]}"
-wait
-echo "[fleet] all workers exited"
+status=0
+for pid in "${pids[@]}"; do
+  wait "$pid" || { echo "[fleet] worker $pid failed" >&2; status=1; }
+done
+if [ $status -eq 0 ]; then echo "[fleet] all workers exited"; fi
+exit $status

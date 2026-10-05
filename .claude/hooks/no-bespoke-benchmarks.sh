@@ -23,7 +23,7 @@ case "$(basename "${lead:-x}")" in
 esac
 
 # Only ever interested in commands that actually run python.
-printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_/])(python3?|[A-Za-z0-9_./-]*/bin/python3?)([[:space:]]|$)' || exit 0
+printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_/])(python3?(\.[0-9]+)?|[A-Za-z0-9_./-]*/bin/python3?(\.[0-9]+)?)([[:space:]]|$)' || exit 0
 
 # Sanctioned entry points: the pipeline, and the paper's own constant scripts.
 if printf '%s' "$cmd" | grep -qE 'benchmarks/(run_arm|study|summarize_canonical|horserace_summary|bench|foundation_study|nozzle_study|refresh_figures)\.py|papers/[A-Za-z0-9_-]+/(constants|verify_paper)\.py|-m[[:space:]]+pytest|tests/'; then
