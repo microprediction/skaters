@@ -198,3 +198,20 @@ def test_name():
         [ema(alpha=0.1, k=1), ema(alpha=0.2, k=1)], k=1
     )
     assert "n=2" in f.__name__
+
+
+def test_perfect_forecaster_gets_maximum_not_minimum_weight():
+    """skaters#220: a mature mse == 0.0 is a real, perfect precision -- not
+    the same as an immature/unresolved (inf) mse -- and must not be floored."""
+    def constant(mu):
+        def f(y, state):
+            return [Dist.gaussian(mu, 1.0)], state
+        return f
+
+    f = precision_weighted_ensemble([constant(0.0), constant(1.0)])
+    state = None
+    for _ in range(5):
+        dists, state = f(0.0, state)
+    w_perfect, w_bad = (w for w, _, _ in dists[0].components)
+    assert w_perfect > w_bad
+    assert w_perfect > 0.99

@@ -1,0 +1,544 @@
+\documentclass[article]{jss}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{natbib}
+
+%% Fallbacks so the paper also builds against a minimal jss.cls.
+\providecommand{\proglang}[1]{\textsf{#1}}
+\providecommand{\pkg}[1]{\textit{#1}}
+%% jss.cls defines \pkg as bold. Twelve package names in running text is too
+%% much bold, so soften it to italic for this paper.
+\renewcommand{\pkg}[1]{\textit{#1}}
+\providecommand{\code}[1]{\texttt{#1}}
+
+\setlength{\emergencystretch}{3em}
+
+%% table marks: ran it / inherited it / both
+\newcommand{\F}{$\bullet$}
+\newcommand{\I}{$\circ$}
+\newcommand{\B}{$\odot$}
+\newcommand{\rh}[1]{\rotatebox{45}{\makebox[0pt][l]{\small #1}}}
+
+\author{
+  Peter Cotton\\
+  \texttt{peter.cotton@microprediction.com}
+}
+
+\title{A Stronger Univariate Benchmark for Foundational Time-Series Model Evaluation}
+\Plaintitle{A Stronger Univariate Benchmark for Foundational Time-Series Model Evaluation}
+\Shorttitle{A Stronger Univariate Benchmark}
+
+\newcommand{\paperabstract}{
+Reported progress for foundation time-series models rests on comparisons that
+leave out a strong classical reference. Across eleven benchmark papers the
+classical arms are per-window refits of ETS, ARIMA and Theta; no online
+forecaster appears, and no suite scores a predictive density. We supply the
+missing reference: \code{laplace}, an online distributional forecaster with no
+pretraining and no tunable parameters. Scored one step ahead on held-out log
+density over an 18{,}815-series \proglang{FRED} panel, it beats TimesFM 3.0 on
+the median series of every stratum by about half a nat, and a post-hoc
+portfolio that sees only the model's own issued density recovers most of the
+gap. It is a \code{pip install}, with a \proglang{Rust} core and bit-exact
+parity.
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\paperabstract
+\end{abstract}
+
+\noindent\textbf{Keywords:} time series, foundation models, benchmarking,
+probabilistic forecasting, proper scoring rules, online learning.
+
+%% -------------------------------------------------------------------------
+\section{Introduction}\label{sec:intro}
+
+The comparisons that report progress for foundation time-series models leave
+out a strong classical reference.\footnote{All results reproduced at
+\url{https://skaters.microprediction.org}.} A foundation model forecasts from a fixed
+window of recent history, with weights frozen at pretraining. An online
+forecaster carries state and revises it with every observation. The benchmarks
+for the first kind contain no example of the second.
+
+Table~\ref{tab:arms} enumerates the classic arms of eleven studies, read from
+the papers rather than from their leaderboards: GIFT-Eval
+\citep{aksu2024gifteval}, Chronos \citep{ansari2024chronos}, Chronos-2
+\citep{ansari2025chronos2}, TimesFM \citep{das2024timesfm}, TiRex
+\citep{auer2025tirex}, Moirai \citep{woo2024moirai}, Moirai-MoE
+\citep{liu2024moiraimoe}, fev-bench \citep{shchur2025fevbench}, Lag-Llama
+\citep{rasul2023lagllama}, TimeGPT-1 \citep{garza2023timegpt}, and the Monash
+archive \citep{godahewa2021monash}, which supplies several of the others'
+baseline tables. Eighteen distinct methods appear across the eleven, and nine of
+those appear in exactly one paper. The working set is much smaller.
+
+\begin{table}[t!]
+\centering
+\small
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{lccccccccccc@{\hspace{10pt}}c}
+\toprule
+\addlinespace[4.2em]
+Method & \rh{GIFT-Eval} & \rh{Chronos} & \rh{Chronos-2} & \rh{TimesFM} & \rh{TiRex}
+ & \rh{Moirai} & \rh{Moirai-MoE} & \rh{fev-bench} & \rh{Lag-Llama}
+ & \rh{TimeGPT-1} & \rh{Monash} & $n$ \\
+\midrule
+(Auto)ETS        & \F & \F & \I & \I &    & \I & \I & \F & \F & \F & \F & 10 \\
+(Auto)ARIMA      & \F & \F & \I & \I & \I & \B & \I & \F & \F &    & \F & 10 \\
+(Auto)Theta      & \F & \F & \I & \I & \I & \I & \I & \F &    & \F & \F & 10 \\
+Seasonal naive   & \F & \F & \I &    & \I & \F & \F & \F &    & \F &    & 8 \\
+Naive            & \F & \F & \I & \F &    & \F &    & \F &    &    &    & 6 \\
+SES              &    &    &    & \I &    & \I & \I &    &    &    & \F & 4 \\
+TBATS            &    &    &    & \I &    & \I &    &    &    &    & \F & 3 \\
+DHR-ARIMA        &    &    &    & \I &    & \I &    &    &    &    & \F & 3 \\
+SCUM ensemble    &    & \F & \I &    &    &    &    & \F &    &    &    & 3 \\
+DynOptTheta      &    &    &    &    &    &    &    &    & \F & \F &    & 2 \\
+Croston          &    &    &    &    &    &    &    &    & \F & \F &    & 2 \\
+AutoCES          &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+ADIDA            &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+IMAPA            &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+Drift            &    &    &    &    &    &    &    & \F &    &    &    & 1 \\
+HistoricAverage  &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+ZeroModel        &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
+\midrule
+\pkg{NPTS}       &    &    &    &    &    &    &    &    & \F &    &    & 1 \\
+\code{laplace}   &    &    &    &    &    &    &    &    &    &    &    & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Every classic arm in eleven studies. \F\ the authors ran it; \I\ the
+number is inherited from another paper's table or from a leaderboard; \B\ both,
+in different experiments. $n$ counts the studies carrying each method. The two
+rows below the rule are the methods that carry state and issue a density.
+Tables inherited from \citet{godahewa2021monash} print ARIMA and its
+harmonic-regression variant as one column applied to disjoint frequency groups;
+both rows are marked.}
+\label{tab:arms}
+\end{table}
+
+Three methods dominate. Automated ETS, ARIMA and Theta each appear in ten of the
+eleven. With seasonal naive they form a quartet that is the complete
+classic roster of six studies. No method appears in all eleven, though Theta
+does if its dynamically optimized variant is treated as the same model, which
+\citet{garza2023timegpt} declines to do by listing both.
+
+Five of the eleven ran no classical model at all for at least one headline
+comparison. \citet{ansari2025chronos2} takes its classic numbers from
+\citet{shchur2025fevbench} and the \citet{aksu2024gifteval} leaderboard;
+\citet{auer2025tirex} takes its from the same leaderboard and from
+\citet{ansari2024chronos}; and \citet{das2024timesfm},
+\citet{woo2024moirai} and \citet{liu2024moiraimoe} inherit a
+\citet{godahewa2021monash} table, the last at two removes.
+
+That matters because of what a Monash number is. Those models were run once, at
+library defaults, and the archive says so. Its ETS is forced non-seasonal above
+period 24 because the implementation cannot take longer cycles, and its harmonic
+regression is pinned to a single Fourier term. The table also reports point
+error only, so an inherited ETS column is a 2021 point-MAE number sitting beside
+a modern probabilistic score.
+
+The arms that are run fare little better. \citet{ansari2024chronos} used library
+defaults with no tuning. \citet{aksu2024gifteval} truncates statistical arms to
+1000 observations and replaces any that exceeds a one-day limit with seasonal
+naive. \citet{shchur2025fevbench} truncates to the same 1000 and caps the
+seasonal period at 200, and reports that its ensemble and automated ARIMA each
+failed four of a hundred tasks.
+
+Statefulness and shape are separate matters, and neither is present. No arm in
+any of the eleven carries state between forecasts: the \pkg{statsforecast}
+predict path is handed an array, fits, forecasts, and keeps nothing. Seasonal
+naive, meanwhile, is a point forecaster serving as the probabilistic normalizer
+in seven of the eleven, and as the substituted score when another arm times out
+in two of them.
+
+The last two rows of Table~\ref{tab:arms} are the methods in this literature
+that carry state and issue a density. \pkg{NPTS} is training-free and is a
+sampling distribution by construction, and it ships in both \pkg{GluonTS} and
+\pkg{AutoGluon}, which these studies import for their datasets, their metrics
+and their deep baselines. It is carried by one of the eleven
+\citep{rasul2023lagllama}.
+
+We scored \pkg{NPTS} through the same protocol as every other arm here. It
+loses to \code{laplace} on the median series in all four strata, by $0.05$ nats
+on daily prices and $0.39$ on daily economics, over $1{,}500$ series per stratum
+where the corpus allows. The arm the field already ships and does not run is
+beatable. That sets the floor this paper's reference has to clear.
+
+This paper supplies such an arm and reports what it does to the comparison. The
+contribution is deliberately small: a reference, a protocol, and four tables.
+
+%% -------------------------------------------------------------------------
+\section{\code{laplace}: an online distributional forecaster}\label{sec:reference}
+
+\code{laplace} imports nothing, requires no GPU, performs no fitting step, and
+exposes no tunable hyperparameters. One parameter-free call returns a predictive
+density.
+
+The predictive object is a weighted mixture of Gaussians. That choice buys
+three things a reference arm needs: the mixture is closed under affine maps and
+under mixing, it admits a closed-form CRPS, and it approximates heavy tails as a
+scale mixture. A density can therefore be pushed through an invertible map and
+scored against a proper rule \citep{gneiting2007strictly} without sampling.
+
+A \emph{transform} is a stateful causal map that consumes one observation and
+emits one transformed value, paired with an inverse that rebuilds predictive
+distributions for future observations from the transformed coordinate, given the
+state it has accumulated. Differencing, standardisation, online autoregression,
+\pkg{GARCH}-style scaling, seasonal differencing and the Yeo--Johnson
+coordinates are all transforms. \emph{Conjugation} composes one with an inner
+forecaster: the observation is transformed, the inner model issues a density in
+the new coordinate, and the inverse carries that density back. Multi-step
+uncertainty accumulates through the inverse rather than by simulation.
+
+\code{laplace} is one fixed composition of these parts, with no knob exposed.
+Candidate models enter it only as mean forecasters, weighted online by
+predictive likelihood, so that a shaped leaf governs the tail rather than the
+dispersion of candidate means. A lattice projection places atoms on the exact
+values a grid-quoted series revisits, and vanishes identically on continuous
+data. Beyond one step the predictive mixes over decimated clocks, since the fine
+clock wins short horizons and a coarse one wins long. A conditional tail fit
+splices the extreme quantiles, which a bulk fit leaves too thin.
+
+\citet{cotton2026transforms} derives all of this. We restate only what a reader
+needs to judge the comparison.
+
+Two properties matter for a reference arm, and neither is accuracy. The first is
+cost. Adding \code{laplace} to a leaderboard is a \code{pip install} and one
+function call, with no weights to download, no device to allocate, and no
+context length to choose. The pure-\proglang{Python} implementation, $288$\,KB of source across $28$
+files, is the reference; a \proglang{Rust} core runs the same arithmetic about
+twenty times faster.
+
+Table~\ref{tab:perf} gives the runtime, and the two regimes disagree. Cold is
+one forecast for a series not seen before, which is what a benchmark harness
+asks for. Warm is one new observation on a series already tracked, which is what
+a deployment asks for.
+
+\begin{table}[t!]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+ & \multicolumn{2}{c}{cold (ms)} & warm (ms) \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-4}
+Model & batch 1 & batch 64 & \\
+\midrule
+\code{laplace} (\proglang{Rust})   & $3.39$   & ---     & $0.012$ \\
+\code{laplace} (\proglang{Python}) & $67.08$  & ---     & $0.251$ \\
+AutoETS (refit)                     & $1.93$   & ---     & $1.93$ \\
+Prophet (refit)                     & $29.97$  & ---     & $29.97$ \\
+AutoARIMA (refit)                   & $62.13$  & ---     & $62.13$ \\
+Chronos-Bolt-small                  & $7.44$   & $0.72$  & $7.44$ \\
+TiRex                               & $96.47$  & $76.34$ & $95.68$ \\
+TimesFM-2.5-200M                    & $323.44$ & $5.10$  & $329.83$ \\
+\bottomrule
+\end{tabular}
+\caption{Milliseconds per forecast, context $256$, horizon $12$, $64$ series,
+one thread, Apple silicon, \pkg{skaters} $0.16.0$. Foundation models batch in
+the cold regime, so the batched column is reported alongside the per-series one.
+In the warm regime \code{laplace} performs one state update; a stateless model
+re-runs its forward pass over a shifted window and a refitting baseline
+re-estimates from scratch, so for those the warm cost equals the cold cost.}
+\label{tab:perf}
+\end{table}
+
+Warm is the regime that separates the arms. One online update costs $0.012$
+milliseconds, against $7.44$ for the cheapest foundation model here and $329.83$
+for the largest.
+
+That per-forecast figure compounds, because a benchmark asks for a forecast at
+every step of every series. Table~\ref{tab:panel} multiplies it out over the
+$1{,}204{,}288$ one-step forecasts this panel contains.
+
+\begin{table}[t!]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+Model & ms/step & batch 1 & batch 64 \\
+\midrule
+\code{laplace} (\proglang{Rust})   & $0.012$   & $15$ s    & ---        \\
+\code{laplace} (\proglang{Python}) & $0.251$   & $5$ min   & ---        \\
+AutoETS (refit)                     & $1.93$    & $39$ min  & ---        \\
+Chronos-Bolt-small                  & $7.44$    & $2.5$ h   & $14$ min   \\
+Prophet (refit)                     & $29.97$   & $10.0$ h  & ---        \\
+AutoARIMA (refit)                   & $62.13$   & $20.8$ h  & ---        \\
+TiRex                               & $95.68$   & $32.0$ h  & $25.5$ h   \\
+TimesFM-2.5-200M                    & $329.83$  & $4.6$ d   & $1.7$ h    \\
+\bottomrule
+\end{tabular}
+\caption{Wall clock to score the whole panel one step at a time, single
+threaded. A stateless model re-runs its forward pass at every step, so its
+per-step cost is its cold cost, and the batch-64 column is the fair figure for
+an offline sweep that can run many series in lockstep.}
+\label{tab:panel}
+\end{table}
+
+The spread runs from fifteen seconds to four and a half days. It also accounts
+for the shape of the suites in Table~\ref{tab:arms}: scoring a stateless model
+at every step of a large panel is expensive enough that one forecast origin per
+series is the affordable design, and four of the eleven use exactly that.
+
+The second is reproducibility across machines. The \proglang{Rust} core uses
+portable mathematics (\pkg{libm}) and produces identical bits on x86 and ARM,
+and a shared parity suite checks roughly $100{,}000$ probe values to $10^{-6}$
+per implementation. A number one person publishes therefore recomputes on
+another person's hardware, which is the property a denominator needs and a
+pretrained checkpoint behind an inference stack does not have.
+
+Sections~\ref{sec:classic} and \ref{sec:results} measure how strong it is.
+\code{laplace} takes the per-series log-likelihood against every classical arm
+in Table~\ref{tab:arms}, and against TimesFM 3.0 in every stratum tested.
+\citet{cotton2026transforms} reports the same ordering against neural and
+foundation-model baselines across the non-price \proglang{FRED} universe;
+\pkg{GARCH}-$t$ on asset prices is the one arm that escapes, and that split is
+reported rather than averaged away.
+
+%% -------------------------------------------------------------------------
+\section{Protocol}\label{sec:protocol}
+
+Every arm sees the same series, the same windows and the same scoring rule. The
+context is 128 observations, the test window rolls one step ahead, and no arm is
+fitted to the evaluation data. The score is held-out log predictive density,
+differenced per series so that each series' intrinsic difficulty cancels.
+
+We report the median of that difference and the per-series win, draw and loss
+counts from a Diebold--Mariano test with HAC standard errors and a draw band,
+following \citet{diebold1995comparing}. We do not report a pooled mean.
+Averaging a log density across heterogeneous series estimates nothing, because a
+few near-constant series dominate the sum; \citet{koning2005m3} made the
+corresponding argument about the M3 competition, and \citet{hewamalage2023evaluation}
+prescribe per-series testing.
+
+The context is fixed rather than growing. Several foundation models degrade
+beyond the window they were pretrained on, and most of them silently truncate
+over-long input rather than raising, so feeding four thousand points to a model
+configured for two thousand scores a two-thousand-context model without saying
+so. A protocol that lets context grow needs a declared per-model cap, set at the
+documented architectural maximum, and recorded per arm.
+
+Recording it matters for a second reason. The \citet{woo2024moirai} benchmark
+numbers come from a per-dataset search over context lengths from one thousand to
+five thousand, jointly with patch size, which the arms it is compared against do
+not receive.
+
+%% -------------------------------------------------------------------------
+\section{Against the classic arms}\label{sec:classic}
+
+The arms of Table~\ref{tab:arms} are the denominator every published skill
+score divides by, so their strength sets what a skill score means.
+Table~\ref{tab:classic} scores \code{laplace} against them on the non-price
+\proglang{FRED} universe.
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{lccccr}
+\toprule
+ & \multicolumn{2}{c}{LL win} & \multicolumn{2}{c}{CRPS win} & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Arm & raw & family & raw & family & $N$ \\
+\midrule
+AutoARIMA (\pkg{statsforecast}) & $87\,\%$ & $87\,\%$ & $58\,\%$ & $63\,\%$ & $1688$ \\
+AutoETS (\pkg{statsforecast})   & $95\,\%$ & $94\,\%$ & $77\,\%$ & $78\,\%$ & $1688$ \\
+Theta (\proglang{R})            & $92\,\%$ & $95\,\%$ & $74\,\%$ & $79\,\%$ & $1917$ \\
+auto.arima (\proglang{R})       & $84\,\%$ & $85\,\%$ & $51\,\%$ & $60\,\%$ & $1917$ \\
+\bottomrule
+\end{tabular}
+\caption{Share of series on which \code{laplace} scores better, over $5{,}397$
+continuous non-price \proglang{FRED} series in $1{,}213$ correlated families.
+The family figure averages within a family first, so that a cluster of related
+series counts once. $N$ is the subset each arm covers under its compute budget.
+Every arm forecasts one step ahead at every point, conditioned on all data up to
+that point, with coefficients re-estimated every $25$ steps.}
+\label{tab:classic}
+\end{table}
+
+On log-likelihood the margin is wide: the closest arm loses on $84\,\%$ of
+series and the widest on $95\,\%$. On CRPS the arms do better, which is the
+expected pattern, since CRPS is forgiving of a mis-shaped tail that a log score
+punishes.
+
+These arms are stronger than the ones the studies of Table~\ref{tab:arms}
+run.\footnote{The two differ in which half of the model goes stale.
+\pkg{statsforecast}'s \code{refit} argument freezes the fitted coefficients
+between refits but hands \code{forward} the current history, so the arms here
+are coefficient-stale and conditioning-current. The frozen parameters include
+the innovation variance, so the interval inherits a scale up to $25$ steps old,
+which is the one setting that could flatter Table~\ref{tab:classic}.
+Re-estimating at every step instead, on twenty paired series, moves AutoARIMA by
+a median of $0.005$ nats and AutoETS by $-0.000$, against margins of $0.31$ to
+$0.59$ nats. The published harnesses are the mirror image: they re-estimate at
+every window and freeze the conditioning.} Their harnesses re-estimate at each
+window, but the forecast for step $j$ of a window conditions only on data up to
+the window origin, so inside a window of length $h$ the baseline never sees the
+observations it is forecasting past. Four of the eleven use a single origin per
+series.
+
+This is the sense in which the incumbent denominators are soft. A skill score
+computed against them credits a model for clearing a bar that a dependency-free
+online method clears by a wide margin on the same data.
+
+\section{Against TimesFM 3.0}\label{sec:results}
+
+Table~\ref{tab:raw} scores TimesFM 3.0 \citep{das2024timesfm} zero-shot against
+the reference on an 18{,}815-series \proglang{FRED} panel. Negative favours the
+reference.
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{lrccr}
+\toprule
+Stratum & $N$ & Win / draw / loss & Median $\Delta$LL & Loss rate \\
+\midrule
+Daily, economic       & $2{,}179$ & $66 / 923 / 1{,}190$      & $-0.854$ & $54.6\,\%$ \\
+Daily, price/returns  & $7{,}633$ & $15 / 4{,}593 / 3{,}025$  & $-0.616$ & $39.6\,\%$ \\
+Weekly, economic      & $3{,}013$ & $517 / 1{,}481 / 1{,}015$ & $-0.520$ & $33.7\,\%$ \\
+Monthly, economic     & $5{,}576$ & $193 / 3{,}592 / 1{,}791$ & $-0.647$ & $32.1\,\%$ \\
+M4-hourly, seasonal   & $414$     & $8 / 241 / 165$           & $-0.543$ & $39.9\,\%$ \\
+\bottomrule
+\end{tabular}
+\caption{TimesFM 3.0 against \code{laplace}, one step ahead on held-out log
+density, 128-length context. $\Delta$LL is the per-series difference, model
+minus reference, reported as a median. The loss rate is the share of series on
+which the model loses.}
+\label{tab:raw}
+\end{table}
+
+The model trails the reference on the median series in every stratum, by
+roughly half a nat, and loses on more series than it wins. Half a nat is a large
+gap in log-likelihood terms.
+
+Table~\ref{tab:wrapped} repeats the comparison with the model wrapped in a
+post-hoc portfolio that combines its own issued predictive with the reference.
+The wrap requires no retraining and no access to model internals; it sees only
+the density the model published.
+
+\begin{table}[t!]
+\centering
+\begin{tabular}{lrccr}
+\toprule
+Stratum & $N$ & Win / draw / loss & Median $\Delta$LL & Loss rate \\
+\midrule
+Daily, economic       & $2{,}179$ & $76 / 1{,}383 / 720$     & $-0.094$ & $33.0\,\%$ \\
+Daily, price/returns  & $7{,}633$ & $152 / 7{,}136 / 345$    & $-0.008$ & $4.5\,\%$ \\
+Weekly, economic      & $3{,}011$ & $467 / 2{,}045 / 499$    & $-0.049$ & $16.6\,\%$ \\
+Monthly, economic     & $5{,}195$ & $350 / 4{,}480 / 365$    & $-0.056$ & $7.0\,\%$ \\
+M4-hourly, seasonal   & $414$     & $58 / 352 / 4$           & $-0.007$ & $1.0\,\%$ \\
+\bottomrule
+\end{tabular}
+\caption{The same model wrapped in a never-worse portfolio with the reference.
+The loss rate falls by as much as thirty-nine points; the median stays negative
+in every stratum.}
+\label{tab:wrapped}
+\end{table}
+
+The wrap cuts the loss rate by as much as thirty-nine points. The median stays
+negative in every stratum, so the wrapped model still trails the reference.
+
+A post-hoc combination that sees only the published density recovers most of the
+gap. At this horizon the pretraining is therefore contributing less than the raw
+comparison suggests, and what it does contribute survives a wrapper.
+
+%% -------------------------------------------------------------------------
+\section{The reconstruction moves the answer more than the model does}\label{sec:nozzle}
+
+A quantile-only model does not emit a density, and a density must exist before a
+log score does. A reconstruction step builds one from the quantiles, and the
+choice of step is independent of the model being scored.
+
+Fix TimesFM 3.0 and fix $3{,}200$ held-out test points, then vary only the
+reconstruction across four methods. The mean log density moves from $-0.373$ to
+$+2.104$. The mean per-point spread is $3.13$ nats, which exceeds the entire
+measured gap between the model and the reference in every stratum of
+Table~\ref{tab:raw}. Two methods already in independent use elsewhere differ by
+$0.62$ nats.
+
+The choice therefore belongs in the protocol, stated rather than assumed. It is
+not peculiar to this study: the \citet{aksu2024gifteval} submission interface
+requires a mean and nine deciles, so a model emitting a genuine density must
+reduce it before scoring and a model emitting samples must convert.
+
+That interface's interval score asks for the $2.5$th and $97.5$th percentiles,
+and a sample forecast returns a nearest order statistic without interpolation.
+At the twenty samples the reference \pkg{Chronos} notebook uses, those two
+quantiles are the minimum and the maximum of twenty draws.
+
+%% -------------------------------------------------------------------------
+\section{Horizon, grid, and statefulness}\label{sec:suites}
+
+The results above do not contradict any published leaderboard, because no
+published leaderboard occupies this regime. Three settings separate them.
+
+The horizon never reaches one step. The shortest prediction length in
+\citet{aksu2024gifteval} is six, and \citet{shchur2025fevbench} use domain
+horizons such as thirty and one hundred sixty-eight.
+
+The scoring rule is a nine-point grid. What these suites report as CRPS is a
+mean of weighted quantile losses at the deciles, so nothing outside the tenth
+and ninetieth percentile enters any published score.
+\citet{ansari2025chronos2} call that grid a defect and move to twenty-one
+levels including the first and ninety-ninth.
+
+And no baseline carries state, which is the hole of Section~\ref{sec:intro}.
+Each setting is defensible for the task those suites set themselves. Together
+they define a regime in which an online distributional method is never scored.
+
+%% -------------------------------------------------------------------------
+\section{Scope}\label{sec:scope}
+
+Everything measured here is univariate and one step ahead. A single pretrained
+model amortized across many related series can exploit cross-series and panel
+structure that no univariate method reaches by construction, and that is where
+pretraining should pay for itself most directly. This paper does not make that
+comparison, and it is the more decisive one.
+
+Leakage is controlled in this literature by dataset name rather than by time.
+\citet{ansari2024chronos} state the temporal standard, that evaluation data
+should begin after the last pretraining observation, and then decline it as a
+minimal risk. \citet{meyer2025leakage} and \citet{oreshkin2026simulation} report
+that a corpus used in TimesFM pretraining reappears in its Monash evaluation;
+their pretraining table lists Traffic at $862$ series and $15{,}122{,}928$
+observations, and the Monash archive file \citep{zenodo-traffic-hourly} holds
+$862$ series of exactly $17{,}544$ steps.
+
+A calibration framing would have to engage \citet{adler2026calibrated}, who find
+these models better calibrated than automated ARIMA and N-BEATS on standard
+datasets. Nothing here contradicts that. Calibration on a decile grid and
+sharpness of a full density are different measurements.
+
+Finally, the panel is \proglang{FRED}, and \proglang{FRED} is the universe these
+models' pretraining corpora almost entirely omit: the corpus of
+\citet{woo2024moirai} is $0.09\,\%$ economic by observation, and the entire
+economics domain of \citet{aksu2024gifteval} is the M4 collection. Whether the
+gap survives on the energy and transport data these models were built for is an
+open question, and \citet{wang2026spectral} suggest it will not.
+
+%% -------------------------------------------------------------------------
+\section{Reproduction}\label{sec:repro}
+
+The paper directory holds four files. \code{constants.py} derives every number
+in Sections~\ref{sec:results} and \ref{sec:nozzle} from a version-controlled
+store. \code{verify\_paper.py} re-derives each one, compares it against the
+tables above, and exits non-zero on drift. \code{REPRODUCE.md} gives three
+tiers: the figures check in seconds from committed files, the summaries rebuild
+from per-step records in minutes, and the records regenerate from raw data in
+days.
+
+The data vintage is published as a release asset in the repository
+\code{skaters-\allowbreak benchmarking-\allowbreak data}. \proglang{FRED} revises series, so a fresh
+pull returns different vintages and will not reproduce these numbers. The archive carries $210{,}574$ public-domain series; commercial index
+series are excluded and listed, which costs the price stratum and nothing else.
+
+%% -------------------------------------------------------------------------
+\bibliographystyle{plainnat}
+\bibliography{benchmark}
+
+\end{document}

@@ -129,12 +129,17 @@ impl PwEnsemble {
             let mut weights = Vec::with_capacity(n);
             for i in 0..n {
                 let mse = self.stats[i][h].mse();
-                let w = if mse.is_finite() && mse > 0.0 {
-                    1.0 / mse
+                // mse() returns infinity exactly when immature; a MATURE
+                // perfect forecaster legitimately returns mse == 0.0 and must
+                // get the highest precision, not the floor (skaters#220).
+                // `floor` doubles as the precision cap (1/floor) so a
+                // near-zero mse cannot overflow.
+                let w = if mse.is_finite() {
+                    1.0 / mse.max(self.floor)
                 } else {
                     self.floor
                 };
-                weights.push(w.max(self.floor));
+                weights.push(w);
             }
             let horizon: Vec<&Dist> = (0..n).map(|i| &all_dists[i][h]).collect();
             combined.push(Dist::combine_refs(&horizon, Some(&weights)));

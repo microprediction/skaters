@@ -36,7 +36,12 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 # CANON_SUFFIX names the output (e.g. "_h4") so it does not clobber the k=1 files.
 PREDS = os.environ.get("CANON_PREDS", os.path.join(_HERE, "preds"))
 SUFFIX = os.environ.get("CANON_SUFFIX", "")
-BASELINE = "laplace"
+# CANON_BASELINE pairs every model against another arm instead (e.g. cps for the
+# #250 cpsz-vs-cps gap, lap_grid for the matched conformalization pair). The
+# output files carry the baseline name so they never overwrite the laplace ones.
+BASELINE = os.environ.get("CANON_BASELINE", "laplace")
+if BASELINE != "laplace":
+    SUFFIX = f"{SUFFIX}_vs_{BASELINE}"
 _COLS = ("y", "q05", "q50", "q95", "logpdf", "crps")
 
 
@@ -131,6 +136,38 @@ def main():
                 cov = float(np.mean((y[ok] >= q05[ok]) & (y[ok] <= q95[ok])))
                 cal = float(np.mean(y[ok] <= q50[ok]))
                 w.writerow([study, m, n, f"{cov:.4f}", f"{cal:.4f}"])
+
+    # ---- real minus null, paired per series (CANON_CROSS="perm-daily:econ=daily:econ") ----
+    # A null study's series are "<arm>:<sid>" copies of the real study's <sid>. Each
+    # model's dLL vs the baseline is differenced across the pair, so whatever the
+    # null keeps (marginal shape, lattice, scale) cancels and what is left is the
+    # part of the gap that needs the series' temporal order.
+    cross = os.environ.get("CANON_CROSS", "")
+    if cross:
+        null_st, real_st = cross.split("=")
+        with open(os.path.join(_HERE, f"canonical_summary_cross{SUFFIX}.csv"), "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["null_study", "real_study", "model", "n_series",
+                        "med_ddLL", "q25_ddLL", "q75_ddLL"])
+            for m in methods:
+                if m == BASELINE:
+                    continue
+                dd = []
+                for (st, s, mm) in store:
+                    if st != null_st or mm != m or (st, s, BASELINE) not in store:
+                        continue
+                    sid = s.split(":", 1)[1]
+                    if (real_st, sid, m) not in store or (real_st, sid, BASELINE) not in store:
+                        continue
+                    d_null = (_series_mean(store[(st, s, m)]["logpdf"], -20.0)
+                              - _series_mean(store[(st, s, BASELINE)]["logpdf"], -20.0))
+                    d_real = (_series_mean(store[(real_st, sid, m)]["logpdf"], -20.0)
+                              - _series_mean(store[(real_st, sid, BASELINE)]["logpdf"], -20.0))
+                    dd.append(d_real - d_null)
+                if dd:
+                    dd = np.asarray(dd, float)
+                    w.writerow([null_st, real_st, m, len(dd), f"{np.nanmedian(dd):.4f}",
+                                f"{np.nanpercentile(dd, 25):.4f}", f"{np.nanpercentile(dd, 75):.4f}"])
 
     print(f"[summarize] {len(store)} (study,series,method) cells; "
           f"studies={studies}; methods={methods}", flush=True)

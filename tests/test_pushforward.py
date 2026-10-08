@@ -2,6 +2,7 @@
 
 import math
 import random
+import pytest
 from skaters.dist import Dist
 from skaters.pushforward import PushforwardDist, table_from_map
 from skaters.transform import yeo_johnson, power_transform
@@ -134,3 +135,34 @@ class TestComposition:
         ys, zs = table_from_map(lambda z: math.expm1(min(z, 350.0)), -3.0, 3.0)
         assert all(b > a for a, b in zip(ys, ys[1:]))
         assert all(b > a for a, b in zip(zs, zs[1:]))
+
+
+class TestObservationNotClamped:
+    """skaters#221: the observation's own coordinate must not be clamped --
+    that made every query past the clamp point return the same constant
+    density (a non-integrable tail) instead of the map's true extrapolation."""
+
+    def test_identity_map_matches_inner_arbitrarily_far_out(self):
+        inner = Dist.gaussian()
+        ys, zs = table_from_map(lambda z: z, -8.0, 8.0)
+        pf = PushforwardDist(inner, ys, zs)
+        for x in (20.0, 100.0, 1_000_000.0):
+            assert pf.logpdf(x) == pytest.approx(inner.logpdf(x), rel=1e-9)
+            assert pf.crps(x) == pytest.approx(inner.crps(x), rel=1e-6)
+
+    def test_wide_inner_keeps_full_probability_mass(self):
+        pf = PushforwardDist(Dist.gaussian(0, 10), [-1.0, 1.0], [-1.0, 1.0])
+        assert pf.cdf(float("-inf")) == pytest.approx(0.0, abs=1e-12)
+        assert pf.cdf(float("inf")) == pytest.approx(1.0, abs=1e-12)
+
+
+class TestMomentMatchingStable:
+    """skaters#225: m2 - mu*mu cancels once location dominates spread; the
+    quadrature variance must stay centered instead."""
+
+    def test_variance_survives_large_location_shift(self):
+        for mu in (0.0, 1e8, 1e9):
+            inner = Dist.gaussian(mu, 1.0)
+            knots = [mu - 8.0, mu + 8.0]
+            mapped = PushforwardDist(inner, knots, knots)
+            assert mapped.std == pytest.approx(1.0, rel=1e-6)
