@@ -1,0 +1,217 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[round]{natbib}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+\newtheorem{conjecture}{Conjecture}
+
+\title{Dyadic regression}
+\author{Peter Cotton}
+\date{7 October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Dyadic regression forecasts a series from its last value, the sum of the two values before that,
+the sum of the four before those, and so on, with one coefficient per block. With $L$ lags it fits
+$\log_2(L+1)$ coefficients. It represents every trailing moving average of length $2^m-1$ exactly,
+and it approximates any power-law lag profile $k^{-\alpha}$ to within relative error $2^{\alpha/2}-1$
+uniformly in $L$. Weighting each lag by $1/(2k-1)$ inside its block cuts that error to about
+$2^{|\alpha-1|/2}-1$, from $0.62$ to $0.15$ for fractional differencing at $d=0.4$, and makes the
+all-equal point exactly the harmonic forecaster of \citet{fishelson2026}.
+\end{abstract}
+
+\section{The model}
+
+Partition the lags $k=1,\dots,L$, with $L=2^J-1$, into dyadic blocks
+\[
+G_j=\{2^j,\dots,2^{j+1}-1\},\qquad j=0,\dots,J-1,
+\]
+so $G_0=\{1\}$, $G_1=\{2,3\}$, $G_2=\{4,\dots,7\}$. Dyadic regression is the forecast
+\begin{equation}\label{eq:model}
+\hat y_{t+1}=\sum_{j=0}^{J-1}\theta_j\,S_j(t),\qquad S_j(t)=\sum_{k\in G_j}y_{t+1-k},
+\end{equation}
+an autoregression whose coefficient on lag $k$ is $\theta_{j(k)}$, shared within each block. Writing
+the regressors as block averages $\bar S_j=S_j/2^j$ instead gives the same model with coefficients
+$2^j\theta_j$. The \texttt{grouped\_ar} transform of the \texttt{skaters} library implements
+\eqref{eq:model} with block sums, fitted by recursive least squares with exponential forgetting and
+a ridge toward zero.
+
+The number of coefficients is $J=\log_2(L+1)$, against $L$ for an unrestricted autoregression. The
+question is what the restriction costs and what it buys.
+
+\section{What the blocks can represent}
+
+\paragraph{Moving averages.} The trailing average of length $W=2^m-1$ is exactly
+$\theta_j=1/W$ for $j<m$ and $\theta_j=0$ for $j\ge m$. Every other window length differs from one of
+these by part of a single block. Dyadic regression therefore contains, exactly or nearly, the moving
+average at every time scale, with one coefficient per doubling. This is the same covering that lets
+online learners compete with the best window of any length using $O(\log T)$ experts
+\citep{daniely2015}.
+
+\paragraph{Power-law profiles.} Long memory shows up as autoregressive coefficients that decay like a
+power of the lag. For fractional differencing $(1-B)^d y_t=\varepsilon_t$ with $0<d<\tfrac12$ the
+coefficients of the AR($\infty$) representation satisfy $\pi_k\sim C\,k^{-(1+d)}$.
+
+\begin{proposition}\label{prop:powerlaw}
+Let $\varphi_k=c\,k^{-\alpha}$ with $\alpha>0$. Choosing $\theta_j$ as the geometric mean of
+$\varphi$ at the two ends of block $G_j$ gives, for every $L$ and every lag $k\le L$,
+\[
+\Bigl|\frac{\theta_{j(k)}}{\varphi_k}-1\Bigr|\;\le\;2^{\alpha/2}-1 .
+\]
+Consequently, for any series, the one-step forecast of the dyadic model differs from that of the
+full AR($L$) model by at most $(2^{\alpha/2}-1)\sum_{k\le L}|\varphi_k|\,|y_{t+1-k}|$.
+\end{proposition}
+
+\begin{proof}
+On $G_j$ the ratio of the largest to the smallest value of $\varphi$ is
+$\bigl((2^{j+1}-1)/2^j\bigr)^{\alpha}<2^{\alpha}$. The geometric mean $\theta_j$ of the two extremes
+is within a factor $2^{\alpha/2}$ of every value in the block, so
+$\theta_j/\varphi_k\in[2^{-\alpha/2},2^{\alpha/2}]$, and $1-2^{-\alpha/2}\le 2^{\alpha/2}-1$. The
+forecast bound follows from the triangle inequality.
+\end{proof}
+
+The bound does not shrink as $L$ grows, and it is not small: $0.23$ at $\alpha=0.6$, $0.41$ at
+$\alpha=1$, and $0.62$ for fractional differencing at $d=0.4$. It is a worst case over lags, and the
+least-squares coefficients of a fitted model trade it against the variance saving of $L-J$ fewer
+parameters. Blocks growing by a ratio $r<2$ instead of $2$ cut the error to $r^{\alpha/2}-1$ at the
+cost of $\log_r(L)$ coefficients. Table~\ref{tab:powerlaw} gives the numbers.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+profile & $r=2$ (13 blocks) & $r=1.5$ (21) & $r=1.25$ (38)\\
+\midrule
+$k^{-0.6}$ & 0.231 & 0.129 & 0.069\\
+$k^{-1}$ & 0.414 & 0.225 & 0.118\\
+$k^{-1.4}$ & 0.624 & 0.328 & 0.169\\
+$(1-B)^{0.2}$, $\pi_k$ & 0.516 & & \\
+$(1-B)^{0.4}$, $\pi_k$ & 0.624 & & \\
+\bottomrule
+\end{tabular}
+\caption{Worst relative error of the best one-coefficient-per-block approximation over lags
+$k\le 4096$, for geometric blocks of ratio $r$. Dyadic regression is $r=2$. The fractional-differencing
+rows use the exact AR($\infty$) coefficients and match the bound of
+Proposition~\ref{prop:powerlaw} with $\alpha=1+d$. Computed by \texttt{check\_dyadic.py}.}
+\label{tab:powerlaw}
+\end{table}
+
+This is the dyadic form of the argument for the heterogeneous autoregressive model of
+\citet{corsi2009}, which regresses on daily, weekly and monthly averages and reproduces long memory
+with three coefficients. \citet{hwang2014} show that the infinite-order version is a long-memory
+model exactly when its coefficients decrease exponentially across horizons, and that a fitted
+finite-order version loses little to truncation. Dyadic regression fixes the horizons at the powers
+of two and lets the data choose the coefficients.
+
+\section{Harmonic dyadic regression}
+
+Most of the error in Proposition~\ref{prop:powerlaw} comes from treating every lag in a block alike
+when the profile falls across the block. Weighting lag $k$ by $1/(2k-1)$ inside its block,
+\begin{equation}\label{eq:harm}
+\hat y_{t+1}=\sum_{j=0}^{J-1}\theta_j\,H_j(t),\qquad H_j(t)=\sum_{k\in G_j}\frac{y_{t+1-k}}{2k-1},
+\end{equation}
+keeps one coefficient per block and puts the profile's typical decay into the regressor. A power
+law $c\,k^{-\alpha}$ then has to be matched only up to the residual factor $k^{1-\alpha}$, which
+varies by at most $2^{|\alpha-1|}$ across a block. The argument of Proposition~\ref{prop:powerlaw}
+gives a worst relative error of $2^{|\alpha-1|/2}-1$ for weights $1/k$. The weights $1/(2k-1)$ add a
+small correction at short lags, $0.054$ at $\alpha=1$ where the bound is zero. For long memory,
+$\alpha=1+d$, the error is $2^{d/2}-1$: $0.035$ at $d=0.1$ and $0.149$ at $d=0.4$, against $0.46$
+and $0.62$ for plain dyadic regression. Table~\ref{tab:harm} gives the numbers.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+profile & dyadic & harmonic dyadic\\
+\midrule
+$k^{-0.6}$ & 0.231 & 0.152\\
+$k^{-1}$ & 0.414 & 0.054\\
+$k^{-1.4}$ & 0.624 & 0.149\\
+$k^{-2}$ & 1.000 & 0.414\\
+$(1-B)^{0.1}$ & 0.464 & 0.035\\
+$(1-B)^{0.2}$ & 0.516 & 0.072\\
+$(1-B)^{0.3}$ & 0.569 & 0.109\\
+$(1-B)^{0.4}$ & 0.624 & 0.149\\
+\bottomrule
+\end{tabular}
+\caption{Worst relative error over lags $k\le 4096$, thirteen blocks in both columns. Computed by
+\texttt{check\_dyadic.py}.}
+\label{tab:harm}
+\end{table}
+
+With every $\theta_j$ equal, \eqref{eq:harm} is a weighted average of past values with weight
+$1/(2k-1)$ on lag $k$. That is exactly the stored forecast of \citet{fishelson2026}, discussed next.
+
+\section{The equal-weight point}
+
+Set every coefficient on the block averages equal, which is $\theta_j\propto 2^{-j}$ on the sums.
+Lag $k$ in block $j$ then gets weight $w_k=2^{-j}$, and since $2^j\le k<2^{j+1}$,
+\[
+\frac1k\;\le\;w_k\;<\;\frac2k .
+\]
+The profile is $1/k$ up to a factor of two, a staircase with one step per doubling. Every dyadic
+scale gets the same total weight, and the weights over $L$ lags sum to $\log_2(L+1)$.
+
+\citet{fishelson2026} forecast with exactly this shape. Their algorithm stores a weighted average of
+past outcomes with weights $1/(2k-1)$ by age, and announces a mixture of its past stored averages
+with the same weights. They prove that it is calibrated against every outcome sequence, with
+average calibration error falling like $1/\log T$, and that the kernel $1/(2(t-s)-1)$, the discrete
+Hilbert transform, is the best choice up to a constant. The reason is that a forecast's calibration
+error is a comparison between the outcomes that built it and the outcomes on which it is used, and
+a kernel with equal weight at every scale offers an adversary no scale to attack.
+
+For harmonic dyadic regression the match is exact. With all $\theta_j$ equal and normalized,
+\eqref{eq:harm} is their stored average $p_t$. Their calibrated forecast is one step further, the
+same harmonic mixture of the stored averages $p_s$, $s<t$, and the guarantee is for that mixture.
+For plain dyadic regression the equal-weight point is the staircase above.
+
+\begin{conjecture}
+The \citet{fishelson2026} guarantee holds, with a larger constant, when their harmonic kernel is
+replaced by the dyadic staircase.
+\end{conjecture}
+
+Their own remark that the weights $1/k$ give the same rates as $1/(2k-1)$ suggests the result does
+not depend on the exact kernel, and dyadic analogues of the Hilbert transform are classically
+bounded. Their proof, however, uses moment bounds specific to the Hilbert matrix, so the staircase
+needs its own check. Harmonic dyadic regression avoids the question.
+
+\begin{remark}[Fitted versus frozen]
+Fitting the coefficients is what makes dyadic regression forecast well on real series, where some
+scales predict and others do not. Freezing them at the equal-weight point is what makes the
+\citet{fishelson2026} forecaster robust, since a learned preferred scale is exactly what an
+adversary exploits. A frozen forecaster that uses only past outcomes is calibrated but carries no
+information about the input. The two can be combined by shrinking the fitted coefficients toward
+the equal-weight point instead of toward zero, so the model starts from the forecaster no sequence
+can exploit and moves only as far as the data justify. Whether the shrunk model keeps any form of the
+guarantee is open.
+\end{remark}
+
+\section{Summary}
+
+Dyadic regression is an autoregression with one coefficient per doubling of the lag. It contains
+the moving average at every scale and approximates power-law memory to a fixed relative error with
+$\log_2 L$ coefficients. Weighting lags by $1/(2k-1)$ inside each block keeps the same number of
+coefficients, cuts the long-memory error by a factor of four or more, and makes the all-equal point
+exactly the scale-free forecaster that online calibration theory singles out. The numbers in this note are reproduced by \texttt{check\_dyadic.py}.
+
+\begin{thebibliography}{5}
+\bibitem[Corsi(2009)]{corsi2009} Corsi, F. (2009). A simple approximate long-memory model of
+  realized volatility. \emph{Journal of Financial Econometrics} 7(2), 174--196.
+\bibitem[Daniely et al.(2015)]{daniely2015} Daniely, A., Gonen, A. and Shalev-Shwartz, S. (2015).
+  Strongly adaptive online learning. \emph{Proceedings of the 32nd International Conference on
+  Machine Learning}, PMLR 37.
+\bibitem[Fishelson and Mohri(2026)]{fishelson2026} Fishelson, M. and Mohri, M. (2026).
+  High-dimensional online calibration from harmonic weights. arXiv:2610.07740.
+\bibitem[Hwang and Shin(2014)]{hwang2014} Hwang, E. and Shin, D.~W. (2014). Infinite-order,
+  long-memory heterogeneous autoregressive models. \emph{Computational Statistics and Data
+  Analysis} 76, 339--358.
+\end{thebibliography}
+
+\end{document}
