@@ -7,7 +7,7 @@
 \usepackage{url}
 \usepackage{hyperref}
 \usepackage{booktabs}
-\usepackage{color}
+\usepackage{xcolor}
 \usepackage{natbib}
 
 %% Fallbacks so the paper also builds against a minimal jss.cls.
@@ -27,7 +27,7 @@
 \newcommand{\rh}[1]{\rotatebox{45}{\makebox[0pt][l]{\small #1}}}
 
 \author{
-  Peter Cotton\thanks{\email{peter.cotton@microprediction.com}}\\
+  Peter Cotton\thanks{Microprediction. \email{peter.cotton@microprediction.com}}\\
   \url{https://skaters.microprediction.org}
 }
 
@@ -36,19 +36,17 @@
 \Shorttitle{A Stronger Univariate Benchmark}
 
 \newcommand{\paperabstract}{
-A foundation model forecasts from a fixed window, with weights frozen at
-pretraining. An online forecaster carries state and revises it at every
-observation. Benchmarks for the first kind contain no example of the second: of
-the 132 entries on the \proglang{GIFT-Eval} leaderboard, five are not neural, and
-all five refit from scratch on each window. We propose \code{laplace}, a
-zero-dependency online distributional forecaster with no pretraining and no
-tunable parameters, as the missing reference. Scored one step ahead on
-held-out log density over an 18{,}815-series \proglang{FRED} panel, it beats
-TimesFM 3.0 on the median series in every stratum by roughly half a nat, and a
-post-hoc portfolio that sees only the model's own issued density recovers most
-of the gap without retraining. The reference costs a \code{pip install} to include, and a
-\proglang{Rust} core with a bit-exact parity suite makes its numbers recompute
-on other hardware.
+Reported progress for foundation time-series models rests on comparisons that
+leave out a strong classical reference. Across eleven benchmark papers the
+classical arms are per-window refits of ETS, ARIMA and Theta; no online
+forecaster appears, and no suite scores a predictive density. We supply the
+missing reference: \code{laplace}, an online distributional forecaster with no
+pretraining and no tunable parameters. Scored one step ahead on held-out log
+density over an 18{,}815-series \proglang{FRED} panel, it beats TimesFM 3.0 on
+the median series of every stratum by about half a nat, and a post-hoc
+portfolio that sees only the model's own issued density recovers most of the
+gap. It is a \code{pip install}, with a \proglang{Rust} core and bit-exact
+parity.
 }
 
 \begin{document}
@@ -65,10 +63,11 @@ probabilistic forecasting, proper scoring rules, online learning.
 %% -------------------------------------------------------------------------
 \section{Introduction}\label{sec:intro}
 
-A foundation model forecasts from a fixed window of recent history, with weights
-frozen at pretraining. An online forecaster carries state, and revises it with
-every observation it sees. Benchmarks for the first kind contain no example of
-the second.
+The comparisons that report progress for foundation time-series models leave
+out a strong classical reference. A foundation model forecasts from a fixed
+window of recent history, with weights frozen at pretraining. An online
+forecaster carries state and revises it with every observation. The benchmarks
+for the first kind contain no example of the second.
 
 Table~\ref{tab:arms} enumerates the classic arms of eleven studies, read from
 the papers rather than from their leaderboards: GIFT-Eval
@@ -169,9 +168,8 @@ and their deep baselines. It is carried by one of the eleven
 We scored \pkg{NPTS} through the same protocol as every other arm here. It
 loses to \code{laplace} on the median series in all four strata, by $0.05$ nats
 on daily prices and $0.39$ on daily economics, over $1{,}500$ series per stratum
-where the corpus allows. So the arm the field already ships and does not run is
-beatable, which is the weaker of the two things one might have found, and it
-sets the floor this paper's reference has to clear.
+where the corpus allows. The arm the field already ships and does not run is
+beatable. That sets the floor this paper's reference has to clear.
 
 This paper supplies such an arm and reports what it does to the comparison. The
 contribution is deliberately small: a reference, a protocol, and four tables.
@@ -214,7 +212,7 @@ needs to judge the comparison.
 Two properties matter for a reference arm, and neither is accuracy. The first is
 cost. Adding \code{laplace} to a leaderboard is a \code{pip install} and one
 function call, with no weights to download, no device to allocate, and no
-context length to choose. The pure-\proglang{Python} implementation, $280$\,KB of source across $28$
+context length to choose. The pure-\proglang{Python} implementation, $288$\,KB of source across $28$
 files, is the reference; a \proglang{Rust} core runs the same arithmetic about
 twenty times faster.
 
@@ -294,9 +292,6 @@ and a shared parity suite checks roughly $100{,}000$ probe values to $10^{-6}$
 per implementation. A number one person publishes therefore recomputes on
 another person's hardware, which is the property a denominator needs and a
 pretrained checkpoint behind an inference stack does not have.
-
-A denominator sets what a skill score means, and a weak one flatters everything
-divided by it.
 
 Sections~\ref{sec:classic} and \ref{sec:results} measure how strong it is.
 \code{laplace} takes the per-series log-likelihood against every classical arm
@@ -416,8 +411,9 @@ which the model loses.}
 \label{tab:raw}
 \end{table}
 
-The model loses on the majority of series in every stratum, by a median of
-roughly half a nat. Half a nat is a large gap in log-likelihood terms.
+The model trails the reference on the median series in every stratum, by
+roughly half a nat, and loses on more series than it wins. Half a nat is a large
+gap in log-likelihood terms.
 
 Table~\ref{tab:wrapped} repeats the comparison with the model wrapped in a
 post-hoc portfolio that combines its own issued predictive with the reference.
@@ -443,8 +439,8 @@ in every stratum.}
 \label{tab:wrapped}
 \end{table}
 
-The wrapped model is safe to deploy, since its loss rate collapses. It remains
-behind the reference, since the median stays negative in every stratum.
+The wrap cuts the loss rate by as much as thirty-nine points. The median stays
+negative in every stratum, so the wrapped model still trails the reference.
 
 A post-hoc combination that sees only the published density recovers most of the
 gap. At this horizon the pretraining is therefore contributing less than the raw
@@ -454,8 +450,8 @@ comparison suggests, and what it does contribute survives a wrapper.
 \section{The reconstruction moves the answer more than the model does}\label{sec:nozzle}
 
 A quantile-only model does not emit a density, and a density must exist before a
-log score does. Something must build one from the quantiles, and that something
-is a modelling choice independent of the model being scored.
+log score does. A reconstruction step builds one from the quantiles, and the
+choice of step is independent of the model being scored.
 
 Fix TimesFM 3.0 and fix $3{,}200$ held-out test points, then vary only the
 reconstruction across four methods. The mean log density moves from $-0.373$ to
@@ -492,7 +488,7 @@ levels including the first and ninety-ninth.
 
 And no baseline carries state, which is the hole of Section~\ref{sec:intro}.
 Each setting is defensible for the task those suites set themselves. Together
-they define a regime in which an online distributional method cannot compete.
+they define a regime in which an online distributional method is never scored.
 
 %% -------------------------------------------------------------------------
 \section{Scope}\label{sec:scope}

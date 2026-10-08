@@ -10,7 +10,7 @@
 % Required packages
 \RequirePackage{amsmath,amsfonts,amssymb}
 \RequirePackage{graphicx}
-\RequirePackage{color}
+\RequirePackage{xcolor}
 \RequirePackage{url}
 \RequirePackage{hyperref}
 \RequirePackage{booktabs}
