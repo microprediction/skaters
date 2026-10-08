@@ -184,9 +184,10 @@ needs its own check. Harmonic dyadic regression avoids the question.
 
 \begin{remark}[Fitted versus frozen]
 Fitting the coefficients is what makes dyadic regression forecast well on real series, where some
-scales predict and others do not. Freezing them at the equal-weight point is what makes the
-\citet{fishelson2026} forecaster robust, since a learned preferred scale is exactly what an
-adversary exploits. A frozen forecaster that uses only past outcomes is calibrated but carries no
+scales predict and others do not. Freezing them at the equal-weight point, and announcing the harmonic mixture of
+the stored averages rather than any single average, is what makes the \citet{fishelson2026}
+forecaster robust, since a learned preferred scale is exactly what an adversary exploits. Averaging
+that mixture into one forecast loses the guarantee. A frozen forecaster that uses only past outcomes is calibrated but carries no
 information about the input. The two can be combined by shrinking the fitted coefficients toward
 the equal-weight point instead of toward zero, so the model starts from the forecaster no sequence
 can exploit and moves only as far as the data justify. Whether the shrunk model keeps any form of the
