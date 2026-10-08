@@ -1,4 +1,4 @@
-\begin{thebibliography}{47}
+\begin{thebibliography}{49}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -68,7 +68,6 @@ Drew Creal, Siem~Jan Koopman, and Andr{\'e} Lucas.
 Claudia Czado, Tilmann Gneiting, and Leonhard Held.
 \newblock Predictive model assessment for count data.
 \newblock \emph{Biometrics}, 65\penalty0 (4):\penalty0 1254--1261, 2009.
-\newblock \doi{10.1111/j.1541-0420.2009.01191.x}.
 
 \bibitem[Das et~al.(2024)Das, Kong, Sen, and Zhou]{das2024timesfm}
 Abhimanyu Das, Weihao Kong, Rajat Sen, and Yichen Zhou.
@@ -199,6 +198,12 @@ James~E Matheson and Robert~L Winkler.
 \newblock \emph{Management Science}, 22\penalty0 (10):\penalty0 1087--1096,
   1976.
 
+\bibitem[{PyMC Labs}(2026)]{pymcforecast2026}
+{PyMC Labs}.
+\newblock pymc-forecast 0.0.1: A {Bayesian} time-series forecasting toolkit for
+  {PyMC}.
+\newblock \url{https://github.com/pymc-labs/pymc_forecast}, 2026.
+
 \bibitem[Raftery et~al.(2005)Raftery, Gneiting, Balabdaoui, and
   Polakowski]{raftery2005using}
 Adrian~E Raftery, Tilmann Gneiting, Fadoua Balabdaoui, and Michael Polakowski.
@@ -250,6 +255,13 @@ Sean~J Taylor and Benjamin Letham.
 {The Pyodide development team}.
 \newblock Pyodide: Python with the scientific stack, compiled to {WebAssembly}.
 \newblock \url{https://pyodide.org}, 2021.
+
+\bibitem[Viole(2026)]{viole2026nns}
+Fred Viole.
+\newblock \emph{{NNS}: Nonlinear Nonparametric Statistics}, 2026.
+\newblock URL \url{https://CRAN.R-project.org/package=NNS}.
+\newblock R package version 13.0; same-phase component forecasting in
+  \code{NNS.ARMA} since 2017.
 
 \bibitem[Vovk et~al.(2005)Vovk, Gammerman, and Shafer]{vovk2005algorithmic}
 Vladimir Vovk, Alexander Gammerman, and Glenn Shafer.
