@@ -42,12 +42,14 @@ classical arms are per-window refits of ETS, ARIMA and Theta; no online
 forecaster appears, and no suite scores a predictive density. We supply the
 missing reference: \code{laplace}, an online distributional forecaster with no
 pretraining and no tunable parameters. Scored one step ahead on held-out log
-density over an 18{,}815-series \proglang{FRED} panel, it beats TimesFM 3.0 on
-the median series of every stratum by about half a nat, and a post-hoc
-portfolio that sees only the model's own issued density recovers most of the
-gap. It is a \code{pip install}, with a \proglang{Rust} core and bit-exact
-parity.
+density over an 18{,}815-series panel of \proglang{FRED} and M4-hourly series,
+it beats TimesFM 3.0 on the median series of every stratum by about half a nat.
+A post-hoc log-score portfolio of the reference with the model's recalibrated
+density, needing no retraining, cuts the model's loss rate by up to thirty-nine
+points and still trails the reference at the median. The reference is a
+\code{pip install}, with a \proglang{Rust} core and bit-exact parity.
 }
+\date{October 8, 2026}
 
 \begin{document}
 
@@ -116,11 +118,11 @@ ZeroModel        &    &    &    &    &    &    &    &    &    & \F &    & 1 \\
 \end{tabular}
 \caption{Every classic arm in eleven studies. \F\ the authors ran it; \I\ the
 number is inherited from another paper's table or from a leaderboard; \B\ both,
-in different experiments. $n$ counts the studies carrying each method. The two
-rows below the rule are the methods that carry state and issue a density.
+in different experiments. $n$ counts the studies carrying each method.
 Tables inherited from \citet{godahewa2021monash} print ARIMA and its
 harmonic-regression variant as one column applied to disjoint frequency groups;
-both rows are marked.}
+both rows are marked. The two rows below the rule are the methods that issue a
+density without a per-window fit.}
 \label{tab:arms}
 \end{table}
 
@@ -160,7 +162,7 @@ in seven of the eleven, and as the substituted score when another arm times out
 in two of them.
 
 The last two rows of Table~\ref{tab:arms} are the methods in this literature
-that carry state and issue a density. \pkg{NPTS} is training-free and is a
+that issue a density without a per-window fit. \pkg{NPTS} is training-free and is a
 sampling distribution by construction, and it ships in both \pkg{GluonTS} and
 \pkg{AutoGluon}, which these studies import for their datasets, their metrics
 and their deep baselines. It is carried by one of the eleven
@@ -242,7 +244,9 @@ TimesFM-2.5-200M                    & $323.44$ & $5.10$  & $329.83$ \\
 \bottomrule
 \end{tabular}
 \caption{Milliseconds per forecast, context $256$, horizon $12$, $64$ series,
-one thread, Apple silicon, \pkg{skaters} $0.16.0$. Foundation models batch in
+one thread, Apple silicon, \pkg{skaters} $0.16.0$. The TimesFM timed here is
+TimesFM-2.5-200M; Tables~\ref{tab:raw} and \ref{tab:wrapped} score TimesFM 3.0.
+Foundation models batch in
 the cold regime, so the batched column is reported alongside the per-series one.
 In the warm regime \code{laplace} performs one state update; a stateless model
 re-runs its forward pass over a shifted window and a refitting baseline
@@ -312,7 +316,10 @@ differenced per series so that each series' intrinsic difficulty cancels.
 
 We report the median of that difference and the per-series win, draw and loss
 counts from a Diebold--Mariano test with HAC standard errors and a draw band,
-following \citet{diebold1995comparing}. We do not report a pooled mean.
+following \citet{diebold1995comparing}: two-sided at the five percent level,
+with a difference inside $\pm 1.96$ standard errors counted as a draw. Log
+densities are floored at $-20$ before differencing. We do not report a pooled
+mean.
 Averaging a log density across heterogeneous series estimates nothing, because a
 few near-constant series dominate the sum; \citet{koning2005m3} made the
 corresponding argument about the M3 competition, and \citet{hewamalage2023evaluation}
@@ -389,8 +396,10 @@ online method clears by a wide margin on the same data.
 \section{Against TimesFM 3.0}\label{sec:results}
 
 Table~\ref{tab:raw} scores TimesFM 3.0 \citep{das2024timesfm} zero-shot against
-the reference on an 18{,}815-series \proglang{FRED} panel. Negative favours the
-reference.
+the reference on an 18{,}815-series panel: four \proglang{FRED} strata and the
+414 M4-hourly series. The model's nine deciles are turned into a density by the
+local-bandwidth mixture (\code{quantile\_dist}, the \code{local} method of
+Section~\ref{sec:nozzle}). Negative favours the reference.
 
 \begin{table}[t!]
 \centering
@@ -417,9 +426,13 @@ roughly half a nat, and loses on more series than it wins. Half a nat is a large
 gap in log-likelihood terms.
 
 Table~\ref{tab:wrapped} repeats the comparison with the model wrapped in a
-post-hoc portfolio that combines its own issued predictive with the reference.
-The wrap requires no retraining and no access to model internals; it sees only
-the density the model published.
+post-hoc portfolio: a long-only online log-score blend of the reference with
+the model's issued density after PIT recalibration against the reference, the
+weights started two log units toward the reference, and the mixture rebuilt on
+the standard quantile grid. The wrap requires no retraining and no access to
+model internals. $N$ is smaller than in Table~\ref{tab:raw} because the
+recalibration needs $128$ further warm-up observations, and series that cannot
+supply them are dropped.
 
 \begin{table}[t!]
 \centering
@@ -443,9 +456,10 @@ in every stratum.}
 The wrap cuts the loss rate by as much as thirty-nine points. The median stays
 negative in every stratum, so the wrapped model still trails the reference.
 
-A post-hoc combination that sees only the published density recovers most of the
-gap. At this horizon the pretraining is therefore contributing less than the raw
-comparison suggests, and what it does contribute survives a wrapper.
+Because the portfolio contains the reference, the narrowing of the gap mostly
+measures the reference. What the wrap shows is narrower: the model's density can
+be combined with the reference without retraining, and the combination loses on
+fewer series than the raw model.
 
 %% -------------------------------------------------------------------------
 \section{The reconstruction moves the answer more than the model does}\label{sec:nozzle}
