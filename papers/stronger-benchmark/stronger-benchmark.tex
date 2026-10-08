@@ -28,9 +28,7 @@
 
 \author{
   Peter Cotton\\
-  Microprediction\\
-  \texttt{peter.cotton@microprediction.com}\\
-  \url{https://skaters.microprediction.org}
+  \texttt{peter.cotton@microprediction.com}
 }
 
 \title{A Stronger Univariate Benchmark for Foundational Time-Series Model Evaluation}
@@ -66,7 +64,8 @@ probabilistic forecasting, proper scoring rules, online learning.
 \section{Introduction}\label{sec:intro}
 
 The comparisons that report progress for foundation time-series models leave
-out a strong classical reference. A foundation model forecasts from a fixed
+out a strong classical reference.\footnote{All results reproduced at
+\url{https://skaters.microprediction.org}.} A foundation model forecasts from a fixed
 window of recent history, with weights frozen at pretraining. An online
 forecaster carries state and revises it with every observation. The benchmarks
 for the first kind contain no example of the second.
