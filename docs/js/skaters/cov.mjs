@@ -43,7 +43,7 @@ export function emaCov(y, state, alpha = 0.05) {
   for (let i = 0; i < n; i++) mean[i] += alpha * delta[i];
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      cov[i * n + j] = (1 - alpha) * (cov[i * n + j] + alpha * delta[i] * delta[j]);
+      cov[i * n + j] = (1 - alpha) * cov[i * n + j] + alpha * delta[i] * delta[j];
     }
   }
   return [mean.slice(), cov.slice(), state];
