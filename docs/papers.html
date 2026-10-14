@@ -87,10 +87,13 @@
       comparisons that leave out a strong classical reference. Across eleven benchmark papers
       the classical arms are per-window refits of ETS, ARIMA and Theta; no online forecaster
       appears, and no suite scores a predictive density. This paper supplies the missing
-      reference. Scored one step ahead on held-out log density over an 18,815-series panel,
-      laplace beats TimesFM 3.0 on the median series of every stratum by about half a nat.
-      Every number derives from a version-controlled store; the verifier and a three-tier
-      reproduction guide live next to the paper.</p>
+      reference, scored one step ahead on held-out log density over an 18,815-series panel.
+      The comparison is decided by a step the suites leave unstated: how the model's nine
+      quantiles become a density. Under a tight reconstruction the reference leads TimesFM 3.0
+      by half a nat on the median series of every stratum; under a generous one the two are
+      level at the median, and the reference keeps the better coverage. Every number derives
+      from a version-controlled store; the verifier and a three-tier reproduction guide live
+      next to the paper.</p>
       <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.pdf">PDF</a>
       <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.tex">LaTeX</a>
       <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/REPRODUCE.md">Reproduce</a>

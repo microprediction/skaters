@@ -80,11 +80,12 @@
       <strong>Abstract.</strong> Recalibration maps a predictive's probability integral
       transform back to uniform. It reliably delivers nominal coverage and costs sharpness:
       applied to three foundation models it moves central-90% coverage to 0.902 in every case
-      and loses 1.8 to 3.4 percent of CRPS. A conditional reparameterisation of the same
-      residual instead estimates a latent scale state and leaves the density family intact.
-      It gains 1 to 3 percent of pinball loss and improves coverage at the same time. The
-      difference is whether the correction carries state, and whether it discards the tails
-      it was given.
+      and loses 1.8 to 3.4 percent of CRPS. A conditional reparameterisation instead estimates
+      a latent scale state and leaves the density family intact. Applied to laplace on a
+      separate panel, scored by pinball loss at the central-80% level, it gains 1 to 3 percent
+      and moves coverage toward nominal at the same time. The two are case studies on
+      different base forecasts, panels and scores, not a paired contrast; the mechanism
+      offered for the difference in sign is a hypothesis.
     </div>
 
     <h2>1. Two corrections</h2>
@@ -131,10 +132,13 @@
     </table>
 
     <h2>3. What the reparameterisation gains</h2>
-    <p>The same residual stream, corrected conditionally instead of marginally. FRED,
-      792 paired series per horizon, one pool per horizon:</p>
+    <p>A second case study, on a different base forecast: laplace's own residual stream,
+      corrected conditionally instead of marginally. FRED, 792 paired series per
+      horizon, one pool per horizon, scored by pinball loss with central-80% coverage
+      (target 0.800):</p>
     <table class="res">
-      <tr><th>h</th><th>n</th><th>pinball ratio</th><th>wins</th><th>coverage</th></tr>
+      <tr><th>h</th><th>n</th><th>pinball ratio</th><th>wins</th>
+        <th>central-80% coverage (target 0.800)</th></tr>
       <tr><td class=num>1</td><td class=num>792</td><td class=num>0.9909</td><td class=num>61.4%</td><td class=num>0.854 &rarr; 0.841</td></tr>
       <tr><td class=num>3</td><td class=num>791</td><td class=num>0.9910</td><td class=num>58.2%</td><td class=num>0.858 &rarr; 0.856</td></tr>
       <tr><td class=num>5</td><td class=num>792</td><td class=num>0.9666</td><td class=num>64.4%</td><td class=num>0.920 &rarr; 0.869</td></tr>
@@ -144,10 +148,14 @@
     </table>
     <p>Ratios are below one throughout, so the corrected forecast is <em>better</em> on the
       proper score, by about 0.9 percent at one step and
-      3.3 percent at h=5. Coverage moves toward nominal
-      at the same time. The sign of the cost is reversed relative to recalibration.</p>
+      3.3 percent at h=5. Coverage moves toward the
+      0.800 target at the same time. Within this case study the sign of the cost is the
+      opposite of the one in section 2. The two sections differ in base forecast, panel,
+      library epoch, proper score and interval level, so the sign contrast is not a
+      controlled comparison of the two methods; section 4 offers a mechanism as a
+      hypothesis, not a measured result.</p>
 
-    <h2>4. Why the sign differs</h2>
+    <h2>4. A hypothesis for the difference in sign</h2>
     <p><strong>A marginal map cannot tighten and widen at once.</strong> Recalibration fits one
       monotone map for the whole stream. If coverage is short on average, the map widens on
       average. A state-carrying correction can tighten in quiet stretches and widen in violent
@@ -193,9 +201,16 @@
         seasonal, so the comparison is empirical rather than a statement about the theory.</li>
       <li>Both arms are one-step and multi-step density forecasts of economic change series.
         Level forecasting is not addressed.</li>
-      <li>The conformal figures come from an earlier library epoch than the homogenization
-        figures, so the two tables should not be differenced directly. Each is internally
-        paired, which is what the claims rest on.</li>
+      <li>Sections 2 and 3 are separate experiments: different base forecasts (three
+        foundation models; laplace), panels (8,740 series; about 790), library epochs,
+        proper scores (CRPS; pinball) and interval levels (central-90%; central-80%). Each
+        table is internally paired, which is what its own claims rest on. Nothing on this
+        page runs the two corrections head-to-head on one frozen forecast stream, so the
+        sign contrast between the sections is not attributed to the methods.</li>
+      <li>The foundation-model coverage in section 2 is that of a density reconstructed from
+        nine deciles, which on its own reads 0.81 for a calibrated source
+        (<a href="https://github.com/microprediction/skaters/issues/261">#261</a>); part of
+        what recalibration repairs there is the reconstruction.</li>
       <li>Gains and costs are both single-digit percentages. The interest is in the sign and
         the mechanism, not the magnitude.</li>
     </ul>
@@ -211,7 +226,7 @@
     </p>
     <p class="stamp">Recalibration arm: 1329 degenerate series excluded of the
       week-study universe. Homogenization arm measured with skaters
-      0.16.0+ff9740f. Page written 2026-08-14. Every
+      0.16.0+ff9740f. Page written 2026-10-14. Every
       figure is generated, not transcribed.</p>
   </main>
 

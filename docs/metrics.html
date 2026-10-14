@@ -236,10 +236,12 @@
     <p>
       Conformal prediction is this taken to its limit. A standard split-conformal
       predictor is not a density forecast. It targets finite-sample
-      <em>marginal</em> coverage (Lei et al., 2018). But coerce its calibration
-      residuals into an unsmoothed empirical predictive law and it assigns zero
-      density outside the observed range: $-\infty$ log-likelihood on any outcome
-      beyond it (about 0.1% here), while its CRPS stays finite and competitive. A
+      <em>marginal</em> coverage (Lei et al., 2018). Its calibration residuals form
+      a discrete empirical law, which has no density at all, so turning it into one
+      needs a smoothing choice. Any choice whose support stops at the observed
+      residual range assigns zero density beyond it: $-\infty$ log-likelihood on
+      any outcome outside that range (about 0.2% of $t_3$ draws against 2,000
+      calibration points here), while its CRPS stays finite and competitive. A
       method that need not produce a density at all, yet scores well on CRPS: the
       metric's tail-insensitivity turned into a feature of the approach.
       (Reproduce: <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/crps_tail_blindness.py"><code>benchmarks/crps_tail_blindness.py</code></a>.)

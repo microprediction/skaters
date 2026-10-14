@@ -284,7 +284,7 @@ def compute_radar(store):
 
 def radar_svg(model, radar):
     """One six-axis regime star plot: the raw model standalone vs Laplace, on the
-    log-likelihood ratio (Laplace = the dashed 1.0 ring, outward beats Laplace
+    log-likelihood win rate (Laplace = the dashed 1.0 ring, outward beats Laplace
     more often). Standalone only; no sandwich arms."""
     W, H, cx, cy, R = 560, 470, 280, 240, 180
     K = len(RADAR_AXES)
@@ -301,7 +301,7 @@ def radar_svg(model, radar):
     parts = [f'<svg viewBox="0 0 {W} {H}" style="width:100%;max-width:560px;height:auto;'
              f'display:block;margin:0 auto" role="img" '
              f'aria-label="Star plot of {model["name"]} standalone versus Laplace across '
-             f'six regime axes; the log-likelihood ratio, Laplace on the 1.0 ring.">']
+             f'six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring.">']
     for rv in (0.5, 1.0, 1.5):
         pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, rv) for i in range(K)))
         if abs(rv - 1.0) < 1e-9:
@@ -333,7 +333,7 @@ def radar_svg(model, radar):
             x, y = pt(i, v)
             parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{color}" '
                          f'stroke="#fff" stroke-width="1.5"><title>{RADAR_AXES[i][0]}: '
-                         f'log-likelihood ratio {v:.2f} vs Laplace '
+                         f'log-likelihood win rate {v:.2f} vs Laplace '
                          f'(n={d["n"][i]})</title></circle>')
     parts.append("</svg>")
     return "".join(parts)
@@ -393,12 +393,15 @@ def combined_section(model, vs, cov):
                     f'<td class="num">{fmt_pct(al)}</td></tr>')
     return f"""<h2>Collaborative use</h2>
     <p>Two collaborative arms wrap {model['name']}'s own predictive. <code>@lap</code>
-      lets Laplace forecast the model's normal scores, which fixes coverage; <code>&amp;lap</code>
+      lets Laplace forecast the normal scores of the reconstructed density, which restores
+      its coverage; <code>&amp;lap</code>
       holds Laplace and that wrap in a long-only online portfolio, so the blend is never
-      much worse than Laplace alone. The recalibration pulls raw coverage back toward the
-      0.90 target, and the portfolio collapses the loss rate against Laplace.</p>
+      much worse than Laplace alone. The recalibration pulls the reconstruction's coverage
+      back toward the 0.90 target, and the portfolio collapses the loss rate against Laplace.
+      The raw column is the reconstruction's coverage (0.81 for a calibrated source, see
+      above), so part of what <code>@lap</code> repairs is the reconstruction.</p>
     <table>
-      <thead><tr><th>stratum</th><th class="num">raw cov</th><th class="num">@lap cov</th>
+      <thead><tr><th>stratum</th><th class="num">reconstructed cov</th><th class="num">@lap cov</th>
       <th class="num">raw loss</th><th class="num">&amp;lap loss</th></tr></thead>
       <tbody>
       {chr(10).join(rows)}
@@ -514,13 +517,18 @@ def build_page(slug, model, vs, cov, radar):
     </div>
     <p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood
       in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse);
-      raw central-90% coverage (0.90 target).</p>
+      central-90% coverage (0.90 target) of the density reconstructed from the model's nine
+      deciles by <code>quantile_dist</code>, not a native model interval. The reconstruction
+      is not calibration-preserving: fed the exact deciles of a standard normal it covers
+      0.81, so a perfectly calibrated model reads 0.81 in this column. The log-likelihood
+      and CRPS columns depend on the same reconstruction.</p>
 
     <h2>Star plot</h2>
     <p>{model['name']} standalone against Laplace, on the same six regime axes as the site's
       <a href="/challengers.html">standalone radar</a>. Each radius is the log-likelihood
-      ratio, <code>(wins + &frac12;&middot;ties) / n</code> scaled so an even split with
-      Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward less. The
+      win rate, <code>(wins + &frac12;&middot;ties) / n</code>, divided by one half so an even
+      split with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
+      less. It is a share of series, not a ratio of likelihoods. The
       M4-hourly set splits into soft and hard waveforms by corpus order, matching that radar.</p>
     <figure style="margin:16px 0 6px">
       {svg}
