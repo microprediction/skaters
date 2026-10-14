@@ -19,8 +19,10 @@ in: a two-point Gaussian scale mixture
 
     g(z) = 1/2 * N(0, v(1-delta))(z) + 1/2 * N(0, v(1+delta))(z)
 
-(a single N(0, v) when ``delta == 0``), always a genuine density for any
-``v > 0``. ``v`` plays the ``H_2`` role (the predictable variance level);
+(a single N(0, v) when ``delta == 0``), a genuine density whenever ``v > 0``
+and ``0 <= delta < 1`` (both component variances positive; at ``delta == 1``
+one component degenerates to a point mass). ``make_candidates`` enforces that
+domain. ``v`` plays the ``H_2`` role (the predictable variance level);
 splitting one variance into two nearby ones via ``delta`` is literally how
 excess kurtosis arises from purely Gaussian pieces -- the same mathematics
 as a Student-t written as a Gaussian scale mixture, or a population that is
@@ -159,7 +161,15 @@ def make_candidates(rho_grid=(0.0, 0.8, 0.95, 0.99), gain_grid=(0.03, 0.12),
                      delta_grid=(0.0, 0.25, 0.50), delta_max: float = _DELTA_MAX):
     """Static candidate config grid, plus a distinguished identity candidate
     (rho=gain=delta=0, frozen at v=1 forever -- distinct from the grid's own
-    rho=0 entries, which still react to every tick via a nonzero gain)."""
+    rho=0 entries, which still react to every tick via a nonzero gain).
+
+    The scale mixture is a density only for ``0 <= delta < 1``, so ``delta_max``
+    and every entry of ``delta_grid`` must lie in that half-open interval."""
+    if not (0.0 <= delta_max < 1.0):
+        raise ValueError(f"delta_max must satisfy 0 <= delta_max < 1, got {delta_max!r}")
+    for delta in delta_grid:
+        if not (0.0 <= float(delta) < 1.0):
+            raise ValueError(f"delta_grid entries must satisfy 0 <= delta < 1, got {delta!r}")
     candidates = [{"rho": 0.0, "gain": 0.0, "delta": 0.0, "is_identity": True}]
     for rho in rho_grid:
         for gain in gain_grid:

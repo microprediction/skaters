@@ -134,3 +134,19 @@ def _gen_two_state_sv(T, seed, sigma_lo=0.6, sigma_hi=1.8, p_switch=0.02):
             y = 1 - y
         zs.append(sig[y] * rng.gauss(0.0, 1.0))
     return zs
+
+
+def test_delta_domain_is_enforced():
+    """#277: the scale mixture is a density only for 0 <= delta < 1, so the public
+    constructor rejects delta_max or grid entries at or beyond 1 up front."""
+    import pytest
+    for bad in (1.0, 1.2):
+        with pytest.raises(ValueError, match="delta_max"):
+            make_candidates(delta_grid=(0.5,), delta_max=bad)
+        with pytest.raises(ValueError, match="delta_grid"):
+            make_candidates(delta_grid=(bad,))
+    with pytest.raises(ValueError):
+        make_candidates(delta_grid=(-0.1,))
+    # the default grid is inside the domain and unchanged
+    deltas = sorted({c["delta"] for c in make_candidates()})
+    assert deltas == [0.0, 0.25, 0.5]
