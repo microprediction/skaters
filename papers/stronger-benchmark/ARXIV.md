@@ -34,7 +34,7 @@ overwrites the shipped `.bbl` with an empty one.
 Reported progress for foundation time-series models rests on comparisons that
 leave out a strong classical reference. Across eleven benchmark papers the
 classical arms are per-window refits of ETS, ARIMA and Theta; no online
-forecaster appears, and no suite scores a predictive density. We supply the
+forecaster appears, and no suite scores a full predictive density by log score. We supply the
 missing reference: laplace, an online distributional forecaster with no
 pretraining and no tunable parameters. Scored one step ahead on held-out log
 density over an 18,815-series FRED panel, it beats TimesFM 3.0 on the median

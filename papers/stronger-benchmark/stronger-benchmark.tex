@@ -39,7 +39,7 @@
 Reported progress for foundation time-series models rests on comparisons that
 leave out a strong classical reference. Across eleven benchmark papers the
 classical arms are per-window refits of ETS, ARIMA and Theta; no online
-forecaster appears, and no suite scores a predictive density. We supply the
+forecaster appears, and no suite scores a full predictive density by log score. We supply the
 missing reference, \code{laplace}, an online distributional forecaster with no
 pretraining and no tunable parameters, and score it against TimesFM 3.0 one
 step ahead on held-out log density over an 18{,}815-series panel of
@@ -313,16 +313,24 @@ reported rather than averaged away.
 \section{Protocol}\label{sec:protocol}
 
 Every arm sees the same series, the same windows and the same scoring rule. The
-context is 128 observations, the test window rolls one step ahead, and no arm is
-fitted to the evaluation data. The score is held-out log predictive density,
-differenced per series so that each series' intrinsic difficulty cancels.
+score is held-out log predictive density, differenced per series so that each
+series' intrinsic difficulty cancels. Two conditioning protocols appear. The
+foundation-model comparison (Tables~\ref{tab:raw}, \ref{tab:wrapped} and
+\ref{tab:wide}) fixes the context at 128 observations, rolls the test window
+one step ahead, and fits no arm to the evaluation data. The classic-arm
+comparison (Table~\ref{tab:classic}) is the companion paper's protocol: each
+arm conditions on all data up to the forecast point, with coefficients
+re-estimated every 25 steps. The two tables are not differenced against each
+other.
 
 We report the median of that difference and the per-series win, draw and loss
 counts from a Diebold--Mariano test with HAC standard errors and a draw band,
 following \citet{diebold1995comparing}: two-sided at the five percent level,
-with a difference inside $\pm 1.96$ standard errors counted as a draw. Log
-densities are floored at $-20$ before differencing. We do not report a pooled
-mean.
+with a difference inside $\pm 1.96$ standard errors counted as a draw. The
+long-run variance is Newey--West with a Bartlett kernel and lag
+$\lfloor n^{1/3} \rceil$ for a series of $n$ scored steps; series with fewer
+than eight finite differences are counted as draws. Log densities are floored
+at $-20$ before differencing. We do not report a pooled mean.
 Averaging a log density across heterogeneous series estimates nothing, because a
 few near-constant series dominate the sum; \citet{koning2005m3} made the
 corresponding argument about the M3 competition, and \citet{hewamalage2023evaluation}
