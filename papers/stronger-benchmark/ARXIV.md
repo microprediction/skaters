@@ -58,7 +58,7 @@ https://skaters.microprediction.org.
 
 ## Before submitting
 
-- The date line is the compile date; arXiv's own build sets it.
-- `cotton2026transforms` is cited as a techreport with no SSRN id. Put the id
-  in `benchmark.bib`, rebuild the `.bbl`, and rebuild the pack.
+- The date is a fixed string in the tex (`\date{...}`); update it for a revision.
+- `cotton2026transforms` carries its SSRN id (7220478); the companion paper
+  was posted 4 August 2026.
 - Re-run `verify_paper.py` on the tex that goes into the pack.
