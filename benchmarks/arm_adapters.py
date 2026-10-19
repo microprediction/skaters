@@ -44,6 +44,19 @@ DEVICE = os.environ.get("FM_DEVICE", "cpu")
 TIREX2_MODEL_ID = "NX-AI/TiRex-2"
 TIREX2_MODEL_REVISION = "05e5b26db52bfb256f1ae1bdf785589850482de3"
 
+# Timestral (Mistral, released 2026-10-15; issue #282). Package pinned to the
+# repository commit in benchmarks/timestral_requirements.lock; each checkpoint
+# pinned to its Hugging Face revision so a run cannot silently move.
+TIMESTRAL_REPO_COMMIT = "a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff"
+TIMESTRAL_REVISIONS = {
+    "5M":   "bdd20cfc15a3fea0e4cb5ccef37f8d3ca7aa335f",
+    "28M":  "180698bbf5a50dda3516aa6419798437fb03a430",
+    "123M": "5a147287addda85f6acd8da3fb8858fe9af7e8f7",
+    "209M": "9874d252ab0aae16f7f7c999f98f98d6ad7d8365",
+}
+LEVELS21 = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
+            0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
+
 
 def fixed_bandwidth_quantile_dist(
     levels,
@@ -239,6 +252,79 @@ def tirex2_dists(ch, h=1):
         ) for row in quantiles]
     except Exception as e:                                 # noqa: BLE001
         print(f"  tirex2 failed: {e}", flush=True); return None
+
+
+_timestral = {}
+def timestral_quantiles_from_contexts(contexts, h=1, size="28M"):
+    """Timestral's native 21-level quantile forecast at horizon ``h``,
+    one row per context: shape ``(n, 21)`` at the levels in ``LEVELS21``.
+
+    Both test-time conveniences are switched off explicitly: symmetric
+    averaging (a sign-flip augmentation) and the nonnegativity clip, which
+    would truncate the change series this benchmark scores.
+    """
+    from timestral import TimestralForecaster
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    if size not in TIMESTRAL_REVISIONS:
+        raise ValueError(f"unknown Timestral size {size!r}")
+    values = np.asarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if size not in _timestral:
+        _timestral[size] = TimestralForecaster.from_pretrained(
+            f"mistralai/Timestral-{size}", device=DEVICE,
+            revision=TIMESTRAL_REVISIONS[size])
+    model = _timestral[size]
+    levels = np.asarray(model.forecast(values[:1, None, :], prediction_length=1,
+                                       symmetric_averaging=False,
+                                       clip_nonnegative=False).quantile_levels, dtype=float)
+    if levels.shape != (21,) or not np.allclose(levels, LEVELS21):
+        raise ValueError(f"unexpected Timestral quantile levels: {levels.tolist()}")
+    batch = int(os.environ.get("TIMESTRAL_BATCH", "64"))
+    rows = []
+    for i in range(0, len(values), batch):
+        fc = model.forecast(values[i:i + batch, None, :], prediction_length=h,
+                            symmetric_averaging=False, clip_nonnegative=False)
+        q = np.asarray(fc.quantiles, dtype=float)             # (b, 1, h, 21)
+        rows.append(q[:, 0, h - 1, :])
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS21)):
+        raise ValueError(f"unexpected Timestral forecast shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Timestral produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("Timestral produced crossing quantiles")
+    return quantiles
+
+
+_Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
+
+
+def timestral_dists(ch, h=1, size="28M", levels="q9"):
+    """Timestral native quantiles reconstructed as benchmark ``Dist`` objects.
+
+    ``levels="q9"`` keeps the nine deciles and the TiRex-2 reconstruction, so
+    the arm is comparable with the other quantile models; ``"q21"`` feeds all
+    21 levels (1% to 99%) to the same fixed-bandwidth reconstruction.
+    """
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = timestral_quantiles_from_contexts(contexts, h=h, size=size)
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        if levels == "q9":
+            return [fixed_bandwidth_quantile_dist(
+                LEVELS9, row[_Q9_IN_21], spacing_multiplier=spacing
+            ) for row in quantiles]
+        return [fixed_bandwidth_quantile_dist(
+            LEVELS21, row, spacing_multiplier=spacing
+        ) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  timestral failed: {e}", flush=True); return None
 
 
 _flowstate = None
@@ -712,6 +798,13 @@ def make_registry(h=1):
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
         "TiRex-2":     lambda ch: tirex2_dists(ch, h),
+        # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
+        # reconstruction, plus the 28M on all 21 native levels
+        "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),
+        "Timestral-28M":  lambda ch: timestral_dists(ch, h, "28M"),
+        "Timestral-123M": lambda ch: timestral_dists(ch, h, "123M"),
+        "Timestral-209M": lambda ch: timestral_dists(ch, h, "209M"),
+        "Timestral-28M(q21)": lambda ch: timestral_dists(ch, h, "28M", "q21"),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
         "PyMC":        lambda ch: pymc_dists(ch, h),

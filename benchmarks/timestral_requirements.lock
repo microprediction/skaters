@@ -1,0 +1,27 @@
+# Timestral arm venv (.venv-timestral, Python 3.12.13); issue #282
+# timestral pinned to repository commit a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff
+anyio==4.15.1
+click==8.5.0
+filelock==4.2.4
+fsspec==2026.9.0
+h11==0.16.0
+hf-xet==1.7.0
+httpcore2==2.14.0
+httpx2==2.14.0
+huggingface_hub==2.2.0
+idna==3.20
+Jinja2==3.1.6
+MarkupSafe==3.0.4
+mpmath==1.3.0
+networkx==3.7
+numpy==2.5.4
+packaging==26.3
+PyYAML==6.0.3
+safetensors==0.8.0
+setuptools==84.0.0
+sympy==1.14.0
+timestral @ git+https://github.com/mistralai/timestral.git@a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff
+torch==2.14.1
+tqdm==4.70.1
+truststore==0.10.5
+typing_extensions==4.16.0
