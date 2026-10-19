@@ -26,7 +26,8 @@ def test_every_size_is_pinned():
 def test_registry_exposes_the_arms():
     reg = aa.make_registry(1)
     for name in ("Timestral-5M", "Timestral-28M", "Timestral-123M", "Timestral-209M",
-                 "Timestral-28M(q21)"):
+                 "Timestral-5M(q21)", "Timestral-28M(q21)", "Timestral-123M(q21)",
+                 "Timestral-209M(q21)"):
         assert name in reg
 
 

@@ -12,7 +12,7 @@ set -u
 cd "$(dirname "$0")/.."
 export PYTHONPATH=src:benchmarks
 PY=.venv-timestral/bin/python
-ARMS=${TIMESTRAL_ARMS:-"Timestral-5M Timestral-28M Timestral-123M Timestral-209M Timestral-28M(q21)"}
+ARMS=${TIMESTRAL_ARMS:-"Timestral-5M Timestral-28M Timestral-123M Timestral-209M Timestral-5M(q21) Timestral-28M(q21) Timestral-123M(q21) Timestral-209M(q21)"}
 CORPORA=${TIMESTRAL_CORPORA:-"m4-hourly weekly daily monthly"}
 THREADS=${TIMESTRAL_THREADS:-4}
 

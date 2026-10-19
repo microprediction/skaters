@@ -78,7 +78,10 @@ MODELS = {
     "Timestral-28M":  (".venv-timestral", "C", {}),
     "Timestral-123M": (".venv-timestral", "C", {}),
     "Timestral-209M": (".venv-timestral", "C", {}),
-    "Timestral-28M(q21)": (".venv-timestral", "C", {}),
+    "Timestral-5M(q21)":   (".venv-timestral", "C", {}),
+    "Timestral-28M(q21)":  (".venv-timestral", "C", {}),
+    "Timestral-123M(q21)": (".venv-timestral", "C", {}),
+    "Timestral-209M(q21)": (".venv-timestral", "C", {}),
     # laplace-calibrated sandwiches (quantile-averaged with laplace, own venv):
     "TimesFM+lap": (".venv-timesfm",   "C", {}),
     "TimesFM3+lap": (".venv-timesfm3", "C", {}),
