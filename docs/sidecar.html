@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters &mdash; Every foundational time-series model needs a sidecar, for now</title>
-  <meta name="description" content="A large-scale, coverage-matched comparison of zero-shot time-series foundation models against the Laplace online ensemble, and a model-agnostic sidecar that makes any of them safe to use." />
+  <meta name="description" content="Zero-shot time-series foundation models against the Laplace online ensemble on identical windows, with the quantile reconstruction named, and a model-agnostic sidecar that makes any of them safe to use." />
   <link rel="stylesheet" href="./academic.css" />
   <style>
     /* page-local: lightweight inline bars, in the site palette */
@@ -88,8 +88,9 @@
       </figcaption>
     </figure>
 
-    <p>Judged fairly, a small online ensemble already out-forecasts them on economic change-series;
-      the sidecar makes any of them safe to use generally, and rarely worse than Laplace alone.</p>
+    <p>Scored on a fair reconstruction of their quantiles, the strongest of them are level with a
+      small online ensemble on economic change-series at the median; the sidecar makes any of them
+      safe to use generally, and rarely worse than Laplace alone.</p>
 
     <p><span class="snapshot">Live snapshot</span> &nbsp;These numbers come from a round-robin study
       still running over the FRED universe, so cell counts differ between arms and the figures will
@@ -129,36 +130,43 @@
         the trusted incumbent.</li>
     </ul>
 
-    <h2>The obvious symptom: over-confidence</h2>
+    <h2>The apparent symptom: over-confidence, mostly manufactured</h2>
     <p>
-      A calibrated 90% interval should contain the outcome 90% of the time. The raw models cover far
-      less: their predictive is too narrow, so ordinary moves land outside the band and the tails go
-      unpriced. Laplace sits on target, and the <code>@lap</code> wrap pulls each model back
-      to nominal. (Seasonal stratum, M4-hourly.)
+      A calibrated 90% interval should contain the outcome 90% of the time. Scored through the tight
+      nine-decile reconstruction of their quantiles, the raw models cover far less. Most of that is
+      the reconstruction, not the model: fed the exact deciles of a calibrated normal, that
+      reconstruction covers 0.81, and the same forecasts through the generous reconstruction cover
+      0.82 to 0.90 on this stratum against Laplace's 0.892. The <code>@lap</code> wrap, built on the
+      tight base, pulls each model to nominal either way. (Seasonal stratum, M4-hourly.)
     </p>
     <table>
-      <thead><tr><th>model</th><th>raw coverage</th><th class="barcell">&nbsp;</th><th>@lap coverage</th><th class="barcell">&nbsp;</th></tr></thead>
+      <thead><tr><th>model</th><th>raw, tight reconstruction</th><th class="barcell">&nbsp;</th><th>raw, generous reconstruction</th><th class="barcell">&nbsp;</th><th>@lap (tight base)</th><th class="barcell">&nbsp;</th></tr></thead>
       <tbody id="covbody"></tbody>
     </table>
     <p style="font-size:.9rem;color:var(--muted)">Bars span 0.60&ndash;1.00; the orange line marks the
-      0.90 target. Laplace covers 0.892 on this stratum.</p>
+      0.90 target. Laplace covers 0.892 on this stratum. Central-90% coverage of the reconstructed
+      density in every column; a perfectly calibrated model reads 0.81 under the tight reconstruction
+      and 0.88 under the generous one.</p>
 
-    <h2>The deeper diagnosis: the gap is skill</h2>
+    <h2>What the gap is</h2>
     <p>
-      The charitable reading would be that the models are secretly good and merely miscalibrated.
-      You can't just fix this by Platt scaling or conformal leveling. The <code>@lap</code> column
-      bounds the charitable reading from above, and generously: Laplace driving the z-series fixes
-      coverage and also tracks error dynamics the model missed, so it recovers more than any static
-      remap could. Even with that help, only a sliver of each model's log-likelihood gap to Laplace
-      closes; the large remainder is a forecasting deficit on these change-series.
+      An earlier version of this page read the log-likelihood gap as a forecasting deficit. It is
+      mostly the reconstruction. Under the tight reconstruction the raw gap on this stratum is half a
+      nat to nearly a nat; the same forecasts under the generous reconstruction are within 0.05 nats
+      of Laplace at the median. The <code>@lap</code> wrap on the tight base recovers only a sliver
+      of the tight gap because it recalibrates the reconstruction's probability integral transform,
+      which fixes coverage but leaves the density's shape, so the recovered column measures what a
+      marginal recalibration buys, not the model's skill. A sidecar built on the generous
+      reconstruction has not been scored.
     </p>
     <table>
-      <thead><tr><th>model</th><th class="num">raw gap</th><th class="num">after @lap</th><th class="num">recovered</th><th>share recovered</th></tr></thead>
+      <thead><tr><th>model</th><th class="num">raw gap, tight</th><th class="num">raw gap, generous</th><th class="num">after @lap (tight base)</th><th class="num">recovered by @lap</th><th>share of tight gap</th></tr></thead>
       <tbody id="decbody"></tbody>
     </table>
     <p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood versus
-      Laplace, in nats (negative means worse than Laplace). Even laplace-driven, no model's median
-      beats Laplace on any stratum.</p>
+      Laplace, in nats (negative means worse than Laplace), M4-hourly. Under the generous
+      reconstruction no model's median is more than 0.05 nats from Laplace here, and on weekly and
+      monthly series TimesFM and TiRex are level or ahead; see each model's page.</p>
 
     <p>The <a href="https://conformalprediction.net/demos/13-coverage-score-plane.html">coverage-score
       plane</a> at conformalprediction.net makes the geometry explicit: a remap slides a model
@@ -243,8 +251,10 @@
         <span><i style="background:var(--good)"></i>Laplace baseline</span>
       </div>
       <figcaption style="font-size:.9rem;color:var(--muted);margin-top:8px;">
-        The coverage-score plane, M4-hourly stratum. Each arrow is one model, raw to
-        <code>@lap</code>: a long slide toward nominal coverage, a short climb in score.
+        The coverage-score plane, M4-hourly stratum. Each arrow is one model, raw (tight
+        reconstruction) to <code>@lap</code>: a long slide toward nominal coverage, a short climb in
+        score. Under the generous reconstruction the raw points instead sit at coverage 0.82 to 0.90
+        and within 0.05 nats of zero, next to Laplace's own point.
       </figcaption>
     </figure>
 
@@ -306,8 +316,8 @@
     <ul>
       <li>The <code>daily:econ</code> drag, above. Prior strength versus a structural cause.</li>
       <li>Convergence: cell counts are still growing, especially for the slower portfolio arms.</li>
-      <li>A fair per-model ranking once every stratum is deep, using the
-        <code>@lap</code> figures as the skill measure, with coverage held equal.</li>
+      <li>Sidecar arms built on the generous reconstruction (or Timestral's native 21 levels),
+        so the recalibration is measured on the fairest base rather than the tight one.</li>
     </ul>
 
   </main>
@@ -323,21 +333,25 @@
   <script>
     var COVMIN=0.60, COVMAX=1.00;
     function cw(v){ return Math.max(0,(v-COVMIN)/(COVMAX-COVMIN))*100; }
-    var cov=[["TiRex",0.756,0.889],["TimesFM",0.816,0.913],["Chronos",0.841,0.916]];
+    // tight raw, generous (wide) raw, @lap on the tight base; canonical_summary_coverage.csv, m4-hourly:econ
+    var cov=[["TiRex",0.756,0.823,0.889],["TimesFM",0.816,0.878,0.913],["Chronos",0.841,0.897,0.916]];
     var tgt=cw(0.90);
     document.getElementById("covbody").innerHTML = cov.map(function(r){
       function bw(v,cls){ return '<span class="barwrap"><span class="bar '+cls+'" style="width:'+cw(v).toFixed(1)+'%"></span><span class="target" style="left:'+tgt.toFixed(1)+'%"></span></span>'; }
       return '<tr><td>'+r[0]+'</td>'
            + '<td class="num">'+r[1].toFixed(3)+'</td><td>'+bw(r[1],'soft')+'</td>'
-           + '<td class="num">'+r[2].toFixed(3)+'</td><td>'+bw(r[2],'')+'</td></tr>';
+           + '<td class="num">'+r[2].toFixed(3)+'</td><td>'+bw(r[2],'soft')+'</td>'
+           + '<td class="num">'+r[3].toFixed(3)+'</td><td>'+bw(r[3],'')+'</td></tr>';
     }).join("");
 
-    var dec=[["TiRex",-0.88,-0.75],["TimesFM",-0.51,-0.49],["Chronos",-0.52,-0.50]];
+    // tight raw gap, generous (wide) raw gap, @lap on the tight base; canonical_summary_vs_laplace.csv, m4-hourly:econ
+    var dec=[["TiRex",-0.88,-0.04,-0.75],["TimesFM",-0.51,-0.02,-0.49],["Chronos",-0.52,-0.05,-0.50]];
     document.getElementById("decbody").innerHTML = dec.map(function(r){
-      var total=Math.abs(r[1]), resid=Math.abs(r[2]), recov=total-resid;
+      var total=Math.abs(r[1]), resid=Math.abs(r[3]), recov=total-resid;
       var share=(recov/total*100);
       return '<tr><td>'+r[0]+'</td><td class="num">'+r[1].toFixed(2)+'</td>'
            + '<td class="num">'+r[2].toFixed(2)+'</td>'
+           + '<td class="num">'+r[3].toFixed(2)+'</td>'
            + '<td class="num">'+(recov>=0?'+':'')+recov.toFixed(2)+'</td>'
            + '<td>'+share.toFixed(0)+'%</td></tr>';
     }).join("");
