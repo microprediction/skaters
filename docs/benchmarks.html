@@ -39,6 +39,7 @@
             <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -120,6 +121,18 @@
       rescue them — it catastrophically overfits (logpdf +1.5 → −118). A zero-dependency online
       ensemble holding its own against 200M-parameter transformers.
       <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">The foundation study →</a>
+    </p>
+    <p>
+      That table is the original 120-series study and is kept for the record. The current
+      comparison runs the same zero-shot protocol (128-length context, one step ahead) over the
+      full 18,815-series panel, one page per model with per-stratum tables, coverage and a
+      star plot: <a href="/foundation/timesfm3.html">TimesFM3</a>,
+      <a href="/foundation/timestral.html">Timestral</a>, <a href="/foundation/tirex.html">TiRex</a>,
+      <a href="/foundation/chronos.html">Chronos</a>, <a href="/foundation/sundial.html">Sundial</a>,
+      <a href="/foundation/flowstate.html">FlowState</a>. Read the win rates with the
+      reconstruction in mind: a quantile model's log score depends on how its quantiles are
+      turned into a density, and the <a href="/papers.html">benchmark paper</a> shows the
+      half-nat margin over TimesFM3 is that step, not the model.
     </p>
 
     <h2>Challengers</h2>

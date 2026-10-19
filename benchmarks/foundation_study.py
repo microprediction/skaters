@@ -141,7 +141,7 @@ def _ctx_batch(ch):
 
 
 _chronos = None
-def chronos_dists(ch, h=1):
+def chronos_dists(ch, h=1, recon=None):
     """Chronos-Bolt (quantile head) zero-shot. We use Bolt rather than the
     autoregressive T5 sampler: it is ~36x faster (a single forward pass) and does
     not stall, at the cost of being quantile-only -> its log-likelihood is a
@@ -158,7 +158,8 @@ def chronos_dists(ch, h=1):
         q, _ = _chronos.predict_quantiles(inputs=ctx, prediction_length=h,
                                           quantile_levels=levels)
         q = q[:, h - 1, :].cpu().numpy()    # [B, n_levels] at horizon h
-        return [quantile_dist(levels, q[i]) for i in range(len(q))]
+        rec = recon or quantile_dist
+        return [rec(levels, q[i]) for i in range(len(q))]
     except Exception as e:                  # noqa: BLE001
         print(f"  chronos failed: {e}", flush=True); return None
 
@@ -234,7 +235,7 @@ def lagllama_dists(ch):
 
 
 _timesfm = None
-def timesfm_dists(ch, h=1):
+def timesfm_dists(ch, h=1, recon=None):
     """TimesFM 2.5 zero-shot; decile quantile head -> quantile_dist. For h>1 the
     context ends h steps before each target and the horizon-h forecast is scored."""
     global _timesfm
@@ -260,7 +261,8 @@ def timesfm_dists(ch, h=1):
             levels = list(np.linspace(0.1, 0.9, Q))
         # NB forecast() pads `inputs` in place to per_core_batch_size but returns
         # exactly one row per real window; iterate over the returned rows.
-        return [quantile_dist(levels, qcols[i]) for i in range(qcols.shape[0])]
+        rec = recon or quantile_dist
+        return [rec(levels, qcols[i]) for i in range(qcols.shape[0])]
     except Exception as e:                  # noqa: BLE001
         print(f"  timesfm failed: {e}", flush=True); return None
 

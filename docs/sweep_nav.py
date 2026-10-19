@@ -43,6 +43,7 @@ CANONICAL = """  <header class="site-header">
             <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>

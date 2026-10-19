@@ -159,7 +159,7 @@ def sundial_dists(ch, h=1):
 
 
 _tirex = None
-def tirex_dists(ch, h=1):
+def tirex_dists(ch, h=1, recon=None):
     """TiRex (NX-AI, 35M xLSTM): 9-quantile head -> smoothed-mixture Dist. CPU
     backend='torch' (no CUDA kernel on this box)."""
     global _tirex
@@ -172,7 +172,8 @@ def tirex_dists(ch, h=1):
         q, _mean = _tirex.forecast(context=ctx, prediction_length=h,
                                    output_type="numpy")     # q: [TEST, h, 9]
         q = np.asarray(q)[:, h - 1, :]                       # horizon h
-        return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
+        rec = recon or fs.quantile_dist
+        return [rec(LEVELS9, q[i]) for i in range(len(q))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  tirex failed: {e}", flush=True); return None
 
@@ -328,7 +329,7 @@ def timestral_dists(ch, h=1, size="28M", levels="q9"):
 
 
 _flowstate = None
-def flowstate_dists(ch, h=1):
+def flowstate_dists(ch, h=1, recon=None):
     """flowstate (IBM research checkpoint, SSM + functional-basis decoder):
     9-quantile output -> smoothed-mixture Dist."""
     global _flowstate
@@ -344,7 +345,8 @@ def flowstate_dists(ch, h=1):
             out = _flowstate(past_values=ctx, prediction_length=h)
         q = out.quantile_outputs.float().cpu().numpy()     # [TEST, 9, h, 1]
         q = q[:, :, h - 1, 0]                              # [TEST, 9] at horizon h
-        return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
+        rec = recon or fs.quantile_dist
+        return [rec(LEVELS9, q[i]) for i in range(len(q))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  flowstate failed: {e}", flush=True); return None
 
@@ -818,6 +820,10 @@ def make_registry(h=1):
         # same forecasts, the widest reconstruction in nozzles.py (issue #269): the
         # reconstruction most favourable to TimesFM3 on the nozzle study's sample
         "TimesFM3(wide)": lambda ch: fs.timesfm3_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "Chronos(wide)":  lambda ch: fs.chronos_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "TimesFM(wide)":  lambda ch: fs.timesfm_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "TiRex(wide)":    lambda ch: tirex_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "flowstate(wide)": lambda ch: flowstate_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
         "TimesFM+lap": _sandwich(fs.timesfm_dists, h),
         "TimesFM3+lap": _sandwich(fs.timesfm3_dists, h),
         "TiRex+lap":   _sandwich(tirex_dists, h),

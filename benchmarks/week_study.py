@@ -73,6 +73,12 @@ MODELS = {
     "TimesFM":     (".venv-timesfm",   "C", {}),
     "TimesFM3":    (".venv-timesfm3",  "C", {}),
     "TabPFN":      (".venv-tabpfn",    "C", {}),
+    # generous (3x bandwidth) reconstruction of the same quantile forecasts (#269)
+    "Chronos(wide)":  (".venv-chronos",   "C", {}),
+    "TimesFM(wide)":  (".venv-timesfm",   "C", {}),
+    "TimesFM3(wide)": (".venv-timesfm3",  "C", {}),
+    "TiRex(wide)":    (".venv-tirex",     "C", {}),
+    "flowstate(wide)": (".venv-flowstate", "C", {}),
     # Timestral (#282): CPU checkpoints, pinned in arm_adapters.TIMESTRAL_REVISIONS
     "Timestral-5M":   (".venv-timestral", "C", {}),
     "Timestral-28M":  (".venv-timestral", "C", {}),
