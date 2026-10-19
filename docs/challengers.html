@@ -30,6 +30,7 @@
             <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -498,16 +499,22 @@
         <tr><td>CSP (official <code>csp-forecaster</code>, 12 configs)</td><td>conformal</td><td>98&ndash;99%</td><td>98&ndash;99%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
         <tr><td><em>CSP, strongly-seasonal series (M4-Hourly)</em></td><td>conformal</td><td colspan="2"><em>the belt is theirs; seasonal pooling earns it there</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
         <tr><td>AutoARIMA + conformal / ACI</td><td>conformal</td><td>86% / 88%</td><td>31% / 29%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#headline-vs-eight-distributional-baselines-studypy-sota">study</a></td></tr>
-        <tr><td><strong>TimesFM 2.5, 200M (Google)</strong></td><td>foundation</td><td>100% cont.</td><td>72% cont.</td><td><a href="/timesfm.html"><strong>David v Goliath</strong></a></td></tr>
-        <tr><td>Chronos-Bolt (Amazon)</td><td>foundation</td><td>100% cont.</td><td>88% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
-        <tr><td>Moirai (Salesforce)</td><td>foundation</td><td>97% cont.</td><td>93% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
-        <tr><td>Lag-Llama</td><td>foundation</td><td>99% cont.</td><td>94% cont.</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
+        <tr><td><strong>Timestral 209M (Mistral), native 21 quantiles</strong></td><td>foundation</td><td>27% (64% draw)&dagger;</td><td>ratio 0.98&dagger;</td><td><a href="/foundation/timestral.html">page</a></td></tr>
+        <tr><td><strong>TimesFM 3.0 (Google), wide reconstruction</strong></td><td>foundation</td><td>28% (63% draw)&dagger;</td><td>ratio 0.98&dagger;</td><td><a href="/foundation/timesfm3.html">page</a></td></tr>
+        <tr><td>TimesFM 2.5, 200M (Google), wide reconstruction</td><td>foundation</td><td>32% (57% draw)&dagger;</td><td>ratio 0.99&dagger;</td><td><a href="/foundation/timesfm.html">page</a></td></tr>
+        <tr><td>TiRex (NX-AI), wide reconstruction</td><td>foundation</td><td>35% (60% draw)&dagger;</td><td>ratio 1.00&dagger;</td><td><a href="/foundation/tirex.html">page</a></td></tr>
+        <tr><td>Chronos-Bolt small (Amazon), wide reconstruction</td><td>foundation</td><td>44% (54% draw)&dagger;</td><td>ratio 1.01&dagger;</td><td><a href="/foundation/chronos.html">page</a></td></tr>
+        <tr><td>FlowState (IBM), wide reconstruction</td><td>foundation</td><td>66% (34% draw)&dagger;</td><td>ratio 1.02&dagger;</td><td><a href="/foundation/flowstate.html">page</a></td></tr>
+        <tr><td>Sundial (THUML), 30-sample kernel density</td><td>foundation</td><td>95% (3% draw)&dagger;</td><td>ratio 1.08&dagger;</td><td><a href="/foundation/sundial.html">page</a></td></tr>
+        <tr><td>Moirai (Salesforce), native Student-t</td><td>foundation</td><td>97% cont.&Dagger;</td><td>93% cont.&Dagger;</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
+        <tr><td>Lag-Llama, native Student-t</td><td>foundation</td><td>99% cont.&Dagger;</td><td>94% cont.&Dagger;</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">study</a></td></tr>
         <tr><td><strong>TabFM 1.0 (Google, tabular)</strong></td><td>foundation</td><td>71&ndash;88% (11 arms)</td><td>38&ndash;60%</td><td><a href="/challengers/tabfm.html"><strong>David v Godzilla</strong></a></td></tr>
         <tr><td>Prophet (Meta)</td><td>calendar GAM</td><td>99.6%</td><td>&mdash;</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/preregistrations/2026-07-13-prophet-wide.md">study</a></td></tr>
         <tr><td>GARCH-t, non-price series</td><td>heavy-tail SOTA</td><td>68&ndash;82%</td><td>53&ndash;54%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-garch">bout</a></td></tr>
         <tr><td><em>GARCH-t, price/return series</em></td><td>heavy-tail SOTA</td><td colspan="2"><em>the belt is theirs; we recommend it there</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-garch">study</a></td></tr>
       </tbody>
     </table>
+    <p style="font-size:.9rem;color:var(--muted)">&dagger; Foundation-model rows are the daily economic stratum of the 18,815-series panel (one step ahead, 128-length context, 64-point test window). LL is the share of series Laplace wins by a per-series <a href="/draws.html">Diebold&ndash;Mariano test</a>, with the draw share in parentheses; the remainder are series the model wins. CRPS is the median per-series ratio of the model's CRPS to Laplace's (below 1 is better than Laplace). Each quantile model is scored on the generous reconstruction of its quantiles, or its native 21 levels for Timestral, because the tight nine-decile reconstruction manufactures most of the half-nat gap (see the <a href="/papers.html">benchmark paper</a>); on weekly and monthly series these models beat Laplace on CRPS and most of them on log score too. Per-stratum tables are on each model's page. &Dagger; Moirai and Lag-Llama were scored only in the original 120-series study (July 2026), where they emit a native density; they have not been rescored on the panel.</p>
 
     <p style="color:var(--muted);font-size:0.92em;">
       Challengers that earn a full treatment get a bout page:

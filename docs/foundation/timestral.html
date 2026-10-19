@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; Timestral vs Laplace</title>
+  <meta name="description" content="A per-stratum workup of Timestral against the
+    Laplace online ensemble: standalone head-to-head, a star plot of not-worse rates, and
+    the collaborative sidecar arms." />
+  <link rel="stylesheet" href="../academic.css" />
+  <style>
+    .wdl { display:flex; height:15px; width:180px; border-radius:3px; overflow:hidden;
+           border:1px solid var(--border); }
+    .wdl i { display:block; height:100%; }
+    .wdl .w { background:var(--good); } .wdl .d { background:#c8c8d4; }
+    .wdl .l { background:var(--warn); }
+    .key { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.85rem;
+           color:var(--muted); margin:8px 0 0; justify-content:center; }
+    .key i { display:inline-block; width:12px; height:12px; border-radius:2px;
+             vertical-align:middle; margin-right:5px; }
+    .muted { color:var(--muted); }
+    .meta-row { display:flex; flex-wrap:wrap; gap:6px 10px; margin:2px 0 14px; }
+    .meta-row .tag { background:#ece9ff; color:var(--accent-dark); border-radius:3px;
+                     padding:2px 9px; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <a href="/performance.html">Performance</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Timestral vs Laplace</h1>
+    <div class="meta-row">
+      <span class="tag">Mistral AI &middot; Timestral 209M</span>
+      <span class="tag">code Apache-2.0; weights Modified MIT</span>
+      <span class="tag">zero-shot</span>
+      <span class="tag">one-step change series</span>
+    </div>
+    <p>Timestral is Mistral's zero-shot time-series model, released 15 October 2026 in four sizes; it emits 21 non-crossing quantiles per step, from the 1st to the 99th percentile. Run zero-shot on CPU with a fixed 128-length context, symmetric averaging and the nonnegativity clip switched off (the series are signed changes). The headline row is the 209M checkpoint scored on all 21 native levels; the other sizes and the nine-decile reconstruction are tabled below.</p>
+    <p class="muted" style="font-size:.92rem;margin-top:-4px">Resources: <a href="https://github.com/mistralai/timestral">GitHub</a> &middot; <a href="https://huggingface.co/mistralai/Timestral-28M">Model card</a></p>
+    <p><strong>What this page measures.</strong> One narrow thing: the sharpness and
+      calibration of Timestral's univariate predictive density, one step ahead on a
+      change series, scored against Laplace on identical windows. It does not exercise the
+      model's covariates, multivariate inputs, long horizons, or the native quantile and
+      path outputs it was built for, and its log score passes through a reconstruction of
+      the model's quantiles (see the table note). A model can trail here and still be the
+      right tool for the job it was designed for.</p>
+    <p><span class="snapshot" style="background:#ece9ff;color:var(--accent-dark);
+      border-radius:4px;padding:2px 9px;font-size:.8rem;font-weight:600">Live snapshot</span>
+      &nbsp;Derived from the week-long round-robin study; counts grow as coverage deepens.
+      Everything scores against Laplace on the identical series and windows.</p>
+
+    <h2>Standalone</h2>
+    <p>The model's own predictive, run zero-shot, scored per series against Laplace.
+      <strong>Win, draw and loss are defined per series</strong>, as follows. Each series has
+      a rolling test window of 64 one-step-ahead points; both forecasters are scored on the
+      same points. For each point take the difference of log predictive densities,
+      <code>d<sub>t</sub> = log p<sub>model</sub>(y<sub>t</sub>) &minus;
+      log p<sub>Laplace</sub>(y<sub>t</sub>)</code>, with each log density floored at
+      &minus;20 first. The series' mean <code>d&#772;</code> is tested against zero by a
+      <a href="/draws.html">Diebold&ndash;Mariano test</a>: the standard error is Newey&ndash;West
+      with a Bartlett kernel and lag round(n<sup>1/3</sup>). The model <em>wins</em> the series
+      if <code>d&#772; &gt; 1.96&middot;SE</code>, <em>loses</em> it if
+      <code>d&#772; &lt; &minus;1.96&middot;SE</code>, and otherwise the series is a
+      <em>draw</em>; a series with fewer than eight finite differences is a draw. A draw
+      means the 64 points cannot separate the two at the 5% level, not that they are
+      equal, so with this window length wins and losses both understate the true rates and
+      the median &Delta;LL is the better size estimate. Counts are over the series both arms
+      cover.</p>
+    <h3>On the model's native 21 quantile levels</h3><p>Arm <code>Timestral-209M(q21)</code>: the model's own 1% to 99% quantiles, fed to the fixed-bandwidth reconstruction without any bandwidth inflation. Its tails are the model's, not a smoothing choice. This is the headline because it is the fairest density the model can be given.</p>    <table>
+      <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
+      <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
+      <th class="num">cov&#8320;&#8320;</th></tr></thead>
+      <tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">2179</td><td><span class="wdl"><i class="w" style="width:9.3%"></i><i class="d" style="width:64.0%"></i><i class="l" style="width:26.7%"></i></span></td><td class="num">-0.04</td><td class="num">0.975</td><td class="num">0.91</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">3013</td><td><span class="wdl"><i class="w" style="width:32.8%"></i><i class="d" style="width:43.0%"></i><i class="l" style="width:24.1%"></i></span></td><td class="num">+0.04</td><td class="num">0.862</td><td class="num">0.91</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">5576</td><td><span class="wdl"><i class="w" style="width:36.1%"></i><i class="d" style="width:57.3%"></i><i class="l" style="width:6.6%"></i></span></td><td class="num">+0.10</td><td class="num">0.883</td><td class="num">0.90</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:20.5%"></i><i class="d" style="width:69.6%"></i><i class="l" style="width:9.9%"></i></span></td><td class="num">+0.04</td><td class="num">0.946</td><td class="num">0.87</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">7633</td><td><span class="wdl"><i class="w" style="width:2.5%"></i><i class="d" style="width:93.7%"></i><i class="l" style="width:3.8%"></i></span></td><td class="num">-0.01</td><td class="num">1.002</td><td class="num">0.89</td></tr>      </tbody>
+    </table>
+    <div class="key">
+      <span><i style="background:var(--good)"></i>beats Laplace</span>
+      <span><i style="background:#c8c8d4"></i>draw</span>
+      <span><i style="background:var(--warn)"></i>loses to Laplace</span>
+    </div>
+<p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse); central-90% coverage (0.90 target). Coverage is that of the reconstruction on the native 21 levels; fed a calibrated normal's quantiles it covers about 0.89, so a perfectly calibrated model reads 0.89 here.</p><h3>Tight nine-decile reconstruction</h3><p>Arm <code>Timestral-209M</code>: the same forecasts through <code>quantile_dist</code>, the reconstruction the original study used. Fed the exact deciles of a standard normal it covers 0.81, so a perfectly calibrated model reads 0.81 in this coverage column and pays for it in log score. Shown for the record; it understates the model.</p>    <table>
+      <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
+      <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
+      <th class="num">cov&#8320;&#8320;</th></tr></thead>
+      <tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">2179</td><td><span class="wdl"><i class="w" style="width:2.3%"></i><i class="d" style="width:47.3%"></i><i class="l" style="width:50.4%"></i></span></td><td class="num">-0.79</td><td class="num">0.982</td><td class="num">0.83</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">3013</td><td><span class="wdl"><i class="w" style="width:8.2%"></i><i class="d" style="width:52.6%"></i><i class="l" style="width:39.2%"></i></span></td><td class="num">-0.47</td><td class="num">0.861</td><td class="num">0.83</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">5576</td><td><span class="wdl"><i class="w" style="width:5.2%"></i><i class="d" style="width:66.9%"></i><i class="l" style="width:27.9%"></i></span></td><td class="num">-0.51</td><td class="num">0.889</td><td class="num">0.81</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:1.4%"></i><i class="d" style="width:68.4%"></i><i class="l" style="width:30.2%"></i></span></td><td class="num">-0.55</td><td class="num">0.952</td><td class="num">0.79</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">7633</td><td><span class="wdl"><i class="w" style="width:0.1%"></i><i class="d" style="width:60.4%"></i><i class="l" style="width:39.5%"></i></span></td><td class="num">-0.62</td><td class="num">1.010</td><td class="num">0.81</td></tr>      </tbody>
+    </table>
+    <div class="key">
+      <span><i style="background:var(--good)"></i>beats Laplace</span>
+      <span><i style="background:#c8c8d4"></i>draw</span>
+      <span><i style="background:var(--warn)"></i>loses to Laplace</span>
+    </div>
+<p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse); central-90% coverage (0.90 target).</p>
+
+    <h2>Checkpoints and level sets</h2>
+    <p>The same model family scored several ways on the identical windows. Each cell is the
+      median per-series &Delta; log-likelihood in nats against Laplace (negative is worse),
+      with the reconstructed central-90% coverage in parentheses (0.90 target). The nine-decile
+      rows use the same fixed-bandwidth reconstruction as TiRex-2; the 21-level rows feed the
+      model's native 1% to 99% quantiles to that reconstruction, so the difference between
+      the two blocks is the reconstruction, not the model.</p>
+    <table>
+      <thead><tr><th>arm</th><th class="num">daily econ</th><th class="num">weekly</th><th class="num">monthly</th><th class="num">seasonal</th><th class="num">price</th></tr></thead>
+      <tbody>
+      <tr><td>5M, 21 levels</td><td class="num">-0.11 <span class="muted">(0.89)</span></td><td class="num">-0.00 <span class="muted">(0.91)</span></td><td class="num">+0.05 <span class="muted">(0.90)</span></td><td class="num">-0.11 <span class="muted">(0.90)</span></td><td class="num">-0.01 <span class="muted">(0.87)</span></td></tr>
+<tr><td>28M, 21 levels</td><td class="num">-0.04 <span class="muted">(0.91)</span></td><td class="num">+0.02 <span class="muted">(0.92)</span></td><td class="num">+0.08 <span class="muted">(0.90)</span></td><td class="num">-0.01 <span class="muted">(0.87)</span></td><td class="num">-0.00 <span class="muted">(0.90)</span></td></tr>
+<tr><td>123M, 21 levels</td><td class="num">-0.04 <span class="muted">(0.91)</span></td><td class="num">+0.03 <span class="muted">(0.91)</span></td><td class="num">+0.10 <span class="muted">(0.90)</span></td><td class="num">+0.02 <span class="muted">(0.87)</span></td><td class="num">-0.00 <span class="muted">(0.90)</span></td></tr>
+<tr><td>209M, 21 levels <strong>&larr; page</strong></td><td class="num">-0.04 <span class="muted">(0.91)</span></td><td class="num">+0.04 <span class="muted">(0.91)</span></td><td class="num">+0.10 <span class="muted">(0.90)</span></td><td class="num">+0.04 <span class="muted">(0.87)</span></td><td class="num">-0.01 <span class="muted">(0.89)</span></td></tr>
+<tr><td>5M, nine deciles</td><td class="num">-1.03 <span class="muted">(0.82)</span></td><td class="num">-0.61 <span class="muted">(0.84)</span></td><td class="num">-0.55 <span class="muted">(0.83)</span></td><td class="num">-0.60 <span class="muted">(0.82)</span></td><td class="num">-0.86 <span class="muted">(0.79)</span></td></tr>
+<tr><td>28M, nine deciles</td><td class="num">-0.78 <span class="muted">(0.83)</span></td><td class="num">-0.45 <span class="muted">(0.84)</span></td><td class="num">-0.49 <span class="muted">(0.82)</span></td><td class="num">-0.62 <span class="muted">(0.77)</span></td><td class="num">-0.55 <span class="muted">(0.82)</span></td></tr>
+<tr><td>123M, nine deciles</td><td class="num">-0.76 <span class="muted">(0.83)</span></td><td class="num">-0.49 <span class="muted">(0.84)</span></td><td class="num">-0.49 <span class="muted">(0.82)</span></td><td class="num">-0.69 <span class="muted">(0.77)</span></td><td class="num">-0.56 <span class="muted">(0.82)</span></td></tr>
+<tr><td>209M, nine deciles</td><td class="num">-0.79 <span class="muted">(0.83)</span></td><td class="num">-0.47 <span class="muted">(0.83)</span></td><td class="num">-0.51 <span class="muted">(0.81)</span></td><td class="num">-0.55 <span class="muted">(0.79)</span></td><td class="num">-0.62 <span class="muted">(0.81)</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Star plot</h2>
+    <p>Timestral standalone against Laplace, on the same six regime axes as the site's
+      <a href="/challengers.html">standalone radar</a>. Each radius is the log-likelihood
+      win rate, <code>(wins + &frac12;&middot;ties) / n</code>, divided by one half so an even
+      split with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
+      less. It is a share of series, not a ratio of likelihoods. The solid polygon is the
+      headline arm; the dashed grey one, where present, is the tight nine-decile
+      reconstruction. The M4-hourly set splits into soft and hard waveforms by corpus
+      order, matching that radar.</p>
+    <figure style="margin:16px 0 6px">
+      <svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of Timestral standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,228.1 317.4,218.4 322.7,264.7 280.0,272.0 260.5,251.3 278.1,238.9" fill="none" stroke="#8a8a9a" stroke-width="2" stroke-dasharray="6 4"/><circle cx="280.0" cy="228.1" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>economic (daily): Timestral-209M log-likelihood win rate 0.10 vs Laplace (tight nine-decile reconstruction) (n=2179)</title></circle><circle cx="317.4" cy="218.4" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>weekly cycles: Timestral-209M log-likelihood win rate 0.36 vs Laplace (tight nine-decile reconstruction) (n=3013)</title></circle><circle cx="322.7" cy="264.7" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>yearly cycles: Timestral-209M log-likelihood win rate 0.41 vs Laplace (tight nine-decile reconstruction) (n=5576)</title></circle><circle cx="280.0" cy="272.0" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>soft waveforms: Timestral-209M log-likelihood win rate 0.27 vs Laplace (tight nine-decile reconstruction) (n=180)</title></circle><circle cx="260.5" cy="251.3" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>hard waveforms: Timestral-209M log-likelihood win rate 0.19 vs Laplace (tight nine-decile reconstruction) (n=234)</title></circle><circle cx="278.1" cy="238.9" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>price / returns: Timestral-209M log-likelihood win rate 0.02 vs Laplace (tight nine-decile reconstruction) (n=7633)</title></circle><polygon points="280.0,150.0 397.5,172.1 428.2,325.6 280.0,420.0 190.3,291.8 203.0,195.5" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="150.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): Timestral-209M(q21) log-likelihood win rate 0.75 vs Laplace (n=2179)</title></circle><circle cx="397.5" cy="172.1" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: Timestral-209M(q21) log-likelihood win rate 1.13 vs Laplace (n=3013)</title></circle><circle cx="428.2" cy="325.6" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: Timestral-209M(q21) log-likelihood win rate 1.43 vs Laplace (n=5576)</title></circle><circle cx="280.0" cy="420.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>soft waveforms: Timestral-209M(q21) log-likelihood win rate 1.54 vs Laplace (n=180)</title></circle><circle cx="190.3" cy="291.8" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>hard waveforms: Timestral-209M(q21) log-likelihood win rate 0.86 vs Laplace (n=234)</title></circle><circle cx="203.0" cy="195.5" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>price / returns: Timestral-209M(q21) log-likelihood win rate 0.74 vs Laplace (n=7633)</title></circle></svg>
+    </figure>
+
+    <h2>Collaborative use</h2>
+<p>The recalibration (<code>@lap</code>) and portfolio (<code>&amp;lap</code>) arms were built for the three strongest models first, so Timestral is scored standalone here. The sidecar wraps any per-step predictive, so these arms can be added without retraining. See the <a href="/sidecar.html">sidecar pattern</a>.</p>
+
+    <h2>Protocol</h2>
+    <p>Fixed 128-length context, rolling one-step test window, no fitting, each model in its
+      own environment. Strata split the cached FRED universe and the M4-hourly set by
+      frequency and regime. Full method on the <a href="/sidecar.html">sidecar pattern</a>
+      page and in the <a href="/guide.html">methodology</a>.</p>
+
+    
+
+    <h2>Architecture and methodology</h2>
+    <p>Timestral is a patched transformer with an hourglass encoder, trained to emit 21 quantile levels per step with a context of up to 32,768 points and support for covariates and multiple variates, none of which this univariate study uses. Its 1% and 99% quantiles are native outputs, so its density needs no bandwidth inflation to carry tails: scored on all 21 levels the 123M and 209M are ahead of Laplace at the median on weekly, monthly and M4-hourly, level on price and a few hundredths behind on daily econ, with matching coverage, while on the nine deciles alone it reads like every other quantile model, about half a nat behind. Pretraining contamination is unchecked.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://github.com/microprediction">microprediction</a> family.
+  </footer>
+</body>
+</html>

@@ -176,16 +176,16 @@ MODELS = {
                            "to forecast at any resolution and horizon without retraining; it "
                            "emits quantiles directly. It is an IBM research checkpoint loaded "
                            "through granite-tsfm."),
-    "timestral": dict(name="Timestral", key="Timestral-28M(q21)", tight_key="Timestral-28M",
+    "timestral": dict(name="Timestral", key="Timestral-209M(q21)", tight_key="Timestral-209M",
                       recon="native21", vendor="Mistral AI",
-                      version="28M", license="code Apache-2.0; weights Modified MIT",
+                      version="209M", license="code Apache-2.0; weights Modified MIT",
                       arms=False,
                       blurb="Timestral is Mistral's zero-shot time-series model, released "
                             "15 October 2026 in four sizes; it emits 21 non-crossing "
                             "quantiles per step, from the 1st to the 99th percentile.",
                       note="Run zero-shot on CPU with a fixed 128-length context, "
                            "symmetric averaging and the nonnegativity clip switched off "
-                           "(the series are signed changes). The headline row is the 28M "
+                           "(the series are signed changes). The headline row is the 209M "
                            "checkpoint scored on all 21 native levels; the other sizes and "
                            "the nine-decile reconstruction are tabled below.",
                       links=[
@@ -197,9 +197,10 @@ MODELS = {
                            "up to 32,768 points and support for covariates and multiple "
                            "variates, none of which this univariate study uses. Its 1% and "
                            "99% quantiles are native outputs, so its density needs no "
-                           "bandwidth inflation to carry tails: scored on all 21 levels it "
-                           "is level with Laplace at the median on most strata and ahead on "
-                           "monthly, with matching coverage, while on the nine deciles alone "
+                           "bandwidth inflation to carry tails: scored on all 21 levels the "
+                           "123M and 209M are ahead of Laplace at the median on weekly, "
+                           "monthly and M4-hourly, level on price and a few hundredths behind "
+                           "on daily econ, with matching coverage, while on the nine deciles alone "
                            "it reads like every other quantile model, about half a nat "
                            "behind. Pretraining contamination is unchecked.",
                       variants=[
@@ -435,8 +436,11 @@ def standalone_tables(model, vs, cov):
     models) the tight nine-decile reconstruction, each saying what it is."""
     tight = model.get("tight_key")
     if not tight:
-        head = (f"<p>{model['name']} issues samples, scored through a kernel density, so "
-                f"there is no quantile reconstruction in these numbers.</p>")
+        head = (f"<p>{model['name']} issues sample paths rather than quantiles; the arm "
+                f"draws 30 samples per step and scores a kernel density on them. That is "
+                f"a reconstruction too, with its own bandwidth and sample-count choices, "
+                f"and unlike the quantile models it has not been rescored under a more "
+                f"generous one, so these numbers are a lower bound on the model.</p>")
         return (head + _TABLE_HEAD + standalone_rows(model, vs, cov) + _TABLE_TAIL
                 + f'<p style="font-size:.9rem;color:var(--muted)">{_COLS_NOTE}</p>')
     if model.get("recon") == "native21":

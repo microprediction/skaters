@@ -47,6 +47,7 @@
             <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -79,49 +80,82 @@
     </div>
     <p>FlowState is a state-space time-series model, loaded via IBM's granite-tsfm. Research checkpoint (research use only); run raw. The collaborative arms were built for the three strongest models first.</p>
     <p class="muted" style="font-size:.92rem;margin-top:-4px">Resources: <a href="https://huggingface.co/ibm-research/flowstate">Model card</a> &middot; <a href="https://arxiv.org/abs/2508.05287">Paper (arXiv 2508.05287)</a></p>
+    <p><strong>What this page measures.</strong> One narrow thing: the sharpness and
+      calibration of FlowState's univariate predictive density, one step ahead on a
+      change series, scored against Laplace on identical windows. It does not exercise the
+      model's covariates, multivariate inputs, long horizons, or the native quantile and
+      path outputs it was built for, and its log score passes through a reconstruction of
+      the model's quantiles (see the table note). A model can trail here and still be the
+      right tool for the job it was designed for.</p>
     <p><span class="snapshot" style="background:#ece9ff;color:var(--accent-dark);
       border-radius:4px;padding:2px 9px;font-size:.8rem;font-weight:600">Live snapshot</span>
       &nbsp;Derived from the week-long round-robin study; counts grow as coverage deepens.
       Everything scores against Laplace on the identical series and windows.</p>
 
     <h2>Standalone</h2>
-    <p>The model's own predictive, run zero-shot, scored per series against Laplace by a
-      one-step-ahead (k=1) <a href="/draws.html">Diebold&ndash;Mariano test</a> on the
-      log-score differential.</p>
-    <table>
+    <p>The model's own predictive, run zero-shot, scored per series against Laplace.
+      <strong>Win, draw and loss are defined per series</strong>, as follows. Each series has
+      a rolling test window of 64 one-step-ahead points; both forecasters are scored on the
+      same points. For each point take the difference of log predictive densities,
+      <code>d<sub>t</sub> = log p<sub>model</sub>(y<sub>t</sub>) &minus;
+      log p<sub>Laplace</sub>(y<sub>t</sub>)</code>, with each log density floored at
+      &minus;20 first. The series' mean <code>d&#772;</code> is tested against zero by a
+      <a href="/draws.html">Diebold&ndash;Mariano test</a>: the standard error is Newey&ndash;West
+      with a Bartlett kernel and lag round(n<sup>1/3</sup>). The model <em>wins</em> the series
+      if <code>d&#772; &gt; 1.96&middot;SE</code>, <em>loses</em> it if
+      <code>d&#772; &lt; &minus;1.96&middot;SE</code>, and otherwise the series is a
+      <em>draw</em>; a series with fewer than eight finite differences is a draw. A draw
+      means the 64 points cannot separate the two at the 5% level, not that they are
+      equal, so with this window length wins and losses both understate the true rates and
+      the median &Delta;LL is the better size estimate. Counts are over the series both arms
+      cover.</p>
+    <h3>Generous reconstruction</h3><p>Arm <code>flowstate(wide)</code>: the same nine-decile forecasts, reconstructed at three times the local bandwidth (<code>nozzles.nozzle_wide</code>), the most generous of the reconstructions tested in the <a href="/papers.html">benchmark paper</a>. This is the headline because the paper found the tight reconstruction, not the model, produces most of the half-nat gap.</p>    <table>
       <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
       <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
       <th class="num">cov&#8320;&#8320;</th></tr></thead>
       <tbody>
-      <tr><td>economic change-series, business-daily</td><td class="num">1381</td><td><span class="wdl"><i class="w" style="width:0.3%"></i><i class="d" style="width:2.2%"></i><i class="l" style="width:97.5%"></i></span></td><td class="num">-3.00</td><td class="num">1.038</td><td class="num">0.70</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:4.2%"></i><i class="d" style="width:7.4%"></i><i class="l" style="width:88.4%"></i></span></td><td class="num">-2.93</td><td class="num">1.022</td><td class="num">0.70</td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:0.2%"></i><i class="d" style="width:11.8%"></i><i class="l" style="width:87.9%"></i></span></td><td class="num">-2.77</td><td class="num">0.992</td><td class="num">0.66</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:0.0%"></i><i class="d" style="width:6.3%"></i><i class="l" style="width:93.7%"></i></span></td><td class="num">-2.31</td><td class="num">1.056</td><td class="num">0.68</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">1539</td><td><span class="wdl"><i class="w" style="width:0.0%"></i><i class="d" style="width:1.0%"></i><i class="l" style="width:99.0%"></i></span></td><td class="num">-2.75</td><td class="num">1.054</td><td class="num">0.65</td></tr>
-      </tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">1386</td><td><span class="wdl"><i class="w" style="width:0.6%"></i><i class="d" style="width:33.5%"></i><i class="l" style="width:65.8%"></i></span></td><td class="num">-0.69</td><td class="num">1.023</td><td class="num">0.76</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">2930</td><td><span class="wdl"><i class="w" style="width:6.6%"></i><i class="d" style="width:34.4%"></i><i class="l" style="width:59.0%"></i></span></td><td class="num">-0.98</td><td class="num">1.009</td><td class="num">0.77</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">2930</td><td><span class="wdl"><i class="w" style="width:3.0%"></i><i class="d" style="width:58.7%"></i><i class="l" style="width:38.4%"></i></span></td><td class="num">-0.56</td><td class="num">0.980</td><td class="num">0.73</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:2.7%"></i><i class="d" style="width:54.8%"></i><i class="l" style="width:42.5%"></i></span></td><td class="num">-0.45</td><td class="num">1.040</td><td class="num">0.75</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">1544</td><td><span class="wdl"><i class="w" style="width:0.1%"></i><i class="d" style="width:51.1%"></i><i class="l" style="width:48.8%"></i></span></td><td class="num">-0.45</td><td class="num">1.038</td><td class="num">0.72</td></tr>      </tbody>
     </table>
     <div class="key">
       <span><i style="background:var(--good)"></i>beats Laplace</span>
       <span><i style="background:#c8c8d4"></i>draw</span>
       <span><i style="background:var(--warn)"></i>loses to Laplace</span>
     </div>
-    <p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood
-      in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse);
-      central-90% coverage (0.90 target) of the density reconstructed from the model's nine
-      deciles by <code>quantile_dist</code>, not a native model interval. The reconstruction
-      is not calibration-preserving: fed the exact deciles of a standard normal it covers
-      0.81, so a perfectly calibrated model reads 0.81 in this column. The log-likelihood
-      and CRPS columns depend on the same reconstruction.</p>
+<p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse); central-90% coverage (0.90 target). Coverage is that of the wide reconstruction; fed a calibrated normal's deciles it covers about 0.88, so a perfectly calibrated model reads 0.88 here.</p><h3>Tight nine-decile reconstruction</h3><p>Arm <code>flowstate</code>: the same forecasts through <code>quantile_dist</code>, the reconstruction the original study used. Fed the exact deciles of a standard normal it covers 0.81, so a perfectly calibrated model reads 0.81 in this coverage column and pays for it in log score. Shown for the record; it understates the model.</p>    <table>
+      <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
+      <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
+      <th class="num">cov&#8320;&#8320;</th></tr></thead>
+      <tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">1381</td><td><span class="wdl"><i class="w" style="width:0.3%"></i><i class="d" style="width:2.2%"></i><i class="l" style="width:97.5%"></i></span></td><td class="num">-3.00</td><td class="num">1.038</td><td class="num">0.70</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:4.2%"></i><i class="d" style="width:7.4%"></i><i class="l" style="width:88.4%"></i></span></td><td class="num">-2.93</td><td class="num">1.022</td><td class="num">0.70</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:0.2%"></i><i class="d" style="width:11.8%"></i><i class="l" style="width:87.9%"></i></span></td><td class="num">-2.77</td><td class="num">0.992</td><td class="num">0.66</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:0.0%"></i><i class="d" style="width:6.3%"></i><i class="l" style="width:93.7%"></i></span></td><td class="num">-2.31</td><td class="num">1.056</td><td class="num">0.68</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">1539</td><td><span class="wdl"><i class="w" style="width:0.0%"></i><i class="d" style="width:1.0%"></i><i class="l" style="width:99.0%"></i></span></td><td class="num">-2.75</td><td class="num">1.054</td><td class="num">0.65</td></tr>      </tbody>
+    </table>
+    <div class="key">
+      <span><i style="background:var(--good)"></i>beats Laplace</span>
+      <span><i style="background:#c8c8d4"></i>draw</span>
+      <span><i style="background:var(--warn)"></i>loses to Laplace</span>
+    </div>
+<p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse); central-90% coverage (0.90 target).</p>
+
+    
 
     <h2>Star plot</h2>
     <p>FlowState standalone against Laplace, on the same six regime axes as the site's
       <a href="/challengers.html">standalone radar</a>. Each radius is the log-likelihood
       win rate, <code>(wins + &frac12;&middot;ties) / n</code>, divided by one half so an even
       split with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
-      less. It is a share of series, not a ratio of likelihoods. The
-      M4-hourly set splits into soft and hard waveforms by corpus order, matching that radar.</p>
+      less. It is a share of series, not a ratio of likelihoods. The solid polygon is the
+      headline arm; the dashed grey one, where present, is the tight nine-decile
+      reconstruction. The M4-hourly set splits into soft and hard waveforms by corpus
+      order, matching that radar.</p>
     <figure style="margin:16px 0 6px">
-      <svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of FlowState standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,239.3 291.2,233.5 282.6,241.5 280.0,240.0 280.0,240.0 280.0,240.0" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="239.3" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): log-likelihood win rate 0.01 vs Laplace (n=1381)</title></circle><circle cx="291.2" cy="233.5" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: log-likelihood win rate 0.11 vs Laplace (n=2920)</title></circle><circle cx="282.6" cy="241.5" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: log-likelihood win rate 0.03 vs Laplace (n=2920)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>soft waveforms: log-likelihood win rate 0.00 vs Laplace (n=180)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>hard waveforms: log-likelihood win rate 0.00 vs Laplace (n=234)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>price / returns: log-likelihood win rate 0.00 vs Laplace (n=1539)</title></circle></svg>
+      <svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of FlowState standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,239.3 291.2,233.5 282.6,241.5 280.0,240.0 280.0,240.0 280.0,240.0" fill="none" stroke="#8a8a9a" stroke-width="2" stroke-dasharray="6 4"/><circle cx="280.0" cy="239.3" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>economic (daily): flowstate log-likelihood win rate 0.01 vs Laplace (tight nine-decile reconstruction) (n=1381)</title></circle><circle cx="291.2" cy="233.5" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>weekly cycles: flowstate log-likelihood win rate 0.11 vs Laplace (tight nine-decile reconstruction) (n=2920)</title></circle><circle cx="282.6" cy="241.5" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>yearly cycles: flowstate log-likelihood win rate 0.03 vs Laplace (tight nine-decile reconstruction) (n=2920)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>soft waveforms: flowstate log-likelihood win rate 0.00 vs Laplace (tight nine-decile reconstruction) (n=180)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>hard waveforms: flowstate log-likelihood win rate 0.00 vs Laplace (tight nine-decile reconstruction) (n=234)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>price / returns: flowstate log-likelihood win rate 0.00 vs Laplace (tight nine-decile reconstruction) (n=1539)</title></circle><polygon points="280.0,233.9 300.2,228.4 306.7,255.4 280.0,288.0 267.5,247.2 279.5,239.7" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="233.9" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): flowstate(wide) log-likelihood win rate 0.05 vs Laplace (n=1386)</title></circle><circle cx="300.2" cy="228.4" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: flowstate(wide) log-likelihood win rate 0.19 vs Laplace (n=2930)</title></circle><circle cx="306.7" cy="255.4" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: flowstate(wide) log-likelihood win rate 0.26 vs Laplace (n=2930)</title></circle><circle cx="280.0" cy="288.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>soft waveforms: flowstate(wide) log-likelihood win rate 0.40 vs Laplace (n=180)</title></circle><circle cx="267.5" cy="247.2" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>hard waveforms: flowstate(wide) log-likelihood win rate 0.12 vs Laplace (n=234)</title></circle><circle cx="279.5" cy="239.7" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>price / returns: flowstate(wide) log-likelihood win rate 0.01 vs Laplace (n=1544)</title></circle></svg>
     </figure>
 
     <h2>Collaborative use</h2>

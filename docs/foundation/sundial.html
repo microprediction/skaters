@@ -47,6 +47,7 @@
             <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -79,49 +80,66 @@
     </div>
     <p>Sundial is a generative time-series model; we draw samples per step and score the empirical predictive. Run raw only in this study; the collaborative arms were built for the three strongest models first.</p>
     <p class="muted" style="font-size:.92rem;margin-top:-4px">Resources: <a href="https://github.com/thuml/Sundial">GitHub</a> &middot; <a href="https://huggingface.co/thuml/sundial-base-128m">Model card</a> &middot; <a href="https://arxiv.org/abs/2502.00816">Paper (arXiv 2502.00816)</a></p>
+    <p><strong>What this page measures.</strong> One narrow thing: the sharpness and
+      calibration of Sundial's univariate predictive density, one step ahead on a
+      change series, scored against Laplace on identical windows. It does not exercise the
+      model's covariates, multivariate inputs, long horizons, or the native quantile and
+      path outputs it was built for, and its log score passes through a reconstruction of
+      the model's quantiles (see the table note). A model can trail here and still be the
+      right tool for the job it was designed for.</p>
     <p><span class="snapshot" style="background:#ece9ff;color:var(--accent-dark);
       border-radius:4px;padding:2px 9px;font-size:.8rem;font-weight:600">Live snapshot</span>
       &nbsp;Derived from the week-long round-robin study; counts grow as coverage deepens.
       Everything scores against Laplace on the identical series and windows.</p>
 
     <h2>Standalone</h2>
-    <p>The model's own predictive, run zero-shot, scored per series against Laplace by a
-      one-step-ahead (k=1) <a href="/draws.html">Diebold&ndash;Mariano test</a> on the
-      log-score differential.</p>
-    <table>
+    <p>The model's own predictive, run zero-shot, scored per series against Laplace.
+      <strong>Win, draw and loss are defined per series</strong>, as follows. Each series has
+      a rolling test window of 64 one-step-ahead points; both forecasters are scored on the
+      same points. For each point take the difference of log predictive densities,
+      <code>d<sub>t</sub> = log p<sub>model</sub>(y<sub>t</sub>) &minus;
+      log p<sub>Laplace</sub>(y<sub>t</sub>)</code>, with each log density floored at
+      &minus;20 first. The series' mean <code>d&#772;</code> is tested against zero by a
+      <a href="/draws.html">Diebold&ndash;Mariano test</a>: the standard error is Newey&ndash;West
+      with a Bartlett kernel and lag round(n<sup>1/3</sup>). The model <em>wins</em> the series
+      if <code>d&#772; &gt; 1.96&middot;SE</code>, <em>loses</em> it if
+      <code>d&#772; &lt; &minus;1.96&middot;SE</code>, and otherwise the series is a
+      <em>draw</em>; a series with fewer than eight finite differences is a draw. A draw
+      means the 64 points cannot separate the two at the 5% level, not that they are
+      equal, so with this window length wins and losses both understate the true rates and
+      the median &Delta;LL is the better size estimate. Counts are over the series both arms
+      cover.</p>
+    <p>Sundial issues sample paths rather than quantiles; the arm draws 30 samples per step and scores a kernel density on them. That is a reconstruction too, with its own bandwidth and sample-count choices, and unlike the quantile models it has not been rescored under a more generous one, so these numbers are a lower bound on the model.</p>    <table>
       <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
       <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
       <th class="num">cov&#8320;&#8320;</th></tr></thead>
       <tbody>
-      <tr><td>economic change-series, business-daily</td><td class="num">1381</td><td><span class="wdl"><i class="w" style="width:1.2%"></i><i class="d" style="width:3.3%"></i><i class="l" style="width:95.4%"></i></span></td><td class="num">-2.78</td><td class="num">1.077</td><td class="num">0.64</td></tr>
+<tr><td>economic change-series, business-daily</td><td class="num">1381</td><td><span class="wdl"><i class="w" style="width:1.2%"></i><i class="d" style="width:3.3%"></i><i class="l" style="width:95.4%"></i></span></td><td class="num">-2.78</td><td class="num">1.077</td><td class="num">0.64</td></tr>
 <tr><td>economic change-series, weekly</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:5.3%"></i><i class="d" style="width:8.2%"></i><i class="l" style="width:86.5%"></i></span></td><td class="num">-2.57</td><td class="num">1.022</td><td class="num">0.68</td></tr>
 <tr><td>economic change-series, monthly (annual cycle)</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:0.4%"></i><i class="d" style="width:5.5%"></i><i class="l" style="width:94.1%"></i></span></td><td class="num">-3.03</td><td class="num">1.014</td><td class="num">0.55</td></tr>
 <tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:0.0%"></i><i class="d" style="width:0.7%"></i><i class="l" style="width:99.3%"></i></span></td><td class="num">-3.41</td><td class="num">1.088</td><td class="num">0.52</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">1539</td><td><span class="wdl"><i class="w" style="width:0.0%"></i><i class="d" style="width:2.2%"></i><i class="l" style="width:97.8%"></i></span></td><td class="num">-2.33</td><td class="num">1.093</td><td class="num">0.59</td></tr>
-      </tbody>
+<tr><td>asset prices and returns, daily</td><td class="num">1539</td><td><span class="wdl"><i class="w" style="width:0.0%"></i><i class="d" style="width:2.2%"></i><i class="l" style="width:97.8%"></i></span></td><td class="num">-2.33</td><td class="num">1.093</td><td class="num">0.59</td></tr>      </tbody>
     </table>
     <div class="key">
       <span><i style="background:var(--good)"></i>beats Laplace</span>
       <span><i style="background:#c8c8d4"></i>draw</span>
       <span><i style="background:var(--warn)"></i>loses to Laplace</span>
     </div>
-    <p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood
-      in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse);
-      central-90% coverage (0.90 target) of the density reconstructed from the model's nine
-      deciles by <code>quantile_dist</code>, not a native model interval. The reconstruction
-      is not calibration-preserving: fed the exact deciles of a standard normal it covers
-      0.81, so a perfectly calibrated model reads 0.81 in this column. The log-likelihood
-      and CRPS columns depend on the same reconstruction.</p>
+<p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse); central-90% coverage (0.90 target).</p>
+
+    
 
     <h2>Star plot</h2>
     <p>Sundial standalone against Laplace, on the same six regime axes as the site's
       <a href="/challengers.html">standalone radar</a>. Each radius is the log-likelihood
       win rate, <code>(wins + &frac12;&middot;ties) / n</code>, divided by one half so an even
       split with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
-      less. It is a share of series, not a ratio of likelihoods. The
-      M4-hourly set splits into soft and hard waveforms by corpus order, matching that radar.</p>
+      less. It is a share of series, not a ratio of likelihoods. The solid polygon is the
+      headline arm; the dashed grey one, where present, is the tight nine-decile
+      reconstruction. The M4-hourly set splits into soft and hard waveforms by corpus
+      order, matching that radar.</p>
     <figure style="margin:16px 0 6px">
-      <svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of Sundial standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,236.6 293.2,232.4 281.9,241.1 280.0,240.0 280.0,240.0 280.0,240.0" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="236.6" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): log-likelihood win rate 0.03 vs Laplace (n=1381)</title></circle><circle cx="293.2" cy="232.4" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: log-likelihood win rate 0.13 vs Laplace (n=2920)</title></circle><circle cx="281.9" cy="241.1" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: log-likelihood win rate 0.02 vs Laplace (n=2920)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>soft waveforms: log-likelihood win rate 0.00 vs Laplace (n=180)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>hard waveforms: log-likelihood win rate 0.00 vs Laplace (n=234)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>price / returns: log-likelihood win rate 0.00 vs Laplace (n=1539)</title></circle></svg>
+      <svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of Sundial standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,236.6 293.2,232.4 281.9,241.1 280.0,240.0 280.0,240.0 280.0,240.0" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="236.6" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): Sundial log-likelihood win rate 0.03 vs Laplace (n=1381)</title></circle><circle cx="293.2" cy="232.4" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: Sundial log-likelihood win rate 0.13 vs Laplace (n=2920)</title></circle><circle cx="281.9" cy="241.1" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: Sundial log-likelihood win rate 0.02 vs Laplace (n=2920)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>soft waveforms: Sundial log-likelihood win rate 0.00 vs Laplace (n=180)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>hard waveforms: Sundial log-likelihood win rate 0.00 vs Laplace (n=234)</title></circle><circle cx="280.0" cy="240.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>price / returns: Sundial log-likelihood win rate 0.00 vs Laplace (n=1539)</title></circle></svg>
     </figure>
 
     <h2>Collaborative use</h2>
