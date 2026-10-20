@@ -197,12 +197,13 @@ MODELS = {
                            "up to 32,768 points and support for covariates and multiple "
                            "variates, none of which this univariate study uses. Its 1% and "
                            "99% quantiles are native outputs, so its density needs no "
-                           "bandwidth inflation to carry tails: scored on all 21 levels the "
+                           "bandwidth inflation to carry tails. Scored on all 21 levels, the "
                            "123M and 209M are ahead of Laplace at the median on weekly, "
-                           "monthly and M4-hourly, level on price and a few hundredths behind "
-                           "on daily econ, with matching coverage, while on the nine deciles alone "
-                           "it reads like every other quantile model, about half a nat "
-                           "behind. Pretraining contamination is unchecked.",
+                           "monthly and M4-hourly series, level on price, and a few "
+                           "hundredths behind on daily econ, with the same coverage as "
+                           "Laplace. On the nine deciles alone it reads like every other "
+                           "quantile model, about half a nat behind. Pretraining "
+                           "contamination is unchecked.",
                       variants=[
                           ("Timestral-5M(q21)", "5M, 21 levels"),
                           ("Timestral-28M(q21)", "28M, 21 levels"),
@@ -436,19 +437,19 @@ def standalone_tables(model, vs, cov):
     models) the tight nine-decile reconstruction, each saying what it is."""
     tight = model.get("tight_key")
     if not tight:
-        head = (f"<p>{model['name']} issues sample paths rather than quantiles; the arm "
+        head = (f"<p>{model['name']} issues sample paths rather than quantiles. The arm "
                 f"draws 30 samples per step and scores a kernel density on them. That is "
-                f"a reconstruction too, with its own bandwidth and sample-count choices, "
-                f"and unlike the quantile models it has not been rescored under a more "
-                f"generous one, so these numbers are a lower bound on the model.</p>")
+                f"also a reconstruction, with a bandwidth and a sample count behind it, "
+                f"and it has not been rescored under a more generous one as the quantile "
+                f"models have, so these numbers are a lower bound on the model.</p>")
         return (head + _TABLE_HEAD + standalone_rows(model, vs, cov) + _TABLE_TAIL
                 + f'<p style="font-size:.9rem;color:var(--muted)">{_COLS_NOTE}</p>')
     if model.get("recon") == "native21":
         fair = (f"<h3>On the model's native 21 quantile levels</h3>"
-                f"<p>Arm <code>{model['key']}</code>: the model's own 1% to 99% quantiles, "
-                f"fed to the fixed-bandwidth reconstruction without any bandwidth "
-                f"inflation. Its tails are the model's, not a smoothing choice. This is "
-                f"the headline because it is the fairest density the model can be given.</p>")
+                f"<p>Arm <code>{model['key']}</code>: the model's own 1% to 99% quantiles "
+                f"through the fixed-bandwidth reconstruction, with no bandwidth inflation. "
+                f"The tails are the model's. This is the fairest density the model can be "
+                f"given, so it is the headline.</p>")
         fair_note = ("Coverage is that of the reconstruction on the native 21 levels; fed "
                      "a calibrated normal's quantiles it covers about 0.89, so a perfectly "
                      "calibrated model reads 0.89 here.")
@@ -458,8 +459,8 @@ def standalone_tables(model, vs, cov):
                 f"reconstructed at three times the local bandwidth "
                 f"(<code>nozzles.nozzle_wide</code>), the most generous of the "
                 f"reconstructions tested in the <a href=\"/papers.html\">benchmark "
-                f"paper</a>. This is the headline because the paper found the tight "
-                f"reconstruction, not the model, produces most of the half-nat gap.</p>")
+                f"paper</a>. The paper found that the tight reconstruction produces most "
+                f"of the half-nat gap, so this arm is the headline.</p>")
         fair_note = ("Coverage is that of the wide reconstruction; fed a calibrated "
                      "normal's deciles it covers about 0.88, so a perfectly calibrated "
                      "model reads 0.88 here.")
@@ -468,8 +469,8 @@ def standalone_tables(model, vs, cov):
                    f"<code>quantile_dist</code>, the reconstruction the original study used. "
                    f"Fed the exact deciles of a standard normal it covers 0.81, so a "
                    f"perfectly calibrated model reads 0.81 in this coverage column and "
-                   f"pays for it in log score. Shown for the record; it understates the "
-                   f"model.</p>")
+                   f"pays for it in log score. It understates the model and is kept here "
+                   f"for comparison with the earlier numbers.</p>")
     return (fair + _TABLE_HEAD + standalone_rows(model, vs, cov, model["key"]) + _TABLE_TAIL
             + f'<p style="font-size:.9rem;color:var(--muted)">{_COLS_NOTE} {fair_note}</p>'
             + tight_block + _TABLE_HEAD + standalone_rows(model, vs, cov, tight) + _TABLE_TAIL
@@ -546,8 +547,8 @@ def variants_section(model, vs, cov):
       median per-series &Delta; log-likelihood in nats against Laplace (negative is worse),
       with the reconstructed central-90% coverage in parentheses (0.90 target). The nine-decile
       rows use the same fixed-bandwidth reconstruction as TiRex-2; the 21-level rows feed the
-      model's native 1% to 99% quantiles to that reconstruction, so the difference between
-      the two blocks is the reconstruction, not the model.</p>
+      model's native 1% to 99% quantiles to that reconstruction. The model is the same in
+      both blocks; only the reconstruction differs.</p>
     <table>
       <thead><tr><th>arm</th>{head}</tr></thead>
       <tbody>
@@ -637,23 +638,22 @@ def build_page(slug, model, vs, cov, radar):
     </div>
     <p>{intro}</p>
     {links_row(model)}
-    <p><strong>What this page measures.</strong> One narrow thing: the sharpness and
-      calibration of {model['name']}'s univariate predictive density, one step ahead on a
-      change series, scored against Laplace on identical windows. It does not exercise the
-      model's covariates, multivariate inputs, long horizons, or the native quantile and
-      path outputs it was built for, and its log score passes through a reconstruction of
-      the model's quantiles (see the table note). A model can trail here and still be the
-      right tool for the job it was designed for.</p>
+    <p>This page measures one thing: how sharp and how well calibrated {model['name']}'s
+      univariate predictive density is, one step ahead on a change series, scored against
+      Laplace on identical windows. It leaves out the covariates, the multivariate inputs,
+      the long horizons and the native quantile or path outputs the model was built for, and
+      its log score passes through a reconstruction of the model's quantiles (the table note
+      says which). A model can trail here and be the better tool for its own job.</p>
     <p><span class="snapshot" style="background:#ece9ff;color:var(--accent-dark);
       border-radius:4px;padding:2px 9px;font-size:.8rem;font-weight:600">Live snapshot</span>
       &nbsp;Derived from the week-long round-robin study; counts grow as coverage deepens.
       Everything scores against Laplace on the identical series and windows.</p>
 
     <h2>Standalone</h2>
-    <p>The model's own predictive, run zero-shot, scored per series against Laplace.
-      <strong>Win, draw and loss are defined per series</strong>, as follows. Each series has
-      a rolling test window of {TEST} one-step-ahead points; both forecasters are scored on the
-      same points. For each point take the difference of log predictive densities,
+    <p>The model's own predictive, run zero-shot, scored per series against Laplace. Win,
+      draw and loss are decided one series at a time. Each series has a rolling test window
+      of {TEST} one-step-ahead points, and both forecasters are scored on the same points. For
+      each point take the difference of log predictive densities,
       <code>d<sub>t</sub> = log p<sub>model</sub>(y<sub>t</sub>) &minus;
       log p<sub>Laplace</sub>(y<sub>t</sub>)</code>, with each log density floored at
       &minus;20 first. The series' mean <code>d&#772;</code> is tested against zero by a
@@ -662,10 +662,10 @@ def build_page(slug, model, vs, cov, radar):
       if <code>d&#772; &gt; 1.96&middot;SE</code>, <em>loses</em> it if
       <code>d&#772; &lt; &minus;1.96&middot;SE</code>, and otherwise the series is a
       <em>draw</em>; a series with fewer than eight finite differences is a draw. A draw
-      means the {TEST} points cannot separate the two at the 5% level, not that they are
-      equal, so with this window length wins and losses both understate the true rates and
-      the median &Delta;LL is the better size estimate. Counts are over the series both arms
-      cover.</p>
+      says the {TEST} points cannot separate the two forecasters at the 5% level. It does not
+      say they are equal. With a window this short both win and loss counts understate the
+      true rates, and the median &Delta;LL is the better measure of size. Counts are over the
+      series both arms cover.</p>
     {standalone_tables(model, vs, cov)}
 
     {variants_section(model, vs, cov)}
@@ -675,10 +675,10 @@ def build_page(slug, model, vs, cov, radar):
       <a href="/challengers.html">standalone radar</a>. Each radius is the log-likelihood
       win rate, <code>(wins + &frac12;&middot;ties) / n</code>, divided by one half so an even
       split with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
-      less. It is a share of series, not a ratio of likelihoods. The solid polygon is the
-      headline arm; the dashed grey one, where present, is the tight nine-decile
-      reconstruction. The M4-hourly set splits into soft and hard waveforms by corpus
-      order, matching that radar.</p>
+      less. The quantity is a share of series. The solid polygon is the headline arm and
+      the dashed grey one, where present, is the tight nine-decile reconstruction. The
+      M4-hourly set splits into soft and hard waveforms by corpus order, matching that
+      radar.</p>
     <figure style="margin:16px 0 6px">
       {svg}
     </figure>

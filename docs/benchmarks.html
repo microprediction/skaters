@@ -71,7 +71,7 @@
     <p>
       A fair rolling one-step-ahead comparison on the <strong>non-price</strong> FRED universe —
       894 continuous daily change-series (57 correlated families); equity/fx/commodity returns are
-      excluded and treated separately in the price caveat below. Every method — ours and theirs — is
+      excluded and treated separately in the price caveat below. Every method, ours and theirs, is
       turned into the same <code>Dist</code> and scored on held-out log-likelihood <em>and</em> CRPS.
       Per-series win-rate of <code>laplace</code>, reported <em>raw</em> and <em>family-weighted</em>
       (one vote per correlated family):
@@ -92,7 +92,7 @@
     </table>
     <p>
       <code>laplace</code> (mean log-likelihood <strong>3.20</strong>) wins the likelihood race
-      against every baseline on non-price series — including <strong>GARCH-t</strong>, the heavy-tail
+      against every baseline on non-price series, including <strong>GARCH-t</strong>, the heavy-tail
       SOTA (68% raw / 65% family-weighted; mean LL 3.20 vs 3.03). On CRPS it beats the mean-model
       baselines and loses only to the CRPS-specialists (fitted conformal ~30%, GARCH-t 45%
       family-weighted) — their home turf. <strong>No free lunch on price/returns:</strong> on
@@ -118,21 +118,20 @@
     <p>
       On the continuous series, <code>laplace</code> beats all four zero-shot. The native-density
       models (Moirai, Lag-Llama) are the closest. Naive per-series <em>fine-tuning</em> doesn't
-      rescue them — it catastrophically overfits (logpdf +1.5 → −118). A zero-dependency online
+      rescue them: it catastrophically overfits (logpdf +1.5 → −118). A zero-dependency online
       ensemble holding its own against 200M-parameter transformers.
       <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#zero-shot-foundation-models-foundation_studypy">The foundation study →</a>
     </p>
     <p>
-      That table is the original 120-series study and is kept for the record. The current
-      comparison runs the same zero-shot protocol (128-length context, one step ahead) over the
-      full 18,815-series panel, one page per model with per-stratum tables, coverage and a
-      star plot: <a href="/foundation/timesfm3.html">TimesFM3</a>,
+      That table is the original 120-series study from July 2026. The current comparison runs
+      the same zero-shot protocol (128-length context, one step ahead) over the full
+      18,815-series panel, one page per model with per-stratum tables, coverage and a star
+      plot: <a href="/foundation/timesfm3.html">TimesFM3</a>,
       <a href="/foundation/timestral.html">Timestral</a>, <a href="/foundation/tirex.html">TiRex</a>,
       <a href="/foundation/chronos.html">Chronos</a>, <a href="/foundation/sundial.html">Sundial</a>,
-      <a href="/foundation/flowstate.html">FlowState</a>. Read the win rates with the
-      reconstruction in mind: a quantile model's log score depends on how its quantiles are
-      turned into a density, and the <a href="/papers.html">benchmark paper</a> shows the
-      half-nat margin over TimesFM3 is that step, not the model.
+      <a href="/foundation/flowstate.html">FlowState</a>. A quantile model's log score depends on how its quantiles are turned into a
+      density, and the <a href="/papers.html">benchmark paper</a> shows that this step accounts
+      for the half-nat margin over TimesFM3. Read the win rates above with that in mind.
     </p>
 
     <h2>Challengers</h2>

@@ -130,14 +130,14 @@
         the trusted incumbent.</li>
     </ul>
 
-    <h2>The apparent symptom: over-confidence, mostly manufactured</h2>
+    <h2>The apparent symptom: over-confidence</h2>
     <p>
       A calibrated 90% interval should contain the outcome 90% of the time. Scored through the tight
-      nine-decile reconstruction of their quantiles, the raw models cover far less. Most of that is
-      the reconstruction, not the model: fed the exact deciles of a calibrated normal, that
-      reconstruction covers 0.81, and the same forecasts through the generous reconstruction cover
-      0.82 to 0.90 on this stratum against Laplace's 0.892. The <code>@lap</code> wrap, built on the
-      tight base, pulls each model to nominal either way. (Seasonal stratum, M4-hourly.)
+      nine-decile reconstruction of their quantiles, the raw models cover far less. Most of the
+      shortfall belongs to the reconstruction. Fed the exact deciles of a calibrated normal, it
+      covers 0.81, and the same forecasts through the generous reconstruction cover 0.82 to 0.90 on
+      this stratum, against Laplace's 0.892. The <code>@lap</code> wrap, built on the tight base,
+      pulls each model to nominal either way. (Seasonal stratum, M4-hourly.)
     </p>
     <table>
       <thead><tr><th>model</th><th>raw, tight reconstruction</th><th class="barcell">&nbsp;</th><th>raw, generous reconstruction</th><th class="barcell">&nbsp;</th><th>@lap (tight base)</th><th class="barcell">&nbsp;</th></tr></thead>
@@ -150,14 +150,14 @@
 
     <h2>What the gap is</h2>
     <p>
-      An earlier version of this page read the log-likelihood gap as a forecasting deficit. It is
-      mostly the reconstruction. Under the tight reconstruction the raw gap on this stratum is half a
-      nat to nearly a nat; the same forecasts under the generous reconstruction are within 0.05 nats
-      of Laplace at the median. The <code>@lap</code> wrap on the tight base recovers only a sliver
-      of the tight gap because it recalibrates the reconstruction's probability integral transform,
-      which fixes coverage but leaves the density's shape, so the recovered column measures what a
-      marginal recalibration buys, not the model's skill. A sidecar built on the generous
-      reconstruction has not been scored.
+      An earlier version of this page read the log-likelihood gap as a forecasting deficit. Most
+      of it is the reconstruction. Under the tight reconstruction the raw gap on this stratum is
+      half a nat to nearly a nat. The same forecasts under the generous reconstruction sit within
+      0.05 nats of Laplace at the median. The <code>@lap</code> wrap on the tight base recovers only
+      a sliver of the tight gap, because it recalibrates the reconstruction's probability integral
+      transform: that fixes coverage and leaves the shape of the density alone. The recovered
+      column therefore measures what a marginal recalibration buys. A sidecar built on the
+      generous reconstruction has not been scored.
     </p>
     <table>
       <thead><tr><th>model</th><th class="num">raw gap, tight</th><th class="num">raw gap, generous</th><th class="num">after @lap (tight base)</th><th class="num">recovered by @lap</th><th>share of tight gap</th></tr></thead>
@@ -166,7 +166,8 @@
     <p style="font-size:.9rem;color:var(--muted)">Median per-series &Delta; log-likelihood versus
       Laplace, in nats (negative means worse than Laplace), M4-hourly. Under the generous
       reconstruction no model's median is more than 0.05 nats from Laplace here, and on weekly and
-      monthly series TimesFM and TiRex are level or ahead; see each model's page.</p>
+      monthly series TimesFM and TiRex are level or ahead. Each model's page has the full
+      table.</p>
 
     <p>The <a href="https://conformalprediction.net/demos/13-coverage-score-plane.html">coverage-score
       plane</a> at conformalprediction.net makes the geometry explicit: a remap slides a model
