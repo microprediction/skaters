@@ -214,6 +214,40 @@ MODELS = {
                           ("Timestral-123M", "123M, nine deciles"),
                           ("Timestral-209M", "209M, nine deciles"),
                       ]),
+    "t0gamma": dict(name="t0-gamma", key="t0-gamma(q21)", tight_key="t0-gamma",
+                    recon="native21", vendor="The Forecasting Company",
+                    version="256M", license="Apache-2.0", arms=False,
+                    blurb="t0-gamma is The Forecasting Company's third public t0 checkpoint, "
+                          "released 13 October 2026: a 256M-parameter decoder-style patch "
+                          "transformer that predicts 21 quantile levels natively and ranks "
+                          "first among single zero-shot models on fev-bench and TIME.",
+                    note="Run zero-shot on CPU with a fixed 128-length context (four 32-point "
+                         "patches) through the direct predict path, with the nonnegativity clip, "
+                         "integer snapping and sign-flip averaging switched off and no "
+                         "cross-series inference. The headline row is all 21 native levels; the "
+                         "nine-decile subset and the vendor's sign-flip averaging are tabled "
+                         "below.",
+                    links=[
+                        ("GitHub", "https://github.com/theforecastingcompany/tfc-t0"),
+                        ("Model card", "https://huggingface.co/theforecastingcompany/t0-gamma"),
+                        ("Paper (arXiv 2609.24559)", "https://arxiv.org/abs/2609.24559"),
+                        ("Release post", "https://www.theforecastingcompany.com/blog/t0-gamma/"),
+                    ],
+                    arch="t0 is a decoder-style patch transformer built for forecasting with "
+                         "covariates and multivariate context, with a 32-step patch and a "
+                         "1,024-step native horizon; none of the covariate machinery is used "
+                         "here. The paper (arXiv 2609.24559) documents the alpha and beta "
+                         "checkpoints; gamma's training recipe is described only in the release "
+                         "post. On its native 21 levels it is within 0.1 nats of Laplace on "
+                         "daily econ, level on price and weekly, and ahead on monthly and "
+                         "M4-hourly, with coverage 0.89 to 0.91. The vendor's sign-flip "
+                         "averaging adds about 0.02 nats at twice the runtime. Pretraining "
+                         "contamination is unchecked.",
+                    variants=[
+                        ("t0-gamma(q21)", "21 levels"),
+                        ("t0-gamma(q21+sym)", "21 levels, sign-flip averaging"),
+                        ("t0-gamma", "nine deciles"),
+                    ]),
 }
 
 # NAV comes from docs/sweep_nav.py, the single source of truth. This file used
