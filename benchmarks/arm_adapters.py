@@ -57,6 +57,14 @@ TIMESTRAL_REVISIONS = {
 LEVELS21 = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
             0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
 
+# t0-gamma (The Forecasting Company, released 2026-10-13; issue #287). Package
+# tfc-t0>=0.6.0 (older releases load gamma under the wrong conventions), pinned
+# in benchmarks/t0_requirements.lock; checkpoint pinned to its HF revision.
+# Predicts the same 21 native levels as Timestral.
+T0_MODEL_ID = "theforecastingcompany/t0-gamma"
+T0_MODEL_REVISION = "e08aee083778f1f32da4974c0a34276776a35c52"
+T0_SOURCE_COMMIT = "5896313cf7a5da5e320a9070c2aff0f8fed79747"
+
 
 def fixed_bandwidth_quantile_dist(
     levels,
@@ -300,6 +308,75 @@ def timestral_quantiles_from_contexts(contexts, h=1, size="28M"):
     if np.any(np.diff(quantiles, axis=1) < 0.0):
         raise ValueError("Timestral produced crossing quantiles")
     return quantiles
+
+
+_t0 = None
+def t0_quantiles_from_contexts(contexts, h=1, symmetric_averaging=False):
+    """t0-gamma's native 21-level quantile forecast at horizon ``h``, one row
+    per context: shape ``(n, 21)`` at the levels in ``LEVELS21``.
+
+    The direct ``T0Forecaster.predict`` path, with every preprocessing switch
+    stated: no nonnegativity clip and no integer snapping (the series are
+    signed changes), no cross-series inference, and sign-flip averaging off
+    unless the caller asks for it as a named ablation.
+    """
+    global _t0
+    import torch
+    from t0 import T0Forecaster
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)   # torch rejects negative strides
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if _t0 is None:
+        _t0 = T0Forecaster.from_pretrained(T0_MODEL_ID, revision=T0_MODEL_REVISION)
+        _t0 = _t0.to(DEVICE).eval()
+    batch = int(os.environ.get("T0_BATCH", "64"))
+    rows = []
+    with torch.no_grad():
+        for i in range(0, len(values), batch):
+            fc = _t0.predict(torch.from_numpy(values[i:i + batch]).to(DEVICE), horizon=h,
+                             quantile_levels=LEVELS21, trim_leading_missing=True,
+                             symmetric_averaging=symmetric_averaging,
+                             clip_nonnegative=False, snap_integers=False)
+            levels = np.asarray(fc.quantile_levels, dtype=float)
+            if levels.shape != (21,) or not np.allclose(levels, LEVELS21):
+                raise ValueError(f"unexpected t0 quantile levels: {levels.tolist()}")
+            q = np.asarray(fc.quantiles.float().cpu().numpy() if hasattr(fc.quantiles, "cpu")
+                           else fc.quantiles, dtype=float)              # (b, h, 21)
+            rows.append(q[:, h - 1, :])
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS21)):
+        raise ValueError(f"unexpected t0 forecast shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("t0 produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("t0 produced crossing quantiles")
+    return quantiles
+
+
+def t0_dists(ch, h=1, levels="q21", symmetric_averaging=False):
+    """t0-gamma native quantiles reconstructed as benchmark ``Dist`` objects,
+    on all 21 levels (``"q21"``) or the nine-decile subset (``"q9"``), through
+    the same fixed-bandwidth reconstruction as TiRex-2 and Timestral."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = t0_quantiles_from_contexts(contexts, h=h,
+                                               symmetric_averaging=symmetric_averaging)
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        if levels == "q9":
+            return [fixed_bandwidth_quantile_dist(
+                LEVELS9, row[_Q9_IN_21], spacing_multiplier=spacing
+            ) for row in quantiles]
+        return [fixed_bandwidth_quantile_dist(
+            LEVELS21, row, spacing_multiplier=spacing
+        ) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  t0 failed: {e}", flush=True); return None
 
 
 _Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
@@ -810,6 +887,11 @@ def make_registry(h=1):
         "Timestral-28M(q21)":  lambda ch: timestral_dists(ch, h, "28M", "q21"),
         "Timestral-123M(q21)": lambda ch: timestral_dists(ch, h, "123M", "q21"),
         "Timestral-209M(q21)": lambda ch: timestral_dists(ch, h, "209M", "q21"),
+        # t0-gamma (#287): native 21 levels (primary), nine-decile subset, and the
+        # vendor's sign-flip averaging as a named ablation
+        "t0-gamma(q21)":     lambda ch: t0_dists(ch, h, "q21"),
+        "t0-gamma":          lambda ch: t0_dists(ch, h, "q9"),
+        "t0-gamma(q21+sym)": lambda ch: t0_dists(ch, h, "q21", symmetric_averaging=True),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
         "PyMC":        lambda ch: pymc_dists(ch, h),

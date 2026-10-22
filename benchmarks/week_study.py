@@ -88,6 +88,9 @@ MODELS = {
     "Timestral-28M(q21)":  (".venv-timestral", "C", {}),
     "Timestral-123M(q21)": (".venv-timestral", "C", {}),
     "Timestral-209M(q21)": (".venv-timestral", "C", {}),
+    "t0-gamma(q21)":     (".venv-t0", "C", {}),
+    "t0-gamma":          (".venv-t0", "C", {}),
+    "t0-gamma(q21+sym)": (".venv-t0", "C", {}),
     # laplace-calibrated sandwiches (quantile-averaged with laplace, own venv):
     "TimesFM+lap": (".venv-timesfm",   "C", {}),
     "TimesFM3+lap": (".venv-timesfm3", "C", {}),
