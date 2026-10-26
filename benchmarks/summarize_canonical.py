@@ -49,10 +49,15 @@ def load_all():
     """{(study, series, method): {col: arr}} across all shard files, rows kept in
     file (step) order so per-series arrays align across methods."""
     store = collections.defaultdict(lambda: {c: [] for c in _COLS})
+    seen_steps = set()      # a (study, series, method, step) scored twice counts once
     for path in sorted(glob.glob(os.path.join(PREDS, "*__*.csv"))):
         with open(path) as fh:
             for r in csv.DictReader(fh):
                 k = (r["study"], r["series"], r["method"])
+                sk = k + (r.get("step", ""),)
+                if sk in seen_steps:
+                    continue
+                seen_steps.add(sk)
                 for c in _COLS:
                     v = r.get(c, "")
                     store[k][c].append(float(v) if v not in ("", "nan") else np.nan)

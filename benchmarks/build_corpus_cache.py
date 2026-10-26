@@ -32,7 +32,11 @@ def main():
         t0 = time.time()
         n = 0
         with open(path, "w") as fh:
+            seen = set()
             for sid, title, ch in corpus.iter_arm(arm, limit=LIMIT):
+                if sid in seen:      # the enumeration yielded 356 daily series twice
+                    continue
+                seen.add(sid)
                 fh.write(json.dumps({"sid": sid, "title": title,
                                      "ch": [float(x) for x in ch]}) + "\n")
                 n += 1
