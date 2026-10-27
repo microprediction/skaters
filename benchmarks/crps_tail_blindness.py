@@ -8,9 +8,12 @@ tail squished in. So the CRPS-optimal Gaussian is markedly narrower than the
 likelihood-optimal one: it wins CRPS and loses log-likelihood.
 
 Propriety still holds -- the TRUE t3 beats every Gaussian on BOTH scores. The
-trade-off lives only among imperfect forecasts. Conformal is the limit: a
-bounded-support predictive law assigns zero density (‑inf log-score) to any tail
-outcome while keeping a finite, competitive CRPS.
+trade-off lives only among imperfect forecasts. Conformal is the limit. Its
+calibration residuals form a discrete empirical law with no density; any
+smoothing of it whose support stops at the observed residual range assigns
+zero density (-inf log-score) to every outcome beyond that range while keeping
+a finite, competitive CRPS. The script measures only the outside-range
+fraction, which is what every such bounded-support choice shares.
 
     python benchmarks/crps_tail_blindness.py    # prints the table, writes docs/assets/crps-tail-blindness.{svg,png}
 """
@@ -53,7 +56,8 @@ _ft = lambda t: stats.t.pdf(t, DF)
 t3_crps, _ = integrate.quad(lambda t: _Ft(t) * (1 - _Ft(t)), -np.inf, np.inf, limit=300)
 t3_nll, _ = integrate.quad(lambda t: -np.log(_ft(t)) * _ft(t), -np.inf, np.inf, limit=300)
 
-# conformal-style bounded support: t3 truncated to an observed calibration range
+# conformal-style bounded support: the fraction of outcomes beyond the observed
+# calibration range, which any density supported on that range scores at -inf
 cal = stats.t.rvs(DF, size=2000, random_state=rng)
 lo, hi = float(cal.min()), float(cal.max())
 outside = float(np.mean((y < lo) | (y > hi)))
@@ -63,7 +67,8 @@ print(f"  likelihood-optimal  sigma = {sL:.3f}  (var {sL**2:.2f} = Var t3)   CRP
 print(f"  CRPS-optimal        sigma = {sC:.3f}  (var {sC**2:.2f})            CRPS {mean_crps(sC):.4f}   NLL {mean_nll(sC):.4f}")
 print(f"  CRPS-best Gaussian is {100*(1-sC/sL):.0f}% narrower: tail squished in -> wins CRPS, loses NLL.")
 print(f"  TRUE t3 (propriety: best at both)                          CRPS {t3_crps:.4f}   NLL {t3_nll:.4f}")
-print(f"  conformal support [{lo:.1f}, {hi:.1f}]: {100*outside:.2f}% of outcomes get -inf log-score, CRPS finite.")
+print(f"  calibration range [{lo:.1f}, {hi:.1f}] from 2000 residuals: {100*outside:.2f}% of outcomes fall outside it, "
+      f"-inf log-score under any density supported on that range, CRPS finite.")
 
 # ---- figure: the two scores want different widths ----
 sig = np.linspace(0.6, 3.2, 140)

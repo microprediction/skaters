@@ -358,7 +358,7 @@ def gpdtails(base, k: int, level: float = 0.98, nexc: int = 500,
         if state is None:
             state = {"base": None, "pending": [],
                      "tails": [{"up": _tail_new(), "lo": _tail_new(),
-                                "warm": [], "n": 0} for _ in range(k)]}
+                                "warm": [], "n": 0, "skipped": 0} for _ in range(k)]}
         # resolve arrivals against the BODY predictions made for them
         pend = state["pending"]
         n = len(pend)
@@ -373,6 +373,17 @@ def gpdtails(base, k: int, level: float = 0.98, nexc: int = 500,
             th = state["tails"][m - 1]
             up, lo = th["up"], th["lo"]
             if up["t"] is None:
+                # The first resolved z's at horizon m >= 2 are PITs of the trunk's
+                # warm-up fallback (the candidate mixture issued before the terminal
+                # leaf has an h-step residual; up to ~2m ticks once multiscale phase
+                # copies are counted), not of the body this splice calibrates. They
+                # stay out of the threshold sample, so a change to candidate h-step
+                # variances cannot move the frozen thresholds. m = 1 is untouched:
+                # the one-step fallback already has the leaf's scale, and k = 1
+                # stays bit-identical.
+                if m >= 2 and th.get("skipped", 0) < 2 * m:
+                    th["skipped"] = th.get("skipped", 0) + 1
+                    continue
                 th["warm"].append(z)
                 if len(th["warm"]) >= warmup:
                     w = sorted(th["warm"])

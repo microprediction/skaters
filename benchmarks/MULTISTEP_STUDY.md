@@ -82,6 +82,26 @@ economic universe laplace is the stronger forecaster, and where the foundation
 models do add something (seasonal CRPS), the `&lap` never-worse sandwich captures
 it without surrendering laplace's log-likelihood and calibration edge.
 
+## Correction, 2026-10-11 (#273)
+
+In this run the adaptive sandwich arms (`~lap`, `@lap`, `&lap`) used information
+from after the forecast origin at every horizon above 1. A horizon-k forecast is
+issued k steps before its target, but the sandwich's internal laplace was a
+one-step learner updated through the previous step, and the portfolio weights
+were updated through the previous step too. The bias favours the sandwiches.
+
+Affected: the sandwich columns at h2 to h13 in Results 1 and 2, the sandwich
+rows of `canonical_summary_*_h{2,3,5,8,13}.csv`, and the closing claim of
+Result 3 about `&lap` at long horizons. Unaffected: every h1 figure (the fix
+leaves h=1 output bit-identical), plain laplace at every horizon, the static
+`+lap` arms, and the standalone foundation models. Even with the bias, the
+TimesFM&lap figures in Result 1 sit below laplace at every horizon.
+
+The fix makes each sandwich's inner model a laplace(k) fed only matured values,
+and fixes each portfolio weight at the forecast origin;
+`tests/test_sidecar_horizon.py` checks this. The h>1 sandwich figures above are
+from the uncorrected run and await a rerun.
+
 ## Files
 
 Raw per-step predictions in `benchmarks/preds_multi/h{k}/`; derived summaries in

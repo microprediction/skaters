@@ -111,11 +111,15 @@ class PushforwardDist:
     # --- the map -----------------------------------------------------------
 
     def _z(self, y: float) -> float:
-        # clamp the linear extrapolation: past ~8 z-units beyond the table the
-        # density is negligible, and an extreme end-segment slope must not
-        # launch z to a magnitude whose finite logpdf poisons a study mean
-        z = interp_table(y, self.ys, self.zs)
-        return min(max(z, self.zs[0] - 8.0), self.zs[-1] + 8.0)
+        # No clamp (skaters#221): interp_table already extrapolates linearly
+        # past the table ends, which is the map's actual, exact behavior out
+        # there. Clamping the OBSERVATION's coordinate made every query at a
+        # large y (even under the identity map) return the same constant
+        # density -- a non-integrable tail and a saturated CRPS breakpoint,
+        # not a bounded score. A study that wants bounded scores floors the
+        # reported logpdf/CRPS itself (bench_core.score_dist already does),
+        # which does not require the distribution's own coordinate map to lie.
+        return interp_table(y, self.ys, self.zs)
 
     def _y(self, z: float) -> float:
         if self.inv_fn is not None:
@@ -209,14 +213,15 @@ class PushforwardDist:
         if self._comps is None:
             comps = []
             for w, m, s in self.inner.components:
-                mu = 0.0
-                m2 = 0.0
-                for x, wt in _GH7:
-                    y = self._y(m + s * _SQRT2 * x)
-                    g = wt / _SQRTPI
-                    mu += g * y
-                    m2 += g * y * y
-                sd = math.sqrt(max(m2 - mu * mu, 1e-24))
+                # Two passes, centered (skaters#225): m2 - mu*mu catastrophically
+                # cancels once the location is large relative to the spread
+                # (mu and m2 both blow up together while their difference does
+                # not). Accumulating (y - mu)^2 directly keeps the subtraction
+                # on the small, spread-scale residuals instead.
+                node_ys = [self._y(m + s * _SQRT2 * x) for x, _ in _GH7]
+                mu = sum((wt / _SQRTPI) * y for y, (_, wt) in zip(node_ys, _GH7))
+                var = sum((wt / _SQRTPI) * (y - mu) ** 2 for y, (_, wt) in zip(node_ys, _GH7))
+                sd = math.sqrt(max(var, 1e-24))
                 comps.append((w, mu, max(sd, 1e-15)))
             self._comps = comps
         return self._comps

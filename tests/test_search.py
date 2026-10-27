@@ -2,7 +2,9 @@
 
 import math
 import random
-from skaters.search import search, _init_pool, _build_from_recipe, _warmup, _make_entry
+from skaters.search import (
+    search, _init_pool, _build_from_recipe, _warmup, _make_entry, _expand, _prune, TRANSFORMS,
+)
 from skaters.leaf import leaf
 from skaters.dist import Dist
 from collections import deque
@@ -227,6 +229,28 @@ def test_long_run_stable():
         x, state = f(random.gauss(0, 1), state)
     assert math.isfinite(x[0].mean)
     assert x[0].std > 0
+
+
+def test_child_of_a_strong_incumbent_is_not_killed_on_arrival():
+    """skaters#223: a freshly _expand'd child starts warm (via _warmup) but
+    unscored; comparing its raw log_w against an incumbent's cumulative sum
+    over hundreds of resolved observations is not the same reference basis.
+    A child must inherit its parent's current log_w, the same way it already
+    inherits the parent's warm state."""
+    pool = [_make_entry(leaf(k=1), depth=0, recipe=[], k=1)]
+    pool[0]["warmed"] = True
+    pool[0]["log_w"] = [100.0]   # a long, strongly positive run
+
+    children = _expand(pool, k=1, top_n=1, max_depth=3, transforms=TRANSFORMS[:2])
+    assert children, "expected at least one child"
+    buf = deque([0.0] * 200)
+    for child in children:
+        _warmup(child, buf, k=1)
+    pool.extend(children)
+    _prune(pool, threshold=-50.0, max_pool=30, k=1)
+
+    survivor_recipes = {tuple(e["recipe"]) for e in pool}
+    assert any(tuple(c["recipe"]) in survivor_recipes for c in children)
 
 
 def test_dantzig_is_the_roster_name_for_search():

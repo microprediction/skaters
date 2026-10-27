@@ -107,6 +107,8 @@ class Dist:
         """Probability density at x."""
         total = 0.0
         for w, m, s in self.components:
+            if w <= 0.0:
+                continue      # skaters#222: 0 * inf at a discarded (s=0) atom is NaN, not 0
             total += w * _gaussian_pdf(x, m, s)
         return total
 
@@ -266,7 +268,12 @@ class Dist:
         # disagree at the ulp level (e.g. libm erf vs a polynomial) still merge
         # the same pairs in the same order. Exact argmin would amplify ulp
         # noise into macroscopically different mixtures.
-        scale = abs(comps[0][1]) + abs(comps[-1][1]) + 1e-12
+        # Translation-invariant (skaters#226): comps is sorted by mean, so
+        # comps[-1][1] - comps[0][1] is the mixture's actual span. The prior
+        # abs(lo) + abs(hi) instead tracked absolute location, so translating
+        # a mixture by a large offset (both endpoints shift together) inflated
+        # the tie allowance by ~2x the offset instead of leaving it unchanged.
+        scale = (comps[-1][1] - comps[0][1]) + 1e-12
         while len(comps) > max_components:
             best_dist = float("inf")
             for i in range(len(comps)):

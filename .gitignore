@@ -244,6 +244,7 @@ benchmarks/overnight_horserace.log
 # (benchmarks/canonical_summary_*.csv) ARE committed — they are the chart source
 # (the lost-run lesson: never gitignore chart source data).
 benchmarks/preds/
+benchmarks/preds_fc/
 
 # arXiv staging: tarball is the artifact, intermediates are not
 papers/arxiv/*.aux
@@ -264,3 +265,24 @@ benchmarks/out_of_scope.csv
 benchmarks/preds_h/
 # FRED holdout snapshot (18MB, regenerate with benchmarks/fetch_holdout.py)
 benchmarks/data_holdout/
+
+# Surrogate/distillation research tree (30GB of checkpoints and tapes). It is
+# slated for its own repo; until it moves, it lives here untracked. Git cannot
+# protect it, so it needs a filesystem backup, not a commit.
+surrogate/
+
+# Multi-horizon and surrogate prediction tapes: large, regenerable, same rule as
+# benchmarks/preds/. The derived canonical_summary_*.csv ARE committed.
+benchmarks/preds_multi/
+benchmarks/preds_surrogate/
+benchmarks/preds_surrogate_big/
+
+# GIFT-Eval distillation workspace: a vendored clone plus its downloaded data.
+benchmarks/gifteval_distill/
+
+# stronger-benchmark paper: the PDF is a build artifact of compile.sh
+papers/stronger-benchmark/*.aux
+papers/stronger-benchmark/*.log
+papers/stronger-benchmark/*.bbl
+papers/stronger-benchmark/*.blg
+papers/stronger-benchmark/*.out

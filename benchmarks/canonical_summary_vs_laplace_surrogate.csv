@@ -1,0 +1,2 @@
+study,model,n_series,win,draw,loss,med_dLL,q25_dLL,q75_dLL,med_crps_ratio
+monthly:econ,surrogate,200,12,113,75,-0.6951,-1.2096,-0.2959,0.9807

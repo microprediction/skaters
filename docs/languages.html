@@ -36,6 +36,8 @@
             <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -87,6 +89,22 @@
       over the Rust core, <code>pip install skaters[fast]</code>), runs the
       identical <code>laplace</code> model at about 20x the per-step rate with
       the same bits on every platform.
+    </p>
+
+    <h2>Python, differentiable (<code>skaters.torch</code>)</h2>
+    <p><code>pip install skaters[torch]</code></p>
+    <p>
+      The transforms and the mixture distribution as <code>torch</code>
+      modules: the same arithmetic in the same order, with every continuous
+      hyperparameter (an EMA rate, a Holt pair, a Yeo&ndash;Johnson lambda) an
+      <code>nn.Parameter</code> and gradients flowing from a log score back
+      through <code>inverse_k</code> and <code>forward</code>. Each ported
+      transform is held to the reference at 1e-9 on seeded series by its own
+      parity check, so a model built on it starts as the reference exactly and
+      can only move where a score says to. The leaf, the trunk and the lattice
+      stay in the reference; this is the substrate for learning the transform
+      parameters and the mixing policy, not a fourth port of
+      <code>laplace</code>. <code>import skaters</code> does not import torch.
     </p>
 
     <h2>JavaScript</h2>

@@ -194,7 +194,10 @@ def render(d):
     <blockquote><code>g(z) = &frac12; N(0, v(1&minus;&delta;)) + &frac12; N(0, v(1+&delta;))</code></blockquote>
     <p>Here <code>v</code> carries the variance level and <code>&delta;</code> splits one
       variance into two nearby ones, which is exactly how excess kurtosis arises from purely
-      Gaussian pieces. It is a genuine density for any <code>v &gt; 0</code>. The name comes
+      Gaussian pieces. It is a genuine density whenever <code>v &gt; 0</code> and
+      <code>0 &le; &delta; &lt; 1</code>, so that both component variances are positive; the
+      candidate grid stops at 0.5 and the constructor rejects anything at or beyond 1. The
+      name comes
       from that split: an unresolved mixture of latent regimes is replaced by an effective
       aggregate description, without ever committing to which regime is active now.</p>
     <p>A small fixed grid of candidates is run in parallel, each with its own filter on the

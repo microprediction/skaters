@@ -279,11 +279,16 @@ def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
                         om = base * c if base * c > 1e-12 else 1e-12
                         hh = om / (1.0 - al - be)            # unconditional-variance init
                         v = 0.0
+                        prev = None
                         for r in resid:
-                            hh = om + al * (r * r) + be * hh
-                            if hh <= 1e-300:
-                                hh = 1e-300
+                            # h_t is built from r_{t-1}, never from r_t itself; the first
+                            # point is scored under the unconditional variance (issue #244).
+                            if prev is not None:
+                                hh = om + al * (prev * prev) + be * hh
+                                if hh <= 1e-300:
+                                    hh = 1e-300
                             v += math.log(hh) + (r * r) / hh
+                            prev = r
                         if v < best_v:                       # first-wins on ties
                             best_v, best_om, best_al, best_be = v, om, al, be
                 s["omega"], s["alpha"], s["beta"] = best_om, best_al, best_be
@@ -297,7 +302,15 @@ def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
             g = gamma if gamma > 1.0 / s["n"] else 1.0 / s["n"]
             s["w"] = [(1 - g) * w[i] + g * dens[i] / total for i in range(K)]
 
-        d = Dist([(s["w"][i], 0.0, C[i] * sigma) for i in range(K)])
+        # The emitted Dist forecasts r_{t+1}, so its scale is the NEXT conditional
+        # variance h_{t+1} = omega + alpha r_t^2 + beta h_t under the (possibly just
+        # refit) parameters. `sigma` above is sqrt(h_t), which scores r_t under its own
+        # conditional variance for the weight update (issue #239).
+        h_next = s["omega"] + s["alpha"] * y * y + s["beta"] * h
+        if not (math.isfinite(h_next) and h_next > 1e-300):
+            h_next = s["s2"]
+        sigma_next = math.sqrt(h_next)
+        d = Dist([(s["w"][i], 0.0, C[i] * sigma_next) for i in range(K)])
         return [d] * k, s
 
     _leaf.__name__ = f"garch_leaf(k={k})"

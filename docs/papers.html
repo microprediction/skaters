@@ -50,6 +50,8 @@
             <a href="/foundation/timesfm3.html">TimesFM3</a>
             <a href="/foundation/sundial.html">Sundial</a>
             <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -79,6 +81,26 @@
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">benchmarks/</a>
       directories of the repository. The benchmark studies themselves live on the
       <a href="/benchmarks.html">benchmarks page</a>.</p>
+
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.pdf">A
+      stronger univariate benchmark for foundational time-series model evaluation</a></h2>
+      <p class="abstract">Reported progress for foundation time-series models rests on
+      comparisons that leave out a strong classical reference. Across eleven benchmark papers
+      the classical arms are per-window refits of ETS, ARIMA and Theta; no online forecaster
+      appears, and no suite scores a full predictive density by log score. This paper supplies the missing
+      reference, scored one step ahead on held-out log density over an 18,815-series panel.
+      The comparison is decided by a step the suites leave unstated: how the model's nine
+      quantiles become a density. Under a tight reconstruction the reference leads TimesFM 3.0
+      by half a nat on the median series of every stratum; under a generous one the two are
+      level at the median, and the reference keeps the better coverage. Every number derives
+      from a version-controlled store; the verifier and a three-tier reproduction guide live
+      next to the paper.</p>
+      <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.pdf">PDF</a>
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.tex">LaTeX</a>
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/REPRODUCE.md">Reproduce</a>
+      <span class="status">SSRN, 2026</span></p>
+    </div>
 
     <div class="paper">
       <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">Transforms

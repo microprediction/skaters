@@ -293,10 +293,21 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int,
 
             child_fn = _build_from_recipe(new_recipe, k, transforms)
             child_fn.__name__ = "|".join(new_recipe) + "|leaf"
-            children.append(_make_entry(
+            child = _make_entry(
                 child_fn, depth=len(new_recipe), recipe=new_recipe, k=k,
                 cost=child_cost,
-            ))
+            )
+            # Parent-relative initialization (skaters#223): a fresh log_w of
+            # 0.0 is not on the same reference basis as an incumbent's
+            # cumulative sum over its whole lifetime, so _prune (and the
+            # softmax combination) were comparing an unscored zero against
+            # hundreds of resolved observations -- units the depth penalty
+            # cannot fix. The child already inherits the parent's warm STATE
+            # via _warmup below; it must also inherit the parent's current
+            # log_w as its starting evidence, the same way a real Bayesian
+            # update starts from the parent's posterior, not from ignorance.
+            child["log_w"] = list(parent["log_w"])
+            children.append(child)
 
     return children
 

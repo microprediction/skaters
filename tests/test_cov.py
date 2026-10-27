@@ -95,12 +95,17 @@ class TestLedoitWolf:
         assert cov[1] > 0
 
     def test_correlations_bounded(self):
-        """Correlations should never exceed [-1, 1]."""
+        """Correlations implied by the returned covariance should never
+        exceed [-1, 1] (skaters#224: this is now a structural guarantee of
+        a genuine PSD covariance matrix, not a per-pair clamp -- checked
+        against the public return value rather than internal state shape,
+        which no longer exposes a separate correlation array)."""
         state = None
         random.seed(42)
         for _ in range(1000):
             y = [random.gauss(0, 1), random.gauss(0, 1)]
-            _, _, state = ledoit_wolf_cov(y, state)
-        for i in range(2):
-            for j in range(2):
-                assert abs(state["corr"][i * 2 + j]) <= 1.0 + 1e-10
+            _, cov, state = ledoit_wolf_cov(y, state)
+        si = math.sqrt(cov[0]) if cov[0] > 0 else 0.0
+        sj = math.sqrt(cov[3]) if cov[3] > 0 else 0.0
+        if si > 0 and sj > 0:
+            assert abs(cov[1] / (si * sj)) <= 1.0 + 1e-10

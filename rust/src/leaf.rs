@@ -329,10 +329,15 @@ impl GarchLeaf {
                             let om = if base * c > 1e-12 { base * c } else { 1e-12 };
                             let mut hh = om / (1.0 - al - be);
                             let mut v = 0.0;
-                            for &r in &resid {
-                                hh = om + al * (r * r) + be * hh;
-                                if hh <= 1e-300 {
-                                    hh = 1e-300;
+                            for (i, &r) in resid.iter().enumerate() {
+                                // h_t from r_{t-1}; the first point is scored under the
+                                // unconditional variance (issue #244).
+                                if i > 0 {
+                                    let prev = resid[i - 1];
+                                    hh = om + al * (prev * prev) + be * hh;
+                                    if hh <= 1e-300 {
+                                        hh = 1e-300;
+                                    }
                                 }
                                 v += libm::log(hh) + (r * r) / hh;
                             }
@@ -375,9 +380,16 @@ impl GarchLeaf {
                 self.w[i] = (1.0 - g) * self.w[i] + g * dens[i] / total;
             }
         }
+        // Emitted scale is the NEXT conditional variance
+        // h_{t+1} = omega + alpha r_t^2 + beta h_t (issue #239).
+        let mut h_next = self.omega + self.alpha * y * y + self.beta * h;
+        if !(h_next.is_finite() && h_next > 1e-300) {
+            h_next = self.s2;
+        }
+        let sigma_next = h_next.sqrt();
         let d = Dist::new(
             (0..kk)
-                .map(|i| (self.w[i], 0.0, self.scales[i] * sigma))
+                .map(|i| (self.w[i], 0.0, self.scales[i] * sigma_next))
                 .collect(),
         );
         vec![d; self.k]

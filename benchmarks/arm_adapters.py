@@ -20,6 +20,7 @@ TiRex-2 is Apache-2.0; flowstate uses the ibm-research research checkpoint
 (arXiv:2508.05287), research-use only.
 """
 from __future__ import annotations
+import hashlib
 import math
 import os
 import sys
@@ -43,6 +44,40 @@ DEVICE = os.environ.get("FM_DEVICE", "cpu")
 
 TIREX2_MODEL_ID = "NX-AI/TiRex-2"
 TIREX2_MODEL_REVISION = "05e5b26db52bfb256f1ae1bdf785589850482de3"
+
+# Timestral (Mistral, released 2026-10-15; issue #282). Package pinned to the
+# repository commit in benchmarks/timestral_requirements.lock; each checkpoint
+# pinned to its Hugging Face revision so a run cannot silently move.
+TIMESTRAL_REPO_COMMIT = "a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff"
+TIMESTRAL_REVISIONS = {
+    "5M":   "bdd20cfc15a3fea0e4cb5ccef37f8d3ca7aa335f",
+    "28M":  "180698bbf5a50dda3516aa6419798437fb03a430",
+    "123M": "5a147287addda85f6acd8da3fb8858fe9af7e8f7",
+    "209M": "9874d252ab0aae16f7f7c999f98f98d6ad7d8365",
+}
+LEVELS21 = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
+            0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
+
+# t0-gamma (The Forecasting Company, released 2026-10-13; issue #287). Package
+# tfc-t0>=0.6.0 (older releases load gamma under the wrong conventions), pinned
+# in benchmarks/t0_requirements.lock; checkpoint pinned to its HF revision.
+# Predicts the same 21 native levels as Timestral.
+T0_MODEL_ID = "theforecastingcompany/t0-gamma"
+T0_MODEL_REVISION = "e08aee083778f1f32da4974c0a34276776a35c52"
+T0_SOURCE_COMMIT = "5896313cf7a5da5e320a9070c2aff0f8fed79747"
+
+# Kumo Tabular (NVIDIA, released 2026-09-23; issue #294): a tabular in-context
+# model used as a forecaster exactly as the pre-registered TabFM study used
+# TabFM: the 128-change context arranged as an 8-lag table, refreshed every
+# STRIDE test steps, NE ensemble members. The regressor emits 999 quantiles,
+# so its density needs no bandwidth inflation; the classifier arm is the
+# TabFM clf8 replication (decile bins). Weights nvidia/Kumo-Tabular at the
+# revision below (structured-data-models 0.2.1, benchmarks/kumo_requirements.lock).
+# CPU only: on Apple MPS the large regressor returned a different median
+# (0.21 vs -1.15 on the same block), so the GPU path is not trusted here.
+KUMO_MODEL_REVISION = "c5893d418e162b9f841ae179dc767afefff73831"
+KUMO_LAGS, KUMO_STRIDE, KUMO_NE = 8, 10, 4
+LEVELS99 = [round(k / 100, 2) for k in range(1, 100)]
 
 
 def fixed_bandwidth_quantile_dist(
@@ -89,16 +124,35 @@ def fixed_bandwidth_quantile_dist(
 
 
 # ------------------------------------------------------------------ laplace baseline
-def laplace_dists(ch, h=1):
+def laplace_dists(ch, h=1, tails="gpd"):
     """Per-step laplace predictive over the test window (the h-step forecast made
     h observations earlier). Mirrors foundation_study.laplace_scores but returns
-    the Dist objects so the canonical store records laplace per step too."""
-    f = laplace(h); st = None; queue = []; out = []
+    the Dist objects so the canonical store records laplace per step too.
+    `tails` is passed through to laplace (``"gaussian"`` = no GPD splice)."""
+    f = laplace(h, tails=tails); st = None; queue = []; out = []
     start = len(ch) - TEST
     for i, yv in enumerate(ch):
         if len(queue) >= h and i >= start:
             out.append(queue[-h][h - 1])
         d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
+
+def _hstep_predictives(xs, h):
+    """Run laplace(h) over the series xs and return, for each i, the h-step
+    predictive for xs[i] issued after xs[i-h] was observed (None for i < h).
+
+    This is the maturity rule for a horizon-h forecast: the correction applied
+    to a forecast issued at time t-h may only use values observed by t-h. With
+    h=1 it is laplace(1)'s one-step predictive, as before (#273).
+    """
+    f = laplace(h); st = None; queue = []; out = []
+    for x in xs:
+        out.append(queue[-h][h - 1] if len(queue) >= h else None)
+        d, st = f(x, st)
         queue.append(d)
         if len(queue) > h:
             queue.pop(0)
@@ -127,7 +181,7 @@ def sundial_dists(ch, h=1):
 
 
 _tirex = None
-def tirex_dists(ch, h=1):
+def tirex_dists(ch, h=1, recon=None):
     """TiRex (NX-AI, 35M xLSTM): 9-quantile head -> smoothed-mixture Dist. CPU
     backend='torch' (no CUDA kernel on this box)."""
     global _tirex
@@ -140,7 +194,8 @@ def tirex_dists(ch, h=1):
         q, _mean = _tirex.forecast(context=ctx, prediction_length=h,
                                    output_type="numpy")     # q: [TEST, h, 9]
         q = np.asarray(q)[:, h - 1, :]                       # horizon h
-        return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
+        rec = recon or fs.quantile_dist
+        return [rec(LEVELS9, q[i]) for i in range(len(q))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  tirex failed: {e}", flush=True); return None
 
@@ -222,8 +277,250 @@ def tirex2_dists(ch, h=1):
         print(f"  tirex2 failed: {e}", flush=True); return None
 
 
+_timestral = {}
+def timestral_quantiles_from_contexts(contexts, h=1, size="28M"):
+    """Timestral's native 21-level quantile forecast at horizon ``h``,
+    one row per context: shape ``(n, 21)`` at the levels in ``LEVELS21``.
+
+    Both test-time conveniences are switched off explicitly: symmetric
+    averaging (a sign-flip augmentation) and the nonnegativity clip, which
+    would truncate the change series this benchmark scores.
+    """
+    from timestral import TimestralForecaster
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    if size not in TIMESTRAL_REVISIONS:
+        raise ValueError(f"unknown Timestral size {size!r}")
+    values = np.asarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if size not in _timestral:
+        _timestral[size] = TimestralForecaster.from_pretrained(
+            f"mistralai/Timestral-{size}", device=DEVICE,
+            revision=TIMESTRAL_REVISIONS[size])
+    model = _timestral[size]
+    levels = np.asarray(model.forecast(values[:1, None, :], prediction_length=1,
+                                       symmetric_averaging=False,
+                                       clip_nonnegative=False).quantile_levels, dtype=float)
+    if levels.shape != (21,) or not np.allclose(levels, LEVELS21):
+        raise ValueError(f"unexpected Timestral quantile levels: {levels.tolist()}")
+    batch = int(os.environ.get("TIMESTRAL_BATCH", "64"))
+    rows = []
+    for i in range(0, len(values), batch):
+        fc = model.forecast(values[i:i + batch, None, :], prediction_length=h,
+                            symmetric_averaging=False, clip_nonnegative=False)
+        q = np.asarray(fc.quantiles, dtype=float)             # (b, 1, h, 21)
+        rows.append(q[:, 0, h - 1, :])
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS21)):
+        raise ValueError(f"unexpected Timestral forecast shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Timestral produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("Timestral produced crossing quantiles")
+    return quantiles
+
+
+_t0 = None
+def t0_quantiles_from_contexts(contexts, h=1, symmetric_averaging=False):
+    """t0-gamma's native 21-level quantile forecast at horizon ``h``, one row
+    per context: shape ``(n, 21)`` at the levels in ``LEVELS21``.
+
+    The direct ``T0Forecaster.predict`` path, with every preprocessing switch
+    stated: no nonnegativity clip and no integer snapping (the series are
+    signed changes), no cross-series inference, and sign-flip averaging off
+    unless the caller asks for it as a named ablation.
+    """
+    global _t0
+    import torch
+    from t0 import T0Forecaster
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)   # torch rejects negative strides
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if _t0 is None:
+        _t0 = T0Forecaster.from_pretrained(T0_MODEL_ID, revision=T0_MODEL_REVISION)
+        _t0 = _t0.to(DEVICE).eval()
+    batch = int(os.environ.get("T0_BATCH", "64"))
+    rows = []
+    with torch.no_grad():
+        for i in range(0, len(values), batch):
+            fc = _t0.predict(torch.from_numpy(values[i:i + batch]).to(DEVICE), horizon=h,
+                             quantile_levels=LEVELS21, trim_leading_missing=True,
+                             symmetric_averaging=symmetric_averaging,
+                             clip_nonnegative=False, snap_integers=False)
+            levels = np.asarray(fc.quantile_levels, dtype=float)
+            if levels.shape != (21,) or not np.allclose(levels, LEVELS21):
+                raise ValueError(f"unexpected t0 quantile levels: {levels.tolist()}")
+            q = np.asarray(fc.quantiles.float().cpu().numpy() if hasattr(fc.quantiles, "cpu")
+                           else fc.quantiles, dtype=float)              # (b, h, 21)
+            rows.append(q[:, h - 1, :])
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS21)):
+        raise ValueError(f"unexpected t0 forecast shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("t0 produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("t0 produced crossing quantiles")
+    return quantiles
+
+
+def t0_dists(ch, h=1, levels="q21", symmetric_averaging=False):
+    """t0-gamma native quantiles reconstructed as benchmark ``Dist`` objects,
+    on all 21 levels (``"q21"``) or the nine-decile subset (``"q9"``), through
+    the same fixed-bandwidth reconstruction as TiRex-2 and Timestral."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = t0_quantiles_from_contexts(contexts, h=h,
+                                               symmetric_averaging=symmetric_averaging)
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        if levels == "q9":
+            return [fixed_bandwidth_quantile_dist(
+                LEVELS9, row[_Q9_IN_21], spacing_multiplier=spacing
+            ) for row in quantiles]
+        return [fixed_bandwidth_quantile_dist(
+            LEVELS21, row, spacing_multiplier=spacing
+        ) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  t0 failed: {e}", flush=True); return None
+
+
+_kumo = {}
+_kumo_memo = {}
+def _kumo_model(task, size):
+    from sdm.models import KumoTabular
+    key = (task, size)
+    if key not in _kumo:
+        _kumo[key] = KumoTabular(task=task, size=size, device=DEVICE)
+    return _kumo[key]
+
+
+def _kumo_blocks(n):
+    start = n - TEST
+    for lo in range(start, n, KUMO_STRIDE):
+        yield lo, min(lo + KUMO_STRIDE, n)
+
+
+def kumo_reg_quantiles(ch, h=1, size="large"):
+    """Kumo regressor over the test window: ``(TEST, 999)`` native quantiles
+    q001..q999 for ch[t], each block's in-context table being the 120 lag
+    rows that end before the block (the same arrangement as TabFM clf8)."""
+    import torch
+    import tabfm_wide_study as tw
+    key = (size, h, hashlib.sha1(np.asarray(ch, float).tobytes()).hexdigest())
+    if key in _kumo_memo:
+        return _kumo_memo[key]
+    model = _kumo_model("regression", size)
+    n = len(ch); rows = []
+    with torch.no_grad():
+        for lo, hi in _kumo_blocks(n):
+            Xtr, ytr = tw.lag_rows(ch, lo - CTX + KUMO_LAGS + h - 1, lo, KUMO_LAGS, h)
+            Xte, _ = tw.lag_rows(ch, lo, hi, KUMO_LAGS, h)
+            if np.ptp(ytr) == 0.0:                      # constant context: point mass
+                rows.append(np.repeat(float(ytr[0]), 999)[None, :].repeat(hi - lo, axis=0))
+                continue
+            out = model(x_context=torch.from_numpy(Xtr),
+                        y_context=torch.from_numpy(ytr.astype(np.float32))[:, None],
+                        x_query=torch.from_numpy(Xte), num_estimators=KUMO_NE)
+            df = out.to_pandas()
+            q = df[[f"q{k:03d}" for k in range(1, 1000)]].to_numpy(dtype=float)
+            rows.append(q)
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (TEST, 999):
+        raise ValueError(f"unexpected Kumo quantile shape {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Kumo produced nonfinite quantiles")
+    quantiles = np.maximum.accumulate(quantiles, axis=1)   # enforce monotone ordering
+    _kumo_memo.clear(); _kumo_memo[key] = quantiles
+    return quantiles
+
+
+def kumo_dists(ch, h=1, size="large", arm="reg(q21)"):
+    """Kumo Tabular as a one-step density forecaster.
+
+    ``reg(q21)``: the regressor's native quantiles at the 21 Timestral/t0
+    levels through the fixed-bandwidth reconstruction (comparable with the
+    other native-21 arms); ``reg(q99)``: the same at every percentile 1..99;
+    ``clf8``: the TabFM decile-bin classifier density on the identical table.
+    """
+    try:
+        if arm.startswith("reg"):
+            q = kumo_reg_quantiles(ch, h, size)
+            levels = LEVELS21 if arm == "reg(q21)" else LEVELS99
+            cols = [int(round(p * 1000)) - 1 for p in levels]
+            spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+            out = []
+            for row in q[:, cols]:
+                if np.ptp(row) == 0.0:
+                    out.append(Dist([(1.0, float(row[0]), 1e-9)]))
+                else:
+                    out.append(fixed_bandwidth_quantile_dist(levels, row, spacing_multiplier=spacing))
+            return out
+        if arm == "clf8":
+            import torch
+            import tabfm_wide_study as tw
+            model = _kumo_model("classification", size)
+            n = len(ch); dists = []
+            with torch.no_grad():
+                for lo, hi in _kumo_blocks(n):
+                    Xtr, ytr = tw.lag_rows(ch, lo - CTX + KUMO_LAGS + h - 1, lo, KUMO_LAGS, h)
+                    Xte, _ = tw.lag_rows(ch, lo, hi, KUMO_LAGS, h)
+                    edges = tw.decile_edges(ytr)
+                    if len(edges) < 3:
+                        v = float(np.median(ytr))
+                        dists += [Dist([(1.0, v, 1e-9)])] * (hi - lo)
+                        continue
+                    lab = tw.labels_for(edges, ytr).astype(np.int64)
+                    out = model(x_context=torch.from_numpy(Xtr),
+                                y_context=torch.from_numpy(lab)[:, None],
+                                x_query=torch.from_numpy(Xte), num_estimators=KUMO_NE)
+                    df = out.to_pandas()
+                    probs = np.zeros((hi - lo, len(edges) - 1))
+                    for c in df.columns:
+                        probs[:, int(c)] = df[c].to_numpy(dtype=float)
+                    dists += [tw.bar_dist(edges, row) for row in probs]
+            return dists
+        raise ValueError(f"unknown Kumo arm {arm!r}")
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  kumo failed: {e}", flush=True); return None
+
+
+_Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
+
+
+def timestral_dists(ch, h=1, size="28M", levels="q9"):
+    """Timestral native quantiles reconstructed as benchmark ``Dist`` objects.
+
+    ``levels="q9"`` keeps the nine deciles and the TiRex-2 reconstruction, so
+    the arm is comparable with the other quantile models; ``"q21"`` feeds all
+    21 levels (1% to 99%) to the same fixed-bandwidth reconstruction.
+    """
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = timestral_quantiles_from_contexts(contexts, h=h, size=size)
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        if levels == "q9":
+            return [fixed_bandwidth_quantile_dist(
+                LEVELS9, row[_Q9_IN_21], spacing_multiplier=spacing
+            ) for row in quantiles]
+        return [fixed_bandwidth_quantile_dist(
+            LEVELS21, row, spacing_multiplier=spacing
+        ) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  timestral failed: {e}", flush=True); return None
+
+
 _flowstate = None
-def flowstate_dists(ch, h=1):
+def flowstate_dists(ch, h=1, recon=None):
     """flowstate (IBM research checkpoint, SSM + functional-basis decoder):
     9-quantile output -> smoothed-mixture Dist."""
     global _flowstate
@@ -239,7 +536,8 @@ def flowstate_dists(ch, h=1):
             out = _flowstate(past_values=ctx, prediction_length=h)
         q = out.quantile_outputs.float().cpu().numpy()     # [TEST, 9, h, 1]
         q = q[:, :, h - 1, 0]                              # [TEST, 9] at horizon h
-        return [fs.quantile_dist(LEVELS9, q[i]) for i in range(len(q))]
+        rec = recon or fs.quantile_dist
+        return [rec(LEVELS9, q[i]) for i in range(len(q))]
     except Exception as e:                                 # noqa: BLE001
         print(f"  flowstate failed: {e}", flush=True); return None
 
@@ -329,6 +627,52 @@ def _sandwich(fm_fn, h=1):
 # still align exactly with every other arm's last TEST steps.
 _RESID_WARM = int(os.environ.get("FM_RESID_WARM", "128"))
 
+_fm_memo = {}
+def _memoized(fm_fn, tag):
+    """Wrap a base forecaster so repeated calls on the same series, horizon
+    and window length return the same forecasts without re-running the
+    model. The sandwich arms of one base (+lap and &lap on the scored window,
+    ~lap and @lap on the warm-up-extended window) then cost one model run
+    each per window instead of four. Keyed on the live foundation_study.TEST
+    because ~lap/@lap lengthen it temporarily."""
+    def run(ch, h=1):
+        key = (tag, h, fs.TEST, hashlib.sha1(np.asarray(ch, float).tobytes()).hexdigest())
+        if key not in _fm_memo:
+            if len(_fm_memo) >= 4:
+                _fm_memo.clear()
+            _fm_memo[key] = fm_fn(ch, h)
+        return _fm_memo[key]
+    return run
+
+
+def _wide_recon():
+    return __import__("nozzles").nozzle_wide
+
+
+# the fair bases (#269/#282/#287): native 21 levels or the generous reconstruction
+_FAIR_BASES = {
+    "Timestral-209M(q21)": lambda ch, h=1: timestral_dists(ch, h, "209M", "q21"),
+    "t0-gamma(q21)":       lambda ch, h=1: t0_dists(ch, h, "q21"),
+    "TimesFM3(wide)":      lambda ch, h=1: fs.timesfm3_dists(ch, h, recon=_wide_recon()),
+    "TimesFM(wide)":       lambda ch, h=1: fs.timesfm_dists(ch, h, recon=_wide_recon()),
+    "TiRex(wide)":         lambda ch, h=1: tirex_dists(ch, h, recon=_wide_recon()),
+    "Chronos(wide)":       lambda ch, h=1: fs.chronos_dists(ch, h, recon=_wide_recon()),
+}
+
+
+def _fair_sandwiches(h):
+    """The four sandwich arms on every fair base: '<base>+lap' (quantile
+    average), '<base>~lap' (FM location, laplace residual scale), '<base>@lap'
+    (PIT recalibration) and '<base>&lap' (online portfolio)."""
+    out = {}
+    for name, fn in _FAIR_BASES.items():
+        base = _memoized(fn, name)
+        out[name + "+lap"] = _sandwich(base, h)
+        out[name + "~lap"] = _resid_sandwich(base, h)
+        out[name + "@lap"] = pit_sandwich(base, h)
+        out[name + "&lap"] = portfolio_sandwich(base, h=h)
+    return out
+
 
 def _resid_sandwich(fm_fn, h=1):
     """Arm = FM location + laplace on the FM residual stream (adaptive scale)."""
@@ -345,13 +689,13 @@ def _resid_sandwich(fm_fn, h=1):
         locs = [d.quantile(0.5) for d in fmx]
         ext = len(ch) - (target + _RESID_WARM)
         resid = [ch[ext + i] - locs[i] for i in range(len(locs))]
-        f = laplace(1); st = None; pend = None; out = []
-        for i, rt in enumerate(resid):
-            if pend is not None and i >= _RESID_WARM:
-                base = pend[0]; loc = locs[i]
-                out.append(fs.quantile_dist(_VLEVELS,
-                                            [loc + base.quantile(p) for p in _VLEVELS]))
-            d, st = f(rt, st); pend = d
+        # Residual r_j is observed at target time j; the forecast for target i
+        # was issued at i-h, so its residual model may only see r_{<=i-h}.
+        preds = _hstep_predictives(resid, h); out = []
+        for i in range(_RESID_WARM, len(resid)):
+            base = preds[i]; loc = locs[i]
+            out.append(fs.quantile_dist(_VLEVELS,
+                                        [loc + base.quantile(p) for p in _VLEVELS]))
         return out
     return run
 
@@ -384,17 +728,18 @@ def pit_sandwich(fm_fn, h=1):
         if fmx is None or len(fmx) < target + _RESID_WARM:
             return None
         ext = len(ch) - (target + _RESID_WARM)
-        f = laplace(1); st = None; pend = None; out = []
-        for i, fd in enumerate(fmx):
-            yt = ch[ext + i]
-            if pend is not None and i >= _RESID_WARM:
-                G = pend
-                yq = [fd.quantile(min(max(_ncdf(G.quantile(p)), 1e-6), 1 - 1e-6))
-                      for p in _PITLEVELS]
-                yq = list(np.maximum.accumulate(yq))     # numerical monotonicity
-                out.append(fs.quantile_dist(_PITLEVELS, yq))
-            u = min(max(fd.cdf(yt), 1e-6), 1 - 1e-6)
-            d, st = f(_nppf(u), st); pend = d[0]
+        # z_j = Phi^{-1}(F_j(y_j)) matures when y_j arrives. The FM forecast for
+        # target i was issued at i-h, so G must be laplace's h-step predictive
+        # from z_{<=i-h}, not a one-step predictive fed z_{i-1} (#273).
+        z = [_nppf(min(max(fd.cdf(ch[ext + i]), 1e-6), 1 - 1e-6))
+             for i, fd in enumerate(fmx)]
+        preds = _hstep_predictives(z, h); out = []
+        for i in range(_RESID_WARM, len(fmx)):
+            fd = fmx[i]; G = preds[i]
+            yq = [fd.quantile(min(max(_ncdf(G.quantile(p)), 1e-6), 1 - 1e-6))
+                  for p in _PITLEVELS]
+            yq = list(np.maximum.accumulate(yq))     # numerical monotonicity
+            out.append(fs.quantile_dist(_PITLEVELS, yq))
         return out
     return run
 
@@ -448,11 +793,17 @@ def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None, h=1):
         if rec is None or len(lap) != len(rec):
             return None
         y = ch[len(ch) - TEST:]
-        lw = [prior, 0.0]; out = []
+        # Both components forecast y[i] from information at i-h, so the weights
+        # mixing them must be those that stood at i-h: snap[k] holds the
+        # log-weights after scoring y[<k] (#273).
+        lw = [prior, 0.0]; snap = []; out = []
         for i in range(len(lap)):
-            m = max(lw); w = [math.exp(x - m) for x in lw]; tot = sum(w)
+            snap.append(list(lw))
+            k = i - h + 1
+            lwi = snap[k] if k >= 0 else [prior, 0.0]
+            m = max(lwi); w = [math.exp(x - m) for x in lwi]; tot = sum(w)
             w = [x / tot for x in w]
-            out.append(mix_dists([lap[i], rec[i]], w))       # predict y[i] from y[<i]
+            out.append(mix_dists([lap[i], rec[i]], w))       # predict y[i] from y[<=i-h]
             for j, d in enumerate((lap[i], rec[i])):          # then learn from y[i]
                 lp = d.logpdf(float(y[i]))
                 lp = 20.0 if lp > 20.0 else (-20.0 if not (lp >= -20.0) else lp)
@@ -466,17 +817,263 @@ def portfolio_sandwich(fm_fn, forget=0.98, eta=0.8, lap_prior=None, h=1):
 # make_registry(h) builds the same roster at forecast horizon h (h=1 = the
 # canonical one-step study). Every adapter and sandwich takes an h that defaults
 # to 1, so REGISTRY (h=1) is byte-for-byte the original behaviour.
+# ---- NPTS: the training-free distributional baseline the field ships but omits -
+# GluonTS and AutoGluon both ship NPTS, and both are imported by the benchmarks
+# that omit it. It resamples past values under a recency kernel, so it is
+# distributional by construction and needs no fitting.
+def npts_dists(ch, h=1):
+    """TEST per-step predictives from GluonTS NPTS on the change series.
+
+    Seasonality is off: these are one-step changes, where a seasonal index over
+    the raw clock has no meaning. The predictive is a weighted resample of past
+    changes, converted by the same sample_dist every sampling arm uses.
+    """
+    try:
+        import numpy as _np
+        import pandas as _pd
+        from gluonts.model.npts import NPTSPredictor
+    except Exception:                                  # noqa: BLE001
+        return None
+    ch = _np.asarray(ch, float)
+    n = len(ch)
+    lo = n - fs.TEST
+    if lo < 8:
+        return None
+    pred = NPTSPredictor(prediction_length=h, use_seasonal_model=False,
+                         use_default_time_features=False)
+    idx0 = _pd.Period("2000-01-01", freq="D")
+    out = []
+    for j in range(lo, n):
+        hist = ch[max(0, j - fs.CTX):j]
+        ts = _pd.Series(hist, index=_pd.period_range(idx0, periods=len(hist), freq="D"))
+        try:
+            fc = pred.predict_time_series(ts, num_samples=500)
+        except Exception:                              # noqa: BLE001
+            return None
+        # fc.samples is (num_samples, prediction_length): take horizon h-1 across
+        # all sample paths. (The former reshape(h, -1)[h-1] mixed paths for h > 1.)
+        samp = _np.asarray(fc.samples, float)[:, h - 1]
+        out.append(fs.sample_dist(samp))
+    return out
+
+
+# ---- PyMC-forecast: a Bayesian challenger, through the canonical protocol -----
+# The original study (pymc_forecast_sandwich_study.py) wrote its own schema to
+# its own CSV and never entered the canonical store, so its numbers were not
+# comparable with the arms here. This adapter reuses that study's model and fit
+# unchanged and converts only the OUTPUT to a canonical Dist, via the same
+# sample_dist every sampling arm uses.
+PYMC_REFIT = int(os.environ.get("PYMC_REFIT", 10))   # ADVI fits are ~90s each
+PYMC_TRAIN = int(os.environ.get("PYMC_TRAIN", 248))  # trailing lag-rows per fit
+
+
+def pymc_dists(ch, h=1):
+    """TEST per-step predictives from a Student-t regression on lagged changes.
+
+    One ADVI fit costs roughly ninety seconds, so refitting at every test step
+    would be over an hour per series. The cadence is PYMC_REFIT steps, stated
+    here rather than hidden: parameters are up to that many steps stale, the
+    lag covariates are always current, which is the same arrangement the
+    statsforecast arms run under.
+    """
+    try:
+        import numpy as _np
+        import pymc_forecast_sandwich_study as _st
+        from tabfm_wide_study import lag_rows as _lag_rows
+    except Exception:                                  # noqa: BLE001
+        return None
+    ch = _np.asarray(ch, float)
+    n = len(ch)
+    lo = n - fs.TEST
+    if lo - h - _st.LAGS - PYMC_TRAIN < 0:
+        return None
+    out, params = [], None
+    for k, j in enumerate(range(lo, n)):
+        if k % PYMC_REFIT == 0:
+            tr_lo = j - PYMC_TRAIN
+            Xtr, ytr = _lag_rows(ch, tr_lo, j, _st.LAGS, h)
+            try:
+                params = _st._fit_zreg(ytr, Xtr, seed=abs(hash((int(j), n))) % 10**6)
+            except Exception:                          # noqa: BLE001
+                return None
+        a, b, sg, nu = params
+        x = ch[j - h - _st.LAGS + 1:j - h + 1]
+        mu = a + b @ x
+        # posterior predictive draws: one Student-t draw per posterior draw
+        g = _np.random.default_rng(int(j))
+        samp = mu + sg * g.standard_t(_np.clip(nu, 2.1, 200.0))
+        out.append(fs.sample_dist(samp))
+    return out
+
+
+# ---- Forecastability decomposition (issue #250): pooled-law arms ---------------
+# Three state-blind predictives scored beside laplace on the same test steps, so
+# the forecastability profile and its conformal share are paired differences of
+# stored per-step log scores (summarize_canonical's dLL vs laplace):
+#   F_hat = L_lap - L_unc,  X_cps = L_cps - L_unc,  left = L_lap - L_cps.
+# Each reuses bench_core.conformal_dist, the conformal shape the foils already
+# use. cps/cpsz share laplace(h)'s h-step mean, so they differ from laplace only
+# in shape. cpsz standardizes by a separate simple scale model (EWMA of squared
+# h-step residuals, as conformal_infogap._streams), NOT laplace's sd, which would
+# import conditional-shape machinery into a pooled arm. A pool holds only what is
+# resolved at the issue time j-h. "(W)" names cap the pool at the most recent W
+# values; the bare name is expanding. Report all.
+FC_MIN = 50                                     # smallest pool a law is quoted from
+FC_ALPHA = 0.03                                 # scale EWMA rate
+FC_FLOOR = 0.0025                               # scale^2 floor, x expanding mean square
+
+
+_ISSUED = [None, None]                          # (key, issued): cps/cpsz share one pass
+
+
+def _lap_issued(ch, h):
+    """issued[j] = laplace's h-step Dist for target j, made after consuming ch[j-h].
+    Same stepping as laplace_dists."""
+    key = (h, len(ch), tuple(float(x) for x in ch))
+    if _ISSUED[0] == key:
+        return _ISSUED[1]
+    f = laplace(h); st = None; issued = [None] * len(ch)
+    for i, yv in enumerate(ch):
+        d, st = f(yv, st)
+        if i + h < len(ch):
+            issued[i + h] = d[h - 1]
+    _ISSUED[0], _ISSUED[1] = key, issued
+    return issued
+
+
+def _pooled_dists(ch, h, kind, win=0):
+    import bench_core as bc
+    ch = np.asarray(ch, float)
+    n = len(ch)
+    lo = n - TEST
+    if kind != "unc":
+        issued = _lap_issued(ch, h)
+        r = [None] * n; z = [None] * n; sc = [0.0] * n
+        v = None; g = 0.0; nr = 0
+        for s in range(n):
+            u = s - h                           # residual u resolves at origin s-h
+            if u >= 0 and r[u] is not None:
+                nr += 1
+                g += (r[u] * r[u] - g) / nr
+                v = r[u] * r[u] if v is None else (1 - FC_ALPHA) * v + FC_ALPHA * r[u] * r[u]
+            if issued[s] is not None:
+                r[s] = ch[s] - issued[s].mean
+                sc[s] = math.sqrt(max(v, FC_FLOOR * g)) if v is not None else 0.0
+                if sc[s] > 0 and math.isfinite(sc[s]):
+                    z[s] = r[s] / sc[s]
+    out = []
+    for j in range(lo, n):
+        cut = j - h + 1                         # targets < cut have resolved at issue
+        if kind == "unc":
+            pool = ch[:cut]
+            point, scale = 0.0, 1.0
+        elif kind == "cps":
+            pool = np.array([x for x in r[:cut] if x is not None])
+            point, scale = issued[j].mean, 1.0
+        else:
+            if not sc[j] > 0:
+                return None
+            pool = np.array([x for x in z[:cut] if x is not None])
+            point, scale = issued[j].mean, sc[j]
+        if win:
+            pool = pool[-win:]
+        if len(pool) < FC_MIN:
+            return None
+        out.append(bc.conformal_dist(point, pool, scale=scale))
+    return out
+
+
+# Matched pre/post conformalization pair (#250 review): cps differs from laplace
+# in shape AND construction, so it cannot isolate the conformal step. lap_grid is
+# laplace's h-step predictive read off a fixed quantile grid (identity rank map);
+# lap_conf is the same grid after the state-blind rank map, the pooled empirical
+# law of laplace's past PITs. Same Dist, same grid: they differ only in the map.
+FC_LEVELS = [0.005, 0.01] + [round(0.02 + 0.024 * i, 3) for i in range(41)] + [0.99, 0.995]
+
+
+def _lap_rank_dists(ch, h, conformal, win=0):
+    ch = np.asarray(ch, float)
+    n = len(ch)
+    lo = n - TEST
+    issued = _lap_issued(ch, h)
+    u = [None] * n
+    for s in range(n):
+        if issued[s] is not None:
+            u[s] = min(max(issued[s].cdf(float(ch[s])), 1e-6), 1 - 1e-6)
+    out = []
+    for j in range(lo, n):
+        d = issued[j]
+        if d is None:
+            return None
+        if conformal:
+            pool = np.array([x for x in u[:j - h + 1] if x is not None])
+            if win:
+                pool = pool[-win:]
+            if len(pool) < FC_MIN:
+                return None
+            ps = np.clip(np.quantile(pool, FC_LEVELS), 1e-6, 1 - 1e-6)
+        else:
+            ps = FC_LEVELS
+        qs = np.maximum.accumulate([d.quantile(float(p)) for p in ps])
+        out.append(fs.quantile_dist(FC_LEVELS, list(qs)))
+    return out
+
+
 def make_registry(h=1):
     return {
+        # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
+        "unc":         lambda ch: _pooled_dists(ch, h, "unc"),
+        "cps":         lambda ch: _pooled_dists(ch, h, "cps"),
+        "cpsz":        lambda ch: _pooled_dists(ch, h, "cpsz"),
+        "unc(250)":    lambda ch: _pooled_dists(ch, h, "unc", 250),
+        "cps(250)":    lambda ch: _pooled_dists(ch, h, "cps", 250),
+        "cpsz(250)":   lambda ch: _pooled_dists(ch, h, "cpsz", 250),
+        "lap_grid":    lambda ch: _lap_rank_dists(ch, h, False),
+        "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
+        "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
+        # ablation: laplace without the GPD tail splice (tails.py degenerate-threshold check)
+        "laplace(gaussian-tails)": lambda ch: laplace_dists(ch, h, tails="gaussian"),
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
         "TiRex-2":     lambda ch: tirex2_dists(ch, h),
+        # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
+        # reconstruction, plus the 28M on all 21 native levels
+        "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),
+        "Timestral-28M":  lambda ch: timestral_dists(ch, h, "28M"),
+        "Timestral-123M": lambda ch: timestral_dists(ch, h, "123M"),
+        "Timestral-209M": lambda ch: timestral_dists(ch, h, "209M"),
+        "Timestral-5M(q21)":   lambda ch: timestral_dists(ch, h, "5M", "q21"),
+        "Timestral-28M(q21)":  lambda ch: timestral_dists(ch, h, "28M", "q21"),
+        "Timestral-123M(q21)": lambda ch: timestral_dists(ch, h, "123M", "q21"),
+        "Timestral-209M(q21)": lambda ch: timestral_dists(ch, h, "209M", "q21"),
+        # t0-gamma (#287): native 21 levels (primary), nine-decile subset, and the
+        # vendor's sign-flip averaging as a named ablation
+        "t0-gamma(q21)":     lambda ch: t0_dists(ch, h, "q21"),
+        "t0-gamma":          lambda ch: t0_dists(ch, h, "q9"),
+        "t0-gamma(q21+sym)": lambda ch: t0_dists(ch, h, "q21", symmetric_averaging=True),
+        # Kumo Tabular (#294): regressor on its native quantiles (21 and 99 levels),
+        # and the TabFM clf8 replication, small and large checkpoints
+        "Kumo-large-reg(q21)": lambda ch: kumo_dists(ch, h, "large", "reg(q21)"),
+        "Kumo-large-reg(q99)": lambda ch: kumo_dists(ch, h, "large", "reg(q99)"),
+        "Kumo-small-reg(q21)": lambda ch: kumo_dists(ch, h, "small", "reg(q21)"),
+        "Kumo-small-reg(q99)": lambda ch: kumo_dists(ch, h, "small", "reg(q99)"),
+        "Kumo-large-clf8":     lambda ch: kumo_dists(ch, h, "large", "clf8"),
+        "Kumo-small-clf8":     lambda ch: kumo_dists(ch, h, "small", "clf8"),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
+        "PyMC":        lambda ch: pymc_dists(ch, h),
+        "NPTS":        lambda ch: npts_dists(ch, h),
         "Chronos":     lambda ch: fs.chronos_dists(ch, h),
         "TimesFM":     lambda ch: fs.timesfm_dists(ch, h),
         "TimesFM3":    lambda ch: fs.timesfm3_dists(ch, h),
+        # same forecasts, the widest reconstruction in nozzles.py (issue #269): the
+        # reconstruction most favourable to TimesFM3 on the nozzle study's sample
+        "TimesFM3(wide)": lambda ch: fs.timesfm3_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "Chronos(wide)":  lambda ch: fs.chronos_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "TimesFM(wide)":  lambda ch: fs.timesfm_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "TiRex(wide)":    lambda ch: tirex_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
+        "flowstate(wide)": lambda ch: flowstate_dists(ch, h, recon=__import__("nozzles").nozzle_wide),
         "TimesFM+lap": _sandwich(fs.timesfm_dists, h),
         "TimesFM3+lap": _sandwich(fs.timesfm3_dists, h),
         "TiRex+lap":   _sandwich(tirex_dists, h),
@@ -495,7 +1092,14 @@ def make_registry(h=1):
         "TimesFM&lap": portfolio_sandwich(fs.timesfm_dists, h=h),
         "TimesFM3&lap": portfolio_sandwich(fs.timesfm3_dists, h=h),
         "TiRex&lap":   portfolio_sandwich(tirex_dists, h=h),
+        # sandwiches on the fair bases (native 21 levels / generous reconstruction)
+        **_fair_sandwiches(h),
         "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
+        "PyMC+lap":    _sandwich(pymc_dists, h),
+        "PyMC~lap":    _resid_sandwich(pymc_dists, h),
+        "PyMC@lap":    pit_sandwich(pymc_dists, h),
+        "PyMC&lap":    portfolio_sandwich(pymc_dists, h=h),
+        "NPTS&lap":    portfolio_sandwich(npts_dists, h=h),
     }
 
 

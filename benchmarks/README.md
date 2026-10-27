@@ -131,7 +131,7 @@ the four-arm tables: `comparisons/laplace-vs-csp/`.
 
 ## Headline: vs eight distributional baselines (`study.py sota`)
 
-The honest head-to-head against everything we could find that claims a
+The head-to-head against everything we could find that claims a
 *distributional* one-step forecast: `statsforecast`'s **AutoARIMA** and
 **AutoETS**; `statsmodels` **SARIMAX** and **ETS** (exact closed-form Gaussian
 predictives); the `arch` package's **GARCH(1,1)-t** (the classical heavy-tail /

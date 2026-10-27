@@ -26,7 +26,7 @@ And it beats them across nearly every regime, giving ground only on price/return
 <p align="center"><sub>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split, <code>laplace</code> = the dashed ring). Outside the ring the challenger wins that regime; inside, <code>laplace</code> does. GARCH-t breaks out on price/returns; CSP edges past on the hard, repeating waveforms, where it is handed the period and <code>laplace</code> is not. <a href="https://skaters.microprediction.org/challengers.html">Explore it interactively →</a></sub></p>
 
 
-Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The foundation-model margin depends on how their nine quantiles are turned into a density: half a nat under a tight reconstruction, level at the median under a generous one (see the [benchmark paper](https://skaters.microprediction.org/papers.html)). The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
 
 **Not for price/return series:** 
 We recommend GARCH-t there instead. 
@@ -390,6 +390,29 @@ def my_transform():
     return forward, inverse_k
 ```
 
+## skaters.torch: the differentiable transforms
+
+`pip install skaters[torch]` adds `skaters.torch`: the transforms and the mixture
+distribution as `torch` modules, same arithmetic in the same order, with every
+continuous hyperparameter an `nn.Parameter` and gradients flowing from a log
+score back through `inverse_k` and `forward`.
+
+```python
+from skaters.leaf import leaf
+from skaters.torch import from_reference
+from skaters.torch.conjugate import conjugate, reference_skater
+
+ema = from_reference("ema_transform", alpha=0.1)          # an nn.Module
+f = conjugate(reference_skater(leaf(k=1)), ema, k=1)     # laplace's depth-1 candidate
+dists, state = f(y, state)                               # list[TorchDist]
+loss = -dists[0].logpdf(y_next)                          # differentiable in ema.alpha
+```
+
+Every ported transform is held to the reference at 1e-9 by `skaters.torch.parity`
+(forward emissions and every component of every `inverse_k` output on seeded
+series), so a model built on these starts as the reference exactly. The leaf,
+trunk and lattice stay in the reference; `import skaters` does not import torch.
+
 ## JavaScript, R, Julia, Rust & the browser
 
 The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
@@ -435,6 +458,14 @@ Interactive demos (forecasting playground in native JS, and the real Python pack
 - **Composable** — transforms chain, ensembles nest, everything returns $\text{Dist}$
 - **Pure Python** — zero dependencies, only `math.erf` and `math.exp`
 - **Pyodide compatible** — works in the browser via WebAssembly
+
+## Papers
+
+- **A stronger univariate benchmark for foundational time-series model evaluation**:
+  [PDF](papers/stronger-benchmark/stronger-benchmark.pdf),
+  [reproduce](papers/stronger-benchmark/REPRODUCE.md) (Tier 1 checks every number
+  in seconds: `pip install numpy && python papers/stronger-benchmark/verify_paper.py`).
+- **Transforms all the way down**, the methods paper: [PDF](papers/skaters-jss.pdf).
 
 ## Theoretical context
 

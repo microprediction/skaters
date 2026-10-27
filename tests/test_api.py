@@ -10,6 +10,45 @@ from skaters.dist import Dist
 ALL_POLICIES = [laplace]
 
 
+# --- _build_candidates leaf_fn contract (skaters#234) ---------------------
+
+def test_build_candidates_default_is_plain_gaussian_leaf():
+    """Omitting leaf_fn must be identical to passing the plain Gaussian
+    `leaf` explicitly: same population, same depths, and bit-identical
+    emissions on the same series."""
+    from skaters.api import _build_candidates
+    from skaters.leaf import leaf
+    default, d_depths, _ = _build_candidates(1)
+    explicit, e_depths, _ = _build_candidates(1, leaf_fn=leaf)
+    assert len(default) == len(explicit)
+    assert d_depths == e_depths
+    r = random.Random(3)
+    series = [r.gauss(0, 1) for _ in range(150)]
+    for cd, ce in zip(default, explicit):
+        sd = se = None
+        for y in series:
+            (dd,), sd = cd(y, sd)
+            (de,), se = ce(y, se)
+            assert dd.mean == de.mean and dd.std == de.std
+
+
+def test_build_candidates_propagates_leaf_factory_to_every_candidate():
+    """leaf_fn is called once per candidate with the requested k, for k=1
+    and k=3, so an explicit factory reaches every member of the population."""
+    from skaters.api import _build_candidates
+    from skaters.leaf import leaf
+    for k in (1, 3):
+        calls = []
+
+        def counting_leaf(k=k, _calls=calls):
+            _calls.append(k)
+            return leaf(k=k)
+
+        candidates, _, _ = _build_candidates(k, leaf_fn=counting_leaf)
+        assert len(calls) == len(candidates)
+        assert all(kk == k for kk in calls)
+
+
 def test_all_policies_return_skaters():
     for policy in ALL_POLICIES:
         f = policy(k=1)

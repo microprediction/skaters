@@ -48,6 +48,9 @@ impl Dist {
     pub fn pdf(&self, x: f64) -> f64 {
         let mut total = 0.0;
         for &(w, m, s) in &self.components {
+            if w <= 0.0 {
+                continue; // skaters#222: 0 * infinity at a discarded (s=0) atom is NaN
+            }
             total += w * gaussian_pdf(x, m, s);
         }
         total
@@ -204,7 +207,10 @@ impl Dist {
                 .then(a.2.partial_cmp(&b.2).unwrap())
                 .then(a.0.partial_cmp(&b.0).unwrap())
         });
-        let scale = comps[0].1.abs() + comps[comps.len() - 1].1.abs() + 1e-12;
+        // Translation-invariant (skaters#226): the span of the sorted means,
+        // not the sum of their absolute locations (which inflates with
+        // translation).
+        let scale = (comps[comps.len() - 1].1 - comps[0].1) + 1e-12;
         while comps.len() > max_components {
             let mut best_dist = f64::INFINITY;
             for i in 0..comps.len() {
