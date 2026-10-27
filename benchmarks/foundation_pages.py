@@ -482,8 +482,9 @@ def standalone_tables(model, vs, cov):
         fair = (f"<h3>On the model's native 21 quantile levels</h3>"
                 f"<p>Arm <code>{model['key']}</code>: the model's own 1% to 99% quantiles "
                 f"through the fixed-bandwidth reconstruction, with no bandwidth inflation. "
-                f"The tails are the model's. This is the fairest density the model can be "
-                f"given, so it is the headline.</p>")
+                f"The outer 1% and 99% anchors are the model's; the density beyond them is "
+                f"the Gaussian-mixture reconstruction's, not an output of the model. This is "
+                f"the fairest density the model can be given here, so it is the headline.</p>")
         fair_note = ("Coverage is that of the reconstruction on the native 21 levels; fed "
                      "a calibrated normal's quantiles it covers about 0.89, so a perfectly "
                      "calibrated model reads 0.89 here.")
@@ -706,10 +707,14 @@ def build_page(slug, model, vs, cov, radar):
 
     <h2>Star plot</h2>
     <p>{model['name']} standalone against Laplace, on the same six regime axes as the site's
-      <a href="/challengers.html">standalone radar</a>. Each radius is the log-likelihood
-      win rate, <code>(wins + &frac12;&middot;ties) / n</code>, divided by one half so an even
-      split with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
-      less. The quantity is a share of series. The solid polygon is the headline arm and
+      <a href="/challengers.html">standalone radar</a>. Each radius is
+      <code>(wins + &frac12;&middot;ties) / n</code> divided by one half, so an even split
+      with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
+      less. Here a series counts as a win when the model's mean per-series log score exceeds
+      Laplace's by any amount, and as a tie only at exact equality: the same rule the
+      challengers radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
+      loss above, which fold statistically unresolved differences into draws. The two
+      agree on direction and differ in how they treat small gaps. The solid polygon is the headline arm and
       the dashed grey one, where present, is the tight nine-decile reconstruction. The
       M4-hourly set splits into soft and hard waveforms by corpus order, matching that
       radar.</p>
