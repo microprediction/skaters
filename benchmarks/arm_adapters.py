@@ -627,6 +627,52 @@ def _sandwich(fm_fn, h=1):
 # still align exactly with every other arm's last TEST steps.
 _RESID_WARM = int(os.environ.get("FM_RESID_WARM", "128"))
 
+_fm_memo = {}
+def _memoized(fm_fn, tag):
+    """Wrap a base forecaster so repeated calls on the same series, horizon
+    and window length return the same forecasts without re-running the
+    model. The sandwich arms of one base (+lap and &lap on the scored window,
+    ~lap and @lap on the warm-up-extended window) then cost one model run
+    each per window instead of four. Keyed on the live foundation_study.TEST
+    because ~lap/@lap lengthen it temporarily."""
+    def run(ch, h=1):
+        key = (tag, h, fs.TEST, hashlib.sha1(np.asarray(ch, float).tobytes()).hexdigest())
+        if key not in _fm_memo:
+            if len(_fm_memo) >= 4:
+                _fm_memo.clear()
+            _fm_memo[key] = fm_fn(ch, h)
+        return _fm_memo[key]
+    return run
+
+
+def _wide_recon():
+    return __import__("nozzles").nozzle_wide
+
+
+# the fair bases (#269/#282/#287): native 21 levels or the generous reconstruction
+_FAIR_BASES = {
+    "Timestral-209M(q21)": lambda ch, h=1: timestral_dists(ch, h, "209M", "q21"),
+    "t0-gamma(q21)":       lambda ch, h=1: t0_dists(ch, h, "q21"),
+    "TimesFM3(wide)":      lambda ch, h=1: fs.timesfm3_dists(ch, h, recon=_wide_recon()),
+    "TimesFM(wide)":       lambda ch, h=1: fs.timesfm_dists(ch, h, recon=_wide_recon()),
+    "TiRex(wide)":         lambda ch, h=1: tirex_dists(ch, h, recon=_wide_recon()),
+    "Chronos(wide)":       lambda ch, h=1: fs.chronos_dists(ch, h, recon=_wide_recon()),
+}
+
+
+def _fair_sandwiches(h):
+    """The four sandwich arms on every fair base: '<base>+lap' (quantile
+    average), '<base>~lap' (FM location, laplace residual scale), '<base>@lap'
+    (PIT recalibration) and '<base>&lap' (online portfolio)."""
+    out = {}
+    for name, fn in _FAIR_BASES.items():
+        base = _memoized(fn, name)
+        out[name + "+lap"] = _sandwich(base, h)
+        out[name + "~lap"] = _resid_sandwich(base, h)
+        out[name + "@lap"] = pit_sandwich(base, h)
+        out[name + "&lap"] = portfolio_sandwich(base, h=h)
+    return out
+
 
 def _resid_sandwich(fm_fn, h=1):
     """Arm = FM location + laplace on the FM residual stream (adaptive scale)."""
@@ -1046,6 +1092,8 @@ def make_registry(h=1):
         "TimesFM&lap": portfolio_sandwich(fs.timesfm_dists, h=h),
         "TimesFM3&lap": portfolio_sandwich(fs.timesfm3_dists, h=h),
         "TiRex&lap":   portfolio_sandwich(tirex_dists, h=h),
+        # sandwiches on the fair bases (native 21 levels / generous reconstruction)
+        **_fair_sandwiches(h),
         "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
         "PyMC+lap":    _sandwich(pymc_dists, h),
         "PyMC~lap":    _resid_sandwich(pymc_dists, h),
