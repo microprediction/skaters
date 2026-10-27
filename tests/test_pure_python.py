@@ -25,10 +25,12 @@ def test_no_third_party_imports():
 
 
 def test_base_import_is_torch_free():
-    """The optional subpackage must not be pulled in by the base package."""
-    import skaters  # noqa: F401
-    assert "torch" not in sys.modules
-    assert "skaters.torch" not in sys.modules
+    """The optional subpackage must not be pulled in by the base package.
+    Checked in a fresh interpreter, so nothing else in this session (a
+    plugin, an earlier test) can have imported torch first."""
+    import subprocess
+    code = "import sys, skaters; assert 'torch' not in sys.modules; assert 'skaters.torch' not in sys.modules"
+    subprocess.run([sys.executable, "-c", code], check=True)
 
 
 def test_no_numpy():
