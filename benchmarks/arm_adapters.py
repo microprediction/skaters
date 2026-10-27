@@ -20,6 +20,7 @@ TiRex-2 is Apache-2.0; flowstate uses the ibm-research research checkpoint
 (arXiv:2508.05287), research-use only.
 """
 from __future__ import annotations
+import hashlib
 import math
 import os
 import sys
@@ -64,6 +65,19 @@ LEVELS21 = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
 T0_MODEL_ID = "theforecastingcompany/t0-gamma"
 T0_MODEL_REVISION = "e08aee083778f1f32da4974c0a34276776a35c52"
 T0_SOURCE_COMMIT = "5896313cf7a5da5e320a9070c2aff0f8fed79747"
+
+# Kumo Tabular (NVIDIA, released 2026-09-23; issue #294): a tabular in-context
+# model used as a forecaster exactly as the pre-registered TabFM study used
+# TabFM: the 128-change context arranged as an 8-lag table, refreshed every
+# STRIDE test steps, NE ensemble members. The regressor emits 999 quantiles,
+# so its density needs no bandwidth inflation; the classifier arm is the
+# TabFM clf8 replication (decile bins). Weights nvidia/Kumo-Tabular at the
+# revision below (structured-data-models 0.2.1, benchmarks/kumo_requirements.lock).
+# CPU only: on Apple MPS the large regressor returned a different median
+# (0.21 vs -1.15 on the same block), so the GPU path is not trusted here.
+KUMO_MODEL_REVISION = "c5893d418e162b9f841ae179dc767afefff73831"
+KUMO_LAGS, KUMO_STRIDE, KUMO_NE = 8, 10, 4
+LEVELS99 = [round(k / 100, 2) for k in range(1, 100)]
 
 
 def fixed_bandwidth_quantile_dist(
@@ -377,6 +391,106 @@ def t0_dists(ch, h=1, levels="q21", symmetric_averaging=False):
         ) for row in quantiles]
     except Exception as e:                                 # noqa: BLE001
         print(f"  t0 failed: {e}", flush=True); return None
+
+
+_kumo = {}
+_kumo_memo = {}
+def _kumo_model(task, size):
+    from sdm.models import KumoTabular
+    key = (task, size)
+    if key not in _kumo:
+        _kumo[key] = KumoTabular(task=task, size=size, device=DEVICE)
+    return _kumo[key]
+
+
+def _kumo_blocks(n):
+    start = n - TEST
+    for lo in range(start, n, KUMO_STRIDE):
+        yield lo, min(lo + KUMO_STRIDE, n)
+
+
+def kumo_reg_quantiles(ch, h=1, size="large"):
+    """Kumo regressor over the test window: ``(TEST, 999)`` native quantiles
+    q001..q999 for ch[t], each block's in-context table being the 120 lag
+    rows that end before the block (the same arrangement as TabFM clf8)."""
+    import torch
+    import tabfm_wide_study as tw
+    key = (size, h, hashlib.sha1(np.asarray(ch, float).tobytes()).hexdigest())
+    if key in _kumo_memo:
+        return _kumo_memo[key]
+    model = _kumo_model("regression", size)
+    n = len(ch); rows = []
+    with torch.no_grad():
+        for lo, hi in _kumo_blocks(n):
+            Xtr, ytr = tw.lag_rows(ch, lo - CTX + KUMO_LAGS + h - 1, lo, KUMO_LAGS, h)
+            Xte, _ = tw.lag_rows(ch, lo, hi, KUMO_LAGS, h)
+            if np.ptp(ytr) == 0.0:                      # constant context: point mass
+                rows.append(np.repeat(float(ytr[0]), 999)[None, :].repeat(hi - lo, axis=0))
+                continue
+            out = model(x_context=torch.from_numpy(Xtr),
+                        y_context=torch.from_numpy(ytr.astype(np.float32))[:, None],
+                        x_query=torch.from_numpy(Xte), num_estimators=KUMO_NE)
+            df = out.to_pandas()
+            q = df[[f"q{k:03d}" for k in range(1, 1000)]].to_numpy(dtype=float)
+            rows.append(q)
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (TEST, 999):
+        raise ValueError(f"unexpected Kumo quantile shape {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Kumo produced nonfinite quantiles")
+    quantiles = np.maximum.accumulate(quantiles, axis=1)   # enforce monotone ordering
+    _kumo_memo.clear(); _kumo_memo[key] = quantiles
+    return quantiles
+
+
+def kumo_dists(ch, h=1, size="large", arm="reg(q21)"):
+    """Kumo Tabular as a one-step density forecaster.
+
+    ``reg(q21)``: the regressor's native quantiles at the 21 Timestral/t0
+    levels through the fixed-bandwidth reconstruction (comparable with the
+    other native-21 arms); ``reg(q99)``: the same at every percentile 1..99;
+    ``clf8``: the TabFM decile-bin classifier density on the identical table.
+    """
+    try:
+        if arm.startswith("reg"):
+            q = kumo_reg_quantiles(ch, h, size)
+            levels = LEVELS21 if arm == "reg(q21)" else LEVELS99
+            cols = [int(round(p * 1000)) - 1 for p in levels]
+            spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+            out = []
+            for row in q[:, cols]:
+                if np.ptp(row) == 0.0:
+                    out.append(Dist([(1.0, float(row[0]), 1e-9)]))
+                else:
+                    out.append(fixed_bandwidth_quantile_dist(levels, row, spacing_multiplier=spacing))
+            return out
+        if arm == "clf8":
+            import torch
+            import tabfm_wide_study as tw
+            model = _kumo_model("classification", size)
+            n = len(ch); dists = []
+            with torch.no_grad():
+                for lo, hi in _kumo_blocks(n):
+                    Xtr, ytr = tw.lag_rows(ch, lo - CTX + KUMO_LAGS + h - 1, lo, KUMO_LAGS, h)
+                    Xte, _ = tw.lag_rows(ch, lo, hi, KUMO_LAGS, h)
+                    edges = tw.decile_edges(ytr)
+                    if len(edges) < 3:
+                        v = float(np.median(ytr))
+                        dists += [Dist([(1.0, v, 1e-9)])] * (hi - lo)
+                        continue
+                    lab = tw.labels_for(edges, ytr).astype(np.int64)
+                    out = model(x_context=torch.from_numpy(Xtr),
+                                y_context=torch.from_numpy(lab)[:, None],
+                                x_query=torch.from_numpy(Xte), num_estimators=KUMO_NE)
+                    df = out.to_pandas()
+                    probs = np.zeros((hi - lo, len(edges) - 1))
+                    for c in df.columns:
+                        probs[:, int(c)] = df[c].to_numpy(dtype=float)
+                    dists += [tw.bar_dist(edges, row) for row in probs]
+            return dists
+        raise ValueError(f"unknown Kumo arm {arm!r}")
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  kumo failed: {e}", flush=True); return None
 
 
 _Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
@@ -892,6 +1006,14 @@ def make_registry(h=1):
         "t0-gamma(q21)":     lambda ch: t0_dists(ch, h, "q21"),
         "t0-gamma":          lambda ch: t0_dists(ch, h, "q9"),
         "t0-gamma(q21+sym)": lambda ch: t0_dists(ch, h, "q21", symmetric_averaging=True),
+        # Kumo Tabular (#294): regressor on its native quantiles (21 and 99 levels),
+        # and the TabFM clf8 replication, small and large checkpoints
+        "Kumo-large-reg(q21)": lambda ch: kumo_dists(ch, h, "large", "reg(q21)"),
+        "Kumo-large-reg(q99)": lambda ch: kumo_dists(ch, h, "large", "reg(q99)"),
+        "Kumo-small-reg(q21)": lambda ch: kumo_dists(ch, h, "small", "reg(q21)"),
+        "Kumo-small-reg(q99)": lambda ch: kumo_dists(ch, h, "small", "reg(q99)"),
+        "Kumo-large-clf8":     lambda ch: kumo_dists(ch, h, "large", "clf8"),
+        "Kumo-small-clf8":     lambda ch: kumo_dists(ch, h, "small", "clf8"),
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
         "PyMC":        lambda ch: pymc_dists(ch, h),

@@ -91,6 +91,12 @@ MODELS = {
     "t0-gamma(q21)":     (".venv-t0", "C", {}),
     "t0-gamma":          (".venv-t0", "C", {}),
     "t0-gamma(q21+sym)": (".venv-t0", "C", {}),
+    "Kumo-large-reg(q21)": (".venv-kumo", "C", {}),
+    "Kumo-large-reg(q99)": (".venv-kumo", "C", {}),
+    "Kumo-small-reg(q21)": (".venv-kumo", "C", {}),
+    "Kumo-small-reg(q99)": (".venv-kumo", "C", {}),
+    "Kumo-large-clf8": (".venv-kumo", "C", {}),
+    "Kumo-small-clf8": (".venv-kumo", "C", {}),
     # laplace-calibrated sandwiches (quantile-averaged with laplace, own venv):
     "TimesFM+lap": (".venv-timesfm",   "C", {}),
     "TimesFM3+lap": (".venv-timesfm3", "C", {}),
