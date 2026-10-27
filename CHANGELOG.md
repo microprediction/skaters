@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New optional subpackage `skaters.torch` (`pip install skaters[torch]`): the
+  mixture distribution (`TorchDist`) and every transform in laplace's pool as
+  `torch` modules with the same arithmetic in the same order, each continuous
+  hyperparameter an `nn.Parameter`, and torch conjugation (`skaters.torch.conjugate`)
+  so chains stack onto the reference leaf. Held to the reference by a parity
+  suite at 1e-9 (`skaters.torch.parity`): every transform at k=1 and k=3,
+  every candidate chain of laplace's pool end to end, and finite gradients
+  through stacked transforms. `import skaters` still does not import torch.
+  Not ported: `gaussianize`, and the `exact=True` pushforward of the power
+  transforms (the default delta inverse is ported).
 - `Dist.from_dict` is now the exact inverse of `to_dict`: weights that already
   sum to one (to within 1e-9 of the compensated sum) are kept bit-for-bit
   instead of being divided by a total that is one only up to rounding, which

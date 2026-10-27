@@ -390,6 +390,29 @@ def my_transform():
     return forward, inverse_k
 ```
 
+## skaters.torch: the differentiable transforms
+
+`pip install skaters[torch]` adds `skaters.torch`: the transforms and the mixture
+distribution as `torch` modules, same arithmetic in the same order, with every
+continuous hyperparameter an `nn.Parameter` and gradients flowing from a log
+score back through `inverse_k` and `forward`.
+
+```python
+from skaters.leaf import leaf
+from skaters.torch import from_reference
+from skaters.torch.conjugate import conjugate, reference_skater
+
+ema = from_reference("ema_transform", alpha=0.1)          # an nn.Module
+f = conjugate(reference_skater(leaf(k=1)), ema, k=1)     # laplace's depth-1 candidate
+dists, state = f(y, state)                               # list[TorchDist]
+loss = -dists[0].logpdf(y_next)                          # differentiable in ema.alpha
+```
+
+Every ported transform is held to the reference at 1e-9 by `skaters.torch.parity`
+(forward emissions and every component of every `inverse_k` output on seeded
+series), so a model built on these starts as the reference exactly. The leaf,
+trunk and lattice stay in the reference; `import skaters` does not import torch.
+
 ## JavaScript, R, Julia, Rust & the browser
 
 The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
