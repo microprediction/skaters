@@ -63,13 +63,13 @@ export function erf(x) {
 
 // --- pure-JS Gaussian math (mirrors dist.py) ---
 
-function gaussianPdf(x, mean, std) {
+export function gaussianPdf(x, mean, std) {
   if (std <= 0) return x === mean ? Infinity : 0.0;
   const z = (x - mean) / std;
   return Math.exp(-0.5 * z * z) / (std * SQRT2PI);
 }
 
-function gaussianCdf(x, mean, std) {
+export function gaussianCdf(x, mean, std) {
   if (std <= 0) return x >= mean ? 1.0 : 0.0;
   return 0.5 * (1.0 + erf((x - mean) / (std * SQRT2)));
 }
