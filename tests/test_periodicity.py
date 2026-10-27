@@ -88,6 +88,21 @@ def test_scores_sorted_by_abs_acf():
         assert abs_acfs == sorted(abs_acfs, reverse=True)
 
 
+def test_acf_is_exactly_one_on_a_noiseless_periodic_signal():
+    """A perfectly periodic, noiseless signal must have ACF == 1.0 at its
+    true period: var and cross must share one reference mean and the same
+    EMA update form, or the reported ACF drifts below 1.0 even with zero
+    noise (previously ~0.99 due to a stray extra (1-alpha) factor on `var`
+    and a pre/post-update mean mismatch between `var` and `cross`)."""
+    detect = period_detector(lags=[12], alpha=0.01, min_observations=30)
+    state = None
+    scores = None
+    for i in range(3000):
+        y = math.sin(2 * math.pi * i / 12)
+        scores, state = detect(y, state)
+    assert abs(scores[0][1] - 1.0) < 1e-6, scores
+
+
 def test_search_discovers_seasonal():
     """The search should detect and exploit periodicity."""
     from skaters.search import search
