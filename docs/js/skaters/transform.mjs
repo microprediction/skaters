@@ -649,6 +649,7 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
     }
     const buf = state.buffer;
     const phi = state.phi;
+    if (state.phiUsed === undefined) state.phiUsed = arStationary(phi.slice());   // pre-#235 checkpoint
     state.n += 1;
     let residual;
     if (buf.length >= p) {
@@ -705,8 +706,9 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
   function inverseK(dists, state) {
     const buf = state.buffer.slice();
     // Same coefficients forward() already emitted residuals under
-    // (skaters#232) -- maintained incrementally there, not re-derived here.
-    const phi = state.phiUsed;
+    // (skaters#232) -- maintained incrementally there, not re-derived here,
+    // except for a pre-#235 checkpoint that has no cache yet.
+    const phi = state.phiUsed !== undefined ? state.phiUsed : arStationary(state.phi.slice());
     const H = dists.length;
     // Impulse responses psi_0..psi_{H-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
     const psi = [1.0];
@@ -778,6 +780,9 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
     }
     const buf = state.buffer;
     const th = state.theta;
+    if (state.phiUsed === undefined) {   // pre-#235 checkpoint
+      state.phiUsed = arStationary(Array.from({ length: maxLag }, (_, j) => th[groups[j]]));
+    }
     state.n += 1;
     let residual;
     if (buf.length >= maxLag) {
@@ -831,8 +836,11 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
   function inverseK(dists, state) {
     const buf = state.buffer.slice();
     // Same coefficients forward() already emitted residuals under
-    // (skaters#232) -- maintained incrementally there, not re-derived here.
-    const phi = state.phiUsed;
+    // (skaters#232) -- maintained incrementally there, not re-derived here,
+    // except for a pre-#235 checkpoint that has no cache yet.
+    const phi = state.phiUsed !== undefined
+      ? state.phiUsed
+      : arStationary(Array.from({ length: maxLag }, (_, j) => state.theta[groups[j]]));
     const H = dists.length;
     const psi = [1.0];
     for (let i = 1; i < H; i++) {

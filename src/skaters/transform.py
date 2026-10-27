@@ -1057,7 +1057,15 @@ def _ar_spectral_radius(phi: list[float]) -> float:
 
 
 def _ar_stationary(phi: list[float], margin: float = 0.999) -> list[float]:
-    """Damp AR coefficients into the stationary region for forecasting.
+    """Project toward the stationary region using the radius estimate below.
+
+    The estimate is a heuristic, not a certificate: the power iteration can
+    miss the dominant root when every seed is an eigenvector of another
+    root (phi = [2, 1, -2] reads radius 1.0; true radius 2), so the
+    projected coefficients are not guaranteed stationary. A proper
+    Schur/reflection-coefficient test is tracked in skaters#232.
+
+    Damp AR coefficients into the stationary region for forecasting.
 
     An online least-squares fit — especially from a handful of warm-up points —
     can land outside the stationary region (a near-unit or explosive root). Its
@@ -1127,6 +1135,10 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
 
         buf = state["buffer"]
         phi = state["phi"]
+        if "phi_used" not in state:
+            # A checkpoint from before skaters#232/#235 carries only the raw
+            # RLS coefficients; the projected set is a function of them.
+            state["phi_used"] = _ar_stationary(list(phi))
         state["n"] += 1
 
         if len(buf) >= p:
@@ -1209,8 +1221,10 @@ def ar(order: int = 2, lam: float = 0.99, ridge: float = 1.0,
         # emitted residuals under (skaters#232) -- `phi_used` is maintained
         # incrementally in forward(), not re-derived here, so extrapolation
         # and the one-step residual stream never disagree on which predictor
-        # produced them.
-        phi = state["phi_used"]
+        # produced them. A pre-#235 checkpoint has no cache yet: derive it.
+        phi = state.get("phi_used")
+        if phi is None:
+            phi = _ar_stationary(list(state["phi"]))
         H = len(dists)
 
         # Impulse responses psi_0..psi_{H-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
@@ -1291,6 +1305,9 @@ def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
 
         buf = state["buffer"]
         theta = state["theta"]
+        if "phi_used" not in state:
+            # pre-#235 checkpoint: the projected per-lag set follows from theta
+            state["phi_used"] = _ar_stationary([state["theta"][groups[j]] for j in range(max_lag)])
         state["n"] += 1
 
         if len(buf) >= max_lag:
@@ -1340,8 +1357,11 @@ def grouped_ar(max_lag: int = 16, lam: float = 0.99, ridge: float = 1.0):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         buf = list(state["buffer"])
         # Same coefficients forward() already emitted residuals under
-        # (skaters#232) -- maintained incrementally there, not re-derived here.
-        phi = state["phi_used"]
+        # (skaters#232) -- maintained incrementally there, not re-derived here,
+        # except for a pre-#235 checkpoint that has no cache yet.
+        phi = state.get("phi_used")
+        if phi is None:
+            phi = _ar_stationary([state["theta"][groups[j]] for j in range(max_lag)])
         H = len(dists)
         psi = [1.0]
         for i in range(1, H):

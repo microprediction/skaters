@@ -1064,7 +1064,10 @@ pub struct Ar {
     /// Stationarity-projected coefficients, re-derived after every update.
     /// Used for BOTH the emitted residual and `inverse_k`'s reconstruction,
     /// so the two always agree on which predictor produced the residual
-    /// (skaters#232) -- `phi` alone drives the raw RLS fit.
+    /// (skaters#232) -- `phi` alone drives the raw RLS fit. Absent from
+    /// checkpoints written before skaters#235: deserialises empty and is
+    /// derived from `phi` on first use.
+    #[serde(default)]
     pub phi_used: Vec<f64>,
     pub pmat: Vec<f64>,
     pub n: u64,
@@ -1116,7 +1119,11 @@ impl Ar {
             let x: Vec<f64> = (0..p).map(|i| self.buffer[bl - 1 - i]).collect();
 
             // Emitted residual uses `phi_used` -- the stationarity-projected
-            // coefficients as of the end of the previous tick.
+            // coefficients as of the end of the previous tick (derived now for
+            // a pre-#235 checkpoint, which carries only `phi`).
+            if self.phi_used.len() != p {
+                self.phi_used = ar_stationary(&self.phi);
+            }
             let prediction = fsum((0..p).map(|i| self.phi_used[i] * x[i]));
             residual = y - prediction;
 
@@ -1156,6 +1163,10 @@ impl Ar {
     }
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+        if self.phi_used.len() != self.p {
+            // pre-#235 checkpoint: the cache follows from the raw coefficients
+            return ar_inverse(dists, &self.buffer, &ar_stationary(&self.phi), self.p);
+        }
         ar_inverse(dists, &self.buffer, &self.phi_used, self.p)
     }
 }
@@ -1326,7 +1337,9 @@ pub struct GroupedAr {
     pub buffer: Vec<f64>,
     pub theta: Vec<f64>,
     /// Expanded, stationarity-projected per-lag coefficients, re-derived
-    /// after every update (see `Ar::phi_used`).
+    /// after every update (see `Ar::phi_used`). Absent from checkpoints
+    /// written before skaters#235: deserialises empty, derived from `theta`.
+    #[serde(default)]
     pub phi_used: Vec<f64>,
     pub pmat: Vec<f64>,
     pub n: u64,
@@ -1371,6 +1384,10 @@ impl GroupedAr {
             // Emitted residual uses the previous tick's stationarity-projected,
             // per-lag coefficients -- same fix as Ar (skaters#232).
             let lag_x: Vec<f64> = (0..self.max_lag).map(|j| self.buffer[bl - 1 - j]).collect();
+            if self.phi_used.len() != self.max_lag {
+                let raw: Vec<f64> = (0..self.max_lag).map(|j| self.theta[self.groups[j]]).collect();
+                self.phi_used = ar_stationary(&raw);
+            }
             let prediction = fsum((0..self.max_lag).map(|j| self.phi_used[j] * lag_x[j]));
             residual = y - prediction;
 
@@ -1413,7 +1430,12 @@ impl GroupedAr {
 
     fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
         // Same coefficients forward() already emitted residuals under
-        // (skaters#232) -- maintained incrementally there, not re-derived here.
+        // (skaters#232) -- maintained incrementally there, not re-derived here,
+        // except for a pre-#235 checkpoint that has no cache yet.
+        if self.phi_used.len() != self.max_lag {
+            let raw: Vec<f64> = (0..self.max_lag).map(|j| self.theta[self.groups[j]]).collect();
+            return ar_inverse(dists, &self.buffer, &ar_stationary(&raw), self.max_lag);
+        }
         ar_inverse(dists, &self.buffer, &self.phi_used, self.max_lag)
     }
 }

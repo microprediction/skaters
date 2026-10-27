@@ -63,18 +63,23 @@ def _spectral_radius(phi):
             r = torch.sqrt(disc)
             return torch.maximum(torch.abs((a + r) / 2.0), torch.abs((a - r) / 2.0))
         return torch.hypot(a / 2.0, torch.sqrt(-disc) / 2.0)
-    v = [torch.ones((), dtype=DTYPE)] * p
-    rho = _zero()
-    for _ in range(60):
-        nv = [_psum(phi[j] * v[j] for j in range(p))] + v[:-1]
-        m = torch.abs(nv[0])
-        for x in nv[1:]:
-            m = torch.maximum(m, torch.abs(x))
-        if not bool(m):
-            m = torch.ones((), dtype=DTYPE)
-        v = [x / m for x in nv]
-        rho = m
-    return rho
+    # Two power-iteration seeds, the max of the two estimates (skaters#235):
+    # all-ones and alternating signs, mirroring the reference.
+    best = _zero()
+    for seed in ([1.0] * p, [(-1.0) ** i for i in range(p)]):
+        v = [torch.as_tensor(x, dtype=DTYPE) for x in seed]
+        rho = _zero()
+        for _ in range(60):
+            nv = [_psum(phi[j] * v[j] for j in range(p))] + v[:-1]
+            m = torch.abs(nv[0])
+            for x in nv[1:]:
+                m = torch.maximum(m, torch.abs(x))
+            if not bool(m):
+                m = torch.ones((), dtype=DTYPE)
+            v = [x / m for x in nv]
+            rho = m
+        best = torch.maximum(best, rho)
+    return best
 
 
 def _stationary(phi, margin=0.999):
@@ -155,7 +160,8 @@ class AR(TorchTransform):
         return P
 
     def _fresh(self):
-        return {"buffer": [], "phi": [_zero()] * self.p, "P": self._init_P(), "n": 0}
+        return {"buffer": [], "phi": [_zero()] * self.p, "phi_used": [_zero()] * self.p,
+                "P": self._init_P(), "n": 0}
 
     def _init_state(self, y):
         # the reference folds the first observation through the same step
@@ -172,32 +178,40 @@ class AR(TorchTransform):
         lam = self.lam
         buf = list(state["buffer"])
         phi = list(state["phi"])
+        # the emitted residual uses the projected coefficients as of the end of
+        # the previous tick (skaters#232/#235); RLS fits the raw problem with
+        # its own prediction error. A state without the cache derives it.
+        phi_used = list(state["phi_used"]) if "phi_used" in state else _stationary(list(phi))
         P = list(state["P"])
         n = state["n"] + 1
         if len(buf) >= p:
             x = [buf[-(i + 1)] for i in range(p)]
-            prediction = _psum(phi[i] * x[i] for i in range(p))
+            prediction = _psum(phi_used[i] * x[i] for i in range(p))
             residual = y - prediction
+            raw_prediction = _psum(phi[i] * x[i] for i in range(p))
+            raw_residual = y - raw_prediction
             Px = _mat_vec(P, x, p)
             denom = lam + _dot(x, Px, p)
             if bool(torch.abs(denom) > 1e-15):
                 K = [px / denom for px in Px]
                 for i in range(p):
-                    phi[i] = phi[i] + K[i] * residual
+                    phi[i] = phi[i] + K[i] * raw_residual
                 for i in range(p):
                     for j in range(p):
                         P[i * p + j] = (P[i * p + j] - K[i] * Px[j]) / lam
                 if not _finite_and_bounded(P):
                     P = self._init_P()
+            phi_used = _stationary(list(phi))
         else:
             residual = y
         buf.append(y)
         if len(buf) > 2 * p + 10:
             buf.pop(0)
-        return residual, {"buffer": buf, "phi": phi, "P": P, "n": n}
+        return residual, {"buffer": buf, "phi": phi, "phi_used": phi_used, "P": P, "n": n}
 
     def inverse_k(self, dists, state):
-        return _ar_inverse(dists, list(state["buffer"]), _stationary(list(state["phi"])), self.p)
+        phi_used = state["phi_used"] if "phi_used" in state else _stationary(list(state["phi"]))
+        return _ar_inverse(dists, list(state["buffer"]), list(phi_used), self.p)
 
 
 def _build_groups(max_lag: int) -> list[int]:
@@ -238,7 +252,7 @@ class GroupedAR(TorchTransform):
         return P
 
     def _fresh(self):
-        return {"buffer": [], "theta": [_zero()] * self.n_groups, "P": self._eye(), "n": 0}
+        return {"buffer": [], "theta": [_zero()] * self.n_groups, "phi_used": [_zero()] * self.max_lag, "P": self._eye(), "n": 0}
 
     def _init_state(self, y):
         return self._step(y, self._fresh())[1]
@@ -253,36 +267,42 @@ class GroupedAR(TorchTransform):
         n_groups, max_lag, lam = self.n_groups, self.max_lag, self.lam
         buf = list(state["buffer"])
         theta = list(state["theta"])
+        phi_used = (list(state["phi_used"]) if "phi_used" in state
+                    else _stationary([theta[self.groups[j]] for j in range(max_lag)]))
         P = list(state["P"])
         n = state["n"] + 1
         if len(buf) >= max_lag:
             x = [_zero()] * n_groups
             for j in range(max_lag):
                 x[self.groups[j]] = x[self.groups[j]] + buf[-(j + 1)]
-            prediction = _psum(theta[g] * x[g] for g in range(n_groups))
+            lag_x = [buf[-(j + 1)] for j in range(max_lag)]
+            prediction = _psum(phi_used[j] * lag_x[j] for j in range(max_lag))
             residual = y - prediction
+            raw_prediction = _psum(theta[g] * x[g] for g in range(n_groups))
+            raw_residual = y - raw_prediction
             Px = _mat_vec(P, x, n_groups)
             denom = lam + _dot(x, Px, n_groups)
             if bool(torch.abs(denom) > 1e-15):
                 K = [px / denom for px in Px]
                 for g in range(n_groups):
-                    theta[g] = theta[g] + K[g] * residual
+                    theta[g] = theta[g] + K[g] * raw_residual
                 for i in range(n_groups):
                     for j in range(n_groups):
                         P[i * n_groups + j] = (P[i * n_groups + j] - K[i] * Px[j]) / lam
                 if not _finite_and_bounded(P):
                     P = self._eye()
+            phi_used = _stationary([theta[self.groups[j]] for j in range(max_lag)])
         else:
             residual = y
         buf.append(y)
         if len(buf) > max_lag + 10:
             buf.pop(0)
-        return residual, {"buffer": buf, "theta": theta, "P": P, "n": n}
+        return residual, {"buffer": buf, "theta": theta, "phi_used": phi_used, "P": P, "n": n}
 
     def inverse_k(self, dists, state):
-        theta = list(state["theta"])
-        phi = _stationary([theta[self.groups[j]] for j in range(self.max_lag)])
-        return _ar_inverse(dists, list(state["buffer"]), phi, self.max_lag)
+        phi_used = (state["phi_used"] if "phi_used" in state
+                    else _stationary([state["theta"][self.groups[j]] for j in range(self.max_lag)]))
+        return _ar_inverse(dists, list(state["buffer"]), list(phi_used), self.max_lag)
 
 
 register(AR)
