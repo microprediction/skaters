@@ -91,6 +91,22 @@
       the same bits on every platform.
     </p>
 
+    <h2>Python, differentiable (<code>skaters.torch</code>)</h2>
+    <p><code>pip install skaters[torch]</code></p>
+    <p>
+      The transforms and the mixture distribution as <code>torch</code>
+      modules: the same arithmetic in the same order, with every continuous
+      hyperparameter (an EMA rate, a Holt pair, a Yeo&ndash;Johnson lambda) an
+      <code>nn.Parameter</code> and gradients flowing from a log score back
+      through <code>inverse_k</code> and <code>forward</code>. Each ported
+      transform is held to the reference at 1e-9 on seeded series by its own
+      parity check, so a model built on it starts as the reference exactly and
+      can only move where a score says to. The leaf, the trunk and the lattice
+      stay in the reference; this is the substrate for learning the transform
+      parameters and the mixing policy, not a fourth port of
+      <code>laplace</code>. <code>import skaters</code> does not import torch.
+    </p>
+
     <h2>JavaScript</h2>
     <p><code>npm install skaters</code></p>
     <p>
