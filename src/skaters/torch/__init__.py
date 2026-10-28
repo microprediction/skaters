@@ -21,4 +21,8 @@ import skaters.torch.transforms_shape  # noqa: F401
 import skaters.torch.transforms_ar  # noqa: F401
 import skaters.torch.transforms_level  # noqa: F401
 
-__all__ = ["TorchDist", "TorchTransform", "REGISTRY", "from_reference", "register"]
+from skaters.torch.trunk import TerminalLeafEnsemble
+from skaters.torch.pool import pool_spec, build_pool, laplace_single_scale
+
+__all__ = ["TorchDist", "TorchTransform", "REGISTRY", "from_reference", "register",
+           "TerminalLeafEnsemble", "pool_spec", "build_pool", "laplace_single_scale"]
