@@ -1095,10 +1095,12 @@ def make_registry(h=1):
         # sandwiches on the fair bases (native 21 levels / generous reconstruction)
         **_fair_sandwiches(h),
         "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
-        "PyMC+lap":    _sandwich(pymc_dists, h),
-        "PyMC~lap":    _resid_sandwich(pymc_dists, h),
-        "PyMC@lap":    pit_sandwich(pymc_dists, h),
-        "PyMC&lap":    portfolio_sandwich(pymc_dists, h=h),
+        # memoized like the fair bases: one ADVI fit sequence serves +/& (scored
+        # window) and one serves ~/@ (warm-up-extended window) per series
+        "PyMC+lap":    _sandwich(_memoized(pymc_dists, "PyMC"), h),
+        "PyMC~lap":    _resid_sandwich(_memoized(pymc_dists, "PyMC"), h),
+        "PyMC@lap":    pit_sandwich(_memoized(pymc_dists, "PyMC"), h),
+        "PyMC&lap":    portfolio_sandwich(_memoized(pymc_dists, "PyMC"), h=h),
         "NPTS&lap":    portfolio_sandwich(npts_dists, h=h),
     }
 

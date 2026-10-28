@@ -184,7 +184,43 @@
     </figure>
 
     <h2>Collaborative use</h2>
-<p>The recalibration (<code>@lap</code>) and portfolio (<code>&amp;lap</code>) arms were built for the three strongest models first, so Timestral is scored standalone here. The sidecar wraps any per-step predictive, so these arms can be added without retraining. See the <a href="/sidecar.html">sidecar pattern</a>.</p>
+    <p>Four sandwich arms wrap Timestral's own predictive on this same base
+      (<code>Timestral-209M(q21)</code>), each paired with the standalone run on identical series and windows.
+      Each cell gives the median per-series &Delta; log-likelihood against Laplace in nats
+      (positive means better than Laplace) and the fraction of series where the arm loses to
+      Laplace by the <a href="/draws.html">Diebold&ndash;Mariano test</a>.</p>
+    <ul>
+      <li><code>+lap</code>: vincentize with Laplace.</li><li><code>~lap</code>: model location, Laplace residual scale.</li><li><code>@lap</code>: Laplace on the model's normal scores.</li><li><code>&amp;lap</code>: online portfolio with Laplace.</li>
+    </ul>
+    <table>
+      <thead><tr><th rowspan="2">stratum</th><th class="num" colspan="2">standalone</th><th class="num" colspan="2">+lap</th><th class="num" colspan="2">~lap</th><th class="num" colspan="2">@lap</th><th class="num" colspan="2">&amp;lap</th></tr>
+      <tr><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th></tr></thead>
+      <tbody>
+      <tr><td>economic change-series, business-daily</td><td class="num">-0.036</td><td class="num">27%</td><td class="num">-0.135</td><td class="num">31%</td><td class="num">-0.264</td><td class="num">33%</td><td class="num">-0.083</td><td class="num">38%</td><td class="num">-0.056</td><td class="num">31%</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">+0.044</td><td class="num">24%</td><td class="num">+0.019</td><td class="num">23%</td><td class="num">-0.283</td><td class="num">37%</td><td class="num">+0.005</td><td class="num">17%</td><td class="num">+0.028</td><td class="num">15%</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">+0.105</td><td class="num">7%</td><td class="num">+0.047</td><td class="num">9%</td><td class="num">-0.214</td><td class="num">34%</td><td class="num">+0.057</td><td class="num">9%</td><td class="num">+0.031</td><td class="num">5%</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">+0.039</td><td class="num">10%</td><td class="num">+0.057</td><td class="num">2%</td><td class="num">-0.065</td><td class="num">7%</td><td class="num">+0.042</td><td class="num">6%</td><td class="num">+0.048</td><td class="num">0%</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">-0.011</td><td class="num">4%</td><td class="num">+0.002</td><td class="num">1%</td><td class="num">-0.041</td><td class="num">4%</td><td class="num">-0.043</td><td class="num">27%</td><td class="num">-0.007</td><td class="num">4%</td></tr>
+      </tbody>
+    </table>
+    <p>Central-90% coverage (0.90 target) of the standalone model, its <code>@lap</code> and
+      <code>&amp;lap</code> wraps, and Laplace on the same windows:</p>
+    <table>
+      <thead><tr><th>stratum</th><th class="num">standalone</th><th class="num">@lap</th>
+      <th class="num">&amp;lap</th><th class="num">laplace</th></tr></thead>
+      <tbody>
+      <tr><td>economic change-series, business-daily</td><td class="num">0.908</td><td class="num">0.949</td><td class="num">0.929</td><td class="num">0.919</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">0.908</td><td class="num">0.950</td><td class="num">0.933</td><td class="num">0.910</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">0.897</td><td class="num">0.958</td><td class="num">0.943</td><td class="num">0.923</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">0.875</td><td class="num">0.936</td><td class="num">0.922</td><td class="num">0.892</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">0.893</td><td class="num">0.954</td><td class="num">0.929</td><td class="num">0.919</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.9rem;color:var(--muted)">Across the six bases that have these arms, the
+      portfolio is the one sandwich that cuts the loss rate on every stratum without moving the
+      median much; the residual-scale and normal-score wraps cost 0.1 to 0.35 nats on the economic
+      strata, and the normal-score wrap over-covers. The <a href="/sidecar.html">sidecar page</a>
+      has the cross-model reading.</p>
 
     <h2>Protocol</h2>
     <p>Fixed 128-length context, rolling one-step test window, no fitting, each model in its

@@ -165,7 +165,7 @@
     </figure>
 
     <h2>Collaborative use</h2>
-<p>The recalibration (<code>@lap</code>) and portfolio (<code>&amp;lap</code>) arms were built for the three strongest models first, so FlowState is scored standalone here. The sidecar wraps any per-step predictive, so these arms can be added without retraining. See the <a href="/sidecar.html">sidecar pattern</a>.</p>
+<p>The sandwich arms (<code>+lap</code>, <code>~lap</code>, <code>@lap</code>, <code>&amp;lap</code>) have not been run on FlowState. The sidecar wraps any per-step predictive, so they can be added without retraining. See the <a href="/sidecar.html">sidecar pattern</a>.</p>
 
     <h2>Protocol</h2>
     <p>Fixed 128-length context, rolling one-step test window, no fitting, each model in its
