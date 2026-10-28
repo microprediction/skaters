@@ -50,6 +50,7 @@ daily:econ,Timestral-5M(q21),141440,0.8931,0.5240
 daily:econ,flowstate,88384,0.7034,0.5636
 daily:econ,flowstate(wide),88704,0.7642,0.5644
 daily:econ,laplace,139456,0.9189,0.5384
+daily:econ,laplace@PyMC,32000,0.9197,0.5303
 daily:econ,t0-gamma,141440,0.8374,0.5323
 daily:econ,t0-gamma(q21),141440,0.9072,0.5321
 daily:econ,t0-gamma(q21)&lap,141440,0.9268,0.5396
@@ -228,6 +229,7 @@ monthly:econ,Timestral-5M(q21),358400,0.9040,0.4875
 monthly:econ,flowstate,186880,0.6595,0.5176
 monthly:econ,flowstate(wide),187520,0.7309,0.5157
 monthly:econ,laplace,356864,0.9233,0.5153
+monthly:econ,laplace@PyMC,30144,0.9240,0.5151
 monthly:econ,t0-gamma,358400,0.8075,0.4941
 monthly:econ,t0-gamma(q21),358400,0.8946,0.4941
 monthly:econ,t0-gamma(q21)&lap,334016,0.9423,0.5000
@@ -286,6 +288,7 @@ weekly:econ,Timestral-5M(q21),192832,0.9118,0.5364
 weekly:econ,flowstate,186880,0.7034,0.5719
 weekly:econ,flowstate(wide),187520,0.7650,0.5712
 weekly:econ,laplace,192832,0.9097,0.5435
+weekly:econ,laplace@PyMC,31936,0.8534,0.5057
 weekly:econ,t0-gamma,192832,0.8449,0.5512
 weekly:econ,t0-gamma(q21),192832,0.9134,0.5491
 weekly:econ,t0-gamma(q21)&lap,192704,0.9312,0.5653
