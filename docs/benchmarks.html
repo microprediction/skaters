@@ -23,6 +23,13 @@
       <nav>
         <a href="/">Home</a>
         <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
             <a href="/challengers.html">Standalone</a>
@@ -45,7 +52,6 @@
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
-        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
@@ -67,6 +73,19 @@
     <h1>Benchmarks</h1>
     <p class="subtitle">A new practical benchmark for univariate distributional prediction —
       simpler and lighter than Prophet, and scored where it counts: held-out likelihood.</p>
+
+    <figure class="hero-figure">
+      <img src="./assets/frontier.svg" alt="Accuracy vs speed frontier: laplace sits top-right,
+        fastest and tied for the best held-out likelihood; the PyMC-laplace sandwich edges it on
+        accuracy at about ten times the compute, and the classical baselines trade accuracy for
+        speed." />
+      <figcaption>Held-out accuracy vs. runtime on 2,775 non-price FRED series. <code>laplace</code>
+        sits top-right: fastest, and tied for the best likelihood. The PyMC-laplace sandwich edges
+        it on accuracy at about ten times the compute; the classical baselines (AutoARIMA, AutoETS,
+        SARIMAX, GARCH-t) trade accuracy for speed. Runtime detail is on the
+        <a href="/performance.html">performance page</a>, size and dependencies on the
+        <a href="/footprint.html">footprint page</a>.</figcaption>
+    </figure>
 
     <h2>Benchmark 1 — the non-price universe</h2>
     <p>

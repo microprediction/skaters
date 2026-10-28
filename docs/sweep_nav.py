@@ -27,6 +27,13 @@ CANONICAL = """  <header class="site-header">
       <nav>
         <a href="/">Home</a>
         <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
             <a href="/challengers.html">Standalone</a>
@@ -49,7 +56,6 @@ CANONICAL = """  <header class="site-header">
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
-        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>

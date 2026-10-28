@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; footprint</title>
+  <meta name="description" content="What it costs to carry skaters: source size per port, dependencies, import time, checkpoint bytes and resident memory of a live laplace, all measured." />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    table.fp { border-collapse: collapse; margin: 0 0 26px; width: 100%; }
+    table.fp th, table.fp td { border-bottom: 1px solid #e3e3e3; padding: 6px 10px; text-align: left; font-size: 0.94em; }
+    table.fp th { border-bottom: 2px solid #bbb; font-weight: 600; }
+    .muted { color: #777; }
+    .stamp { color: #888; font-size: 0.88em; font-style: italic; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Footprint</h1>
+    <p class="lede">Accuracy is on the <a href="/benchmarks.html">accuracy page</a> and runtime
+      on the <a href="/performance.html">performance page</a>. This page is the third axis:
+      what the library costs to carry. Every number is measured by
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/footprint.py"><code>benchmarks/footprint.py</code></a>.</p>
+
+    <table class="fp">
+      <thead><tr><th>item</th><th>measured</th><th>how</th></tr></thead>
+      <tbody>
+      <tr><td>Python reference, source</td><td>292 KB, 7,284 lines in 28 files</td><td class="muted">the whole library, standard library only; skaters.torch excluded</td></tr>
+      <tr><td>Declared dependencies</td><td>none</td><td class="muted">pyproject.toml; numpy is not required</td></tr>
+      <tr><td>Published wheel</td><td>106 KB (skaters 0.16.0 on PyPI)</td><td class="muted">what pip downloads</td></tr>
+      <tr><td>Import time</td><td>22 ms</td><td class="muted">fresh interpreter, median of 5</td></tr>
+      <tr><td>laplace(1) checkpoint</td><td>23 KB</td><td class="muted">pickled state after 500 observations</td></tr>
+      <tr><td>laplace(3) checkpoint</td><td>132 KB</td><td class="muted">pickled state after 500 observations</td></tr>
+      <tr><td>laplace(1) resident memory</td><td>192 KB</td><td class="muted">tracemalloc, one instance, 500 steps; peak 204 KB</td></tr>
+      <tr><td>laplace(3) resident memory</td><td>1027 KB</td><td class="muted">tracemalloc, one instance, 500 steps; peak 1067 KB</td></tr>
+      <tr><td>JavaScript port, source</td><td>114 KB, 3,148 lines</td><td class="muted">ES modules, no dependencies; runs in the browser</td></tr>
+      <tr><td>Rust core, source</td><td>149 KB, 4,855 lines</td><td class="muted">the fast backend and the wasm build</td></tr>
+      <tr><td>skaters_fast binary</td><td>1491 KB</td><td class="muted">the compiled PyO3 extension, this machine</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Reading it</h2>
+    <p>The reference is a few hundred kilobytes of standard-library Python with no
+      dependencies, so it installs anywhere Python runs, including Pyodide in the
+      browser. A running <code>laplace</code> is a dictionary of floats: its checkpoint is
+      the state above, which round-trips through pickle or JSON bit for bit (the parity
+      suite checks the restore), so a forecaster can be paused, stored and resumed per
+      series. The compiled core is larger than the source it mirrors, as compiled code
+      is, and is optional.</p>
+
+    <h2>Reproducing this</h2>
+<pre><code>PYTHONPATH=src python benchmarks/footprint.py</code></pre>
+    <p class="stamp">Measured 2026-10-28 on arm64, Python 3.13.7,
+      commit 4fa186b.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>
