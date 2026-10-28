@@ -182,6 +182,10 @@ monthly:econ,Chronos(wide)~lap,173440,0.9390,0.5058
 monthly:econ,Chronos@lap,170560,0.9064,0.4961
 monthly:econ,NPTS,96000,0.8877,0.4788
 monthly:econ,PyMC,30144,0.8843,0.4893
+monthly:econ,PyMC&lap,22656,0.9370,0.5114
+monthly:econ,PyMC+lap,30144,0.9239,0.5025
+monthly:econ,PyMC@lap,22656,0.9479,0.4936
+monthly:econ,PyMC~lap,22656,0.9420,0.4984
 monthly:econ,Sundial,186880,0.5545,0.5151
 monthly:econ,TiRex,186240,0.7964,0.4883
 monthly:econ,TiRex&lap,170560,0.9187,0.5084

@@ -764,9 +764,10 @@ def build_page(slug, model, vs, cov, radar):
 
 
 FAIR_BASES = ["Timestral-209M(q21)", "t0-gamma(q21)", "TimesFM3(wide)", "TimesFM(wide)",
-              "TiRex(wide)", "Chronos(wide)"]
+              "TiRex(wide)", "Chronos(wide)", "PyMC"]
 FAIR_SHORT = {"Timestral-209M(q21)": "Timestral", "t0-gamma(q21)": "t0-gamma", "TimesFM3(wide)": "TimesFM3",
-              "TimesFM(wide)": "TimesFM", "TiRex(wide)": "TiRex", "Chronos(wide)": "Chronos"}
+              "TimesFM(wide)": "TimesFM", "TiRex(wide)": "TiRex", "Chronos(wide)": "Chronos",
+              "PyMC": "PyMC-forecast"}
 SIDECAR = os.path.join(os.path.dirname(BENCH), "docs", "sidecar.html")
 
 
@@ -780,10 +781,13 @@ def sidecar_fairbase_section(vs, cov):
         if k not in ("weekly:econ", "monthly:econ"):
             continue
         for b in FAIR_BASES:
+            if (k, b) not in vs:
+                continue
             cells = []
             for a in arms:
                 r = vs.get((k, b + a))
-                cells.append(f'<td class="num">{float(r["med_dLL"]):+.3f}</td>' if r else '<td class="num">&ndash;</td>')
+                cells.append(f'<td class="num">{float(r["med_dLL"]):+.3f} <span style="color:var(--muted)">({int(r["n_series"]):,})</span></td>'
+                             if r else '<td class="num">&ndash;</td>')
             t1.append(f'<tr><td>{long}</td><td>{FAIR_SHORT[b]}</td>{"".join(cells)}</tr>')
     # table 2: loss rate standalone -> &lap, every stratum x base
     t2 = []
@@ -825,9 +829,11 @@ def sidecar_fairbase_section(vs, cov):
     <p>The arms above were built on the tight reconstruction, and part of what they repaired was the
       reconstruction. The same four sandwiches have now been run on the fair bases: Timestral-209M and
       t0-gamma on their native 21 levels, and TimesFM 3.0, TimesFM 2.5, TiRex and Chronos through the
-      generous reconstruction. Each arm is paired with its standalone run on identical series and
-      windows. Median per-series &Delta; log-likelihood against Laplace, in nats, positive meaning
-      better than Laplace:</p>
+      generous reconstruction, plus the PyMC-forecast challenger (a Student-t regression on lagged
+      changes, fit by ADVI) on the monthly stratum. Each arm is paired with its standalone run on
+      identical series and windows; <code>~lap</code> and <code>@lap</code> need a longer warm-up
+      window, so their series counts are smaller. Median per-series &Delta; log-likelihood against
+      Laplace, in nats, positive meaning better than Laplace, with the number of series:</p>
     <table>
       <thead><tr><th>stratum</th><th>base</th><th class="num">standalone</th><th class="num">+lap</th>
       <th class="num">~lap</th><th class="num">@lap</th><th class="num">&amp;lap</th></tr></thead>
