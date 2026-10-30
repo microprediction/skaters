@@ -390,12 +390,13 @@ def my_transform():
     return forward, inverse_k
 ```
 
-## skaters.torch: the differentiable transforms
+## skaters.torch: the differentiable port
 
-`pip install skaters[torch]` adds `skaters.torch`: the transforms and the mixture
-distribution as `torch` modules, same arithmetic in the same order, with every
-continuous hyperparameter an `nn.Parameter` and gradients flowing from a log
-score back through `inverse_k` and `forward`.
+`pip install skaters[torch]` adds `skaters.torch`: the whole library on `torch`
+tensors (transforms, leaves, ensembles, the lattice projection, the GPD tail
+splice, the parade, search, `laplace` and `dantzig`), same arithmetic in the same
+order, with every continuous hyperparameter an `nn.Parameter` and gradients
+flowing from a log score at the output back through every stage.
 
 ```python
 from skaters.leaf import leaf
@@ -408,10 +409,20 @@ dists, state = f(y, state)                               # list[TorchDist]
 loss = -dists[0].logpdf(y_next)                          # differentiable in ema.alpha
 ```
 
-Every ported transform is held to the reference at 1e-9 by `skaters.torch.parity`
-(forward emissions and every component of every `inverse_k` output on seeded
-series), so a model built on these starts as the reference exactly. The leaf,
-trunk and lattice stay in the reference; `import skaters` does not import torch.
+It is the fifth implementation held to the parity vectors: `parity/check_torch.py`
+runs every scenario the JavaScript, Rust, R and Julia ports pass, including
+`laplace` at k=1 and k=3, the repeat-series lattice and the missing-observation
+rules, at the same 1e-6 gate (200,900 values), and each module is also checked
+against the reference at 1e-9 in `tests/test_torch_*.py`. A learned model
+initialised at the reference's values therefore is laplace, by the standard
+check. `import skaters` does not import torch.
+
+```python
+from skaters.torch import laplace
+f = laplace(k=1)                      # the same model, tensors inside
+dists, state = f(y, None)
+loss = -dists[0].logpdf(y_next)       # differentiable in every parameter
+```
 
 ## JavaScript, R, Julia, Rust & the browser
 
