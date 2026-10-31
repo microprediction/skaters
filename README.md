@@ -463,9 +463,11 @@ Interactive demos (forecasting playground in native JS, and the real Python pack
 
 - **A stronger univariate benchmark for foundational time-series model evaluation**:
   [PDF](papers/stronger-benchmark/stronger-benchmark.pdf),
+  [SSRN](https://papers.ssrn.com/abstract=7583618),
   [reproduce](papers/stronger-benchmark/REPRODUCE.md) (Tier 1 checks every number
   in seconds: `pip install numpy && python papers/stronger-benchmark/verify_paper.py`).
-- **Transforms all the way down**, the methods paper: [PDF](papers/skaters-jss.pdf).
+- **Transforms all the way down**, the methods paper: [PDF](papers/skaters-jss.pdf),
+  [SSRN](https://papers.ssrn.com/abstract=7220478).
 
 ## Theoretical context
 
