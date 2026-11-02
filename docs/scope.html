@@ -153,12 +153,13 @@
       evaluating each observation under a distribution issued before it arrived.
       A strictly trailing z-score is already causal: the distributional alternative
       can represent skew and tail behavior beyond location and scale, and supplies
-      a calibration diagnostic. Both approaches can lag regime changes; the PIT
-      is standard-normal only when the predictive CDF is calibrated and continuous
+      a calibration diagnostic. Both approaches can lag regime changes. For a
+      calibrated, continuous predictive CDF, the ideal PIT is uniform and its
+      inverse-normal transform is standard-normal before numerical clamping
       (discrete outcomes need a randomized PIT for that guarantee). It is a
       stateful alternative, with warm-up and additional computation, rather than
       an unconditional drop-in. The
-      <a href="/skills.html">standardization-review skill</a> explains these trade-offs.
+      <a href="https://github.com/microprediction/skaters/blob/main/skills/standardization-review.md">standardization-review skill</a> explains these trade-offs.
     </p>
 
     <h2>The short version</h2>
