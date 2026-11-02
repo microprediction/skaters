@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace
+  at worst. Two experts, the frozen reference `laplace` and a trainable torch
+  `laplace` with a state-conditioned gate added to the trunk's prequential log
+  weights at the combine step (`TerminalLeafEnsemble.gate_offset`), under an
+  exact density mixture weighted by undiscounted cumulative log-likelihood (the
+  Aggregating Algorithm, one instance per phase `t mod h` at horizon `h`). The
+  bound `sum -log q <= sum -log p_laplace - h log(pi_laplace)` holds at every
+  prefix and is tested against a deliberately corrupted learned expert; at
+  initialisation the model equals `laplace` to the parity gate; the forecast
+  issued for `y_t` cannot depend on `y_t`; `project_()` keeps the transform
+  parameters inside their valid regions after an optimizer step. Training and
+  the harness arm are steps 3 and 4.
 - New optional subpackage `skaters.torch` (`pip install skaters[torch]`): the
   library on `torch` tensors. Transforms, leaves (`leaf`, `crps_leaf`,
   `scale_mixture_leaf`, `garch_leaf`, ...), the ensembles, `multiscale`, the

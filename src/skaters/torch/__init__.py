@@ -37,11 +37,13 @@ import skaters.torch.bayesian  # noqa: F401
 import skaters.torch.multiscale  # noqa: F401
 import skaters.torch.periodicity  # noqa: F401
 import skaters.torch.search  # noqa: F401
+import skaters.torch.learned  # noqa: F401
 import skaters.torch.spec  # noqa: F401
 
 from skaters.torch.trunk import TerminalLeafEnsemble
 from skaters.torch.pool import pool_spec, build_pool
 from skaters.torch.api import laplace, dantzig
+from skaters.torch.learned import learned, LearnedLaplace
 
-__all__ = ["TorchDist", "TorchTransform", "REGISTRY", "from_reference", "register",
+__all__ = ["learned", "LearnedLaplace", "TorchDist", "TorchTransform", "REGISTRY", "from_reference", "register",
            "TerminalLeafEnsemble", "pool_spec", "build_pool", "laplace", "dantzig"]

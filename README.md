@@ -402,7 +402,10 @@ leaves, ensembles and the trunk are `nn.Parameter`s reachable from
 learning rates are plain floats. Gradients flow from a log score at the
 output back through every stage, with the weight recursions truncated at
 one step by default (`detach_carry`), so a streaming call without
-`torch.no_grad()` keeps a bounded graph.
+`torch.no_grad()` keeps a bounded graph. `skaters.torch.learned` builds on it:
+a trainable laplace with a learned gate, held under an Aggregating-Algorithm
+mixture with the frozen reference `laplace`, so its cumulative log loss can
+exceed laplace's by at most `h log 2` nats on any stream (#297).
 
 ```python
 from skaters.leaf import leaf

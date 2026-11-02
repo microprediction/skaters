@@ -59,6 +59,12 @@ class TerminalLeafEnsemble(nn.Module):
         self.skater_modules = nn.ModuleList([s for s in skaters if isinstance(s, nn.Module)])
         self.candidate_modules = nn.ModuleList()
         self.detach_carry = True        # truncate backprop through the weight recursion at one step
+        # #297: an optional per-step log-weight offset set by a learned gate
+        # (skaters.torch.learned); None or zeros reproduce the reference exactly.
+        # The offset multiplies the prequential weights at the combine step only;
+        # the weight recursion itself is untouched.
+        self.gate_offset = None
+        self.last_log_w = None          # the prequential log weights after this step, detached
         self.k = k
         self.leaf_fn = leaf_fn
         self.n = n
@@ -114,6 +120,9 @@ class TerminalLeafEnsemble(nn.Module):
             state["decay"] = (self.forget * decay).detach()
         state["log_w"] = log_w
         lw = torch.stack([_t(v).reshape(()) for v in log_w])
+        self.last_log_w = lw.detach()
+        if self.gate_offset is not None:
+            lw = lw + self.gate_offset
         max_lw = torch.max(lw)
         w = torch.exp(lw - max_lw)
         tot = torch.sum(w)
