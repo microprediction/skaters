@@ -1075,6 +1075,82 @@ def lap_pymc_sandwich(ch, h=1):
     return out
 
 
+# ---- the learned model (#297): laplace at worst, from a trained checkpoint ------
+# LEARNED_CKPT names the checkpoint written by learned_train.py. "learned" is
+# the guaranteed mixture (frozen laplace + trained expert under the
+# Aggregating Algorithm); "learned-expert" is the trained expert alone, so the
+# two rows show what the training bought and what the wrapper costs. The arm
+# emits the torch distributions' exact densities (no reconstruction).
+LEARNED_CKPT = os.environ.get("LEARNED_CKPT", "")
+_learned_models = {}
+
+
+class _FloatDist:
+    """A torch distribution read as floats, for the canonical writer."""
+
+    def __init__(self, d):
+        self._d = d
+
+    def logpdf(self, x):
+        return float(self._d.logpdf(x))
+
+    def cdf(self, x):
+        return float(self._d.cdf(x))
+
+    def crps(self, x):
+        return float(self._d.crps(x))
+
+    def quantile(self, p):
+        return float(self._d.quantile(p))
+
+    @property
+    def mean(self):
+        return float(self._d.mean)
+
+    @property
+    def std(self):
+        return float(self._d.std)
+
+
+def _learned_model(h):
+    key = (LEARNED_CKPT, h)
+    if key not in _learned_models:
+        import torch
+        from skaters.torch.learned import LearnedLaplace
+        if not LEARNED_CKPT or not os.path.exists(LEARNED_CKPT):
+            raise SystemExit(f"LEARNED_CKPT must name a checkpoint from learned_train.py (got {LEARNED_CKPT!r})")
+        ck = torch.load(LEARNED_CKPT, map_location="cpu", weights_only=False)
+        if int(ck["k"]) != int(h):
+            raise SystemExit(f"checkpoint was trained at k={ck['k']}, arm runs at h={h}")
+        m = LearnedLaplace(k=h, pi_lap=float(ck.get("pi_lap", 0.5)))
+        m.load_state_dict(ck["state_dict"])
+        m.eval()
+        _learned_models[key] = m
+    return _learned_models[key]
+
+
+def learned_dists(ch, h=1, which="mixture"):
+    """TEST per-step predictives of the learned model: the mixture, or the
+    trained expert alone. Same window convention as laplace_dists."""
+    import torch
+    m = _learned_model(h)
+    ch = [float(v) for v in ch]
+    start = len(ch) - TEST
+    st = None; queue = []; out = []
+    with torch.no_grad():
+        for i, yv in enumerate(ch):
+            if len(queue) >= h and i >= start:
+                out.append(_FloatDist(queue[-h][h - 1]))
+            d, st = m(yv, st)
+            if which == "expert":
+                _lap, lrn = st["pend"][-1]
+                d = lrn
+            queue.append(d)
+            if len(queue) > h:
+                queue.pop(0)
+    return out
+
+
 def make_registry(h=1):
     return {
         # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
@@ -1088,6 +1164,8 @@ def make_registry(h=1):
         "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
         "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
+        "learned":        lambda ch: learned_dists(ch, h, "mixture"),   # #297: laplace at worst
+        "learned-expert": lambda ch: learned_dists(ch, h, "expert"),
         # ablation: laplace without the GPD tail splice (tails.py degenerate-threshold check)
         "laplace(gaussian-tails)": lambda ch: laplace_dists(ch, h, tails="gaussian"),
         "Sundial":     lambda ch: sundial_dists(ch, h),
