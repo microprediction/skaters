@@ -124,50 +124,50 @@
         <tr><td>Prophet</td><td>921 series, pre-registered</td><td>&minus;0.76 (&minus;4.6 family-weighted)</td><td>&minus;0.02</td></tr>
         <tr><td>TabFM (regressor)</td><td>226 series</td><td>&minus;0.75</td><td>&minus;0.02</td></tr>
         <tr><td>TabFM (x100 classifier)</td><td>921 series, pre-registered</td><td>&minus;0.15</td><td><strong>+0.87 family-weighted; +1.99 on repeat-heavy series</strong></td></tr>
-        <tr><td>PYMC-Forecast (Student-t lag regression, ADVI)</td><td>226 series, pre-registered</td><td>&minus;0.45</td><td><strong>+0.04; +2.1 on repeat-heavy series</strong></td></tr>
+        <tr><td>PYMC-Forecast (Student-t lag regression, ADVI; historical)</td><td>226 series, July pre-registration; superseded protocol</td><td>&minus;0.45</td><td><strong>+0.04; +2.1 on repeat-heavy series</strong></td></tr>
       </tbody>
     </table>
     <p>
       Numbers are median nats per observation relative to laplace alone
-      (FRED-30 rows are means relative to laplace's 3.674). The pattern:
-      raw models trail by whole nats; sandwiched, they converge to laplace
-      plus or minus a small epsilon, and the epsilon measures conditional
-      structure laplace missed. The large positive epsilons sit on
-      repeat-heavy series, first found by the discrete TabFM head and
-      confirmed by the PYMC-Forecast bout; that structure is a standing
-      library work item.
+      (FRED-30 rows are means relative to laplace's 3.674). These studies
+      use different universes and protocols; the July PYMC-Forecast row
+      records the figures previously reported, not a current whole-universe
+      improvement claim.
+    </p>
+    <h3>PYMC-Forecast: current canonical result</h3>
+    <p>
+      Under the canonical protocol, <code>laplace@PyMC</code> has negative
+      median paired &Delta; log-likelihood against plain laplace on each
+      economic stratum: <strong>&minus;0.0522 daily (500 series),
+      &minus;0.0124 weekly (499), and &minus;0.0153 monthly (471)</strong>.
+      Positive would mean better than laplace. These are the committed
+      <a href="https://github.com/microprediction/skaters/blob/main/benchmarks/canonical_summary_vs_laplace.csv">canonical summary</a>
+      results also reported on the <a href="/sidecar.html">sidecar page</a>.
+      The general claim that the PyMC sandwich edges laplace is withdrawn.
     </p>
     <p>
-      The PYMC-Forecast row is the first sandwiched challenger whose
-      positive epsilon spans the whole universe rather than one stratum:
-      ahead of laplace on 65% of series, +0.04 nats median, filed as its
-      pre-registered convergence hypothesis. The z stream also suits
-      Bayesian machinery unusually well. To the extent laplace's predictive
-      cdf is right, the z stream is close to standard normal (that is what the
-      PIT tables measure), so priors centred at no structure and unit scale
-      are a measured default rather than guesswork, and a single pre-test ADVI fit
-      frozen through all 150 test steps still ties laplace to the third
-      decimal: in these coordinates, batch-refit staleness costs almost
-      nothing. One pooled hierarchical fit across all 226 series lost to
-      the same model fit per series on 72% of them, with the gains
-      concentrated on the repeat-heavy stratum (+2.1 nats median); the
-      full tape is on the
-      <a href="/challengers/pymc-forecast.html">bout page</a>.
+      The July 226-series study remains available on the
+      <a href="/challengers/pymc-forecast.html">historical bout page</a>.
+      It reported its block-refit <code>sand</code> arm ahead on 65% of series,
+      with +0.04 nats median. Its separate frozen <code>solo</code> arm,
+      fit once before the 150-step test window, was reported with a +0.005-nat median
+      gap. These are distinct arms, not two summaries of one fit.
+      The canonical adapter refits and emits predictive distributions
+      through the common density reconstruction and scoring protocol;
+      the old results therefore do not establish a canonical gain or
+      that batch-refit staleness is negligible. The historical pooling
+      contrast is retained on the bout page and was not rerun here.
     </p>
     <p>
-      That convergence is not a daily-universe artifact. The same frozen
-      z-space fit, carried onto the seasonal and waveform arms, pulls
-      <em>ahead</em> of plain laplace rather than merely tying it: it wins 55%
-      of the weekly series, 64% of the monthly, and 84% of the M4-Hourly
-      waveforms, a small median lift (+0.009, +0.017, +0.063 nats) that grows
-      with periodic structure and peaks on the near-deterministic hard
-      waveforms. Those residual streams still carry conditional structure the
-      lag regression reads back, most of all where the signal is a repeating
-      shape (see <code>benchmarks/pymc_arms_study.py</code>). Standalone on the
-      raw series it stays a genuine underdog, losing to laplace on four of five
-      regimes (the challengers
-      <a href="/challengers.html">radar</a>); the lift is the sandwich, not the
-      model.<sup id="fnref-toolkits"><a href="#fn-toolkits" style="text-decoration:none">1</a></sup>
+      The older seasonal study (<code>benchmarks/pymc_arms_study.py</code>)
+      used the frozen z-space fit and reported positive sign-comparison
+      rates of 55% weekly, 64% monthly, and 84% on M4-Hourly, with median
+      lifts +0.009, +0.017, and +0.063 nats. Those are historical results
+      under a different protocol; the canonical weekly and monthly
+      medians above are negative. The canonical rerun did not cover
+      M4-Hourly, so it neither confirms nor retracts that older hourly
+      result. Sign-comparison percentages must not be confused with the
+      canonical HAC/DM win/draw/loss rule.<sup id="fnref-toolkits"><a href="#fn-toolkits" style="text-decoration:none">1</a></sup>
     </p>
 
     <h2>Detectors</h2>
