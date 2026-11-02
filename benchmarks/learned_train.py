@@ -19,6 +19,11 @@ validation half goes through run_arm.py with ARM_SPLIT=valid and the
     LT_OUT=benchmarks/learned_ckpt/weekly_k1.pt \
     PYTHONPATH=src:benchmarks .venv-kumo/bin/python benchmarks/learned_train.py
 
+A checkpoint is written every LT_CKPT_EVERY series (default 25) and at the
+end of each epoch, atomically; LT_RESUME=<ckpt> continues from the series it
+stopped at, with the optimizer state. LT_SHUFFLE=1 (default) orders the
+series by a seeded shuffle so families mix within the pass.
+
 Reports, per epoch, the mean learned-expert log score against the frozen
 laplace's on the same steps (the two experts inside the model), so the
 training signal is read next to its floor. This number is in-sample; the
@@ -50,6 +55,9 @@ CLIP = float(os.environ.get("LT_CLIP", 1.0))
 PI_LAP = float(os.environ.get("LT_PI", 0.5))
 OUT = os.environ.get("LT_OUT", f"benchmarks/learned_ckpt/{CORPUS}_k{K}.pt")
 SEED = int(os.environ.get("LT_SEED", 0))
+CKPT_EVERY = int(os.environ.get("LT_CKPT_EVERY", 25))     # series between checkpoints
+RESUME = os.environ.get("LT_RESUME", "")                   # checkpoint to continue from
+SHUFFLE = int(os.environ.get("LT_SHUFFLE", 1))             # seeded order so families mix
 HIST = ra.aa.fs.HIST
 FLOOR = -20.0
 
@@ -58,15 +66,30 @@ def train_series():
     series = [(sid, title, ch) for sid, title, ch in ra.iter_series(CORPUS)
               if ra.regime(title) == "econ" and split_of(sid) == "train"]
     series = [x for x in series if len(x[2][-HIST:]) >= ra.MINLEN]
+    if SHUFFLE:
+        import random
+        random.Random(SEED).shuffle(series)
     return series[:MAX] if MAX else series
 
 
-def run_epoch(model, opt, series, epoch):
-    """One pass over the series; returns (mean learned LL, mean laplace LL, n)."""
+def save(model, opt, series, epoch, done, history, path=OUT):
+    torch.save({"state_dict": model.state_dict(), "opt_state": opt.state_dict(),
+                "k": K, "pi_lap": PI_LAP, "corpus": CORPUS, "n_series": len(series),
+                "window": WINDOW, "lr": LR, "epochs": epoch, "done": done, "history": history,
+                "series": [sid for sid, _, _ in series], "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")},
+               path + ".tmp")
+    os.replace(path + ".tmp", path)
+
+
+def run_epoch(model, opt, series, epoch, start_at=0, history=None):
+    """One pass over the series; returns (mean learned LL, mean laplace LL, n).
+    Saves a checkpoint every CKPT_EVERY series (resumable with LT_RESUME)."""
     tot_lrn = tot_lap = 0.0
     n_scored = 0
     t0 = time.time()
     for j, (sid, title, ch) in enumerate(series):
+        if j < start_at:
+            continue
         ch = [float(v) for v in ch[-HIST:]]
         state = None
         pend = []                       # learned-expert dists issued earlier (graph kept)
@@ -103,9 +126,14 @@ def run_epoch(model, opt, series, epoch):
                 pend = [[_detach(d) for d in ds] for ds in pend]
         if (j + 1) % 10 == 0 or j + 1 == len(series):
             dt = time.time() - t0
+            done_here = j + 1 - start_at
+            eta = dt / max(done_here, 1) * (len(series) - j - 1) / 60
             print(f"[epoch {epoch}] {j + 1}/{len(series)} series, {n_scored} scored steps, "
                   f"learned {tot_lrn / max(n_scored, 1):+.4f} vs laplace {tot_lap / max(n_scored, 1):+.4f} "
-                  f"(delta {(tot_lrn - tot_lap) / max(n_scored, 1):+.4f}), {dt / 60:.1f} min", flush=True)
+                  f"(delta {(tot_lrn - tot_lap) / max(n_scored, 1):+.4f}), {dt / 60:.1f} min, "
+                  f"eta {eta:.0f} min", flush=True)
+        if CKPT_EVERY and (j + 1) % CKPT_EVERY == 0 and j + 1 < len(series):
+            save(model, opt, series, epoch, j + 1, history or [])
     return tot_lrn / max(n_scored, 1), tot_lap / max(n_scored, 1), n_scored
 
 
@@ -124,14 +152,24 @@ def main():
     print(f"[learned_train] {sum(p.numel() for p in params)} trainable values in {len(params)} tensors", flush=True)
     opt = torch.optim.Adam(params, lr=LR)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    history = []
-    for epoch in range(1, EPOCHS + 1):
-        lrn, lap, n = run_epoch(model, opt, series, epoch)
+    history, first_epoch, start_at = [], 1, 0
+    if RESUME and os.path.exists(RESUME):
+        ck = torch.load(RESUME, map_location="cpu", weights_only=False)
+        model.load_state_dict(ck["state_dict"])
+        if "opt_state" in ck:
+            opt.load_state_dict(ck["opt_state"])
+        history = list(ck.get("history", []))
+        done = int(ck.get("done", 0))
+        first_epoch = int(ck.get("epochs", 1))
+        if done >= len(series):          # that epoch was complete; start the next
+            first_epoch, done = first_epoch + 1, 0
+        start_at = done
+        print(f"[learned_train] resumed from {RESUME}: epoch {first_epoch}, series {start_at}", flush=True)
+    for epoch in range(first_epoch, EPOCHS + 1):
+        lrn, lap, n = run_epoch(model, opt, series, epoch, start_at=start_at, history=history)
+        start_at = 0
         history.append({"epoch": epoch, "learned_ll": lrn, "laplace_ll": lap, "n_scored": n})
-        torch.save({"state_dict": model.state_dict(), "k": K, "pi_lap": PI_LAP,
-                    "corpus": CORPUS, "n_series": len(series), "window": WINDOW, "lr": LR,
-                    "epochs": epoch, "history": history,
-                    "series": [sid for sid, _, _ in series]}, OUT)
+        save(model, opt, series, epoch, len(series), history)
         print(f"[learned_train] epoch {epoch}: learned {lrn:+.4f} laplace {lap:+.4f} "
               f"delta {lrn - lap:+.4f} nats/step (in-sample); checkpoint -> {OUT}", flush=True)
     with open(OUT + ".json", "w") as fh:
