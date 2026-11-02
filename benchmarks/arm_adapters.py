@@ -1019,6 +1019,62 @@ def _lap_rank_dists(ch, h, conformal, win=0):
     return out
 
 
+# ---- laplace@PyMC: the frontier's "PyMC-laplace sandwich", through the canonical protocol
+# laplace is the base; a Student-t regression on laplace's own normal scores
+# z_t = Phi^{-1}(F_lap(y_t)) (the parade z) forecasts z, and the posterior
+# mixture predictive in z is inverted through laplace's predictive, level by
+# level. The July frontier scored this construction with a single frozen
+# pre-test ADVI fit and reported only a mean LL; here it emits a Dist per step
+# and refits on the PyMC arm's cadence (PYMC_REFIT steps, PYMC_TRAIN rows).
+def lap_pymc_sandwich(ch, h=1):
+    try:
+        import numpy as _np
+        from scipy import stats as _stats
+        import pymc_forecast_sandwich_study as _st
+        from tabfm_wide_study import lag_rows as _lag_rows
+    except Exception:                                  # noqa: BLE001
+        return None
+    ch = _np.asarray(ch, float)
+    n = len(ch)
+    lo = n - TEST
+    if lo - PYMC_TRAIN - h - _st.LAGS + 1 < h:
+        return None
+    # laplace's h-step predictive for every position, so z exists over the whole history
+    f = laplace(h); st = None; queue = []; lap = [None] * n
+    for i, yv in enumerate(ch):
+        if len(queue) >= h:
+            lap[i] = queue[-h][h - 1]
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    z = _np.zeros(n)
+    for i in range(h, n):
+        z[i] = _nppf(min(max(lap[i].cdf(ch[i]), 1e-6), 1 - 1e-6))
+    out, params = [], None
+    for k, j in enumerate(range(lo, n)):
+        if k % PYMC_REFIT == 0:
+            Xtr, ytr = _lag_rows(z, j - PYMC_TRAIN, j, _st.LAGS, h)
+            try:
+                params = _st._fit_zreg(ytr, Xtr, seed=abs(hash((int(j), n, "lap@pymc"))) % 10**6)
+            except Exception:                          # noqa: BLE001
+                return None
+        a, b, sg, nu = params
+        x = z[j - h - _st.LAGS + 1:j - h + 1]
+        mu = a + b @ x                                   # one location per posterior draw
+        nu = _np.clip(nu, 2.1, 200.0)
+        # mixture-of-t CDF on a grid in z, inverted by interpolation at the standard levels
+        glo = float(_np.min(mu - 25.0 * sg)); ghi = float(_np.max(mu + 25.0 * sg))
+        grid = _np.linspace(glo, ghi, 801)
+        cdf = _stats.t.cdf(grid[:, None], df=nu[None, :], loc=mu[None, :], scale=sg[None, :]).mean(axis=1)
+        cdf = _np.maximum.accumulate(cdf)
+        zq = _np.interp(_PITLEVELS, cdf, grid)
+        G = lap[j]
+        yq = [G.quantile(min(max(_ncdf(float(v)), 1e-6), 1 - 1e-6)) for v in zq]
+        out.append(fs.quantile_dist(_PITLEVELS, list(_np.maximum.accumulate(yq))))
+    return out
+
+
 def make_registry(h=1):
     return {
         # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
@@ -1063,6 +1119,7 @@ def make_registry(h=1):
         "flowstate":   lambda ch: flowstate_dists(ch, h),
         "TabPFN":      lambda ch: tabpfn_dists(ch, h),
         "PyMC":        lambda ch: pymc_dists(ch, h),
+        "laplace@PyMC": lambda ch: lap_pymc_sandwich(ch, h),   # laplace base, PyMC on its normal scores
         "NPTS":        lambda ch: npts_dists(ch, h),
         "Chronos":     lambda ch: fs.chronos_dists(ch, h),
         "TimesFM":     lambda ch: fs.timesfm_dists(ch, h),
@@ -1095,10 +1152,12 @@ def make_registry(h=1):
         # sandwiches on the fair bases (native 21 levels / generous reconstruction)
         **_fair_sandwiches(h),
         "Chronos&lap": portfolio_sandwich(fs.chronos_dists, h=h),
-        "PyMC+lap":    _sandwich(pymc_dists, h),
-        "PyMC~lap":    _resid_sandwich(pymc_dists, h),
-        "PyMC@lap":    pit_sandwich(pymc_dists, h),
-        "PyMC&lap":    portfolio_sandwich(pymc_dists, h=h),
+        # memoized like the fair bases: one ADVI fit sequence serves +/& (scored
+        # window) and one serves ~/@ (warm-up-extended window) per series
+        "PyMC+lap":    _sandwich(_memoized(pymc_dists, "PyMC"), h),
+        "PyMC~lap":    _resid_sandwich(_memoized(pymc_dists, "PyMC"), h),
+        "PyMC@lap":    pit_sandwich(_memoized(pymc_dists, "PyMC"), h),
+        "PyMC&lap":    portfolio_sandwich(_memoized(pymc_dists, "PyMC"), h=h),
         "NPTS&lap":    portfolio_sandwich(npts_dists, h=h),
     }
 

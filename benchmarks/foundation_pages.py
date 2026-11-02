@@ -511,50 +511,74 @@ def standalone_tables(model, vs, cov):
             + f'<p style="font-size:.9rem;color:var(--muted)">{_COLS_NOTE}</p>')
 
 
+SANDWICH_ARMS = [
+    ("+lap", "vincentize with Laplace"),
+    ("~lap", "model location, Laplace residual scale"),
+    ("@lap", "Laplace on the model's normal scores"),
+    ("&amp;lap", "online portfolio with Laplace"),
+]
+
+
+def _wdl_cell(r):
+    if not r:
+        return '<td class="num">&ndash;</td><td class="num">&ndash;</td>'
+    n = int(r["n_series"]) or 1
+    return (f'<td class="num">{float(r["med_dLL"]):+.3f}</td>'
+            f'<td class="num">{fmt_pct(int(r["loss"]) / n)}</td>')
+
+
 def combined_section(model, vs, cov):
-    if not model["arms"]:
-        return (f'<h2>Collaborative use</h2>\n<p>The recalibration (<code>@lap</code>) '
-                f'and portfolio (<code>&amp;lap</code>) arms were built for the three '
-                f'strongest models first, so {model["name"]} is scored standalone here. '
-                f'The sidecar wraps any per-step predictive, so these arms can be added '
+    base = model["key"]
+    have = any(vs.get((k, base + a.replace("&amp;", "&"))) for k, _s, _l in STRATA for a, _ in SANDWICH_ARMS)
+    if not have:
+        return (f'<h2>Collaborative use</h2>\n<p>The sandwich arms (<code>+lap</code>, '
+                f'<code>~lap</code>, <code>@lap</code>, <code>&amp;lap</code>) have not been run on '
+                f'{model["name"]}. The sidecar wraps any per-step predictive, so they can be added '
                 f'without retraining. See the <a href="/sidecar.html">sidecar pattern</a>.</p>')
-    base = model.get("tight_key", model["key"])
-    rows = []
+    rows, crows = [], []
     for k, _short, long in STRATA:
         raw = vs.get((k, base))
-        amp = vs.get((k, base + "&lap"))
-        cr = cov.get((k, base))
-        ca = cov.get((k, base + "@lap"))
-        if not (raw and amp):
+        if not raw:
             continue
-        rl = int(raw["loss"]) / (int(raw["n_series"]) or 1)
-        al = int(amp["loss"]) / (int(amp["n_series"]) or 1)
-        rc = f'{float(cr["cov_central90"]):.2f}' if cr else "&ndash;"
-        ac = f'{float(ca["cov_central90"]):.2f}' if ca else "&ndash;"
-        rows.append(f'<tr><td>{long}</td><td class="num">{rc}</td>'
-                    f'<td class="num">{ac}</td><td class="num">{fmt_pct(rl)}</td>'
-                    f'<td class="num">{fmt_pct(al)}</td></tr>')
+        cells = _wdl_cell(raw)
+        for a, _ in SANDWICH_ARMS:
+            cells += _wdl_cell(vs.get((k, base + a.replace("&amp;", "&"))))
+        rows.append(f'<tr><td>{long}</td>{cells}</tr>')
+        cr, ca, cp, cl = (cov.get((k, base)), cov.get((k, base + "@lap")),
+                          cov.get((k, base + "&lap")), cov.get((k, "laplace")))
+        f = lambda c: f'{float(c["cov_central90"]):.3f}' if c else "&ndash;"
+        crows.append(f'<tr><td>{long}</td><td class="num">{f(cr)}</td><td class="num">{f(ca)}</td>'
+                     f'<td class="num">{f(cp)}</td><td class="num">{f(cl)}</td></tr>')
+    heads = "".join(f'<th class="num" colspan="2">{a}</th>' for a, _ in SANDWICH_ARMS)
+    sub = "".join('<th class="num">&Delta;LL</th><th class="num">loss</th>' for _ in range(1 + len(SANDWICH_ARMS)))
+    legend = "".join(f'<li><code>{a}</code>: {d}.</li>' for a, d in SANDWICH_ARMS)
     return f"""<h2>Collaborative use</h2>
-    <p>Two collaborative arms wrap {model['name']}'s own predictive, as the tight nine-decile
-      reconstruction (<code>{base}</code>); they were built before the generous
-      reconstruction was scored. <code>@lap</code>
-      lets Laplace forecast the normal scores of the reconstructed density, which restores
-      its coverage; <code>&amp;lap</code>
-      holds Laplace and that wrap in a long-only online portfolio, so the blend is never
-      much worse than Laplace alone. The recalibration pulls the reconstruction's coverage
-      back toward the 0.90 target, and the portfolio collapses the loss rate against Laplace.
-      The raw column is the reconstruction's coverage (0.81 for a calibrated source, see
-      above), so part of what <code>@lap</code> repairs is the reconstruction.</p>
+    <p>Four sandwich arms wrap {model['name']}'s own predictive on this same base
+      (<code>{base}</code>), each paired with the standalone run on identical series and windows.
+      Each cell gives the median per-series &Delta; log-likelihood against Laplace in nats
+      (positive means better than Laplace) and the fraction of series where the arm loses to
+      Laplace by the <a href="/draws.html">Diebold&ndash;Mariano test</a>.</p>
+    <ul>
+      {legend}
+    </ul>
     <table>
-      <thead><tr><th>stratum</th><th class="num">reconstructed cov</th><th class="num">@lap cov</th>
-      <th class="num">raw loss</th><th class="num">&amp;lap loss</th></tr></thead>
+      <thead><tr><th rowspan="2">stratum</th><th class="num" colspan="2">standalone</th>{heads}</tr>
+      <tr>{sub}</tr></thead>
       <tbody>
       {chr(10).join(rows)}
       </tbody>
     </table>
-    <p style="font-size:.9rem;color:var(--muted)">Central-90% coverage (0.90 target) and
-      the fraction of series where the arm loses to Laplace by a
-      <a href="/draws.html">Diebold&ndash;Mariano test</a>.</p>"""
+    <p>Central-90% coverage (0.90 target) of the standalone model, its <code>@lap</code> and
+      <code>&amp;lap</code> wraps, and Laplace on the same windows:</p>
+    <table>
+      <thead><tr><th>stratum</th><th class="num">standalone</th><th class="num">@lap</th>
+      <th class="num">&amp;lap</th><th class="num">laplace</th></tr></thead>
+      <tbody>
+      {chr(10).join(crows)}
+      </tbody>
+    </table>
+    <p style="font-size:.9rem;color:var(--muted)">The <a href="/sidecar.html#fairbase">sidecar
+      page</a> reads these arms across all six fair bases.</p>"""
 
 
 def variants_section(model, vs, cov):
@@ -739,6 +763,134 @@ def build_page(slug, model, vs, cov, radar):
 """
 
 
+FAIR_BASES = ["Timestral-209M(q21)", "t0-gamma(q21)", "TimesFM3(wide)", "TimesFM(wide)",
+              "TiRex(wide)", "Chronos(wide)", "PyMC"]
+FAIR_SHORT = {"Timestral-209M(q21)": "Timestral", "t0-gamma(q21)": "t0-gamma", "TimesFM3(wide)": "TimesFM3",
+              "TimesFM(wide)": "TimesFM", "TiRex(wide)": "TiRex", "Chronos(wide)": "Chronos",
+              "PyMC": "PyMC-forecast"}
+SIDECAR = os.path.join(os.path.dirname(BENCH), "docs", "sidecar.html")
+
+
+def sidecar_fairbase_section(vs, cov):
+    """The cross-model reading of the sandwich arms on the fair bases, rendered
+    from the summary CSVs into docs/sidecar.html between the fairbase markers."""
+    arms = ["", "+lap", "~lap", "@lap", "&lap"]
+    # table 1: median dLL by arm, two economic strata
+    t1 = []
+    for k, _s, long in STRATA:
+        if k not in ("weekly:econ", "monthly:econ"):
+            continue
+        for b in FAIR_BASES:
+            if (k, b) not in vs:
+                continue
+            cells = []
+            for a in arms:
+                r = vs.get((k, b + a))
+                cells.append(f'<td class="num">{float(r["med_dLL"]):+.3f} <span style="color:var(--muted)">({int(r["n_series"]):,})</span></td>'
+                             if r else '<td class="num">&ndash;</td>')
+            t1.append(f'<tr><td>{long}</td><td>{FAIR_SHORT[b]}</td>{"".join(cells)}</tr>')
+    # table 2: loss rate standalone -> &lap, every stratum x base
+    t2 = []
+    for k, _s, long in STRATA:
+        cells = []
+        for b in FAIR_BASES:
+            r, q = vs.get((k, b)), vs.get((k, b + "&lap"))
+            if r and q:
+                cells.append(f'<td class="num">{fmt_pct(int(r["loss"]) / (int(r["n_series"]) or 1))} &rarr; '
+                             f'{fmt_pct(int(q["loss"]) / (int(q["n_series"]) or 1))}</td>')
+            else:
+                cells.append('<td class="num">&ndash;</td>')
+        t2.append(f'<tr><td>{long}</td>{"".join(cells)}</tr>')
+    # computed ranges for the prose
+    def rng(suffix):
+        v = [float(c["cov_central90"]) for (k, m), c in cov.items()
+             if any(m == b + suffix for b in FAIR_BASES) and k in dict((x[0], 1) for x in STRATA)]
+        return (min(v), max(v)) if v else (float("nan"), float("nan"))
+    cs, ca, cp = rng(""), rng("@lap"), rng("&lap")
+    econ = [k for k, _s, _l in STRATA if k.endswith(":econ") and k != "m4-hourly:econ"]
+    longname = {k: short for k, short, _l in STRATA}
+    def dmed(suffix, strata=econ):
+        d = {(k, b): float(vs[(k, b + suffix)]["med_dLL"]) - float(vs[(k, b)]["med_dLL"])
+             for k in strata for b in FAIR_BASES if (k, b + suffix) in vs and (k, b) in vs}
+        lo, hi = min(d, key=d.get), max(d, key=d.get)
+        return d[lo], d[hi], lo, hi, sum(1 for v in d.values() if v < 0), len(d)
+    dr, dp = dmed("~lap"), dmed("@lap")
+    da = dmed("&lap", [k for k, _s, _l in STRATA])
+    def lossrate(k, m):
+        return int(vs[(k, m)]["loss"]) / (int(vs[(k, m)]["n_series"]) or 1)
+    worse = [(k, b) for k, _s, _l in STRATA for b in FAIR_BASES
+             if (k, b + "&lap") in vs and (k, b) in vs and lossrate(k, b + "&lap") > lossrate(k, b)]
+    worse_amp = len(worse)
+    worse_txt = "; ".join(f"{FAIR_SHORT[b]} on {longname[k]}" for k, b in worse) or "none"
+    cells_total = sum(1 for k, _s, _l in STRATA for b in FAIR_BASES if (k, b + "&lap") in vs and (k, b) in vs)
+    heads = "".join(f"<th>{FAIR_SHORT[b]}</th>" for b in FAIR_BASES)
+    # the reverse sandwich: laplace as the base, PyMC on laplace's normal scores
+    rev = []
+    for k, short, _l in STRATA:
+        r = vs.get((k, "laplace@PyMC"))
+        if r:
+            rev.append(f"{short} {float(r['med_dLL']):+.3f} ({r['win']}W/{r['draw']}D/{r['loss']}L of {r['n_series']})")
+    rev_txt = "; ".join(rev)
+    return f"""<!-- fairbase:begin (generated by benchmarks/foundation_pages.py; do not edit by hand) -->
+    <h2>On the fair bases</h2>
+    <p>The arms above were built on the tight reconstruction, and part of what they repaired was the
+      reconstruction. The same four sandwiches have now been run on the fair bases: Timestral-209M and
+      t0-gamma on their native 21 levels, and TimesFM 3.0, TimesFM 2.5, TiRex and Chronos through the
+      generous reconstruction, plus the PyMC-forecast challenger (a Student-t regression on lagged
+      changes, fit by ADVI) on the monthly stratum. Each arm is paired with its standalone run on
+      identical series and windows; <code>~lap</code> and <code>@lap</code> need a longer warm-up
+      window, so their series counts are smaller. Median per-series &Delta; log-likelihood against
+      Laplace, in nats, positive meaning better than Laplace, with the number of series:</p>
+    <table>
+      <thead><tr><th>stratum</th><th>base</th><th class="num">standalone</th><th class="num">+lap</th>
+      <th class="num">~lap</th><th class="num">@lap</th><th class="num">&amp;lap</th></tr></thead>
+      <tbody>
+      {chr(10).join(t1)}
+      </tbody>
+    </table>
+    <p>With no reconstruction defect to repair, the wraps mostly cost accuracy. Replacing the model's
+      scale with Laplace's residual scale (<code>~lap</code>) lowers the median in {dr[4]} of {dr[5]}
+      economic cells, by {dr[0]:+.2f} ({FAIR_SHORT[dr[2][1]]}, {longname[dr[2][0]]}) to
+      {dr[1]:+.2f} nats ({FAIR_SHORT[dr[3][1]]}, {longname[dr[3][0]]}). Forecasting the model's normal
+      scores (<code>@lap</code>) lowers it in {dp[4]} of {dp[5]}, from {dp[0]:+.2f}
+      ({FAIR_SHORT[dp[2][1]]}, {longname[dp[2][0]]}) to {dp[1]:+.2f}
+      ({FAIR_SHORT[dp[3][1]]}, {longname[dp[3][0]]}): it still helps the weakest base and costs the
+      strongest. The standalone fair bases cover {cs[0]:.2f} to {cs[1]:.2f} at the 90% level;
+      <code>@lap</code> pushes that to {ca[0]:.2f} to {ca[1]:.2f}, past the target, and
+      <code>&amp;lap</code> sits at {cp[0]:.2f} to {cp[1]:.2f}. Loss rate against Laplace,
+      standalone &rarr; <code>&amp;lap</code>:</p>
+    <table>
+      <thead><tr><th>stratum</th>{heads}</tr></thead>
+      <tbody>
+      {chr(10).join(t2)}
+      </tbody>
+    </table>
+    <p>The portfolio lowers the loss rate in {cells_total - worse_amp} of {cells_total} base-stratum
+      cells; the exceptions are {worse_txt}. Its median moves by {da[0]:+.2f} ({FAIR_SHORT[da[2][1]]}, {longname[da[2][0]]}) to
+      {da[1]:+.2f} nats ({FAIR_SHORT[da[3][1]]}, {longname[da[3][0]]}) against the standalone base:
+      a strong base gives up part of its lead for the lower loss rate, a weak base is pulled most of
+      the way back to Laplace. The reading for the strongest base is on
+      <a href="/foundation/timestral.html">Timestral's page</a>: no sandwich improves it at the
+      median, and the portfolio is the safe way to run it. Each model's page carries the full
+      per-stratum table with loss rates and coverage.</p>
+    <p>The reverse sandwich was also run: laplace as the base, with the PyMC regression forecasting
+      laplace's own normal scores and its posterior mixture inverted through laplace's predictive.
+      An earlier version of the home-page figure showed this construction edging laplace, from a
+      July study with a frozen pre-test fit and a typed speed table. Through the canonical protocol,
+      paired against laplace on the first 500 series of each economic stratum, the median is below
+      zero on every stratum: {rev_txt}. That claim is withdrawn.</p>
+    <!-- fairbase:end -->"""
+
+
+def write_sidecar(vs, cov):
+    html = open(SIDECAR).read()
+    a, b = "<!-- fairbase:begin", "<!-- fairbase:end -->"
+    i, j = html.index(a), html.index(b) + len(b)
+    html = html[:i] + sidecar_fairbase_section(vs, cov) + html[j:]
+    open(SIDECAR, "w").write(html)
+    print("[page] sidecar.html fair-base section")
+
+
 def main():
     os.makedirs(FDIR, exist_ok=True)
     vs, cov = load_vs(), load_cov()
@@ -750,6 +902,7 @@ def main():
         html = build_page(slug, model, vs, cov, radar)
         open(os.path.join(FDIR, f"{slug}.html"), "w").write(html)
         print(f"[page] foundation/{slug}.html")
+    write_sidecar(vs, cov)
     sweep_nav()
 
 
