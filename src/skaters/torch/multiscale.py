@@ -32,8 +32,8 @@ def _clamp_lp(lp):
 
 
 def _prune(d, max_components):
-    """Prune through the reference merge (no gradient along the merge path)."""
-    return TorchDist.from_reference(d.to_reference().prune(max_components))
+    """``TorchDist.prune``: reference merge path, tensor moments (gradient kept)."""
+    return d.prune(max_components)
 
 _LOGPDF_FLOOR = -20.0
 
@@ -46,6 +46,8 @@ class Multiscale(nn.Module):
         self.forget = nn.Parameter(torch.as_tensor(float(forget), dtype=DTYPE))
         self.max_components = max_components
         self.subs = {s: base(max(1, math.ceil(k / s))) for s in scales}
+        # the per-scale models, registered (a dict attribute is invisible to nn.Module)
+        self.sub_modules = nn.ModuleDict({str(s): m for s, m in self.subs.items() if isinstance(m, nn.Module)})
 
     def forward(self, y, state=None):
         y = _t(y)

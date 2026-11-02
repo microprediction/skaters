@@ -35,6 +35,17 @@ def _probe_tor(d):
             float(d.quantile(Q_LO)), float(d.quantile(Q_HI)), float(d.crps(PROBE))]
 
 
+def _diff(x, z):
+    """|x - z| with non-finite values compared exactly (a NaN on one side fails)."""
+    if math.isnan(x) or math.isnan(z):
+        assert math.isnan(x) and math.isnan(z), (x, z)
+        return 0.0
+    if math.isinf(x) or math.isinf(z):
+        assert x == z, (x, z)
+        return 0.0
+    return abs(x - z)
+
+
 def _worst(ref_f, tor_f, series, k):
     s1 = s2 = None
     worst = 0.0
@@ -46,8 +57,7 @@ def _worst(ref_f, tor_f, series, k):
             for a, b in zip(d1, d2):
                 assert len(a.components) == len(b)
                 for x, z in zip(_probe_ref(a), _probe_tor(b)):
-                    if math.isfinite(x) or math.isfinite(z):
-                        worst = max(worst, abs(x - z))
+                    worst = max(worst, _diff(x, z))
     return worst
 
 

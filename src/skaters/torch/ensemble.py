@@ -51,6 +51,7 @@ class PrecisionWeightedEnsemble(nn.Module):
         super().__init__()
         assert len(skaters) > 0
         self.skaters = list(skaters)
+        self.skater_modules = nn.ModuleList([s for s in skaters if isinstance(s, nn.Module)])
         self.n = len(skaters)
         self.k = k
         self.floor = nn.Parameter(torch.as_tensor(float(floor), dtype=DTYPE))

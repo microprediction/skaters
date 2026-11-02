@@ -100,12 +100,16 @@
     <h2>Python, differentiable (<code>skaters.torch</code>)</h2>
     <p><code>pip install skaters[torch]</code></p>
     <p>
-      The whole library on <code>torch</code> tensors: transforms, leaves,
+      The library on <code>torch</code> tensors: transforms, leaves,
       ensembles, the lattice projection, the GPD tail splice, the parade,
       search, <code>laplace</code> and <code>dantzig</code>, in the same
-      arithmetic order as the reference, with every continuous hyperparameter
-      an <code>nn.Parameter</code> and gradients flowing from a log score at
-      the output through every stage. It is the fifth implementation held to
+      arithmetic order as the reference. Not ported: <code>gaussianize</code>,
+      the covariance estimators and the <code>exact=True</code> pushforward.
+      The continuous hyperparameters of transforms, leaves, ensembles and the
+      trunk are <code>nn.Parameter</code>s reachable from
+      <code>laplace(k).parameters()</code>; gradients flow from a log score at
+      the output through every stage, with the weight recursions truncated at
+      one step by default. It is the fifth implementation held to
       the parity vectors: <code>parity/check_torch.py</code> runs every scenario
       the other ports pass, <code>laplace</code> at k=1 and k=3 included, at the
       same 1e-6 gate, and each module is checked against the reference at 1e-9.

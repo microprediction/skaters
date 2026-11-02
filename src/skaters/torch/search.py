@@ -73,48 +73,8 @@ TRANSFORMS = [
 
 
 def _prune_dist(d: TorchDist, max_components: int) -> TorchDist:
-    """``Dist.prune`` on tensors: closest-pair moment-matching merges, pair
-    selection on floats exactly as the reference (sorted by (mean, std,
-    weight); first pair within ``1e-9 * span`` of the minimum distance)."""
-    max_components = max(1, max_components)
-    comps = list(zip(d.w, d.m, d.s))
-    if len(comps) <= max_components:
-        return d
-    def _f(x):
-        return float(x.detach()) if hasattr(x, "detach") else float(x)
-    comps.sort(key=lambda c: (_f(c[1]), _f(c[2]), _f(c[0])))
-    scale = (_f(comps[-1][1]) - _f(comps[0][1])) + 1e-12
-    while len(comps) > max_components:
-        best_dist = float("inf")
-        for i in range(len(comps)):
-            for j in range(i + 1, len(comps)):
-                dd = abs(_f(comps[i][1]) - _f(comps[j][1]))
-                if dd < best_dist:
-                    best_dist = dd
-        thresh = best_dist + 1e-9 * scale
-        best_i = best_j = None
-        for i in range(len(comps)):
-            for j in range(i + 1, len(comps)):
-                if abs(_f(comps[i][1]) - _f(comps[j][1])) <= thresh:
-                    best_i, best_j = i, j
-                    break
-            if best_i is not None:
-                break
-        if best_i is None:
-            best_i, best_j = 0, 1
-        wi, mi, si = comps[best_i]
-        wj, mj, sj = comps[best_j]
-        w_new = wi + wj
-        if bool(w_new < 1e-300):
-            m_new = 0.5 * (mi + mj)
-            s_new = torch.clamp(torch.maximum(si, sj), min=1e-12)
-        else:
-            m_new = (wi * mi + wj * mj) / w_new
-            v_new = (wi * (si * si + (mi - m_new) ** 2) + wj * (sj * sj + (mj - m_new) ** 2)) / w_new
-            s_new = torch.sqrt(torch.clamp(v_new, min=0.0))
-        comps[best_i] = (w_new, m_new, s_new)
-        comps.pop(best_j)
-    return TorchDist([c[0] for c in comps], [c[1] for c in comps], [c[2] for c in comps])
+    """``TorchDist.prune``: reference merge path, tensor moments."""
+    return d.prune(max_components)
 
 
 def search(
@@ -129,6 +89,7 @@ def search(
     prune_threshold: float = -50.0,
     max_components: int = 20,
     cost_budget: float = float("inf"),
+    detach_carry: bool = True,
 ):
     """Adaptive-search skater; same arguments and defaults as the reference."""
     _pd_func = period_detector()
@@ -165,7 +126,10 @@ def search(
                             lp = torch.as_tensor(20.0, dtype=DTYPE)
                         elif not bool(lp >= -20.0):
                             lp = torch.as_tensor(-20.0, dtype=DTYPE)
-                        entry["log_w"][h] = (entry["log_w"][h] + learning_rate * lp
+                        carried = entry["log_w"][h]
+                        if detach_carry and hasattr(carried, "detach"):
+                            carried = carried.detach()     # one-step truncated backprop
+                        entry["log_w"][h] = (carried + learning_rate * lp
                                              - complexity_penalty * entry["depth"])
 
         scores, state["pd_state"] = _pd_func(y, state["pd_state"])
@@ -202,6 +166,16 @@ def search(
     return _search
 
 
+class _SharedModules(list):
+    """The transform modules a pool entry's closure reads. A deepcopy of the
+    state (the restore leg) must keep pointing at the same modules, or an
+    optimizer over the copied list would update parameters the forecaster
+    never reads; parameters are the model's, not the state's."""
+
+    def __deepcopy__(self, memo):
+        return self
+
+
 def _make_entry(skater_fn, depth: int, recipe: list, k: int, cost: float = 0.0, mods=None) -> dict:
     return {
         "f": skater_fn,
@@ -214,7 +188,7 @@ def _make_entry(skater_fn, depth: int, recipe: list, k: int, cost: float = 0.0, 
         "log_w": [_zero() for _ in range(k)],
         "queues": [deque() for _ in range(k)],
         "dists": None,
-        "mods": mods or [],      # the chain's transform modules, outer first (parameters)
+        "mods": _SharedModules(mods or []),   # the chain's transform modules, outer first
     }
 
 

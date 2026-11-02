@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from functools import partial
 
+import torch.nn as nn
+
 from skaters.leaf import leaf as reference_leaf, crps_leaf
 from skaters.torch.conjugate import conjugate, reference_skater
 from skaters.torch.transform import from_reference
@@ -101,5 +103,5 @@ def laplace_single_scale(k: int = 1, scale_alpha: float = 0.03):
     trunk = TerminalLeafEnsemble(skaters, k=k, leaf_fn=partial(crps_leaf, scale_alpha=scale_alpha),
                                  learning_rate=0.8, complexity_penalty=0.005, depths=depths,
                                  max_components=20, forget=0.99)
-    trunk.candidate_modules = modules
+    trunk.candidate_modules = nn.ModuleList(nn.ModuleList(ms) for ms in modules)
     return trunk

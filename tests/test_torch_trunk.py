@@ -28,6 +28,17 @@ def test_pool_spec_matches_the_reference_pool_shape():
         assert all(spec[i][0][0][0] == "yeo_johnson" for i in groups["coordinate"])
 
 
+def _diff(x, z):
+    """|x - z| with non-finite values compared exactly (a NaN on one side fails)."""
+    if math.isnan(x) or math.isnan(z):
+        assert math.isnan(x) and math.isnan(z), (x, z)
+        return 0.0
+    if math.isinf(x) or math.isinf(z):
+        assert x == z, (x, z)
+        return 0.0
+    return abs(x - z)
+
+
 def _worst(ref_f, tor_f, series, k):
     s1 = s2 = None
     worst = 0.0
@@ -40,7 +51,7 @@ def _worst(ref_f, tor_f, series, k):
                 bc = b.to_reference().components
                 assert len(a.components) == len(bc), (len(a.components), len(bc))
                 for (w1, m1, v1), (w2, m2, v2) in zip(a.components, bc):
-                    worst = max(worst, abs(w1 - w2), abs(m1 - m2), abs(v1 - v2))
+                    worst = max(worst, _diff(w1, w2), _diff(m1, m2), _diff(v1, v2))
     return worst
 
 

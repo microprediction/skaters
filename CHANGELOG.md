@@ -3,13 +3,24 @@
 ## Unreleased
 
 - New optional subpackage `skaters.torch` (`pip install skaters[torch]`): the
-  whole library on `torch` tensors. Transforms, leaves (`leaf`, `crps_leaf`,
+  library on `torch` tensors. Transforms, leaves (`leaf`, `crps_leaf`,
   `scale_mixture_leaf`, `garch_leaf`, ...), the ensembles, `multiscale`, the
   lattice projection, the GPD tail splice (`TorchSplicedDist`), the parade,
   the periodicity detector, `search`/`dantzig`, `spec`, and `laplace`, each
-  with the reference's arithmetic in the reference's order, every continuous
-  hyperparameter an `nn.Parameter`, and gradients flowing from a log score at
-  the output through every stage. Held to the standard parity vectors by
+  with the reference's arithmetic in the reference's order, the continuous
+  hyperparameters of transforms, leaves, ensembles and the trunk as
+  `nn.Parameter`s reachable from `laplace(k).parameters()` (sub-models and
+  the candidate chains' modules are registered as `ModuleList`/`ModuleDict`),
+  and gradients flowing from a log score at the output through every stage.
+  Pruning runs on tensors (`TorchDist.prune`: the reference's merge path on
+  detached floats, merged moments as tensors), so every horizon of `laplace(k)`
+  keeps its gradient past the 20-component cap. The weight recursions of the
+  trunk, the Bayesian ensemble and `search` detach the carried log weight by
+  default (`detach_carry=True`, one-step truncated backprop), so a streaming
+  call without `torch.no_grad()` keeps a bounded graph. A deepcopy of a
+  `search` state keeps pointing at the live transform modules (parameters are
+  the model's, not the state's). The lattice projection's options and search's
+  learning rates remain plain floats. Held to the standard parity vectors by
   `parity/check_torch.py` (every scenario, 200,900 values at 1e-6, including
   `laplace` at k=1 and k=3, the repeat-series lattice and the missing-observation
   rules) and module by module at 1e-9 in `tests/test_torch_*.py`.

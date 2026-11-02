@@ -36,7 +36,8 @@ def laplace_single_scale(k, objective="crps", sticky=True, leaf=None, scale_alph
         skaters, k=k,
         leaf_fn=leaf if leaf is not None else _objective_leaf(objective, scale_alpha),
         learning_rate=0.8, complexity_penalty=0.005, depths=depths, max_components=20, forget=0.99)
-    f.candidate_modules = modules
+    import torch.nn as nn
+    f.candidate_modules = nn.ModuleList(nn.ModuleList(ms) for ms in modules)
     if sticky:
         from skaters.torch.sticky import sticky as _project
         f = _project(f, k=k)

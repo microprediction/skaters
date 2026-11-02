@@ -32,8 +32,8 @@ def _clamp_lp(lp):
 
 
 def _prune(d, max_components):
-    """Prune through the reference merge (no gradient along the merge path)."""
-    return TorchDist.from_reference(d.to_reference().prune(max_components))
+    """``TorchDist.prune``: reference merge path, tensor moments (gradient kept)."""
+    return d.prune(max_components)
 
 
 class BayesianEnsemble(nn.Module):
@@ -45,9 +45,11 @@ class BayesianEnsemble(nn.Module):
         assert 0 < learning_rate <= 1
         assert complexity_penalty >= 0
         self.skaters = list(skaters)
+        self.skater_modules = nn.ModuleList([s for s in skaters if isinstance(s, nn.Module)])
         self.n, self.k = n, k
         self.depths = list(depths) if depths is not None else [0] * n
         self.max_components = max_components
+        self.detach_carry = True        # truncate backprop through the weight recursion at one step
         self.learning_rate = nn.Parameter(torch.as_tensor(float(learning_rate), dtype=DTYPE))
         self.complexity_penalty = nn.Parameter(torch.as_tensor(float(complexity_penalty), dtype=DTYPE))
         prior = prior_log_weights if prior_log_weights is not None else [0.0] * n
@@ -74,7 +76,13 @@ class BayesianEnsemble(nn.Module):
                 q.append(all_dists[i][h])
                 if len(q) > h + 1:
                     lp = _clamp_lp(q.popleft().logpdf(y))
-                    state["log_w"][i][h] = (state["log_w"][i][h]
+                    carried = _t(state["log_w"][i][h])
+                    if self.detach_carry:
+                        # truncate the recursion's graph at one step, but keep the prior's
+                        # exact gradient (d log_w / d prior = 1) through a value-zero term
+                        pr = self.prior_log_weights[i]
+                        carried = carried.detach() + (pr - pr.detach())
+                    state["log_w"][i][h] = (carried
                                             + self.learning_rate * lp
                                             - self.complexity_penalty * self.depths[i])
         combined = []

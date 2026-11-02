@@ -392,11 +392,17 @@ def my_transform():
 
 ## skaters.torch: the differentiable port
 
-`pip install skaters[torch]` adds `skaters.torch`: the whole library on `torch`
+`pip install skaters[torch]` adds `skaters.torch`: the library on `torch`
 tensors (transforms, leaves, ensembles, the lattice projection, the GPD tail
 splice, the parade, search, `laplace` and `dantzig`), same arithmetic in the same
-order, with every continuous hyperparameter an `nn.Parameter` and gradients
-flowing from a log score at the output back through every stage.
+order. Not ported: `gaussianize`, the covariance estimators in `cov/`, and the
+`exact=True` pushforward. The continuous hyperparameters of the transforms,
+leaves, ensembles and the trunk are `nn.Parameter`s reachable from
+`laplace(k).parameters()`; the lattice projection's options and search's
+learning rates are plain floats. Gradients flow from a log score at the
+output back through every stage, with the weight recursions truncated at
+one step by default (`detach_carry`), so a streaming call without
+`torch.no_grad()` keeps a bounded graph.
 
 ```python
 from skaters.leaf import leaf

@@ -54,6 +54,11 @@ class TerminalLeafEnsemble(nn.Module):
         n = len(skaters)
         assert n > 0
         self.skaters = list(skaters)
+        # candidates are closures (conjugate chains); their transform modules
+        # are registered separately so parameters()/state_dict()/.to() see them
+        self.skater_modules = nn.ModuleList([s for s in skaters if isinstance(s, nn.Module)])
+        self.candidate_modules = nn.ModuleList()
+        self.detach_carry = True        # truncate backprop through the weight recursion at one step
         self.k = k
         self.leaf_fn = leaf_fn
         self.n = n
@@ -64,8 +69,10 @@ class TerminalLeafEnsemble(nn.Module):
         self.forget = nn.Parameter(torch.as_tensor(float(forget), dtype=DTYPE))
         prior = prior_log_weights if prior_log_weights is not None else [0.0] * n
         self.prior_log_weights = nn.Parameter(torch.as_tensor([float(p) for p in prior], dtype=DTYPE))
-        # one reference terminal leaf per horizon; closures live here, not in state
+        # one terminal leaf per horizon; closures live here, not in state.
+        # A torch leaf (an nn.Module) is registered; a reference leaf is not.
         self.tleafs = [leaf_fn(k=1) for _ in range(k)]
+        self.tleaf_modules = nn.ModuleList([t for t in self.tleafs if isinstance(t, nn.Module)])
 
     def forward(self, y, state=None):
         y = _t(y)
@@ -75,6 +82,7 @@ class TerminalLeafEnsemble(nn.Module):
                 "sub": [None] * n,
                 "qdist": [deque() for _ in range(n)],
                 "log_w": [self.prior_log_weights[i] for i in range(n)],
+                "decay": torch.ones((), dtype=DTYPE),      # forget^t, the prior's exact weight
                 "leaf_state": [None] * k,
                 "leaf_pred": [None] * k,
                 "mean_q": [deque() for _ in range(k)],
@@ -86,13 +94,24 @@ class TerminalLeafEnsemble(nn.Module):
 
         # weight update from the resolved one-step predictive
         log_w = list(state["log_w"])
+        decay = state.get("decay", torch.ones((), dtype=DTYPE))
+        updated = False
         for i in range(n):
             q = state["qdist"][i]
             if q:
                 lp = _clamp_lp(q.popleft().logpdf(y))
-                log_w[i] = (self.forget * log_w[i] + self.learning_rate * lp
+                carried = _t(log_w[i])
+                if self.detach_carry:
+                    # truncate the recursion's graph at one step, but keep the prior's
+                    # exact gradient (d log_w_t / d prior = forget^t) through a value-zero term
+                    pr = decay * self.prior_log_weights[i]
+                    carried = carried.detach() + (pr - pr.detach())
+                log_w[i] = (self.forget * carried + self.learning_rate * lp
                             - self.complexity_penalty * self.depths[i])
+                updated = True
             q.append(all_dists[i][0])
+        if updated:
+            state["decay"] = (self.forget * decay).detach()
         state["log_w"] = log_w
         lw = torch.stack([_t(v).reshape(()) for v in log_w])
         max_lw = torch.max(lw)
@@ -120,6 +139,6 @@ class TerminalLeafEnsemble(nn.Module):
 
 
 def _prune(d: TorchDist, max_components: int) -> TorchDist:
-    """Warm-up only: prune through the reference (no gradient through the
-    merge path), keeping weights/means/stds as the reference computes them."""
-    return TorchDist.from_reference(d.to_reference().prune(max_components))
+    """``TorchDist.prune``: the reference's merge path on detached floats, the
+    merged moments as tensors, so the warm-up predictive keeps its gradient."""
+    return d.prune(max_components)
