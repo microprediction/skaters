@@ -4,13 +4,16 @@ The lens is a diagnostic. The MAD standardizer is a conjugate transform:
 per-stream state, k horizons, and an affine map back to the original units.
 """
 
+import json
 import math
+import random
 
 from skaters.conjugate import conjugate
 from skaters.dist import Dist
 from skaters.leaf import leaf
 from skaters.residual_variance_lens import ResidualVarianceLens
 from skaters.robust_mad_standardize import robust_mad_standardize
+from skaters.transform import standardize
 
 
 def _alternating(value: float, n: int) -> list[float]:
@@ -175,6 +178,71 @@ def test_warmup_forecast_scale_tracks_the_observed_spread():
     for y in series:
         dists, state = f(y, state)
     assert dists[0].std > 0.1
+
+
+def test_gaussian_mad_scale_is_within_a_few_percent():
+    """After burn-in, the stored MAD scale tracks a known Gaussian sigma."""
+    sigma = 3.0
+    window = 120
+    forward, _ = robust_mad_standardize(window=window, min_periods=30)
+    rng = random.Random(0)
+    state = None
+    late = []
+    for i in range(2500):
+        _, state = forward(rng.gauss(0.0, sigma), state)
+        if i >= 1700:
+            late.append(state["scale"])
+    estimate = sum(late) / len(late)
+    assert abs(estimate - sigma) / sigma < 0.05
+
+
+def test_conjugate_state_roundtrips_through_json():
+    rng = random.Random(1)
+    series = [rng.gauss(0.0, 1.0) for _ in range(80)]
+    f = conjugate(leaf(), robust_mad_standardize(window=30, min_periods=8))
+    state = None
+    for y in series[:50]:
+        _, state = f(y, state)
+    restored = json.loads(json.dumps(state))
+    for y in series[50:]:
+        original, state = f(y, state)
+        copy, restored = f(y, restored)
+        assert original[0].mean == copy[0].mean
+        assert original[0].std == copy[0].std
+        assert json.dumps(state) == json.dumps(restored)
+
+
+def _mean_log_score(maker, series, burn):
+    f = maker()
+    state = None
+    pending = None
+    total = 0.0
+    count = 0
+    for i, y in enumerate(series):
+        if pending is not None and i >= burn:
+            total += pending.logpdf(y)
+            count += 1
+        dists, state = f(y, state)
+        pending = dists[0]
+    return total / count
+
+
+def test_robust_mad_beats_standardize_on_a_heavy_tailed_stream():
+    """5% of the points are N(0, 30); the rest are N(0, 1).
+
+    The same pair is registered as leaf+robust-mad and leaf+standardize for
+    benchmarks/run_arm.py. This is the stream where the robust arm wins.
+    """
+    rng = random.Random(7)
+    series = [rng.gauss(0.0, 30.0) if rng.random() < 0.05 else rng.gauss(0.0, 1.0)
+              for _ in range(2000)]
+    robust = _mean_log_score(
+        lambda: conjugate(leaf(), robust_mad_standardize(window=60, min_periods=20)),
+        series, 400)
+    plain = _mean_log_score(
+        lambda: conjugate(leaf(), standardize(0.05)),
+        series, 400)
+    assert robust > plain
 
 
 def test_non_finite_observation_does_not_poison_the_window():

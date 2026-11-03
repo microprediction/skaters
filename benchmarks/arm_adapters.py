@@ -31,7 +31,11 @@ import numpy as np
 
 import foundation_study as fs           # sample_dist, quantile_dist, CTX, TEST, laplace
 from skaters.api import laplace
+from skaters.conjugate import conjugate
 from skaters.dist import Dist
+from skaters.leaf import leaf
+from skaters.robust_mad_standardize import robust_mad_standardize
+from skaters.transform import standardize
 from predictions import _norm_ppf as _nppf
 
 
@@ -135,6 +139,28 @@ def laplace_dists(ch, h=1, tails="gpd"):
         if len(queue) >= h and i >= start:
             out.append(queue[-h][h - 1])
         d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
+
+def _leaf_conjugate_dists(ch, transform, h=1):
+    """Per-step predictive of conjugate(leaf(k=h), transform) over the test window.
+
+    Same stepping as :func:`laplace_dists`, so ``run_arm.py`` can score the arm
+    without a separate runner. ``leaf+robust-mad`` is the heavy-tail candidate;
+    ``leaf+standardize`` is the baseline it is compared with.
+    """
+    f = conjugate(leaf(k=h), transform, k=h)
+    st = None
+    queue = []
+    out = []
+    start = len(ch) - TEST
+    for i, yv in enumerate(ch):
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(float(yv), st)
         queue.append(d)
         if len(queue) > h:
             queue.pop(0)
@@ -1088,6 +1114,11 @@ def make_registry(h=1):
         "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
         "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
+        # leaf conjugates. On a heavy-tailed stream leaf+robust-mad beats
+        # leaf+standardize; tests/test_robust_transforms.py pins that gap.
+        "leaf+standardize": lambda ch: _leaf_conjugate_dists(ch, standardize(), h),
+        "leaf+robust-mad":  lambda ch: _leaf_conjugate_dists(
+            ch, robust_mad_standardize(), h),
         # ablation: laplace without the GPD tail splice (tails.py degenerate-threshold check)
         "laplace(gaussian-tails)": lambda ch: laplace_dists(ch, h, tails="gaussian"),
         "Sundial":     lambda ch: sundial_dists(ch, h),
