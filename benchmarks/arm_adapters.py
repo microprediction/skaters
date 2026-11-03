@@ -1082,6 +1082,7 @@ def lap_pymc_sandwich(ch, h=1):
 # two rows show what the training bought and what the wrapper costs. The arm
 # emits the torch distributions' exact densities (no reconstruction).
 LEARNED_CKPT = os.environ.get("LEARNED_CKPT", "")
+LEARNED_TAG = os.environ.get("LEARNED_TAG", "")      # names the run: learned(<tag>), learned-expert(<tag>)
 _learned_models = {}
 
 
@@ -1166,6 +1167,8 @@ def make_registry(h=1):
         "laplace":     lambda ch: laplace_dists(ch, h),
         "learned":        lambda ch: learned_dists(ch, h, "mixture"),   # #297: laplace at worst
         "learned-expert": lambda ch: learned_dists(ch, h, "expert"),
+        **({f"learned({LEARNED_TAG})": lambda ch: learned_dists(ch, h, "mixture"),
+            f"learned-expert({LEARNED_TAG})": lambda ch: learned_dists(ch, h, "expert")} if LEARNED_TAG else {}),
         # ablation: laplace without the GPD tail splice (tails.py degenerate-threshold check)
         "laplace(gaussian-tails)": lambda ch: laplace_dists(ch, h, tails="gaussian"),
         "Sundial":     lambda ch: sundial_dists(ch, h),

@@ -15,14 +15,18 @@ MAX=${LV_MAX:-300}
 NSHARD=${LV_NSHARD:-8}
 THREADS=${LV_THREADS:-2}
 : "${LEARNED_CKPT:?set LEARNED_CKPT to the checkpoint}"
-TAG=$(basename "$LEARNED_CKPT" .pt)
+TAG=${LV_TAG:-$(basename "$LEARNED_CKPT" .pt)}
+# LV_RUN names the run inside the store (arms learned(<run>) / learned-expert(<run>)),
+# so checkpoints from different runs coexist; empty = the plain arm names.
+RUN=${LV_RUN:-}
+if [ -n "$RUN" ]; then ARMS="learned(${RUN}),learned-expert(${RUN})"; else ARMS="learned,learned-expert"; fi
 
 pids=()
 for r in $(seq 0 $((NSHARD - 1))); do
   OMP_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS \
-  ARM_METHODS="learned,learned-expert" ARM_CORPUS=$CORPUS ARM_REGIME=econ ARM_SPLIT=valid \
+  LEARNED_TAG="$RUN" ARM_METHODS="$ARMS" ARM_CORPUS=$CORPUS ARM_REGIME=econ ARM_SPLIT=valid \
   ARM_MAX=$MAX ARM_NSHARD=$NSHARD ARM_SHARDS=$r \
-  PRED_OUT="benchmarks/preds/learned-${TAG}__${CORPUS}.s${r}.csv" \
+  PRED_OUT="benchmarks/preds/learned-${TAG}${RUN:+-$RUN}__${CORPUS}.s${r}.csv" \
     "$PY" -u benchmarks/run_arm.py > "benchmarks/_learned_valid_${TAG}.s${r}.log" 2>&1 &
   pids+=($!)
 done
