@@ -39,7 +39,7 @@ train_one() {   # corpus
   OMP_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS \
   LT_CORPUS=$c LT_MAX=$(over MAX "$c" "$MAX") LT_K=1 LT_EPOCHS=$(over EPOCHS "$c" "$EPOCHS") \
   LT_WINDOW=64 LT_LR=$(over LR "$c" "${ON_LR:-1e-3}") LT_PI=$PI \
-  LT_CKPT_EVERY=25 LT_RESUME="$resume" LT_OUT="$ck" \
+  LT_CKPT_EVERY=25 LT_SNAP_EVERY=${ON_SNAP:-0} LT_RESUME="$resume" LT_OUT="$ck" \
     "$PY" -u benchmarks/learned_train.py > "benchmarks/_learned_train_${c}_k1.log" 2>&1
 }
 
