@@ -241,8 +241,9 @@ def _mean_log_score(maker, series, burn):
 def test_robust_mad_beats_standardize_on_a_heavy_tailed_stream():
     """5% of the points are N(0, 30); the rest are N(0, 1).
 
-    The same pair is registered as leaf+robust-mad and leaf+standardize for
-    benchmarks/run_arm.py. This is the stream where the robust arm wins.
+    A synthetic stream. On the FRED daily and M4 hourly corpora the robust
+    arm does not beat standardize at the median series; see
+    benchmarks/canonical_summary_vs_laplace_pr307_vs_leaf+standardize.csv.
     """
     rng = random.Random(7)
     series = [rng.gauss(0.0, 30.0) if rng.random() < 0.05 else rng.gauss(0.0, 1.0)
