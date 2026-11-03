@@ -148,12 +148,18 @@
 
     <h2>Replacing running standardization</h2>
     <p>
-      A common first use is narrower and immediate: wherever a codebase whitens a
-      stream with a rolling z-score or a running mean and standard deviation, the
-      calibrated online transform is a drop-in that fixes the leakage, the
-      symmetric-Gaussian assumption, and the lack of calibration those approaches
-      carry. The <a href="/skills.html">standardization-review skill</a> scans for
-      that pattern and suggests the replacement.
+      Full-sample or centered-window standardization can use future observations.
+      A prequential probability integral transform avoids that look-ahead by
+      evaluating each observation under a distribution issued before it arrived.
+      A strictly trailing z-score is already causal: the distributional alternative
+      can represent skew and tail behavior beyond location and scale, and supplies
+      a calibration diagnostic. Both approaches can lag regime changes. For a
+      calibrated, continuous predictive CDF, the ideal PIT is uniform and its
+      inverse-normal transform is standard-normal before numerical clamping
+      (discrete outcomes need a randomized PIT for that guarantee). It is a
+      stateful alternative, with warm-up and additional computation, rather than
+      an unconditional drop-in. The
+      <a href="https://github.com/microprediction/skaters/blob/main/skills/standardization-review.md">standardization-review skill</a> explains these trade-offs.
     </p>
 
     <h2>The short version</h2>

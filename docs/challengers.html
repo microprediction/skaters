@@ -80,11 +80,13 @@
       Pick up to six challengers &mdash; <code>GARCH-t</code>, Prophet, the
       foundation models and more. Entries marked <em>(sandwiched)</em> are drawn
       <strong>dashed</strong>: those models run inside <code>laplace</code>'s own
-      coordinates and beat it by construction, so they are collaboration, not a
-      head-to-head win (see <a href="/sandwich.html">collaborative use</a>). The
-      default view includes the <strong>PyMC&ndash;laplace sandwich</strong>,
-      which finishes ahead across the whole universe when run this way &mdash;
-      the clearest case of cooperation beating competition.
+      coordinates, so they measure collaboration rather than a standalone
+      head-to-head comparison (see <a href="/sandwich.html">collaborative use</a>).
+      Improvement is not guaranteed by construction. The default view includes
+      the historical <strong>PyMC&ndash;laplace sandwich</strong> results;
+      these do not represent the later canonical rerun, whose median gains
+      are negative on all three economic strata. See the
+      <a href="/challengers/pymc-forecast.html">canonical update and protocol distinctions</a>.
     </p>
     <div class="panel" id="radar-panel">
       <div class="controls">
@@ -132,10 +134,11 @@
       cooperates as well as it competes: sandwiched in laplace's coordinates a
       challenger keeps its own strengths but inherits laplace's calibration and
       manufactured stationarity, and usually improves dramatically
-      (<a href="/sandwich.html">the sandwich</a>). <strong>PyMC</strong>, new but
-      already strong, finishes ahead across the whole universe once sandwiched
-      (+0.04 nats median on 65% of series) &mdash; it is the dashed entry in the
-      star map above. <strong>Prophet</strong>, which wins only 4 of 921
+      (<a href="/sandwich.html">the sandwich</a>). <strong>PyMC</strong>'s
+      dashed entry above is historical: the later canonical sandwich has
+      negative median gains on daily, weekly and monthly economic series,
+      superseding the earlier general improvement claim.
+      <strong>Prophet</strong>, which wins only 4 of 921
       pre-registered series raw, changes character entirely in these
       coordinates. So a bare horserace can mislead: these pages look for the
       series and regimes where each method does its best work, alone or
@@ -185,11 +188,11 @@
       </div>
       <div class="card">
         <h3>PYMC-Forecast &mdash; the day-one bout</h3>
-        <p>PyMC is new but already great out of the box. Sandwiched it
-          finishes ahead across the whole universe, +0.04 nats median on
-          65% of series; the pooling arm is the first with cross-series
-          information.
-          <a href="/challengers/pymc-forecast.html">The bout &rarr;</a></p>
+        <p>The July pre-registered bout is retained as historical evidence,
+          including its pooling arm. The later canonical PyMC sandwich
+          has negative median gains against laplace on all three economic
+          strata; the earlier general improvement claim is withdrawn.
+          <a href="/challengers/pymc-forecast.html">Historical bout and canonical update &rarr;</a></p>
       </div>
     </div>
 

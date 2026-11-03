@@ -11,16 +11,43 @@
   a trailing residual variance to a reference frozen after burn-in. A
   conditioning feature with no inverse, not a conjugate transform, and not in
   laplace's pool.
+- `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace
+  at worst. Two experts, the frozen reference `laplace` and a trainable torch
+  `laplace` with a state-conditioned gate added to the trunk's prequential log
+  weights at the combine step (`TerminalLeafEnsemble.gate_offset`), under an
+  exact density mixture weighted by undiscounted cumulative log-likelihood (the
+  Aggregating Algorithm, one instance per phase `t mod h` at horizon `h`). The
+  bound `sum -log q <= sum -log p_laplace - h log(pi_laplace)` holds at every
+  prefix and is tested against a deliberately corrupted learned expert; at
+  initialisation the model equals `laplace` to the parity gate; the forecast
+  issued for `y_t` cannot depend on `y_t`; `project_()` keeps the transform
+  parameters inside their valid regions after an optimizer step. Training and
+  the harness arm are steps 3 and 4.
 - New optional subpackage `skaters.torch` (`pip install skaters[torch]`): the
-  mixture distribution (`TorchDist`) and every transform in laplace's pool as
-  `torch` modules with the same arithmetic in the same order, each continuous
-  hyperparameter an `nn.Parameter`, and torch conjugation (`skaters.torch.conjugate`)
-  so chains stack onto the reference leaf. Held to the reference by a parity
-  suite at 1e-9 (`skaters.torch.parity`): every transform at k=1 and k=3,
-  every candidate chain of laplace's pool end to end, and finite gradients
-  through stacked transforms. `import skaters` still does not import torch.
-  Not ported: `gaussianize`, and the `exact=True` pushforward of the power
-  transforms (the default delta inverse is ported).
+  library on `torch` tensors. Transforms, leaves (`leaf`, `crps_leaf`,
+  `scale_mixture_leaf`, `garch_leaf`, ...), the ensembles, `multiscale`, the
+  lattice projection, the GPD tail splice (`TorchSplicedDist`), the parade,
+  the periodicity detector, `search`/`dantzig`, `spec`, and `laplace`, each
+  with the reference's arithmetic in the reference's order, the continuous
+  hyperparameters of transforms, leaves, ensembles and the trunk as
+  `nn.Parameter`s reachable from `laplace(k).parameters()` (sub-models and
+  the candidate chains' modules are registered as `ModuleList`/`ModuleDict`),
+  and gradients flowing from a log score at the output through every stage.
+  Pruning runs on tensors (`TorchDist.prune`: the reference's merge path on
+  detached floats, merged moments as tensors), so every horizon of `laplace(k)`
+  keeps its gradient past the 20-component cap. The weight recursions of the
+  trunk, the Bayesian ensemble and `search` detach the carried log weight by
+  default (`detach_carry=True`, one-step truncated backprop), so a streaming
+  call without `torch.no_grad()` keeps a bounded graph. A deepcopy of a
+  `search` state keeps pointing at the live transform modules (parameters are
+  the model's, not the state's). The lattice projection's options and search's
+  learning rates remain plain floats. Held to the standard parity vectors by
+  `parity/check_torch.py` (every scenario, 200,900 values at 1e-6, including
+  `laplace` at k=1 and k=3, the repeat-series lattice and the missing-observation
+  rules) and module by module at 1e-9 in `tests/test_torch_*.py`.
+  `import skaters` still does not import torch. Not ported: `gaussianize`,
+  the covariance estimators (`cov/`), and the `exact=True` pushforward of the
+  power transforms (the default delta inverse is ported).
 - `Dist.from_dict` is now the exact inverse of `to_dict`: weights that already
   sum to one (to within 1e-9 of the compensated sum) are kept bit-for-bit
   instead of being divided by a total that is one only up to rounding, which
