@@ -3,7 +3,7 @@
 The caller passes residuals. The first ``burn_in`` finite residuals estimate
 a reference variance, which then freezes. Each later update returns
 
-    log((var(last ``window`` residuals) + eps) / ref_var)
+    log(var(last ``window`` residuals) + eps) - log(ref_var)
 
 using the ordinary (non-robust) population variance. ``+r`` and ``-r`` give
 the same value: this is a surprise feature, not a coordinate of the residual,
@@ -69,5 +69,10 @@ class ResidualVarianceLens:
             self._last = 0.0
             return 0.0
         var = _population_var(self._recent)
-        self._last = math.log((var + self.eps) / self.ref_var)
+        numerator = var + self.eps
+        # Subtract the logs. The quotient itself overflows when a flat
+        # reference (eps) meets large finite residuals, even though both
+        # variance terms are finite.
+        if numerator > 0.0 and self.ref_var > 0.0 and math.isfinite(numerator):
+            self._last = math.log(numerator) - math.log(self.ref_var)
         return self._last

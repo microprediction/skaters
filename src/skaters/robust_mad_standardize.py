@@ -9,10 +9,15 @@ observation:
 same affine, read from the updated window, to every horizon. State is the
 window dict for one stream; streams do not share it.
 
-Until ``min_periods`` observations are in the window, or when MAD is 0, the
-scale used for division is floored. The location is always the exact window
-median, so after a flat stretch a new level occupies the window in
-``window`` steps. The median step does not shrink with the MAD.
+Until the window has ``min_periods`` points and a nonzero MAD, there is no
+robust scale in the state. The emission then uses the same cold start as
+:func:`skaters.transform.standardize`: the affine unit is the residual
+itself, so the standardized value is ±1, and that unit is stored. A later
+flat stretch holds the last informative unit instead of replacing it with a
+tiny floor. Dividing a level shift by a hard floor feeds the downstream leaf
+one enormous residual, and the leaf's variance never forgets it. The stored
+unit is part of the affine map ``inverse_k`` applies; the standardized value
+is not clipped.
 """
 
 from __future__ import annotations
@@ -34,14 +39,15 @@ def _median(values: list[float]) -> float:
     return 0.5 * (ordered[mid - 1] + ordered[mid])
 
 
-def _sigma(values: list[float], median: float, min_periods: int, eps: float) -> float | None:
-    """Normal-consistent MAD scale, or None when the window is still short."""
+def _mad_sigma(values: list[float], min_periods: int, eps: float) -> float | None:
+    """Normal-consistent MAD scale, or None while that scale is uninformative."""
     if len(values) < min_periods:
         return None
+    median = _median(values)
     mad = _median([abs(value - median) for value in values])
     sigma = _MAD_TO_SIGMA * mad
-    if sigma < eps:
-        return eps
+    if not math.isfinite(sigma) or sigma < eps:
+        return None
     return sigma
 
 
@@ -58,34 +64,50 @@ def robust_mad_standardize(window: int = 60, min_periods: int = 8, eps: float = 
     if eps <= 0.0:
         raise ValueError("eps must be positive")
 
-    def _location_scale(buf: list[float]) -> tuple[float, float]:
-        if not buf:
-            return 0.0, eps
-        median = _median(buf)
-        sigma = _sigma(buf, median, min_periods, eps)
-        if sigma is None:
-            return median, eps
-        return median, sigma
+    def _emit_scale(buf: list[float], held: float, y: float) -> float:
+        sigma = _mad_sigma(buf, min_periods, eps)
+        if sigma is not None:
+            return sigma
+        if held > eps:
+            return held
+        dev = abs(y - _median(buf)) if buf else 0.0
+        return dev if dev > eps else eps
+
+    def _hold_scale(buf: list[float], held: float, y: float, median: float) -> float:
+        learned = _mad_sigma(buf, min_periods, eps)
+        if learned is not None:
+            return learned
+        if held > eps:
+            return held
+        dev = abs(y - median)
+        return dev if dev > eps else eps
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
-        buf = [] if state is None else list(state["buf"])
+        if state is None:
+            buf, held = [], eps
+        else:
+            buf, held = list(state["buf"]), float(state.get("scale", eps))
         if not math.isfinite(y):
-            return 0.0, {"buf": buf}
+            return 0.0, {"buf": buf, "scale": held}
         if not buf:
-            return 0.0, {"buf": [y]}
+            return 0.0, {"buf": [y], "scale": held}
         median = _median(buf)
-        sigma = _sigma(buf, median, min_periods, eps)
-        if sigma is None:
-            dev = abs(y - median)
-            sigma = dev if dev > eps else eps
+        sigma = _emit_scale(buf, held, y)
         y_prime = (y - median) / sigma
         buf.append(y)
         if len(buf) > window:
             del buf[:-window]
-        return y_prime, {"buf": buf}
+        return y_prime, {"buf": buf, "scale": _hold_scale(buf, held, y, median)}
 
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
-        median, sigma = _location_scale([] if state is None else state["buf"])
+        buf = [] if state is None else list(state["buf"])
+        held = eps if state is None else float(state.get("scale", eps))
+        if not buf:
+            return [d.affine(held, 0.0) for d in dists]
+        median = _median(buf)
+        sigma = _mad_sigma(buf, min_periods, eps)
+        if sigma is None:
+            sigma = held if held > eps else eps
         return [d.affine(sigma, median) for d in dists]
 
     return forward, inverse_k

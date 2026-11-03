@@ -63,6 +63,15 @@ def test_lens_streams_do_not_share_a_reference():
     assert quiet.ref_var != loud.ref_var
 
 
+def test_lens_log_ratio_stays_finite_for_a_flat_reference():
+    """A flat reference makes the variance quotient overflow before log."""
+    lens = ResidualVarianceLens(burn_in=2, window=2)
+    values = [lens.update(x) for x in (0.0, 0.0, 1e150, -1e150)]
+    assert values[:3] == [0.0, 0.0, 0.0]
+    assert math.isfinite(values[3])
+    assert abs(values[3] - 718.4065490141422) < 1e-9
+
+
 def test_lens_ignores_non_finite_and_overflowing_residuals():
     lens = ResidualVarianceLens(burn_in=4, window=4)
     for value in _alternating(1.0, 4):
@@ -140,6 +149,32 @@ def test_flat_stretch_then_level_shift_enters_within_one_window():
     assert located.mean == 1000.0
     y_prime, state = forward(1000.0, state)
     assert y_prime == 0.0
+
+
+def test_wrapped_forecast_recovers_after_a_flat_stretch():
+    """The leaf must not keep a residual created by dividing by the floor.
+
+    The window median does recover on its own. This checks the forecast the
+    conjugated skater actually returns once that window has moved.
+    """
+    series = [0.0] * 40 + [1000.0] * 11 + [998.0, 999.0, 1000.0, 1001.0, 1002.0] * 40
+    f = conjugate(leaf(), robust_mad_standardize(window=11, min_periods=5))
+    state = None
+    dists = None
+    for y in series:
+        dists, state = f(y, state)
+    assert abs(dists[0].mean - 1000.0) < 1.0
+    assert 0.05 < dists[0].std < 20.0
+
+
+def test_warmup_forecast_scale_tracks_the_observed_spread():
+    series = [0.0, 10.0, -10.0, 10.0, -10.0, 10.0, -10.0]
+    f = conjugate(leaf(), robust_mad_standardize())
+    state = None
+    dists = None
+    for y in series:
+        dists, state = f(y, state)
+    assert dists[0].std > 0.1
 
 
 def test_non_finite_observation_does_not_poison_the_window():
