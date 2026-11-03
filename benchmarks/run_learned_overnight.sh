@@ -15,7 +15,7 @@
 # the whole validation half), ON_THREADS (torch threads per trainer, default
 # 4), ON_PI (laplace's prior share, default 0.5), ON_TAG (run tag for the
 # validation arms). Any of MAX, EPOCHS, VALID_MAX takes a per-corpus override
-# ON_<name>_<corpus>, e.g. ON_MAX_monthly=3000.
+# ON_<name>_<corpus>, e.g. ON_MAX_monthly=3000; so does LR (ON_LR, ON_LR_<corpus>).
 set -u
 cd "$(dirname "$0")/.."
 export PYTHONPATH=src:benchmarks
@@ -38,7 +38,7 @@ train_one() {   # corpus
   [ -f "$ck" ] && resume="$ck"
   OMP_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS \
   LT_CORPUS=$c LT_MAX=$(over MAX "$c" "$MAX") LT_K=1 LT_EPOCHS=$(over EPOCHS "$c" "$EPOCHS") \
-  LT_WINDOW=64 LT_LR=1e-3 LT_PI=$PI \
+  LT_WINDOW=64 LT_LR=$(over LR "$c" "${ON_LR:-1e-3}") LT_PI=$PI \
   LT_CKPT_EVERY=25 LT_RESUME="$resume" LT_OUT="$ck" \
     "$PY" -u benchmarks/learned_train.py > "benchmarks/_learned_train_${c}_k1.log" 2>&1
 }
