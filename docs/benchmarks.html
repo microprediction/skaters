@@ -23,6 +23,13 @@
       <nav>
         <a href="/">Home</a>
         <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
             <a href="/challengers.html">Standalone</a>
@@ -45,7 +52,6 @@
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
-        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
@@ -67,6 +73,16 @@
     <h1>Benchmarks</h1>
     <p class="subtitle">A new practical benchmark for univariate distributional prediction —
       simpler and lighter than Prophet, and scored where it counts: held-out likelihood.</p>
+
+    <figure class="hero-figure">
+      <div id="frontier3d" style="width:100%;min-height:520px;"></div>
+      <figcaption><span id="frontier3d-caption">Accuracy, speed and footprint, one point per model;
+        every coordinate is measured. Drag to rotate.</span>
+        Runtime detail is on the <a href="/performance.html">performance page</a>, size and dependencies
+        on the <a href="/footprint.html">footprint page</a>.</figcaption>
+    </figure>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+    <script src="./assets/frontier3d.js"></script>
 
     <h2>Benchmark 1 — the non-price universe</h2>
     <p>

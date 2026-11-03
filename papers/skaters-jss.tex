@@ -1317,26 +1317,35 @@ structure \code{laplace} leaves on the table is discrete, concentrated
 on lattice-heavy series, and an atom-aware residual head is the
 corresponding work item.
 
-The sharpest sandwich test to date is \pkg{pymc-forecast}
+A historical July test used \pkg{pymc-forecast}
 \citep{pymcforecast2026}, a Bayesian forecasting toolkit released by
-PyMC Labs on 2026-07-13; the bout statement was filed the following
+PyMC Labs on 2026-07-13. Its bout statement was filed the following
 morning
 (\code{benchmarks/preregistrations/2026-07-14-pymc-forecast-sandwich.md})
-on the frozen 226-series universe of Section~\ref{sec:tabfm}. A Bayesian
-challenger is a distinctive test because the $z$ coordinates hand it its
-two preferred conditions: the marginal is $\mathcal N(0,1)$ by
-construction, so priors centred at ``no structure, unit scale'' are
-exact rather than guessed, and $z$ is nearly stationary, so the cost of
-batch refits (the method's structural weakness in a prequential race)
-largely vanishes. Every arm shares one model, a Student-$t$ regression
-on eight lagged values fit by mean-field ADVI, and every predictive
-density is the exact posterior-draw mixture. Four hypotheses were
-pre-registered; two-sided exact sign tests on per-series log-likelihood:
+on the frozen 226-series universe of Section~\ref{sec:tabfm}.
+\emph{The general improvement claim from this noncanonical study is
+superseded.} The later canonical \code{laplace@PyMC} comparison has
+median paired log-likelihood gains against \code{laplace} of
+$-0.0522$ on daily economic series ($n=500$), $-0.0124$ weekly ($n=499$)
+and $-0.0153$ monthly ($n=471$), from
+\code{benchmarks/canonical\_summary\_vs\_laplace.csv}. Positive would mean
+better than \code{laplace}; all three medians are negative.
+
+We retain the July figures as previously reported, rather than treating
+it as the current canonical conclusion. Every July arm used a Student-$t$
+regression on eight lags, fit by mean-field ADVI, with predictive density
+scored as the exact posterior-draw mixture. The \code{sand} arm refit
+every ten steps; the separate \code{solo} and hierarchical arms froze
+pre-test fits through all 150 test steps. The canonical adapter refits
+and emits predictive distributions through the common density
+reconstruction and scoring protocol, so the experiments are distinct.
+The July table below reports two-sided exact sign tests on per-series
+log-likelihood, not the canonical HAC/DM win/draw/loss classification.
 
 \begin{center}
 \begin{tabular}{llc}
 \hline
-hypothesis & result (226 series) & $p$ \\
+hypothesis & historical July result (226 series) & $p$ \\
 \hline
 raw model vs \code{laplace} & \code{laplace} wins 82\%, $+0.45$ nats median & $5\!\times\!10^{-23}$ \\
 sandwich lift & sandwiched beats raw on 86\%, $+0.63$ median & $3\!\times\!10^{-30}$ \\
@@ -1346,25 +1355,24 @@ pooling & one pooled fit loses to per-series fits on 72\% & $2\!\times\!10^{-11}
 \end{tabular}
 \end{center}
 
-Three readings. First, the convergence prediction held with a positive
-sign: the median absolute per-series gap to \code{laplace} collapses
-from $0.62$ nats raw to $0.05$ sandwiched, and the residual epsilon is
-$+0.04$, positive across the whole universe rather than confined to one
-stratum. The gain still concentrates on repeat-heavy series ($+2.1$
-nats median on the near-martingale repeat stratum), the same place the
-discrete TabFM head found structure; this is the third independent
-detection of exploitable structure in the $z$ stream of lattice-valued
-series. Second, staleness is cheap in these coordinates: a single
-pre-test ADVI fit, frozen with no refits through all 150 test steps,
-ties \code{laplace} overall (54\% of series, median gap $0.005$ nats).
-Third, the pooling arm, the first challenger given cross-series
-information (one hierarchical fit across all 226 series' $z$ streams
-against the identical model fit per series, so the contrast isolates
-the priors), loses overall: the shrinkage tax beats the borrowed
-strength except on the repeat-heavy stratum, where pooling wins 79\% of
-series by $+2.1$ nats median. Cross-series information helps exactly
-where series share an exploitable signature, and nowhere else on this
-universe.
+The July report stated that the median absolute per-series gap to
+\code{laplace} fell from $0.62$ nats raw to $0.05$ sandwiched, with a
+$+0.04$ median gain for the block-refit \code{sand} arm and $+2.1$ on
+the near-martingale repeat stratum. The distinct frozen \code{solo}
+arm was ahead on 54\% of series, with a median gap of $+0.005$ nats.
+Those observations do not establish a canonical gain or negligible
+batch-refit staleness. Calibration of the base predictive, rather than
+the coordinate transform alone, is needed for standard-normal normal
+scores; stationarity is also an empirical question.
+
+The historical pooling arm fitted one hierarchical model across all
+226 series' $z$ streams and compared it with per-series fits, holding
+the window and freeze fixed. Pooling lost on 72\% of series overall,
+but won on 79\% of the repeat-heavy stratum with $+2.1$ nats median.
+That pooling contrast was not rerun in the canonical comparison.
+The old whole-universe improvement claim is withdrawn, while the
+preregistration, arm distinctions and historical results remain part
+of the research record.
 
 %% -------------------------------------------------------------------------
 \section{Ablations: repointing the objective} \label{sec:ablations}

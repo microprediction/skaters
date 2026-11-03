@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; the learned model</title>
+  <meta name="description" content="A learned forecaster built on skaters.torch that is laplace at worst: a trainable laplace with a gate, under an Aggregating-Algorithm mixture with the frozen laplace, trained on one half of FRED by family and scored on the other." />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .wdl { display:flex; height:15px; width:180px; border-radius:3px; overflow:hidden;
+           border:1px solid var(--border); }
+    .wdl i { display:block; height:100%; }
+    .wdl .w { background:var(--good); } .wdl .d { background:#c8c8d4; }
+    .wdl .l { background:var(--warn); }
+    .key { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.85rem;
+           color:var(--muted); margin:8px 0 0; justify-content:center; }
+    .key i { display:inline-block; width:12px; height:12px; border-radius:2px;
+             vertical-align:middle; margin-right:5px; }
+    .muted { color:var(--muted); }
+    .meta-row { display:flex; flex-wrap:wrap; gap:6px 10px; margin:2px 0 14px; }
+    .meta-row .tag { background:#ece9ff; color:var(--accent-dark); border-radius:3px;
+                     padding:2px 9px; font-size:.8rem; }
+    .stamp { color:#888; font-size:.88em; font-style:italic; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>The learned model: laplace at worst</h1>
+    <div class="meta-row">
+      <span class="tag">skaters.torch.learned</span>
+      <span class="tag">trained on half of FRED, by family</span>
+      <span class="tag">scored on the other half</span>
+      <span class="tag">k = 1</span>
+      <span class="tag">issue #297</span>
+    </div>
+    <p>Two forecasters run on every series and an exact mixture sits on top. The floor is
+      <code>laplace</code>, the reference implementation, frozen. The challenger is the torch
+      twin of <code>laplace</code>: the same pool of candidate chains, trunk, lattice projection,
+      tail splice and parade, initialised at laplace's values, with two things that learn. The
+      continuous hyperparameters of the transforms and the trunk (smoothing rates, mean-reversion
+      and GARCH rates, autoregressive ridge and decay, power and Yeo&ndash;Johnson exponents,
+      the trunk's learning rate, forgetting and depth penalty) are <code>nn.Parameter</code>s.
+      And a small gate reads the parade's <code>z</code>, the trunk's prequential log weights and
+      two running descriptors, and adds an offset to those log weights at the combine step, so it
+      tilts which candidates carry the forecast. The gate starts at zero.</p>
+    <p>The mixture weights the two experts by their undiscounted cumulative log-likelihood, the
+      Aggregating Algorithm under log loss, one instance per phase at each horizon. That is the
+      guarantee: on any series the mixture's cumulative log loss exceeds laplace's by at most
+      <code>h&middot;log(1/&pi;)</code> nats, with <code>&pi;</code> laplace's prior share
+      (0.5 in the run on this page). Nothing training does to the challenger can break it.
+      The learned part can only re-tune laplace's own knobs and re-weight laplace's own
+      candidates; if an edge cannot be expressed that way, this model cannot find it.</p>
+
+    <h2>Training and the split</h2>
+    <p>FRED is split by family (<code>fred_universe.family</code>: a curve of maturities, an FX
+      panel, a release's components land on one side), so the validation half shares no family
+      with the training half. Training is prequential: the forecast for <code>y<sub>t</sub></code>
+      is issued before <code>y<sub>t</sub></code> arrives, scored against it, and the loss of a
+      64-step window, the challenger's own log score, is backpropagated at the window boundary;
+      Adam steps, every bounded parameter is clamped back into its valid region, and the state is
+      detached. The mixture is not trained. The in-sample signal over the training pass, the
+      challenger's mean log score next to the frozen laplace's on the same steps:</p>
+    <table>
+      <thead><tr><th>corpus</th><th class="num">epoch</th><th class="num">train series</th>
+      <th class="num">scored steps</th><th class="num">challenger</th><th class="num">laplace</th>
+      <th class="num">gap (nats/step)</th></tr></thead>
+      <tbody>
+<tr><td>daily</td><td class="num">1</td><td class="num">1,425</td><td class="num">1,381,272</td><td class="num">+3.888</td><td class="num">+3.634</td><td class="num">+0.254</td></tr>
+<tr><td>monthly</td><td class="num">1</td><td class="num">3,000</td><td class="num">686,340</td><td class="num">+2.474</td><td class="num">+2.414</td><td class="num">+0.059</td></tr>
+<tr><td>weekly</td><td class="num">1</td><td class="num">1,491</td><td class="num">143,841</td><td class="num">+1.928</td><td class="num">+1.640</td><td class="num">+0.288</td></tr>
+<tr><td>weekly</td><td class="num">1</td><td class="num">1,491</td><td class="num">1,391,499</td><td class="num">+2.416</td><td class="num">+2.060</td><td class="num">+0.356</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">In-sample and prequential: the gate adapts within each training series, and
+      families share shape inside the training half. The gap on the validation half below is
+      smaller, which is the point of the split.</p>
+
+    <h2>Validation</h2>
+    <p>Scored through the canonical pipeline on the validation half, paired against
+      <code>laplace</code> on identical series and windows. Win, draw and loss are decided one
+      series at a time by a <a href="/draws.html">Diebold&ndash;Mariano test</a> on the per-step
+      log-score differential over the 64-point test window (floor &minus;20, Newey&ndash;West
+      standard error, &plusmn;1.96 SE; a draw says the window cannot separate the two at the 5%
+      level, not that they are equal). The densities are the model's own; there is no quantile
+      reconstruction on this page.</p>
+    <h3>The mixture (<code>learned</code>)</h3>
+    <table>
+      <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
+      <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
+      <th class="num">cov&#8320;&#8320;</th></tr></thead>
+      <tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">400</td><td><span class="wdl"><i class="w" style="width:13.0%"></i><i class="d" style="width:65.0%"></i><i class="l" style="width:22.0%"></i></span></td><td class="num">-0.00</td><td class="num">1.000</td><td class="num">0.93</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">400</td><td><span class="wdl"><i class="w" style="width:24.0%"></i><i class="d" style="width:71.8%"></i><i class="l" style="width:4.2%"></i></span></td><td class="num">+0.01</td><td class="num">0.999</td><td class="num">0.89</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">400</td><td><span class="wdl"><i class="w" style="width:22.0%"></i><i class="d" style="width:69.8%"></i><i class="l" style="width:8.2%"></i></span></td><td class="num">+0.01</td><td class="num">0.998</td><td class="num">0.91</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td colspan="6" class="muted">not yet scored</td></tr>
+<tr><td>asset prices and returns, daily</td><td colspan="6" class="muted">not yet scored</td></tr>
+      </tbody>
+    </table>
+    <div class="key">
+      <span><i style="background:var(--good)"></i>beats Laplace</span>
+      <span><i style="background:#c8c8d4"></i>draw</span>
+      <span><i style="background:var(--warn)"></i>loses to Laplace</span>
+    </div>
+
+    <h3>The trained expert alone (<code>learned-expert</code>)</h3>
+    <table>
+      <thead><tr><th>stratum</th><th class="num">n</th><th>win / draw / loss vs Laplace</th>
+      <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
+      <th class="num">cov&#8320;&#8320;</th></tr></thead>
+      <tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">400</td><td><span class="wdl"><i class="w" style="width:11.2%"></i><i class="d" style="width:69.5%"></i><i class="l" style="width:19.2%"></i></span></td><td class="num">-0.01</td><td class="num">1.005</td><td class="num">0.92</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">400</td><td><span class="wdl"><i class="w" style="width:15.0%"></i><i class="d" style="width:80.0%"></i><i class="l" style="width:5.0%"></i></span></td><td class="num">+0.01</td><td class="num">0.990</td><td class="num">0.88</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">400</td><td><span class="wdl"><i class="w" style="width:24.0%"></i><i class="d" style="width:72.0%"></i><i class="l" style="width:4.0%"></i></span></td><td class="num">+0.04</td><td class="num">0.991</td><td class="num">0.90</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td colspan="6" class="muted">not yet scored</td></tr>
+<tr><td>asset prices and returns, daily</td><td colspan="6" class="muted">not yet scored</td></tr>
+      </tbody>
+    </table>
+    <div class="key">
+      <span><i style="background:var(--good)"></i>beats Laplace</span>
+      <span><i style="background:#c8c8d4"></i>draw</span>
+      <span><i style="background:var(--warn)"></i>loses to Laplace</span>
+    </div>
+
+    <p class="muted">Median per-series &Delta; log-likelihood in nats (negative is worse than Laplace); CRPS ratio to Laplace (above 1 is worse); central-90% coverage (0.90 target).</p>
+    <p>On daily econ the mixture has more losses than wins, 52 to 88 of 400, at a median of -0.000 nats; the trained expert alone is 45 to 77 at -0.008. On weekly the mixture has more wins than losses, 96 to 17 of 400, at a median of +0.009 nats; the trained expert alone is 60 to 20 at +0.011. On monthly the mixture has more wins than losses, 88 to 33 of 400, at a median of +0.005 nats; the trained expert alone is 96 to 16 at +0.037.</p>
+    <p>The mixture and the expert differ where their numbers differ. The mixture's weights are
+      undiscounted over the whole history, as the bound requires, so where the challenger was
+      weaker early in a series it never fully regains weight; the expert alone carries no such
+      drag and no such guarantee.</p>
+
+    <h2>Star plot</h2>
+    <p>The mixture standalone against Laplace on the six regime axes of the
+      <a href="/challengers.html">challengers radar</a>: the share of series where its mean log
+      score is the higher, ties split, divided by one half, so an even split sits on the dashed
+      1.0 ring. Axes without 30 shared series are left empty.</p>
+    <figure style="margin:14px 0 6px;"><svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of learned standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,129.6 421.3,158.4 410.9,315.6" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="129.6" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): learned log-likelihood win rate 0.92 vs Laplace (n=400)</title></circle><circle cx="421.3" cy="158.4" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: learned log-likelihood win rate 1.36 vs Laplace (n=400)</title></circle><circle cx="410.9" cy="315.6" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: learned log-likelihood win rate 1.26 vs Laplace (n=400)</title></circle></svg></figure>
+
+    <h2>What is not here</h2>
+    <ul>
+      <li>Daily economic series are laplace's home and the learned model does not improve them;
+        training is now confined to weekly and monthly.</li>
+      <li>Only <code>k = 1</code> has been trained. The multi-step case, where the multiscale
+        machinery lives, is next.</li>
+      <li>GIFT-Eval, the clean out-of-domain test, has not been run on this model.</li>
+    </ul>
+
+    <h2>Reproducing this</h2>
+<pre><code>PYTHONPATH=src:benchmarks .venv-kumo/bin/python benchmarks/learned_train.py      # LT_CORPUS, LT_MAX, LT_EPOCHS ...
+LEARNED_CKPT=benchmarks/learned_ckpt/weekly_k1.pt LV_CORPUS=weekly LV_RUN=first benchmarks/run_learned_valid.sh
+PYTHONPATH=src:benchmarks python benchmarks/summarize_canonical.py
+LP_RUN= PYTHONPATH=src:benchmarks python benchmarks/learned_page.py</code></pre>
+    <p class="stamp">Generated 2026-11-03 from the canonical store and the checkpoints in
+      benchmarks/learned_ckpt.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family.
+  </footer>
+</body>
+</html>

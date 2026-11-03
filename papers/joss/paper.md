@@ -62,8 +62,8 @@ split reported rather than averaged away. The calibration state turns the
 forecaster into an anomaly detector with stated false-alarm rates: alarm
 when $\mathrm{erfc}(|z|/\sqrt{2}) < \alpha$, with measured rates near
 nominal on economic series. Methods, benchmarks, and the tail-calibration
-studies are documented in a companion methods paper in the repository and
-at https://skaters.microprediction.org.
+studies are documented in a companion methods paper [@cotton2026transforms]
+in the repository and at https://skaters.microprediction.org.
 
 # State of the field
 
@@ -108,7 +108,8 @@ Pyodide [@pyodide2021].
 The package is the measurement instrument in an ongoing empirical study of
 representation value in conformal prediction, whose experiment scripts
 live in this repository's `benchmarks` directory, and the companion
-methods paper reports the underlying benchmark across 5,402 FRED series.
+methods paper [@cotton2026transforms] reports the underlying benchmark
+across 5,402 FRED series.
 Beyond its own results, the harness gives researchers a reproducible
 rolling-protocol comparison of distributional forecasters under
 log-likelihood and CRPS, with per-regime splits, and the calibration state

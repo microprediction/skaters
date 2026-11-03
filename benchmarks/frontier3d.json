@@ -1,0 +1,187 @@
+{
+ "meta": {
+  "date": "2026-10-28",
+  "strata": [
+   "daily:econ",
+   "weekly:econ",
+   "monthly:econ"
+  ],
+  "perf_meta": {
+   "version": "0.16.0",
+   "commit": "4fa186b",
+   "python": "3.11.15",
+   "machine": "Darwin arm64",
+   "torch_threads": 1,
+   "context": 256,
+   "horizon": 12,
+   "series": 64,
+   "date": "2026-10-28",
+   "groups": {
+    "timestral": {
+     "version": "0.16.0",
+     "commit": "4fa186b",
+     "python": "3.12.13",
+     "machine": "Darwin arm64",
+     "torch_threads": 1,
+     "context": 256,
+     "horizon": 12,
+     "series": 64,
+     "date": "2026-10-28"
+    },
+    "t0": {
+     "version": "0.16.0",
+     "commit": "4fa186b",
+     "python": "3.12.13",
+     "machine": "Darwin arm64",
+     "torch_threads": 1,
+     "context": 256,
+     "horizon": 12,
+     "series": 64,
+     "date": "2026-10-28"
+    },
+    "timesfm3": {
+     "version": "0.16.0",
+     "commit": "4fa186b",
+     "python": "3.14.6",
+     "machine": "Darwin arm64",
+     "torch_threads": 1,
+     "context": 256,
+     "horizon": 12,
+     "series": 64,
+     "date": "2026-10-28"
+    },
+    "sundial": {
+     "version": "0.16.0",
+     "commit": "4fa186b",
+     "python": "3.11.15",
+     "machine": "Darwin arm64",
+     "torch_threads": 1,
+     "context": 256,
+     "horizon": 12,
+     "series": 64,
+     "date": "2026-10-28"
+    }
+   }
+  },
+  "footprint_date": "2026-10-28"
+ },
+ "points": [
+  {
+   "name": "laplace (Rust core)",
+   "group": "laplace",
+   "method": "laplace",
+   "ms": 0.012255834415555,
+   "mb": 1.634833,
+   "footprint_how": "published wheel plus the compiled core",
+   "med_dll": 0.0,
+   "q25": 0.0,
+   "q75": 0.0,
+   "n_series": null,
+   "win_frac": null
+  },
+  {
+   "name": "laplace (pure Python)",
+   "group": "laplace",
+   "method": "laplace",
+   "ms": 0.2857736125588417,
+   "mb": 0.108353,
+   "footprint_how": "published wheel, no dependencies",
+   "med_dll": 0.0,
+   "q25": 0.0,
+   "q75": 0.0,
+   "n_series": null,
+   "win_frac": null
+  },
+  {
+   "name": "Timestral-209M",
+   "group": "fm",
+   "method": "Timestral-209M(q21)",
+   "ms": 30.48975020647049,
+   "mb": 837.271648,
+   "footprint_how": "weight files as cached from the Hub",
+   "med_dll": 0.044284093750000086,
+   "q25": -0.08889299999999878,
+   "q75": 0.27863241015624984,
+   "n_series": 10768,
+   "win_frac": 0.6027117384843982
+  },
+  {
+   "name": "Timestral-28M",
+   "group": "fm",
+   "method": "Timestral-28M(q21)",
+   "ms": 5.54662523791194,
+   "mb": 111.296464,
+   "footprint_how": "weight files as cached from the Hub",
+   "med_dll": 0.02377982031250031,
+   "q25": -0.11624640234374972,
+   "q75": 0.23328735156250013,
+   "n_series": 10768,
+   "win_frac": 0.5650074294205052
+  },
+  {
+   "name": "t0-gamma",
+   "group": "fm",
+   "method": "t0-gamma(q21)",
+   "ms": 40.0977092795074,
+   "mb": 1022.492908,
+   "footprint_how": "weight files as cached from the Hub",
+   "med_dll": 0.0030828984374999813,
+   "q25": -0.2304574921875,
+   "q75": 0.2052229374999991,
+   "n_series": 10768,
+   "win_frac": 0.5087295690936107
+  },
+  {
+   "name": "TimesFM 3.0",
+   "group": "fm",
+   "method": "TimesFM3(wide)",
+   "ms": 66.942457575351,
+   "mb": 3968.696472,
+   "footprint_how": "weight files as cached from the Hub",
+   "med_dll": 0.0011801171875003846,
+   "q25": -0.2411685156250003,
+   "q75": 0.19356108984375042,
+   "n_series": 10768,
+   "win_frac": 0.5260029717682021
+  },
+  {
+   "name": "TimesFM 2.5",
+   "group": "fm",
+   "method": "TimesFM(wide)",
+   "ms": 317.05083418637514,
+   "mb": 925.181104,
+   "footprint_how": "weight files as cached from the Hub",
+   "med_dll": -0.030536109375000287,
+   "q25": -0.43911526562500036,
+   "q75": 0.0907879062500001,
+   "n_series": 7221,
+   "win_frac": 0.44606010247888106
+  },
+  {
+   "name": "TiRex",
+   "group": "fm",
+   "method": "TiRex(wide)",
+   "ms": 94.08704238012433,
+   "mb": 141.230262,
+   "footprint_how": "weight files as cached from the Hub",
+   "med_dll": -0.060637046875000156,
+   "q25": -0.4739790312500003,
+   "q75": 0.0916644843750003,
+   "n_series": 7221,
+   "win_frac": 0.38706550339288187
+  },
+  {
+   "name": "Chronos-Bolt-small",
+   "group": "fm",
+   "method": "Chronos(wide)",
+   "ms": 7.339457981288433,
+   "mb": 190.888824,
+   "footprint_how": "weight files as cached from the Hub",
+   "med_dll": -0.12843214062499997,
+   "q25": -0.6188856054687505,
+   "q75": 0.02654671093750019,
+   "n_series": 7246,
+   "win_frac": 0.29409329285122826
+  }
+ ]
+}

@@ -26,6 +26,13 @@
       <nav>
         <a href="/">Home</a>
         <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
             <a href="/challengers.html">Standalone</a>
@@ -48,7 +55,6 @@
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
-        <a href="/performance.html">Performance</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
@@ -108,22 +114,19 @@
       forecast issued for it, so <code>state["z"]</code> is a normalized residual and
       <code>state["pit"]</code> its probability integral transform.
       <a href="/demos/normalization.html">See it live →</a>
-      Turning that signal into streaming anomaly detection with honest false-alarm rates is
+      Turning that signal into streaming anomaly detection with measured false-alarm rates is
       its own project, <a href="https://timemachines.microprediction.org/">timemachines</a>,
       built on skaters.
     </p>
 
     <figure class="hero-figure">
-      <img src="./assets/frontier.svg" alt="Accuracy vs speed frontier: laplace sits top-right,
-        fastest and tied for the best held-out likelihood; the PyMC-laplace sandwich edges it on
-        accuracy at about ten times the compute, and the classical baselines trade accuracy for
-        speed." />
-      <figcaption>Held-out accuracy vs. runtime on 2,775 non-price FRED series. <code>laplace</code>
-        sits top-right: fastest, and tied for the best likelihood. The <strong>PyMC-laplace
-        sandwich</strong> edges it on accuracy at ~10&times; the compute; the classical baselines
-        (AutoARIMA, AutoETS, SARIMAX, GARCH-t) trade accuracy for speed.
-        <a href="/benchmarks.html">The benchmarks →</a></figcaption>
+      <div id="frontier3d" style="width:100%;min-height:520px;"></div>
+      <figcaption><span id="frontier3d-caption">Accuracy, speed and footprint, one point per model;
+        every coordinate is measured. Drag to rotate.</span>
+        <a href="/benchmarks.html">The benchmarks &rarr;</a></figcaption>
     </figure>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+    <script src="./assets/frontier3d.js"></script>
 
     <figure class="hero-figure">
       <img src="./assets/radar.svg" alt="Radar chart of per-regime win-rate against laplace on

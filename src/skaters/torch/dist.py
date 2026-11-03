@@ -191,6 +191,55 @@ class TorchDist:
         """Component-wise ``(m, s) -> (fn_m(m, s), fn_s(m, s))``, weights kept."""
         return TorchDist(self.w, fn_m(self.m, self.s), fn_s(self.m, self.s), _trusted=True)
 
+    def prune(self, max_components: int = 20) -> "TorchDist":
+        """``Dist.prune`` on tensors: closest-pair moment-matching merges.
+        Pair selection runs on detached floats exactly as the reference
+        (sorted by (mean, std, weight); first pair within ``1e-9 * span`` of
+        the minimum distance), so the discrete merge path is identical; the
+        merged weights, means and stds are tensor arithmetic, so gradients
+        flow through the surviving components."""
+        max_components = max(1, max_components)
+        comps = list(zip(self.w, self.m, self.s))
+        if len(comps) <= max_components:
+            return self
+
+        def _f(x):
+            return float(x.detach()) if hasattr(x, "detach") else float(x)
+        comps.sort(key=lambda c: (_f(c[1]), _f(c[2]), _f(c[0])))
+        scale = (_f(comps[-1][1]) - _f(comps[0][1])) + 1e-12
+        while len(comps) > max_components:
+            means = [_f(c[1]) for c in comps]
+            best_dist = float("inf")
+            for i in range(len(comps)):
+                for j in range(i + 1, len(comps)):
+                    dd = abs(means[i] - means[j])
+                    if dd < best_dist:
+                        best_dist = dd
+            thresh = best_dist + 1e-9 * scale
+            best_i = best_j = None
+            for i in range(len(comps)):
+                for j in range(i + 1, len(comps)):
+                    if abs(means[i] - means[j]) <= thresh:
+                        best_i, best_j = i, j
+                        break
+                if best_i is not None:
+                    break
+            if best_i is None:          # only with a NaN mean; terminate like the reference
+                best_i, best_j = 0, 1
+            wi, mi, si = comps[best_i]
+            wj, mj, sj = comps[best_j]
+            w_new = wi + wj
+            if bool(w_new < 1e-300):
+                m_new = 0.5 * (mi + mj)
+                s_new = torch.clamp(torch.maximum(si, sj), min=1e-12)
+            else:
+                m_new = (wi * mi + wj * mj) / w_new
+                v_new = (wi * (si * si + (mi - m_new) ** 2) + wj * (sj * sj + (mj - m_new) ** 2)) / w_new
+                s_new = torch.sqrt(torch.clamp(v_new, min=0.0))
+            comps[best_i] = (w_new, m_new, s_new)
+            comps.pop(best_j)
+        return TorchDist([c[0] for c in comps], [c[1] for c in comps], [c[2] for c in comps])
+
     def __len__(self) -> int:
         return int(self.w.numel())
 

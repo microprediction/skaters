@@ -21,10 +21,20 @@ argument:
         large, and it is the regime a live deployment actually runs in.
 
 Both the Rust core (skaters_fast) and the pure-Python reference are timed, since
-they differ by ~18x and a published ratio has to say which one it means.
+they differ by an order of magnitude and a published ratio has to say which one it means.
 
     PYTHONPATH=src:benchmarks .venv-gifteval/bin/python benchmarks/perf_compare.py
     ... writes benchmarks/perf_results.json and docs/performance.html
+
+Models that live in their own virtual environment (Timestral, t0-gamma,
+TimesFM 3.0, Sundial) are measured there with PERF_ONLY=<group>, which
+replaces that group's rows in perf_results.json and re-renders the page,
+so one results file carries every model measured on the same machine:
+
+    PERF_ONLY=timestral PYTHONPATH=src:benchmarks .venv-timestral/bin/python benchmarks/perf_compare.py
+    PERF_ONLY=t0        PYTHONPATH=src:benchmarks .venv-t0/bin/python        benchmarks/perf_compare.py
+    PERF_ONLY=timesfm3  PYTHONPATH=src:benchmarks .venv-timesfm3/bin/python  benchmarks/perf_compare.py
+    PERF_ONLY=sundial   PYTHONPATH=src:benchmarks .venv-sundial/bin/python   benchmarks/perf_compare.py
 """
 from __future__ import annotations
 import os
@@ -79,6 +89,80 @@ def stamp():
             "machine": f"{platform.system()} {platform.machine()}",
             "torch_threads": THREADS, "context": L, "horizon": H, "series": NSER,
             "date": time.strftime("%Y-%m-%d")}
+
+
+PERF_ONLY = os.environ.get("PERF_ONLY", "")
+
+# model-name prefixes owned by each PERF_ONLY group (rows replaced on merge)
+GROUPS = {
+    "timestral": ("Timestral-",),
+    "t0": ("t0-gamma",),
+    "timesfm3": ("TimesFM-3.0",),
+    "sundial": ("Sundial-",),
+}
+
+
+def measure_only(group):
+    """Measure one venv-bound group; everything else is left to the main run."""
+    rows = []
+
+    def add(model, regime, ms, note):
+        rows.append({"model": model, "regime": regime, "ms": ms, "note": note})
+
+    def fm(name, call, params):
+        try:
+            call(CTX[:2])
+        except Exception as e:                                   # noqa: BLE001
+            add(name, "cold", float("nan"), f"unavailable: {type(e).__name__}: {str(e)[:70]}")
+            return
+        for bs in BATCHES:
+            def run(bs=bs):
+                for i in range(0, NSER, bs):
+                    call(CTX[i:i + bs])
+            add(name, f"cold b={bs}", med(run) / NSER * 1000, f"{params}, batched")
+        add(name, "warm", med(lambda: call(CTX[:1]), reps=5) * 1000, "stateless: full re-forward")
+
+    if group == "timestral":
+        from timestral import TimestralForecaster
+        import arm_adapters as aa
+        for size, params in (("209M", "209M params"), ("28M", "28M params")):
+            m = TimestralForecaster.from_pretrained(f"mistralai/Timestral-{size}", device="cpu",
+                                                    revision=aa.TIMESTRAL_REVISIONS[size])
+            def c_ts(cs, m=m):
+                m.forecast(np.asarray(cs, dtype=np.float32)[:, None, :], prediction_length=1,
+                           symmetric_averaging=False, clip_nonnegative=False)
+            fm(f"Timestral-{size}", c_ts, params)
+    elif group == "t0":
+        import torch
+        from t0 import T0Forecaster
+        import arm_adapters as aa
+        m = T0Forecaster.from_pretrained(aa.T0_MODEL_ID, revision=aa.T0_MODEL_REVISION).eval()
+        def c_t0(cs):
+            with torch.no_grad():
+                m.predict(torch.from_numpy(np.asarray(cs, dtype=np.float32)), horizon=1,
+                          quantile_levels=aa.LEVELS21, trim_leading_missing=True,
+                          symmetric_averaging=False, clip_nonnegative=False, snap_integers=False)
+        fm("t0-gamma", c_t0, "256M params")
+    elif group == "timesfm3":
+        from timesfm3 import TimesFM3Evaluator, ModelConfig
+        m = TimesFM3Evaluator(ModelConfig(checkpoint_path="google/timesfm-3.0-pytorch",
+                                          per_core_batch_size=64, device="cpu"))
+        def c_tf3(cs):
+            list(m.predict_batch([np.asarray(c, dtype=np.float32) for c in cs], horizon=1,
+                                 return_quantiles=True, use_symmetric_averaging=False,
+                                 make_positive=False, univariate=True))
+        fm("TimesFM-3.0", c_tf3, "3.0 checkpoint")
+    elif group == "sundial":
+        import torch
+        from transformers import AutoModelForCausalLM
+        sd = AutoModelForCausalLM.from_pretrained("thuml/sundial-base-128m", trust_remote_code=True).eval()
+        def c_sd(cs):
+            with torch.no_grad():
+                sd.generate(torch.tensor(np.asarray(cs, dtype=np.float32)), num_samples=30, max_new_tokens=1)
+        fm("Sundial-base-128m", c_sd, "128M params, 30 sample paths")
+    else:
+        raise SystemExit(f"unknown PERF_ONLY group {group!r}; have {sorted(GROUPS)}")
+    return rows
 
 
 def measure():
@@ -166,19 +250,6 @@ def measure():
         add("TiRex", "cold", float("nan"), f"load failed: {type(e).__name__}")
 
     try:
-        from transformers import AutoModelForCausalLM
-        sd = AutoModelForCausalLM.from_pretrained("thuml/sundial-base-128m",
-                                                  trust_remote_code=True).eval()
-
-        def c_sundial(cs):
-            with torch.no_grad():
-                sd.generate(torch.tensor(np.stack(cs), dtype=torch.float32),
-                            num_samples=30, max_new_tokens=H)
-        fm("Sundial-base-128m", c_sundial, "128M params, 30 sample paths")
-    except Exception as e:                                       # noqa: BLE001
-        add("Sundial-base-128m", "cold", float("nan"), f"load failed: {type(e).__name__}")
-
-    try:
         # Convention copied from foundation_study.timesfm_dists: the 2.5 torch
         # class plus an explicit compile(), not the older TimesFm(hparams=...)
         # constructor, which does not exist in this version.
@@ -247,6 +318,8 @@ def measure():
 
 
 def render(rows, meta):
+    by = {(r["model"], r["regime"]): r["ms"] for r in rows}
+    py_rust = by[("laplace (Python) k=1", "warm")] / by[("laplace (Rust) k=1", "warm")]
     import sys
     sys.path.insert(0, os.path.join(ROOT, "docs"))
     from sweep_nav import CANONICAL                              # one nav source of truth
@@ -345,9 +418,9 @@ def render(rows, meta):
         foundation model can be cheaper per series than laplace replaying a history.
         Streaming, laplace is orders of magnitude cheaper. Which number applies depends
         entirely on whether you are scoring a benchmark or running a service.</li>
-      <li><strong>Rust and Python differ by roughly 18&times;.</strong> Ratios here are
-        against the Rust core (<code>skaters_fast</code>), which is what ships; the
-        pure-Python reference is correspondingly slower.</li>
+      <li><strong>Rust and Python differ by {py_rust:.0f}&times;</strong> (k=1, streaming,
+        this run). Ratios here are against the Rust core (<code>skaters_fast</code>), which
+        is what ships; the pure-Python reference is correspondingly slower.</li>
       <li><strong>Horizon costs laplace.</strong> Going from k=1 to k={H} costs it roughly
         an order of magnitude, because the multi-scale ensemble runs a full candidate pool
         per decimation stride per horizon.</li>
@@ -356,7 +429,8 @@ def render(rows, meta):
         implementations as configured, not architectures in the abstract.</li>
       <li><strong>Dependencies are not in the table.</strong> laplace is pure Python (and
         JavaScript, and Rust) with no weights to download and runs in a browser; the
-        foundation models need torch and hundreds of megabytes of weights.</li>
+        foundation models need torch and hundreds of megabytes of weights. Size, dependencies
+        and checkpoint bytes are measured on the <a href="/footprint.html">footprint page</a>.</li>
     </ul>
 
     <h2>Reproducing this</h2>
@@ -392,9 +466,27 @@ def render(rows, meta):
 
 def main():
     meta = stamp()
-    rows = measure()
-    out = {"meta": meta, "rows": rows}
     jp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perf_results.json")
+    if PERF_ONLY:
+        new = measure_only(PERF_ONLY)
+        prefixes = GROUPS[PERF_ONLY]
+        prev = json.load(open(jp)) if os.path.exists(jp) else {"meta": meta, "rows": []}
+        kept = [r for r in prev["rows"] if not r["model"].startswith(prefixes)]
+        rows = kept + new
+        meta = dict(prev.get("meta", meta))
+        meta.setdefault("groups", {})[PERF_ONLY] = stamp()
+    else:
+        rows = measure()
+        prev = json.load(open(jp)) if os.path.exists(jp) else {"rows": [], "meta": {}}
+        # the venv-bound groups are measured by their own runs: drop any row of
+        # theirs this run produced (a load failure here is not a measurement)
+        # and keep the group rows from the previous results file
+        extra_prefixes = tuple(p for g in GROUPS.values() for p in g)
+        rows = ([r for r in rows if not r["model"].startswith(extra_prefixes)]
+                + [r for r in prev["rows"] if r["model"].startswith(extra_prefixes)])
+        if prev.get("meta", {}).get("groups"):
+            meta["groups"] = prev["meta"]["groups"]
+    out = {"meta": meta, "rows": rows}
     with open(jp, "w") as fh:
         json.dump(out, fh, indent=1)
     hp = os.path.join(ROOT, "docs", "performance.html")

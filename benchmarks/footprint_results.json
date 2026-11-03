@@ -1,0 +1,26 @@
+{
+ "python_bytes": 299202,
+ "python_lines": 7284,
+ "python_files": 28,
+ "js_bytes": 116972,
+ "js_lines": 3148,
+ "rust_bytes": 152419,
+ "rust_lines": 4855,
+ "fast_so_bytes": 1526480,
+ "dependencies": "[]",
+ "pypi_version": "0.16.0",
+ "wheel_bytes": 108353,
+ "import_ms": 22.31558319181204,
+ "laplace_k1_state_pickle_bytes": 23599,
+ "laplace_k1_resident_bytes": 196800,
+ "laplace_k1_peak_bytes": 209384,
+ "laplace_k3_state_pickle_bytes": 134850,
+ "laplace_k3_resident_bytes": 1051672,
+ "laplace_k3_peak_bytes": 1093008,
+ "meta": {
+  "date": "2026-10-28",
+  "python": "3.13.7",
+  "machine": "arm64",
+  "commit": "4fa186b"
+ }
+}
