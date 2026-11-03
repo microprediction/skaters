@@ -61,18 +61,23 @@ from skaters import laplace
 def whiten(stream):
     """Stateful, prequential alternative to a rolling z-score.
     Approximately normal only when the predictive CDF is calibrated and continuous;
-    preserves warm-up None values and uses the parade's numerical PIT clamp."""
+    preserves None values (warm-up, missing ticks or non-finite CDF values)
+    and uses the parade's numerical PIT clamp."""
     f = laplace(1)
     state = None
     for y in stream:
         _, state = f(y, state)
         z = state["z"][0]          # standardized surprise of y under F issued for it
-        yield z                    # None during warmup, then ~N(0,1) when calibrated
+        yield z                    # preserve every tick, including every None
 ```
 
 The `z` stream is what you feed downstream: check its calibration before
 assigning nominal probabilities to thresholds, histogram it, or adapt the old
-z-score consumer to handle warm-up `None`s and the changed statistical meaning.
+z-score consumer to handle every `None` and the changed statistical meaning.
+`None` can occur after warm-up too, for missing observations or non-finite CDF
+values. Preserve its time position when downstream logic uses lags or horizons;
+skipping the numeric calculation at that tick is not the same as deleting the
+tick from the stream.
 For anomaly detection specifically
 the calibrated p-value machinery lives one layer up in the `timemachines`
 package (`wald`); see the [anomaly-detection](anomaly-detection.md) skill.
