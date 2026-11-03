@@ -18,6 +18,7 @@ Env:
   PRED_OUT      output CSV (canonical schema). Required.
   ARM_MAX       cap series per arm (0 = all). Smoke tests.
   ARM_REGIME    econ | price: keep only that stratum (default both).
+  ARM_SPLIT     train | valid: keep one half of the family split (learned_split.py).
   ARM_NSHARD / ARM_SHARDS   fleet sharding by series residue (disjoint files).
   FM_CTX / FM_TEST / FM_DEVICE / FM_SAMPLES   inference protocol (foundation_study).
 
@@ -68,6 +69,7 @@ ARM = os.environ.get("ARM_CORPUS", "")
 OUT = os.environ.get("PRED_OUT", "")
 ARM_MAX = int(os.environ.get("ARM_MAX", 0))
 REGIME = os.environ.get("ARM_REGIME", "")     # econ | price | "" (both)
+SPLIT = os.environ.get("ARM_SPLIT", "")       # train | valid | "" (both): the family split (learned_split)
 ARM_H = int(os.environ.get("ARM_H", "1"))     # forecast horizon k (1 = canonical study)
 NSHARD = int(os.environ.get("ARM_NSHARD", 1))
 SHARDS = {int(s) for s in os.environ.get("ARM_SHARDS", "0").split(",") if s != ""}
@@ -94,6 +96,9 @@ def main():
     series = list(iter_series(ARM))
     if REGIME:
         series = [x for x in series if regime(x[1]) == REGIME]
+    if SPLIT:
+        from learned_split import split_of
+        series = [x for x in series if split_of(x[0]) == SPLIT]
     if ARM_MAX:
         series = series[:ARM_MAX]
     series = [(j, x) for j, x in enumerate(series) if j % NSHARD in SHARDS]

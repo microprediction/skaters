@@ -302,6 +302,40 @@ class LearnedLaplace(nn.Module):
         return list(self.learned.parameters()) + list(self.gates.parameters())
 
 
+def detach_state(state):
+    """Return the state with every tensor detached (a training window boundary
+    for truncated backprop: the values carry on, the graph does not). Dicts and
+    lists are rebuilt in place; tuples and deques are rebuilt as the same type."""
+    if torch.is_tensor(state):
+        return state.detach()
+    if isinstance(state, dict):
+        for key in list(state.keys()):
+            state[key] = detach_state(state[key])
+        return state
+    if isinstance(state, list):
+        for i in range(len(state)):
+            state[i] = detach_state(state[i])
+        return state
+    if isinstance(state, deque):
+        items = [detach_state(x) for x in state]
+        return deque(items, maxlen=state.maxlen)
+    if isinstance(state, tuple):
+        return tuple(detach_state(x) for x in state)
+    if isinstance(state, (TorchDist, TorchSplicedDist, MixtureDist)):
+        return _detach_dist(state)
+    return state
+
+
+def _detach_dist(d):
+    if isinstance(d, TorchDist):
+        return TorchDist(d.w.detach(), d.m.detach(), d.s.detach(), _trusted=True)
+    if isinstance(d, TorchSplicedDist):
+        return TorchSplicedDist.from_reference(d.to_reference())
+    if isinstance(d, MixtureDist):
+        return MixtureDist([_detach_dist(x) for x in d.dists], d.log_w.detach())
+    return d
+
+
 def learned(k: int = 1, pi_lap: float = 0.5, gate_hidden: int = 32, tails: str = "gpd") -> LearnedLaplace:
     """Factory in the skater style: ``f(y, state) -> (dists, state)``."""
     return LearnedLaplace(k=k, pi_lap=pi_lap, gate_hidden=gate_hidden, tails=tails)
