@@ -11,85 +11,96 @@ import random
 from skaters.conjugate import conjugate
 from skaters.dist import Dist
 from skaters.leaf import leaf
-from skaters.residual_variance_lens import ResidualVarianceLens
+from skaters.residual_variance_lens import residual_variance_lens
 from skaters.robust_mad_standardize import robust_mad_standardize
 from skaters.transform import standardize
+
+_EPS = 1e-12
 
 
 def _alternating(value: float, n: int) -> list[float]:
     return [value if i % 2 == 0 else -value for i in range(n)]
 
 
+def _feed(update, values, state=None):
+    outputs = []
+    for value in values:
+        feature, state = update(value, state)
+        outputs.append(feature)
+    return outputs, state
+
+
 # --- residual variance lens: diagnostic, frozen reference -------------------
 
 def test_lens_is_silent_until_the_reference_freezes():
-    lens = ResidualVarianceLens(burn_in=6, window=4)
-    for value in _alternating(1.0, 5):
-        assert lens.update(value) == 0.0
-        assert lens.ref_var is None
-    assert lens.update(-1.0) == 0.0
-    assert lens.ref_var == 1.0 + lens.eps
+    update = residual_variance_lens(burn_in=6, window=4)
+    outputs, state = _feed(update, _alternating(1.0, 5))
+    assert outputs == [0.0] * 5
+    assert state["ref_var"] is None
+    feature, state = update(-1.0, state)
+    assert feature == 0.0
+    assert state["ref_var"] == 1.0 + _EPS
 
 
 def test_lens_freezes_the_reference_and_reports_the_variance_ratio():
-    lens = ResidualVarianceLens(burn_in=20, window=20)
-    for value in _alternating(1.0, 20):
-        lens.update(value)
-    frozen = lens.ref_var
-    for value in _alternating(3.0, 20):
-        feature = lens.update(value)
-    assert lens.ref_var == frozen
-    assert abs(feature - math.log((9.0 + lens.eps) / frozen)) < 1e-12
+    update = residual_variance_lens(burn_in=20, window=20)
+    _, state = _feed(update, _alternating(1.0, 20))
+    frozen = state["ref_var"]
+    outputs, state = _feed(update, _alternating(3.0, 20), state)
+    assert state["ref_var"] == frozen
+    assert abs(outputs[-1] - math.log((9.0 + _EPS) / frozen)) < 1e-12
 
 
-def test_lens_loses_sign_and_has_no_inverse():
-    positive = ResidualVarianceLens(burn_in=4, window=4)
-    negative = ResidualVarianceLens(burn_in=4, window=4)
-    for value in _alternating(1.0, 4):
-        positive.update(value)
-        negative.update(value)
-    last_pos = last_neg = None
-    for value in _alternating(2.0, 4):
-        last_pos = positive.update(value)
-        last_neg = negative.update(-value)
-    assert last_pos == last_neg
-    assert not hasattr(positive, "inverse")
+def test_lens_loses_sign():
+    update = residual_variance_lens(burn_in=4, window=4)
+    _, warm = _feed(update, _alternating(1.0, 4))
+    positive, _ = _feed(update, _alternating(2.0, 4), warm)
+    negative, _ = _feed(update, [-x for x in _alternating(2.0, 4)], warm)
+    assert positive == negative
 
 
-def test_lens_streams_do_not_share_a_reference():
-    quiet = ResidualVarianceLens(burn_in=8, window=4)
-    loud = ResidualVarianceLens(burn_in=8, window=4)
-    for value in _alternating(1.0, 8):
-        quiet.update(value)
-    for value in _alternating(4.0, 8):
-        loud.update(value)
-    assert quiet.ref_var != loud.ref_var
+def test_lens_streams_keep_separate_state():
+    update = residual_variance_lens(burn_in=8, window=4)
+    _, quiet = _feed(update, _alternating(1.0, 8))
+    _, loud = _feed(update, _alternating(4.0, 8))
+    assert quiet["ref_var"] != loud["ref_var"]
+    snapshot = json.dumps(quiet)
+    update(100.0, quiet)
+    assert json.dumps(quiet) == snapshot
+
+
+def test_lens_state_roundtrips_through_json():
+    update = residual_variance_lens(burn_in=10, window=6)
+    rng = random.Random(2)
+    series = [rng.gauss(0.0, 1.0) for _ in range(40)]
+    _, state = _feed(update, series[:20])
+    restored = json.loads(json.dumps(state))
+    for value in series[20:]:
+        a, state = update(value, state)
+        b, restored = update(value, restored)
+        assert a == b
 
 
 def test_lens_log_ratio_stays_finite_for_a_flat_reference():
     """A flat reference makes the variance quotient overflow before log."""
-    lens = ResidualVarianceLens(burn_in=2, window=2)
-    values = [lens.update(x) for x in (0.0, 0.0, 1e150, -1e150)]
-    assert values[:3] == [0.0, 0.0, 0.0]
-    assert math.isfinite(values[3])
-    assert abs(values[3] - 718.4065490141422) < 1e-9
+    update = residual_variance_lens(burn_in=2, window=2)
+    outputs, _ = _feed(update, (0.0, 0.0, 1e150, -1e150))
+    assert outputs[:3] == [0.0, 0.0, 0.0]
+    assert math.isfinite(outputs[3])
+    assert abs(outputs[3] - 718.4065490141422) < 1e-9
 
 
 def test_lens_ignores_non_finite_and_overflowing_residuals():
-    lens = ResidualVarianceLens(burn_in=4, window=4)
-    for value in _alternating(1.0, 4):
-        lens.update(value)
-    for value in _alternating(1.0, 4):
-        settled = lens.update(value)
-    assert lens.update(float("nan")) == settled
-    assert lens.update(float("inf")) == settled
-    assert lens.update(1e200) == settled
-    assert lens.ref_var == 1.0 + lens.eps
-    again = None
-    for value in _alternating(1.0, 4):
-        again = lens.update(value)
-    assert math.isfinite(again)
-    assert abs(again - settled) < 1e-12
+    update = residual_variance_lens(burn_in=4, window=4)
+    outputs, state = _feed(update, _alternating(1.0, 8))
+    settled = outputs[-1]
+    for bad in (float("nan"), float("inf"), 1e200):
+        feature, state = update(bad, state)
+        assert feature == settled
+    assert state["ref_var"] == 1.0 + _EPS
+    outputs, _ = _feed(update, _alternating(1.0, 4), state)
+    assert math.isfinite(outputs[-1])
+    assert abs(outputs[-1] - settled) < 1e-12
 
 
 # --- robust MAD: conjugate transform ----------------------------------------

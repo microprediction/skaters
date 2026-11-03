@@ -26,7 +26,7 @@ from skaters.transform import (
     yeo_johnson,
 )
 from skaters.robust_mad_standardize import robust_mad_standardize
-from skaters.residual_variance_lens import ResidualVarianceLens
+from skaters.residual_variance_lens import residual_variance_lens
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
 from skaters.api import laplace, dantzig
@@ -74,7 +74,7 @@ __all__ = [
     "holt_linear",
     "theta",
     "robust_mad_standardize",
-    "ResidualVarianceLens",
+    "residual_variance_lens",
     # Ensembles and search
     "precision_weighted_ensemble",
     "bayesian_ensemble",

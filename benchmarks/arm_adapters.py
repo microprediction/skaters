@@ -1114,8 +1114,7 @@ def make_registry(h=1):
         "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
         "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
-        # leaf conjugates. On a heavy-tailed stream leaf+robust-mad beats
-        # leaf+standardize; tests/test_robust_transforms.py pins that gap.
+        # robust_mad_standardize vs standardize under the same leaf (PR #307)
         "leaf+standardize": lambda ch: _leaf_conjugate_dists(ch, standardize(), h),
         "leaf+robust-mad":  lambda ch: _leaf_conjugate_dists(
             ch, robust_mad_standardize(), h),
