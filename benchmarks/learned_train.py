@@ -56,6 +56,7 @@ PI_LAP = float(os.environ.get("LT_PI", 0.5))
 OUT = os.environ.get("LT_OUT", f"benchmarks/learned_ckpt/{CORPUS}_k{K}.pt")
 SEED = int(os.environ.get("LT_SEED", 0))
 CKPT_EVERY = int(os.environ.get("LT_CKPT_EVERY", 25))     # series between checkpoints
+SNAP_EVERY = int(os.environ.get("LT_SNAP_EVERY", 0))      # keep a numbered snapshot every N series (0 = off)
 RESUME = os.environ.get("LT_RESUME", "")                   # checkpoint to continue from
 SHUFFLE = int(os.environ.get("LT_SHUFFLE", 1))             # seeded order so families mix
 HIST = ra.aa.fs.HIST
@@ -134,6 +135,10 @@ def run_epoch(model, opt, series, epoch, start_at=0, history=None):
                   f"eta {eta:.0f} min", flush=True)
         if CKPT_EVERY and (j + 1) % CKPT_EVERY == 0 and j + 1 < len(series):
             save(model, opt, series, epoch, j + 1, history or [])
+        if SNAP_EVERY and (j + 1) % SNAP_EVERY == 0:
+            # a snapshot that later passes never overwrite: pick the best by validation
+            save(model, opt, series, epoch, j + 1, history or [],
+                 path=OUT.replace(".pt", f"_e{epoch}s{j + 1}.pt"))
     return tot_lrn / max(n_scored, 1), tot_lap / max(n_scored, 1), n_scored
 
 
