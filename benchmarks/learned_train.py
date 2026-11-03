@@ -170,6 +170,8 @@ def main():
         start_at = 0
         history.append({"epoch": epoch, "learned_ll": lrn, "laplace_ll": lap, "n_scored": n})
         save(model, opt, series, epoch, len(series), history)
+        # keep every epoch's end state: a later epoch's periodic checkpoints overwrite OUT
+        save(model, opt, series, epoch, len(series), history, path=OUT.replace(".pt", f"_e{epoch}.pt"))
         print(f"[learned_train] epoch {epoch}: learned {lrn:+.4f} laplace {lap:+.4f} "
               f"delta {lrn - lap:+.4f} nats/step (in-sample); checkpoint -> {OUT}", flush=True)
     with open(OUT + ".json", "w") as fh:
