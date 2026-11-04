@@ -64,6 +64,7 @@ CANONICAL = """  <header class="site-header">
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
             <a href="/faq.html">FAQ</a>
             <a href="/skills.html">Skills</a>
           </span>
