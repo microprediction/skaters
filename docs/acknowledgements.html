@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; acknowledgements</title>
+  <meta name="description" content="People who contributed code, reviews and ideas to skaters, and what became of each idea." />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    table.ack { border-collapse: collapse; width: 100%; margin: 6px 0 22px; }
+    table.ack th, table.ack td { border-bottom: 1px solid #e5e5e5; padding: 7px 9px; text-align: left; vertical-align: top; font-size: .93rem; }
+    table.ack th { border-bottom: 2px solid #bbb; font-weight: 600; }
+    .st { display: inline-block; font-size: .75rem; border-radius: 3px; padding: 1px 7px; white-space: nowrap; }
+    .st.merged { background: #e3f3e8; color: #1a6b3a; }
+    .st.tested { background: #ece9ff; color: #3b2fb0; }
+    .st.queued { background: #f3efe3; color: #7a5a12; }
+    .st.covered { background: #eef1f4; color: #4a5560; }
+    .st.review { background: #fdf0e6; color: #8a4b12; }
+    .muted { color: #777; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Acknowledgements</h1>
+    <p class="lede">skaters is better for the people below. Each row says what they contributed and what
+      became of it.</p>
+
+    <h2>Code and reviews</h2>
+    <table class="ack">
+      <thead><tr><th>who</th><th>contribution</th><th>status</th></tr></thead>
+      <tbody>
+        <tr><td>spencer-ak</td><td>TiRex-2 challenger and the frozen M4-hourly benchmark
+          (<a href="https://github.com/microprediction/skaters/pull/159">#159</a>); a correction to
+          the TimesFM 2.5 distillation contract
+          (<a href="https://github.com/microprediction/skaters/pull/158">#158</a>).</td>
+          <td><span class="st merged">merged</span></td></tr>
+        <tr><td>verityengine</td><td>A localized search bracket and scale-relative tolerance for
+          <code>Dist.quantile</code>
+          (<a href="https://github.com/microprediction/skaters/pull/176">#176</a>).</td>
+          <td><span class="st review">in review</span></td></tr>
+        <tr><td>Endre Moen</td><td>Robust median/MAD standardization and a residual variance-ratio
+          lens (<a href="https://github.com/microprediction/skaters/pull/307">#307</a>), from his work
+          on real-time structural breaks.</td>
+          <td><span class="st review">in review</span></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Ideas</h2>
+    <p>Suggestions for new transforms and model features, most from the discussion collected in
+      <a href="https://github.com/microprediction/skaters/issues/319">issue #319</a>. The queue of what is
+      being built and tested next is in
+      <a href="https://github.com/microprediction/skaters/issues/320">issue #320</a>.</p>
+    <table class="ack">
+      <thead><tr><th>who</th><th>idea</th><th>status</th></tr></thead>
+      <tbody>
+        <tr><td>Kaveh Nobari</td><td>Fourier terms for multiple or non-integer seasonalities; differences
+          of fractional order for I(d) series.</td>
+          <td><span class="st tested">tested</span> <span class="muted">Fourier at 52.18 weeks; fractional
+          differencing is already in the pool</span></td></tr>
+        <tr><td>Petros Zerfos</td><td>Multiple seasonality as in BATS; Box&ndash;Cox.</td>
+          <td><span class="st tested">tested</span> <span class="muted">extra periods 52 and 168; Box&ndash;Cox
+          is covered by Yeo&ndash;Johnson</span></td></tr>
+        <tr><td>Endre Moen</td><td>Robust standardization, a residual variance-ratio lens, and a
+          whitened likelihood check that tells the chain when to reset its memory.</td>
+          <td><span class="st queued">queued</span></td></tr>
+        <tr><td>Ndetto Mbalu</td><td>A scaled logit for bounded series such as rates and proportions;
+          a Kalman or Hodrick&ndash;Prescott trend filter that keeps short-term dynamics; median/IQR
+          normalization.</td><td><span class="st queued">queued</span></td></tr>
+        <tr><td>Georg M. Goerg</td><td>Lambert W transforms for heavy tails.</td>
+          <td><span class="st queued">queued</span></td></tr>
+        <tr><td>David Patschke</td><td>A complex-valued state-space transform with stable conjugate poles
+          whose frequency, phase and damping adapt online (after S4D, FITS and FreTS).</td>
+          <td><span class="st queued">queued</span></td></tr>
+        <tr><td>Sean Allen</td><td>Causal Hodrick&ndash;Prescott or Baxter&ndash;King filters, empirical mode
+          decomposition, the sinh-arcsinh transform, log-squared stochastic volatility coordinates,
+          dynamic time warping, and an online discrete wavelet transform.</td>
+          <td><span class="st queued">queued</span> <span class="muted">sinh-arcsinh and log-squared
+          first</span></td></tr>
+        <tr><td>Arthur Berd</td><td>ARIMA with exogenous inputs; wavelet transforms.</td>
+          <td><span class="st queued">queued</span></td></tr>
+        <tr><td>Lukas Schreiner</td><td>Lag-polynomial (ARMA) structure and the Wold decomposition.</td>
+          <td><span class="st queued">queued</span> <span class="muted">as a moving-average transform</span></td></tr>
+        <tr><td>Dale Rosenthal</td><td>Transfer functions, moving-average effects, vector versions.</td>
+          <td><span class="st queued">queued</span></td></tr>
+        <tr><td>Klaus Gl&uuml;ckert</td><td>A predicted changepoint.</td>
+          <td><span class="st queued">queued</span> <span class="muted">with Endre Moen's memory reset</span></td></tr>
+        <tr><td>Alex Ornatsky</td><td>Spike removal, as in power prices.</td>
+          <td><span class="st queued">queued</span></td></tr>
+        <tr><td>Konstantin Shmakov</td><td>Reflections <code>y &rarr; c &minus; y</code> and
+          <code>y &rarr; &minus;y</code>; time reversal; frequency transforms.</td>
+          <td><span class="st queued">queued</span> <span class="muted">reflection first</span></td></tr>
+        <tr><td>Fran&ccedil;ois P.</td><td>Kalman filters.</td>
+          <td><span class="st queued">queued</span></td></tr>
+        <tr><td>Albert Galick</td><td>Behavioural cohorts of aggregated series, with series that jump
+          between cohorts; phenomena an ordinary distribution describes badly.</td>
+          <td><span class="st covered">noted</span> <span class="muted">heavy tails are handled by the
+          GPD splice; cohorts are a multivariate question</span></td></tr>
+        <tr><td>Andrew Mureddu</td><td>Notes and a worked conversation on new transforms.</td>
+          <td><span class="st covered">noted</span></td></tr>
+      </tbody>
+    </table>
+
+    <p class="muted">Statuses: <b>merged</b> is in the library; <b>tested</b> was run through the
+      benchmark and the result is recorded; <b>queued</b> is in the build queue; <b>in review</b> is an
+      open pull request; <b>noted</b> is read and answered. If your contribution is missing or
+      misdescribed, open an issue.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family.
+  </footer>
+</body>
+</html>
