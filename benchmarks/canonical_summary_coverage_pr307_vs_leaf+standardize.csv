@@ -1,0 +1,7 @@
+study,method,n_steps,cov_central90,cal_median
+daily:econ,leaf+robust-mad,39424,0.9288,0.5785
+daily:econ,leaf+standardize,39424,0.9319,0.5416
+daily:price,leaf+robust-mad,21632,0.9411,0.5329
+daily:price,leaf+standardize,21632,0.9458,0.5291
+m4-hourly:econ,leaf+robust-mad,26496,0.9267,0.5064
+m4-hourly:econ,leaf+standardize,26496,0.9481,0.5559
