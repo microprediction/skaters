@@ -34,7 +34,13 @@ GROUPS = {
                  "nn5_daily_with_missing", "uber_tlc_daily", "covid_mobility", "bitcoin_with_missing",
                  "sunspot_with_missing", "vehicle_trips_with_missing"],
     "weekly-gp2": ["cdc_fluview_ilinet", "cdc_fluview_who_nrevss", "project_tycho"],
+    "hourly-gp2": ["bdg-2_bear", "bdg-2_fox", "bdg-2_panther", "bdg-2_rat", "gfc12_load", "gfc14_load",
+                   "gfc17_load", "pedestrian_counts", "beijing_air_quality", "oikolab_weather", "spain",
+                   "smart", "ideal", "borealis", "covid19_energy", "elf", "hog", "bull", "cockatoo", "sceaux"],
 }
+# long series are cut into consecutive segments of this many changes (the trainer
+# uses at most HIST=1000 steps of a series, so a 17,544-hour series is 17 segments)
+SEGMENT = {"hourly-gp2": 1000}
 # GP_GROUPS=daily-gp,weekly-gp2 builds only those (default: all)
 ONLY = [g for g in os.environ.get("GP_GROUPS", "").split(",") if g]
 
@@ -53,7 +59,6 @@ def changes(vals):
 
 
 def main():
-    os.makedirs(PREDS, exist_ok=True)
     for corpus, subs in GROUPS.items():
         if ONLY and corpus not in ONLY:
             continue
@@ -76,10 +81,13 @@ def main():
                         rows = [tgt]
                     for j, vals in enumerate(rows):
                         ch = changes(vals)
-                        if len(ch) >= MIN_CHANGES:
-                            fh.write(json.dumps({"sid": f"gp:{sub}:{r['item_id']}:{j}",
-                                                 "title": f"giftpre {sub}", "ch": ch}) + "\n")
-                            k += 1
+                        seg = SEGMENT.get(corpus, 0)
+                        parts = [ch[a:a + seg] for a in range(0, len(ch), seg)] if seg else [ch]
+                        for q, part in enumerate(parts):
+                            if len(part) >= MIN_CHANGES:
+                                fh.write(json.dumps({"sid": f"gp:{sub}:{r['item_id']}:{j}" + (f":{q}" if seg else ""),
+                                                     "title": f"giftpre {sub}", "ch": part}) + "\n")
+                                k += 1
                 print(f"[giftpre] {corpus}: {sub} -> {k} series", flush=True)
                 n += k
         os.replace(out + ".tmp", out)
