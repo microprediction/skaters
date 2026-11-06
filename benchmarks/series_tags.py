@@ -8,8 +8,9 @@ the TabFM study pre-registered (tabfm_wide_study.characterize):
   martingality   lag-1 autocorrelation of changes: |rho1| < 0.05 is
                  "martingale", rho1 >= 0.05 "momentum", rho1 <= -0.05
                  "mean-reverting"
-  repeats        share of zero changes: < 5% "continuous", < 35% "mixed",
-                 else "sticky"
+  repeats        share of adjacent equal changes (on a sticky series, runs
+                 of zero change): < 5% "continuous", < 35% "mixed", else
+                 "sticky"
   heavy tails    excess kurtosis of changes above 3
   vol clustering lag-1 autocorrelation of |changes| above 0.2
   seasonal       autocorrelation of changes at the frequency's natural period

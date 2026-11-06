@@ -63,3 +63,15 @@ def test_state_json_round_trip():
     st2 = json.loads(json.dumps(st))
     d = [Dist.gaussian(0.2, 0.5)]
     assert [x.mean for x in inv(d, st)] == [x.mean for x in inv(d, st2)]
+
+
+def test_inverse_maps_back_at_the_end_of_warmup():
+    """After exactly `warmup` points the next forward transforms, so the inverse must too."""
+    rng = random.Random(4)
+    for n in (19, 20, 21):
+        fwd, inv = shash(0.3, 1.2, warmup=20)
+        _, st = _feed(fwd, [rng.gauss(0, 1) ** 3 for _ in range(n)])
+        y_next = 1.7
+        yp, _ = fwd(y_next, copy.deepcopy(st))
+        back = inv([Dist.gaussian(yp, 1e-9)], st)[0].mean
+        assert abs(back - y_next) < 1e-6, n

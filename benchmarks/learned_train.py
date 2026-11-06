@@ -70,9 +70,14 @@ FLOOR = -20.0
 
 
 def train_series():
-    series = [(sid, title, ch) for sid, title, ch in ra.iter_series(CORPUS)
-              if ra.regime(title) == "econ" and split_of(sid) == "train"]
-    series = [x for x in series if len(x[2][-HIST:]) >= ra.MINLEN]
+    # LT_BASE=0 skips the base corpus, so a run trains on LT_EXTRA alone (one
+    # shard of a sharded run whose weights are averaged afterwards)
+    if os.environ.get("LT_BASE", "1") == "0":
+        series = []
+    else:
+        series = [(sid, title, ch) for sid, title, ch in ra.iter_series(CORPUS)
+                  if ra.regime(title) == "econ" and split_of(sid) == "train"]
+        series = [x for x in series if len(x[2][-HIST:]) >= ra.MINLEN]
     # LT_EXTRA: comma list of extra corpora used whole for training (never
     # validated on), e.g. weekly-aug from weekly_augment.py (leak-checked)
     for extra in [e for e in os.environ.get("LT_EXTRA", "").split(",") if e]:
@@ -91,7 +96,8 @@ def save(model, opt, series, epoch, done, history, path=OUT):
     torch.save({"state_dict": model.state_dict(), "opt_state": opt.state_dict(),
                 "k": K, "pi_lap": PI_LAP, "corpus": CORPUS, "n_series": len(series),
                 "window": WINDOW, "lr": LR, "epochs": epoch, "done": done, "history": history,
-                "series": [sid for sid, _, _ in series], "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")},
+                "series": [sid for sid, _, _ in series], "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "swa": _SWA if _SWA["avg"] is not None else None},   # so LT_RESUME keeps the running average
                path + ".tmp")
     os.replace(path + ".tmp", path)
 
@@ -112,7 +118,7 @@ def swa_update(model):
 
 
 def save_swa(model, series, epoch, done, history):
-    path = OUT.replace(".pt", "_swa.pt")
+    path = (OUT[:-3] if OUT.endswith(".pt") else OUT) + "_swa.pt"
     torch.save({"state_dict": _SWA["avg"], "k": K, "pi_lap": PI_LAP, "corpus": CORPUS,
                 "n_series": len(series), "window": WINDOW, "lr": LR, "epochs": epoch, "done": done,
                 "history": history, "swa_n": _SWA["n"], "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")},
@@ -209,6 +215,9 @@ def main():
         if "opt_state" in ck:
             opt.load_state_dict(ck["opt_state"])
         history = list(ck.get("history", []))
+        if ck.get("swa"):
+            _SWA.update(ck["swa"])
+            print(f"[learned_train] running weight average restored (n={_SWA['n']})", flush=True)
         done = int(ck.get("done", 0))
         first_epoch = int(ck.get("epochs", 1))
         if done >= len(series):          # that epoch was complete; start the next

@@ -49,3 +49,14 @@ def test_scale_tracks_a_volatility_jump_faster_than_the_medium_estimate():
     s_oct = inv([Dist.gaussian(0.0, 1.0)], st)[0].std
     s_mid = math.sqrt(st["vm"])
     assert s_oct > s_mid, (s_oct, s_mid)
+
+
+def test_inverse_undoes_forward_at_the_end_of_warmup():
+    """After exactly `warmup` points the next forward scales, so the inverse must too."""
+    rng = random.Random(2)
+    for n in (19, 20, 21):
+        fwd, inv = octave_standardize(warmup=20)
+        _, st = _feed(fwd, [rng.gauss(0, 2) for _ in range(n)])
+        y_next = 3.3
+        yp, _ = fwd(y_next, copy.deepcopy(st))
+        assert abs(inv([Dist.gaussian(yp, 1e-9)], st)[0].mean - y_next) < 1e-9, n

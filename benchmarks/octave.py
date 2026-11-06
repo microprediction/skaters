@@ -60,7 +60,7 @@ def octave_standardize(lf: float = 0.22, lm: float = 0.08, tau: float = 0.1366,
 
     def inverse_k(dists, state):
         s = scale(state)
-        if state["n"] <= warmup or s <= 0:
+        if state["n"] < warmup or s <= 0:   # forward scales once n >= warmup
             return [d.shift(state["m"]) for d in dists]
         return [d.affine(s, state["m"]) for d in dists]
 

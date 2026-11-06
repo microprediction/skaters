@@ -62,7 +62,7 @@ def shash(epsilon: float = 0.0, delta: float = 1.0, alpha: float = 0.02, warmup:
     def inverse_k(dists, state):
         m, v, n = state["m"], state["v"], state["n"]
         s = math.sqrt(v) if v > 0 else 0.0
-        if n <= warmup or s <= 0:
+        if n < warmup or s <= 0:   # forward transforms once n >= warmup
             return [dd.shift(m) for dd in dists]
         out = []
         for dd in dists:

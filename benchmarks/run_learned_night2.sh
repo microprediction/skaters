@@ -60,6 +60,6 @@ CANON_PER_SERIES=1 CANON_PER_SERIES_MODELS="$M" CANON_PAIRS="$M" \
   .venv-gifteval/bin/python -u benchmarks/summarize_canonical.py > benchmarks/_summ_pairs.log 2>&1
 log "site rebuild"
 ( cd ../foundationalprediction && SKATERS_DIR=../skaters python3 build.py \
-  && git add -A && git commit -q -m "Nightly rebuild: laplace++ runs, classical models, TimeH2O" \
+  && git add docs && git commit -q -m "Nightly rebuild: laplace++ runs, classical models, TimeH2O" \
   && git push -q origin main ) >> benchmarks/_learned_night2.log 2>&1
 log "done"
