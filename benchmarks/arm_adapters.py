@@ -1152,6 +1152,161 @@ def learned_dists(ch, h=1, which="mixture"):
     return out
 
 
+# ---- classical baselines, refit at EVERY step (#site: online classical) ------
+# The published suites fit their classical baselines once at the window origin;
+# our older studies refit every 25 steps and froze the variance in between.
+# These canonical arms refit on the trailing history before every forecast, so
+# each predictive uses everything observed so far: the classical rows are as
+# online as laplace. Seasonal period by corpus (ARM_CORPUS): monthly 12, hourly
+# 24, otherwise none (AutoETS cannot carry 52; weekly is non-seasonal here).
+CLASSICAL_FIT_WIN = int(os.environ.get("CLASSICAL_FIT_WIN", 750))
+
+
+def _season():
+    c = os.environ.get("ARM_CORPUS", "")
+    return {"monthly": 12, "m4-hourly": 24}.get(c, 1)
+
+
+def statsforecast_dists(ch, h=1, model="AutoARIMA"):
+    """TEST per-step Gaussian predictives from a statsforecast model refit every
+    step (rolling CV, refit=1), the 90% band read as the Gaussian scale.
+    AutoARIMA's order search at every step costs minutes per series, so its
+    order (p,d,q)(P,D,Q) is chosen once by AutoARIMA on the pre-test history and
+    the coefficients are re-estimated at every step."""
+    import pandas as pd
+    import warnings
+    from statsforecast import StatsForecast
+    from statsforecast.models import ARIMA, AutoARIMA, AutoETS, AutoTheta
+    import bench_core as bc
+    y = np.asarray(ch, float)[-(CLASSICAL_FIT_WIN + TEST + h):]
+    n = len(y)
+    m = _season()
+    def _arima():
+        pre = y[:n - TEST]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            a = AutoARIMA(season_length=m).fit(pre)
+        p_, q_, P_, Q_, mm, d_, D_ = a.model_["arma"][:7]
+        coef = a.model_.get("coef", {})
+        return ARIMA(order=(p_, d_, q_), season_length=max(int(mm), 1), seasonal_order=(P_, D_, Q_),
+                     include_mean="intercept" in coef, include_drift="drift" in coef, alias="AutoARIMA")
+    mk = {"AutoARIMA": _arima,
+          "AutoETS": lambda: AutoETS(season_length=min(m, 24)),
+          "AutoTheta": lambda: AutoTheta(season_length=m)}[model]
+    df = pd.DataFrame({"unique_id": "s", "ds": pd.date_range("2000-01-01", periods=n, freq="D"), "y": y})
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sf = StatsForecast(models=[mk()], freq="D", n_jobs=1)
+            cv = sf.cross_validation(df=df, h=h, step_size=1, n_windows=TEST, level=[90],
+                                     refit=1).sort_values(["cutoff", "ds"])
+    except Exception:                                   # noqa: BLE001
+        return None
+    name = cv.columns[[c for c in range(len(cv.columns)) if cv.columns[c] not in
+                       ("unique_id", "ds", "cutoff", "y")][0]]
+    out = []
+    for cutoff, g in cv.groupby("cutoff", sort=True):
+        r = g.iloc[h - 1]
+        mu, lo, hi = float(r[name]), float(r[f"{name}-lo-90"]), float(r[f"{name}-hi-90"])
+        if not (math.isfinite(mu) and math.isfinite(lo) and math.isfinite(hi)):
+            return None                                  # the fit failed on this series: not scored
+        out.append(bc.gauss_dist(mu, lo, hi))
+    return out if len(out) == TEST else None
+
+
+def garch_t_dists(ch, h=1):
+    """TEST per-step GARCH(1,1)-t predictives on the changes, refit every step
+    on the trailing window (one-step only)."""
+    if h != 1:
+        return None
+    import warnings
+    from arch import arch_model
+    import bench_core as bc
+    y = np.asarray(ch, float); n = len(y)
+    start = n - TEST
+    sc = 1.0 / (np.std(y[:start]) or 1.0); ys = y * sc
+    out = []
+    for t in range(start, n):
+        hist = ys[max(0, t - CLASSICAL_FIT_WIN):t]
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                r = arch_model(hist, mean="Constant", vol="GARCH", p=1, q=1, dist="t",
+                               rescale=False).fit(disp="off", options={"maxiter": 200})
+            f = r.forecast(horizon=1, reindex=False)
+            mu = float(f.mean.values[-1, 0]); var = float(f.variance.values[-1, 0])
+            nu = float(r.params["nu"])
+        except Exception:                               # noqa: BLE001
+            return None
+        if not (math.isfinite(mu) and math.isfinite(var) and var > 0 and math.isfinite(nu)):
+            return None                                  # the fit failed on this series: not scored
+        out.append(bc.student_t_dist(mu, var, nu).scale(1.0 / sc))
+    return out
+
+
+# ---- laplace with extra seasonal periods in its pool (weekly annual cycle) ----
+# laplace's pool carries seasonal candidates at periods 7, 12 and 24 only. On
+# weekly series the foundation models' edge sits on series with a lag-52 annual
+# cycle (+0.14..+0.19 nats on the seasonal tag). This arm is laplace with the
+# same three seasonal families added at extra periods (seasonal difference,
+# hedged seasonal anchor, and seasonal difference + EMA), everything else
+# identical. laplace's defaults are untouched.
+def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_grid=(), octave=False):
+    from functools import partial
+    from skaters import api as _api
+    from skaters.conjugate import conjugate as _conj
+    from skaters.leaf import leaf as _leaf
+    from skaters.transform import ema_transform, seasonal_anchor, seasonal_difference
+    from skaters.terminal import terminal_leaf_ensemble
+
+    def single(kk):
+        cands, depths, _ = _api._build_candidates(kk)
+        if octave:                         # reliability-gated two-speed scale (#320)
+            from octave import octave_standardize
+            cands.append(_conj(_leaf(k=kk), octave_standardize(), k=kk)); depths.append(1)
+            for a in (0.05, 0.1):
+                cands.append(_conj(_conj(_leaf(k=kk), ema_transform(a), k=kk), octave_standardize(), k=kk))
+                depths.append(2)
+        for e_, d_ in shash_grid:          # sinh-arcsinh: tail weight and skew (#320)
+            from shash import shash as _shash
+            cands.append(_conj(_leaf(k=kk), _shash(e_, d_), k=kk)); depths.append(1)
+            cands.append(_conj(_conj(_leaf(k=kk), ema_transform(0.1), k=kk), _shash(e_, d_), k=kk)); depths.append(2)
+        for P_ in fourier:                 # non-integer period: online Fourier harmonics
+            from fourier_seasonal import fourier_seasonal
+            cands.append(_conj(_leaf(k=kk), fourier_seasonal(P_), k=kk)); depths.append(1)
+            for a in (0.05, 0.1):
+                cands.append(_conj(_conj(_leaf(k=kk), ema_transform(a), k=kk), fourier_seasonal(P_), k=kk))
+                depths.append(2)
+        for p in periods:
+            cands.append(_conj(_leaf(k=kk), seasonal_difference(p), k=kk)); depths.append(1)
+            cands.append(_conj(_leaf(k=kk), seasonal_anchor(p), k=kk)); depths.append(1)
+            for a in (0.05, 0.1):
+                cands.append(_conj(_conj(_leaf(k=kk), ema_transform(a), k=kk), seasonal_difference(p), k=kk))
+                depths.append(2)
+        f = terminal_leaf_ensemble(cands, k=kk, leaf_fn=_api._objective_leaf("crps", 0.03),
+                                   learning_rate=0.8, complexity_penalty=0.005, depths=depths,
+                                   max_components=20, forget=0.99)
+        return _api._project(f, k=kk)
+
+    f = _api.multiscale(single, k=k, scales=None)
+    if tails == "gpd":
+        f = _api._gpdtails(f, k=k)
+    return _api._parade(f, k=k)
+
+
+def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(), octave=False):
+    f = laplace_extra_periods(h, periods, fourier=fourier, shash_grid=shash_grid, octave=octave); st = None; queue = []; out = []
+    start = len(ch) - TEST
+    for i, yv in enumerate(ch):
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
+
 def make_registry(h=1):
     return {
         # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
@@ -1165,6 +1320,12 @@ def make_registry(h=1):
         "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
         "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
+        "laplace(s52)": lambda ch: laplace_extra_periods_dists(ch, h, (52,)),   # + annual cycle on weekly data
+        "laplace(s168)": lambda ch: laplace_extra_periods_dists(ch, h, (168,)),  # + weekly cycle on hourly data
+        "laplace(octave)": lambda ch: laplace_extra_periods_dists(ch, h, (), octave=True),
+        "laplace(shash)": lambda ch: laplace_extra_periods_dists(ch, h, (), shash_grid=__import__("shash").SHASH_GRID),
+        "laplace(f52)": lambda ch: laplace_extra_periods_dists(ch, h, (), fourier=(365.25 / 7,)),   # Fourier annual, weekly data
+        "laplace(s52f52)": lambda ch: laplace_extra_periods_dists(ch, h, (52,), fourier=(365.25 / 7,)),
         "learned":        lambda ch: learned_dists(ch, h, "mixture"),   # #297: laplace at worst
         "learned-expert": lambda ch: learned_dists(ch, h, "expert"),
         **({f"learned({LEARNED_TAG})": lambda ch: learned_dists(ch, h, "mixture"),
@@ -1202,6 +1363,11 @@ def make_registry(h=1):
         "PyMC":        lambda ch: pymc_dists(ch, h),
         "laplace@PyMC": lambda ch: lap_pymc_sandwich(ch, h),   # laplace base, PyMC on its normal scores
         "NPTS":        lambda ch: npts_dists(ch, h),
+        # classical baselines, refit every step (as online as laplace)
+        "AutoARIMA":   lambda ch: statsforecast_dists(ch, h, "AutoARIMA"),
+        "AutoETS":     lambda ch: statsforecast_dists(ch, h, "AutoETS"),
+        "AutoTheta":   lambda ch: statsforecast_dists(ch, h, "AutoTheta"),
+        "GARCH-t":     lambda ch: garch_t_dists(ch, h),
         "Chronos":     lambda ch: fs.chronos_dists(ch, h),
         "TimesFM":     lambda ch: fs.timesfm_dists(ch, h),
         "TimesFM3":    lambda ch: fs.timesfm3_dists(ch, h),

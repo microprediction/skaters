@@ -40,6 +40,17 @@ SUFFIX = os.environ.get("CANON_SUFFIX", "")
 # #250 cpsz-vs-cps gap, lap_grid for the matched conformalization pair). The
 # output files carry the baseline name so they never overwrite the laplace ones.
 BASELINE = os.environ.get("CANON_BASELINE", "laplace")
+# CANON_PER_SERIES=1 also writes the per-series verdicts behind the summary
+# (canonical_per_series.csv: study, series, model, verdict, dLL, crps ratio,
+# central-90 hits and steps), so a page can re-aggregate any subset of series
+# without a second scorer. CANON_PER_SERIES_MODELS limits it to a comma list.
+PER_SERIES = os.environ.get("CANON_PER_SERIES", "") == "1"
+PER_SERIES_MODELS = {m for m in os.environ.get("CANON_PER_SERIES_MODELS", "").split(",") if m}
+# CANON_PAIRS=<comma list of models> writes canonical_pairs.csv: for every
+# unordered pair of the listed models and every series both scored, the same
+# per-series Diebold-Mariano verdict and log-score gap the summary uses for
+# model vs laplace, so a page can let the reader choose the reference model.
+PAIRS = [m for m in os.environ.get("CANON_PAIRS", "").split(",") if m]
 if BASELINE != "laplace":
     SUFFIX = f"{SUFFIX}_vs_{BASELINE}"
 _COLS = ("y", "q05", "q50", "q95", "logpdf", "crps")
@@ -83,6 +94,16 @@ def main():
     methods = sorted({m for (_, _, m) in store})
 
     # ---- paired, scale-free comparison of each model vs laplace ----
+    ps_fh = open(os.path.join(_HERE, f"canonical_per_series{SUFFIX}.csv"), "w", newline="") if PER_SERIES else None
+    ps = csv.writer(ps_fh) if ps_fh else None
+    if ps:
+        ps.writerow(["study", "series", "model", "verdict", "dLL", "crps_ratio", "in90", "n_steps"])
+
+    def _hits(d):
+        y, lo, hi = (np.asarray(d[c], float) for c in ("y", "q05", "q95"))
+        ok = np.isfinite(y) & np.isfinite(lo) & np.isfinite(hi)
+        return int(np.sum((y >= lo) & (y <= hi) & ok)), int(np.sum(ok))
+
     with open(os.path.join(_HERE, f"canonical_summary_vs_laplace{SUFFIX}.csv"), "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["study", "model", "n_series", "win", "draw", "loss",
@@ -96,7 +117,10 @@ def main():
             for m in methods:
                 if m == BASELINE:
                     continue
-                common = sorted(base & by.get(m, set()))
+                # a series still being written by a running fleet can be partial:
+                # pair only series whose step counts agree
+                common = sorted(s_ for s_ in base & by.get(m, set())
+                                if len(store[(study, s_, m)]["logpdf"]) == len(store[(study, s_, BASELINE)]["logpdf"]))
                 if not common:
                     continue
                 rec = {"win": 0, "draw": 0, "loss": 0}
@@ -106,18 +130,56 @@ def main():
                     bl = store[(study, s, BASELINE)]
                     v, *_ = P.dm_contest(dm["logpdf"], bl["logpdf"])
                     rec["win" if v == "A" else "loss" if v == "B" else "draw"] += 1
-                    dlls.append(_series_mean(dm["logpdf"], -20.0)
-                                - _series_mean(bl["logpdf"], -20.0))
+                    dll = (_series_mean(dm["logpdf"], -20.0)
+                           - _series_mean(bl["logpdf"], -20.0))
+                    dlls.append(dll)
                     cb = _series_mean(bl["crps"])
                     cm = _series_mean(dm["crps"])
+                    ratio = None
                     if cb and np.isfinite(cb) and cb > 0 and np.isfinite(cm):
-                        ratios.append(cm / cb)
+                        ratio = cm / cb
+                        ratios.append(ratio)
+                    if ps and (not PER_SERIES_MODELS or m in PER_SERIES_MODELS):
+                        h, n = _hits(dm)
+                        ps.writerow([study, s, m, "W" if v == "A" else "L" if v == "B" else "D",
+                                     f"{dll:.4f}", "" if ratio is None else f"{ratio:.4f}", h, n])
                 dlls = np.asarray(dlls, float)
                 w.writerow([study, m, len(common), rec["win"], rec["draw"], rec["loss"],
                             f"{np.nanmedian(dlls):.4f}",
                             f"{np.nanpercentile(dlls, 25):.4f}",
                             f"{np.nanpercentile(dlls, 75):.4f}",
                             f"{np.nanmedian(ratios):.4f}" if ratios else ""])
+
+    if PAIRS:
+        with open(os.path.join(_HERE, f"canonical_pairs{SUFFIX}.csv"), "w", newline="") as pf:
+            pw = csv.writer(pf)
+            pw.writerow(["study", "series", "a", "b", "verdict", "dLL", "crps_ratio"])
+            for study in studies:
+                have = collections.defaultdict(set)
+                for (st, s_, m) in store:
+                    if st == study and m in PAIRS:
+                        have[m].add(s_)
+                for i, a in enumerate(PAIRS):
+                    for b in PAIRS[i + 1:]:
+                        for s_ in sorted(have[a] & have[b]):
+                            da, db = store[(study, s_, a)], store[(study, s_, b)]
+                            if len(da["logpdf"]) != len(db["logpdf"]):
+                                continue
+                            v, *_ = P.dm_contest(da["logpdf"], db["logpdf"])
+                            dll = _series_mean(da["logpdf"], -20.0) - _series_mean(db["logpdf"], -20.0)
+                            ca, cb = _series_mean(da["crps"]), _series_mean(db["crps"])
+                            r = ca / cb if (cb and np.isfinite(cb) and cb > 0 and np.isfinite(ca)) else None
+                            pw.writerow([study, s_, a, b, "W" if v == "A" else "L" if v == "B" else "D",
+                                         f"{dll:.4f}", "" if r is None else f"{r:.4f}"])
+            print(f"[summarize] pairs over {len(PAIRS)} models written", flush=True)
+
+    if ps:
+        # the baseline's own coverage per series, for re-aggregating its row
+        for (st, s, m), d in store.items():
+            if m == BASELINE:
+                h, n = _hits(d)
+                ps.writerow([st, s, BASELINE, "base", "0", "1", h, n])
+        ps_fh.close()
 
     # ---- calibration: interval coverage from the stored quantiles ----
     with open(os.path.join(_HERE, f"canonical_summary_coverage{SUFFIX}.csv"), "w", newline="") as fh:

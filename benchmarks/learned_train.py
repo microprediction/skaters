@@ -57,6 +57,12 @@ OUT = os.environ.get("LT_OUT", f"benchmarks/learned_ckpt/{CORPUS}_k{K}.pt")
 SEED = int(os.environ.get("LT_SEED", 0))
 CKPT_EVERY = int(os.environ.get("LT_CKPT_EVERY", 25))     # series between checkpoints
 SNAP_EVERY = int(os.environ.get("LT_SNAP_EVERY", 0))      # keep a numbered snapshot every N series (0 = off)
+# running weight average (stochastic weight averaging): every LT_SWA_EVERY series
+# after LT_SWA_START, fold the current weights into a running mean and save it
+# as <out>_swa.pt. Averaging along the path removes the drift a constant
+# learning rate leaves in any single snapshot.
+SWA_EVERY = int(os.environ.get("LT_SWA_EVERY", 0))
+SWA_START = int(os.environ.get("LT_SWA_START", 0))
 RESUME = os.environ.get("LT_RESUME", "")                   # checkpoint to continue from
 SHUFFLE = int(os.environ.get("LT_SHUFFLE", 1))             # seeded order so families mix
 HIST = ra.aa.fs.HIST
@@ -67,6 +73,14 @@ def train_series():
     series = [(sid, title, ch) for sid, title, ch in ra.iter_series(CORPUS)
               if ra.regime(title) == "econ" and split_of(sid) == "train"]
     series = [x for x in series if len(x[2][-HIST:]) >= ra.MINLEN]
+    # LT_EXTRA: comma list of extra corpora used whole for training (never
+    # validated on), e.g. weekly-aug from weekly_augment.py (leak-checked)
+    for extra in [e for e in os.environ.get("LT_EXTRA", "").split(",") if e]:
+        mn = int(os.environ.get("LT_EXTRA_MINLEN", ra.MINLEN))   # training needs no scoring window
+        add = [x for x in ra.iter_series(extra) if ra.regime(x[1]) == "econ"
+               and len(x[2][-HIST:]) >= mn]
+        print(f"[learned_train] + {len(add)} training series from {extra}", flush=True)
+        series += add
     if SHUFFLE:
         import random
         random.Random(SEED).shuffle(series)
@@ -78,6 +92,30 @@ def save(model, opt, series, epoch, done, history, path=OUT):
                 "k": K, "pi_lap": PI_LAP, "corpus": CORPUS, "n_series": len(series),
                 "window": WINDOW, "lr": LR, "epochs": epoch, "done": done, "history": history,
                 "series": [sid for sid, _, _ in series], "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")},
+               path + ".tmp")
+    os.replace(path + ".tmp", path)
+
+
+_SWA = {"n": 0, "avg": None}
+
+
+def swa_update(model):
+    sd = model.state_dict()
+    if _SWA["avg"] is None:
+        _SWA["avg"] = {k: v.detach().clone() for k, v in sd.items()}
+        _SWA["n"] = 1
+        return
+    _SWA["n"] += 1
+    for k, v in sd.items():
+        if torch.is_tensor(v) and v.is_floating_point():
+            _SWA["avg"][k] += (v.detach() - _SWA["avg"][k]) / _SWA["n"]
+
+
+def save_swa(model, series, epoch, done, history):
+    path = OUT.replace(".pt", "_swa.pt")
+    torch.save({"state_dict": _SWA["avg"], "k": K, "pi_lap": PI_LAP, "corpus": CORPUS,
+                "n_series": len(series), "window": WINDOW, "lr": LR, "epochs": epoch, "done": done,
+                "history": history, "swa_n": _SWA["n"], "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")},
                path + ".tmp")
     os.replace(path + ".tmp", path)
 
@@ -135,6 +173,9 @@ def run_epoch(model, opt, series, epoch, start_at=0, history=None):
                   f"eta {eta:.0f} min", flush=True)
         if CKPT_EVERY and (j + 1) % CKPT_EVERY == 0 and j + 1 < len(series):
             save(model, opt, series, epoch, j + 1, history or [])
+        if SWA_EVERY and (j + 1) >= SWA_START and (j + 1) % SWA_EVERY == 0:
+            swa_update(model)
+            save_swa(model, series, epoch, j + 1, history or [])
         if SNAP_EVERY and (j + 1) % SNAP_EVERY == 0:
             # a snapshot that later passes never overwrite: pick the best by validation
             save(model, opt, series, epoch, j + 1, history or [],
@@ -158,6 +199,10 @@ def main():
     opt = torch.optim.Adam(params, lr=LR)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     history, first_epoch, start_at = [], 1, 0
+    if os.environ.get("LT_INIT", "") and os.path.exists(os.environ["LT_INIT"]) and not (RESUME and os.path.exists(RESUME)):
+        # start a fresh pass from another run's weights (no progress or optimizer carried over)
+        model.load_state_dict(torch.load(os.environ["LT_INIT"], map_location="cpu", weights_only=False)["state_dict"])
+        print(f"[learned_train] weights initialised from {os.environ['LT_INIT']}", flush=True)
     if RESUME and os.path.exists(RESUME):
         ck = torch.load(RESUME, map_location="cpu", weights_only=False)
         model.load_state_dict(ck["state_dict"])
