@@ -32,6 +32,14 @@ unit tests, and all three gate every release:
    Changing its contract requires editing that test deliberately, plus a
    changelog entry and a version bump, in the same pull request.
 
+A change that can move laplace's issued predictive (`Dist`, tails,
+transforms) also needs the output-signature check. Run
+`PYTHONPATH=src python parity/laplace_k1_signatures.py --write before.json`
+on main, apply the change, then run it with `--compare before.json`. The
+ordinary streams should stay identical or move by no more than the change's
+stated tolerance; report the printed moves in the pull request. Reference
+digests at main are in `parity/laplace_k1_signatures.txt`.
+
 ## Ground rules
 
 - Pure stdlib in `src/skaters/`; dependencies belong in benchmarks only.
