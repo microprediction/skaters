@@ -81,6 +81,10 @@ def main():
         w.writerow(["corpus", "series", "regime", "family", "asset_class",
                     "repeat_frac", "rho1", "excess_kurtosis", "vol_cluster", "seasonal_acf", "tags"])
         for corpus in CORPORA:
+            # tag exactly the cached corpus the benchmarks scored; the live
+            # fallback enumerates a different (smaller) series set
+            if not os.path.exists(os.path.join(HERE, "preds", f"_corpus_{corpus}.jsonl")):
+                raise SystemExit(f"[series_tags] no corpus cache for {corpus}: build it first (build_corpus_cache.py)")
             for sid, title, ch in ra.iter_series(corpus):
                 if len(ch[-HIST:]) < ra.MINLEN:
                     continue

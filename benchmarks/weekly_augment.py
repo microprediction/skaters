@@ -1,5 +1,9 @@
 """Extra weekly TRAINING data for laplace++ from the daily corpus, leak-checked.
 
+SUPERSEDED for training by weekly_augment_strict.py (corpus weekly-augc): the
+0.9 cutoff here misses weekly-average twins of end-of-week samples. Do not
+train on weekly-aug; it is kept as the record of the first check.
+
 FRED's weekly tag is exhausted: 3,631 series, all qualifying ones already in the
 weekly corpus. The daily corpus holds ~10,900 series; resampled to weekly (the
 last observation of each week ending Friday) they are more weekly training

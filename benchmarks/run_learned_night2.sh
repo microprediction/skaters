@@ -9,6 +9,8 @@
 # Every step resumes; re-running the script skips what is done.
 #
 #   caffeinate -i -s nohup benchmarks/run_learned_night2.sh > benchmarks/_learned_night2.log 2>&1 &
+# The one-off chain for the night of 2026-11-04, kept as the record of what ran;
+# later runs use resumable per-run chains instead of this script.
 set -u
 cd "$(dirname "$0")/.."
 export PYTHONPATH=src:benchmarks

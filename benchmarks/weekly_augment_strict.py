@@ -15,6 +15,7 @@ least 104 common weeks.
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import sys
@@ -39,7 +40,9 @@ def main():
         if split_of(sid) == "valid" and os.path.exists(os.path.join(fred._CACHE, f"{sid}.csv")):
             d = dict(weekly_changes(weekly_levels(fred._load_levels(sid))))
             ws = sorted(d)
-            sm = {ws[i]: d[ws[i]] + d[ws[i - 1]] for i in range(1, len(ws))}   # 2-week moving sum
+            # 2-week moving sum, only over two consecutive weeks (a missing week is a gap)
+            sm = {ws[i]: d[ws[i]] + d[ws[i - 1]] for i in range(1, len(ws))
+                  if (dt.date.fromisoformat(str(ws[i])) - dt.date.fromisoformat(str(ws[i - 1]))).days == 7}
             valid.append((sid, d, sm))
     cands = []
     for line in open(os.path.join(PREDS, "_corpus_daily.jsonl")):
