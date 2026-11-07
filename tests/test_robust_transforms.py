@@ -90,6 +90,14 @@ def test_lens_log_ratio_stays_finite_for_a_flat_reference():
     assert abs(outputs[3] - 718.4065490141422) < 1e-9
 
 
+def test_lens_constant_large_stream_has_no_variance():
+    """sum/n of a constant 1e12 rounds off the value; that must not read as variance."""
+    update = residual_variance_lens(burn_in=60, window=4)
+    outputs, state = _feed(update, [1_000_000_000_000.04] * 64)
+    assert outputs == [0.0] * 64
+    assert state["ref_var"] == _EPS
+
+
 def test_lens_ignores_non_finite_and_overflowing_residuals():
     update = residual_variance_lens(burn_in=4, window=4)
     outputs, state = _feed(update, _alternating(1.0, 8))

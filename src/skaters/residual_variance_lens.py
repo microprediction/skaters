@@ -31,10 +31,14 @@ _MAX_ABS = 1e150
 
 
 def _population_var(values: list[float]) -> float:
+    # Centre on a sample first: sum/n of a large constant can round one ulp
+    # off the value itself, and squaring that rounding invents variance.
     n = len(values)
-    mean = sum(values) / n
+    shift = values[0]
+    shifted = [value - shift for value in values]
+    mean = sum(shifted) / n
     acc = 0.0
-    for value in values:
+    for value in shifted:
         diff = value - mean
         acc += diff * diff
     return acc / n
