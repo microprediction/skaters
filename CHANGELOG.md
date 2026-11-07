@@ -8,7 +8,8 @@
   scale instead of dividing by a floor. Not in laplace's pool. Benchmark arms
   `leaf+robust-mad` and `leaf+standardize` are registered for `run_arm.py`.
 - New diagnostic `residual_variance_lens(burn_in, window, eps)`: the log ratio of
-  a trailing residual variance to a reference frozen after burn-in. A
+  a trailing residual variance to a reference frozen after burn-in, silent
+  with `state["ready"]` False until the window is full. A
   conditioning feature with no inverse, not a conjugate transform, and not in
   laplace's pool.
 - `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace

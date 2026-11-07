@@ -4,11 +4,17 @@ A conditioning feature, not a conjugate transform. It is not wired into
 laplace's pool.
 
 The caller passes residuals. The first ``burn_in`` finite residuals estimate
-a reference variance, which then freezes. Each later update returns
+a reference variance, which then freezes. Once the reference is frozen and
+``window`` finite residuals have been seen, each update returns
 
     log(var(last ``window`` residuals) + eps) - log(ref_var)
 
-using the ordinary (non-robust) population variance. ``+r`` and ``-r`` give
+using the ordinary (non-robust) population variance. The trailing window is
+the last ``window`` finite residuals of the whole stream, burn-in included,
+so it overlaps the reference when ``window`` reaches back that far. Before
+both conditions hold the feature is 0.0 and ``state["ready"]`` is False, so
+a gate can tell warm-up from a measured ratio of zero. The window is never
+partial: with ``window > burn_in`` the feature stays silent past the freeze. ``+r`` and ``-r`` give
 the same value, so the feature has no inverse to the residual.
 
 The reference does not forget. A forgetting baseline drifts into a new
@@ -60,28 +66,29 @@ def residual_variance_lens(burn_in: int = 60, window: int = 60, eps: float = 1e-
 
     def update(epsilon: float, state: dict | None) -> tuple[float, dict]:
         if state is None:
-            state = {"ref": [], "ref_var": None, "recent": [], "last": 0.0}
+            state = {"ref": [], "ref_var": None, "recent": [], "last": 0.0,
+                     "ready": False}
         else:
             state = {
                 "ref": list(state["ref"]),
                 "ref_var": state["ref_var"],
                 "recent": list(state["recent"]),
                 "last": state["last"],
+                "ready": state.get("ready", False),
             }
         if not math.isfinite(epsilon) or abs(epsilon) > _MAX_ABS:
             return state["last"], state
+        state["recent"].append(epsilon)
+        if len(state["recent"]) > window:
+            del state["recent"][0]
         if state["ref_var"] is None:
             state["ref"].append(epsilon)
             if len(state["ref"]) >= burn_in:
                 state["ref_var"] = _population_var(state["ref"]) + eps
                 state["ref"] = []
+        if state["ref_var"] is None or len(state["recent"]) < window:
             return 0.0, state
-        state["recent"].append(epsilon)
-        if len(state["recent"]) > window:
-            del state["recent"][0]
-        if len(state["recent"]) < 2:
-            state["last"] = 0.0
-            return 0.0, state
+        state["ready"] = True
         numerator = _population_var(state["recent"]) + eps
         # Subtract the logs. The quotient itself overflows when a flat
         # reference (eps) meets large finite residuals, even though both

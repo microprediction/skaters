@@ -53,10 +53,40 @@ def test_lens_freezes_the_reference_and_reports_the_variance_ratio():
 
 def test_lens_loses_sign():
     update = residual_variance_lens(burn_in=4, window=4)
-    _, warm = _feed(update, _alternating(1.0, 4))
-    positive, _ = _feed(update, _alternating(2.0, 4), warm)
-    negative, _ = _feed(update, [-x for x in _alternating(2.0, 4)], warm)
+    series = _alternating(1.0, 4) + [2.0, 3.0, -1.0, 2.5]
+    positive, _ = _feed(update, series)
+    negative, _ = _feed(update, [-x for x in series])
     assert positive == negative
+    assert positive[-1] != 0.0
+
+
+def test_lens_window_is_the_trailing_residuals_including_burn_in():
+    """Peter's example: the last four residuals are [-1, 1, 1, 1], variance 0.75."""
+    update = residual_variance_lens(burn_in=4, window=4)
+    outputs, state = _feed(update, [-1.0, 1.0, -1.0, 1.0, 1.0, 1.0])
+    assert state["recent"] == [-1.0, 1.0, 1.0, 1.0]
+    expected = math.log(0.75 + _EPS) - math.log(1.0 + _EPS)
+    assert abs(outputs[-1] - expected) < 1e-12
+    assert abs(outputs[-1] - (-0.287682)) < 1e-6
+
+
+def test_lens_is_not_ready_until_the_window_is_full():
+    update = residual_variance_lens(burn_in=4, window=8)
+    state = None
+    for i, value in enumerate(_alternating(1.0, 7)):
+        feature, state = update(value, state)
+        assert feature == 0.0 and state["ready"] is False, i
+    feature, state = update(float("nan"), state)
+    assert feature == 0.0 and state["ready"] is False
+    feature, state = update(3.0, state)
+    assert state["ready"] is True
+    expected = math.log(_population_var_of(_alternating(1.0, 7) + [3.0]) + _EPS)
+    assert abs(feature - (expected - math.log(1.0 + _EPS))) < 1e-12
+
+
+def _population_var_of(values):
+    mean = sum(values) / len(values)
+    return sum((v - mean) ** 2 for v in values) / len(values)
 
 
 def test_lens_streams_keep_separate_state():
@@ -85,8 +115,8 @@ def test_lens_log_ratio_stays_finite_for_a_flat_reference():
     """A flat reference makes the variance quotient overflow before log."""
     update = residual_variance_lens(burn_in=2, window=2)
     outputs, _ = _feed(update, (0.0, 0.0, 1e150, -1e150))
-    assert outputs[:3] == [0.0, 0.0, 0.0]
-    assert math.isfinite(outputs[3])
+    assert outputs[:2] == [0.0, 0.0]
+    assert all(math.isfinite(x) for x in outputs)
     assert abs(outputs[3] - 718.4065490141422) < 1e-9
 
 
