@@ -332,6 +332,19 @@ def test_median_of_two_huge_values_does_not_overflow():
     assert _median([-1e308, -1e308, 1.0, 2.0]) == 0.5 * -1e308 + 0.5 * 1.0
 
 
+def test_opposite_huge_observations_keep_output_and_scale_finite():
+    forward, _ = robust_mad_standardize()
+    y1, state = forward(1e308, None)
+    y2, state = forward(-1e308, state)
+    assert math.isfinite(y1) and math.isfinite(y2)
+    assert math.isfinite(state["scale"])
+    f = conjugate(leaf(k=1), robust_mad_standardize(), k=1)
+    s = None
+    for y in (1e308, -1e308, 1.0, 2.0):
+        dists, s = f(y, s)
+    assert math.isfinite(dists[0].mean) and math.isfinite(dists[0].std)
+
+
 def test_non_finite_observation_does_not_poison_the_window():
     forward, inverse = robust_mad_standardize(window=10, min_periods=4)
     state = None

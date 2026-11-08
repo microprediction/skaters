@@ -18,6 +18,9 @@ tiny floor. Dividing a level shift by a hard floor feeds the downstream leaf
 one enormous residual, and the leaf's variance never forgets it. The stored
 unit is part of the affine map ``inverse_k`` applies; the standardized value
 is not clipped.
+
+Observations are clamped to ``±1e150`` before they enter the window, so a
+difference of two of them, and the MAD scale, stay finite.
 """
 
 from __future__ import annotations
@@ -28,6 +31,8 @@ from skaters.dist import Dist
 
 # Consistency factor: 1.4826 * MAD estimates sigma for a normal sample.
 _MAD_TO_SIGMA = 1.4826
+# Two values near 1e308 overflow when subtracted; 1e150 leaves a wide margin.
+_MAX_ABS = 1e150
 
 
 def _median(values: list[float]) -> float:
@@ -89,6 +94,7 @@ def robust_mad_standardize(window: int = 60, min_periods: int = 8, eps: float = 
             buf, held = list(state["buf"]), float(state.get("scale", eps))
         if not math.isfinite(y):
             return 0.0, {"buf": buf, "scale": held}
+        y = min(max(y, -_MAX_ABS), _MAX_ABS)
         if not buf:
             return 0.0, {"buf": [y], "scale": held}
         median = _median(buf)
