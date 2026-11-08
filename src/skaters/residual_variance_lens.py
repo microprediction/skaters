@@ -57,12 +57,12 @@ def residual_variance_lens(burn_in: int = 60, window: int = 60, eps: float = 1e-
         ``update(epsilon, state) -> (feature, state)``. Pass ``state=None`` to
         start a stream.
     """
-    if burn_in < 2:
-        raise ValueError("burn_in must be at least 2")
-    if window < 2:
-        raise ValueError("window must be at least 2")
-    if eps <= 0.0:
-        raise ValueError("eps must be positive")
+    if not isinstance(burn_in, int) or burn_in < 2:
+        raise ValueError("burn_in must be an integer of at least 2")
+    if not isinstance(window, int) or window < 2:
+        raise ValueError("window must be an integer of at least 2")
+    if not (math.isfinite(eps) and eps > 0.0):
+        raise ValueError("eps must be positive and finite")
 
     def update(epsilon: float, state: dict | None) -> tuple[float, dict]:
         if state is None:

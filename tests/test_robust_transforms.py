@@ -141,6 +141,24 @@ def test_lens_variance_is_exact_when_the_first_sample_is_an_outlier():
         assert abs(_population_var(values) - exact) <= 1e-12 * exact
 
 
+def _rejects(maker, **kwargs) -> bool:
+    try:
+        maker(**kwargs)
+    except ValueError:
+        return True
+    return False
+
+
+def test_constructors_reject_non_integer_counts_and_non_finite_eps():
+    nan, inf = float("nan"), float("inf")
+    for kwargs in ({"window": nan}, {"window": inf}, {"window": 2.5, "min_periods": 2},
+                   {"min_periods": nan}, {"eps": nan}, {"eps": inf}, {"eps": 0.0}):
+        assert _rejects(robust_mad_standardize, **kwargs), kwargs
+    for kwargs in ({"burn_in": nan}, {"burn_in": 4.5}, {"window": nan},
+                   {"window": inf}, {"eps": nan}, {"eps": inf}, {"eps": -1.0}):
+        assert _rejects(residual_variance_lens, **kwargs), kwargs
+
+
 def test_lens_ignores_non_finite_and_overflowing_residuals():
     update = residual_variance_lens(burn_in=4, window=4)
     outputs, state = _feed(update, _alternating(1.0, 8))

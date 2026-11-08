@@ -57,12 +57,12 @@ def robust_mad_standardize(window: int = 60, min_periods: int = 8, eps: float = 
     Returns:
         ``(forward, inverse_k)`` for :func:`skaters.conjugate`.
     """
-    if window < 2:
-        raise ValueError("window must be at least 2")
-    if min_periods < 2 or min_periods > window:
-        raise ValueError("min_periods must lie between 2 and window")
-    if eps <= 0.0:
-        raise ValueError("eps must be positive")
+    if not isinstance(window, int) or window < 2:
+        raise ValueError("window must be an integer of at least 2")
+    if not isinstance(min_periods, int) or min_periods < 2 or min_periods > window:
+        raise ValueError("min_periods must be an integer between 2 and window")
+    if not (math.isfinite(eps) and eps > 0.0):
+        raise ValueError("eps must be positive and finite")
 
     def _emit_scale(buf: list[float], held: float, y: float) -> float:
         sigma = _mad_sigma(buf, min_periods, eps)
