@@ -36,7 +36,7 @@ def _median(values: list[float]) -> float:
     mid = n // 2
     if n % 2:
         return ordered[mid]
-    return 0.5 * (ordered[mid - 1] + ordered[mid])
+    return 0.5 * ordered[mid - 1] + 0.5 * ordered[mid]
 
 
 def _mad_sigma(values: list[float], min_periods: int, eps: float) -> float | None:

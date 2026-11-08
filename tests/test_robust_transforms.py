@@ -326,6 +326,12 @@ def test_robust_mad_beats_standardize_on_a_heavy_tailed_stream():
     assert robust > plain
 
 
+def test_median_of_two_huge_values_does_not_overflow():
+    from skaters.robust_mad_standardize import _median
+    assert _median([1e308, 1e308]) == 1e308
+    assert _median([-1e308, -1e308, 1.0, 2.0]) == 0.5 * -1e308 + 0.5 * 1.0
+
+
 def test_non_finite_observation_does_not_poison_the_window():
     forward, inverse = robust_mad_standardize(window=10, min_periods=4)
     state = None
