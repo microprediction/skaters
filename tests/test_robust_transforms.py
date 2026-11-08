@@ -7,11 +7,13 @@ per-stream state, k horizons, and an affine map back to the original units.
 import json
 import math
 import random
+import statistics
+from fractions import Fraction
 
 from skaters.conjugate import conjugate
 from skaters.dist import Dist
 from skaters.leaf import leaf
-from skaters.residual_variance_lens import residual_variance_lens
+from skaters.residual_variance_lens import _population_var, residual_variance_lens
 from skaters.robust_mad_standardize import robust_mad_standardize
 from skaters.transform import standardize
 
@@ -126,6 +128,17 @@ def test_lens_constant_large_stream_has_no_variance():
     outputs, state = _feed(update, [1_000_000_000_000.04] * 64)
     assert outputs == [0.0] * 64
     assert state["ref_var"] == _EPS
+
+
+def test_lens_variance_is_exact_when_the_first_sample_is_an_outlier():
+    """The variance is centred on values[0]; an outlier there must not cost precision."""
+    rng = random.Random(3)
+    for _ in range(300):
+        base = rng.choice([0.0, 1e6, 1e12])
+        values = [base + rng.gauss(0.0, 1.0) for _ in range(rng.choice([4, 60, 250]))]
+        values[0] = base + rng.choice([-1.0, 1.0]) * 10 ** rng.uniform(2.0, 8.0)
+        exact = float(statistics.pvariance([Fraction(v) for v in values]))
+        assert abs(_population_var(values) - exact) <= 1e-12 * exact
 
 
 def test_lens_ignores_non_finite_and_overflowing_residuals():
