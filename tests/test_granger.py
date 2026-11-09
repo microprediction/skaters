@@ -119,3 +119,23 @@ def test_bad_parameters_are_rejected():
     for bad in ({**P, "pi_lap": 0.0}, {**P, "pi_lap": 1.0}, {**P, "granger_format": 2}):
         with pytest.raises(ValueError):
             granger(1, params=bad)
+
+
+@pytest.mark.parametrize("freq", available())
+def test_weights_stay_normalised_and_the_bound_holds_after_an_extreme_step(freq):
+    """[0, 0, 0, 2] makes laplace's log density ~ -1e14; the running totals are
+    re-centred, so later weights keep full precision."""
+    rng = random.Random(12)
+    ys = [0.0, 0.0, 0.0, 2.0] + [float(min(6, int(abs(rng.gauss(0, 1.5))))) for _ in range(200)]
+    g, f = granger(1, frequency=freq), laplace(1)
+    sg = sf = None
+    pg = pf = None
+    gap = 0.0          # running (granger - laplace) log score, summed per step
+    for t, y in enumerate(ys):
+        if pg is not None:
+            gap += pg.logpdf(y) - pf.logpdf(y)   # per-step difference: one rounding of ~1e-2 at the 1e14 step
+        dg, sg = g(y, sg)
+        df, sf = f(y, sf)
+        pg, pf = dg[0], df[0]
+        assert abs(sum(pg.w) - 1.0) < 1e-12
+    assert gap >= -math.log(4.0) - 0.05

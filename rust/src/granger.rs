@@ -137,6 +137,13 @@ impl GrangerParams {
                         return Err(format!("{name}: missing or non-numeric {key}"));
                     }
                 }
+                for (key, lo, hi) in [("order", 1.0, 64.0), ("period", 1.0, 10_000.0), ("window", 1.0, 10_000.0)] {
+                    if let Some(v) = kw.get(key).and_then(Value::as_f64) {
+                        if !(v >= lo && v <= hi && v.fract() == 0.0) {
+                            return Err(format!("{name}: {key} must be an integer in [{lo}, {hi}], got {v}"));
+                        }
+                    }
+                }
                 if kw.get("exact").and_then(Value::as_bool).unwrap_or(false) {
                     return Err(format!("{name}(exact=True) is not ported"));
                 }
@@ -422,7 +429,7 @@ impl Granger {
         let mut f = vec![z, self.repeat_frac, self.abs_z_mean];
         // zeros until the ensemble has stepped once (a leading missing value
         // leaves it unstepped, as in the Python reference)
-        let stepped = trunk_mut(&mut self.expert).qdist.first().map_or(false, |q| !q.is_empty());
+        let stepped = trunk_mut(&mut self.expert).qdist.first().is_some_and(|q| !q.is_empty());
         if !stepped {
             f.extend(std::iter::repeat(0.0).take(n));
         } else {
@@ -441,6 +448,10 @@ impl Granger {
                 for (j, d) in [lap_d, lrn_d].iter().enumerate() {
                     self.cum[j] += score(d.logpdf(y));
                 }
+                // re-centre: the weights depend only on the difference
+                let mx = self.cum[0].max(self.cum[1]);
+                self.cum[0] -= mx;
+                self.cum[1] -= mx;
             }
         }
         // 2. the trained expert with its combining weights shifted by the gate

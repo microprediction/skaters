@@ -33,6 +33,13 @@ def streams(n=200):
     ys = [rng.gauss(0, 1) for _ in range(n)]
     out["leading_nan"] = [float("nan")] * 3 + ys[3:]
     out["mid_nan"] = [v if t not in (40, 41, 120) else float("nan") for t, v in enumerate(ys)]
+    # an integer count series opening [0, 0, 0, 2]: laplace's log density at the 2
+    # is ~ -1e14, the case that exposed un-centred running totals. Every
+    # implementation rounds a number that size differently (~1e-2 absolute), and
+    # that one-time difference reaches the mixture weights: on monthly the ports
+    # sit ~7e-7 from Python on this stream (torch, Rust and JS agree with each
+    # other), inside the 1e-6 gate; elsewhere they agree to ~1.5e-8
+    out["counts"] = [0.0, 0.0, 0.0, 2.0] + [float(min(6, int(abs(rng.gauss(0, 1.5))))) for _ in range(n - 4)]
     return out
 
 

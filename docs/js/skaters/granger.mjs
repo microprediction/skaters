@@ -54,6 +54,43 @@ const TRANSFORMS = {
   yeo_johnson: (kw) => { noExact(kw, "yeo_johnson"); return yeoJohnson(kw.lmbda); },
 };
 
+const REQUIRED = {
+  ema_transform: ["alpha"], difference: [], drift: ["alpha", "shrinkage"], theta: ["alpha"],
+  ar: ["order", "lam", "ridge", "decay"], holt_linear: ["alpha", "beta"],
+  seasonal_difference: ["period"], seasonal_anchor: ["period", "alpha", "weight"],
+  standardize: ["alpha", "eps"], fractional_difference: ["d", "window"],
+  garch: ["omega", "alpha", "beta", "mean_alpha", "eps"], power_transform: ["p"], yeo_johnson: ["lmbda"],
+};
+const INT_RANGES = { order: [1, 64], period: [1, 10000], window: [1, 10000] };
+
+// Throw unless P is a well-formed granger parameter set.
+export function validateGrangerParams(P) {
+  if ((P.granger_format ?? 1) !== 1) throw new Error(`unsupported granger parameter format ${P.granger_format}`);
+  if (!(typeof P.pi_lap === "number" && P.pi_lap > 0 && P.pi_lap < 1)) throw new Error(`pi_lap must lie in (0, 1), got ${P.pi_lap}`);
+  const n = (P.candidates || []).length;
+  if (n === 0 || P.trunk.prior_log_weights.length !== n) throw new Error("prior_log_weights must have one entry per candidate");
+  for (const c of P.candidates) {
+    for (const [name, kw] of c.chain) {
+      if (!(name in REQUIRED)) throw new Error(`unknown transform ${name}`);
+      for (const key of REQUIRED[name]) {
+        if (typeof kw[key] !== "number") throw new Error(`${name}: missing or non-numeric ${key}`);
+      }
+      for (const [key, [lo, hi]] of Object.entries(INT_RANGES)) {
+        if (key in kw && !(Number.isInteger(kw[key]) && kw[key] >= lo && kw[key] <= hi)) {
+          throw new Error(`${name}: ${key} must be an integer in [${lo}, ${hi}]`);
+        }
+      }
+      if (kw.exact) throw new Error(`${name}(exact=True) is not ported`);
+    }
+  }
+  const G = P.gate;
+  const hidden = G.l1_weight.length;
+  if (hidden === 0 || G.l1_bias.length !== hidden || G.l1_weight.some((r) => r.length !== n + 3)
+      || G.l2_weight.length !== n || G.l2_bias.length !== n || G.l2_weight.some((r) => r.length !== hidden)) {
+    throw new Error(`gate dimensions do not match ${n} candidates (inputs must be ${n + 3})`);
+  }
+}
+
 function candidate(chain, k) {
   let f = plainLeaf(k);
   for (let j = chain.length - 1; j >= 0; j--) {
@@ -186,8 +223,7 @@ export class MixtureDist {
 export function granger(params, k = 1) {
   if (k !== 1) throw new Error("granger is trained at horizon 1 only");
   const P = params;
-  if ((P.granger_format ?? 1) !== 1) throw new Error(`unsupported granger parameter format ${P.granger_format}`);
-  if (!(P.pi_lap > 0 && P.pi_lap < 1)) throw new Error(`pi_lap must lie in (0, 1), got ${P.pi_lap}`);
+  validateGrangerParams(P);
   const logPrior = [Math.log(P.pi_lap), Math.log(1.0 - P.pi_lap)];
   const ref = laplace(k);
   const current = { offset: null };   // the gate's offset for the current call only
@@ -208,9 +244,14 @@ export function granger(params, k = 1) {
     const t = state.t;
     if (finite && state.pend.length > 0) {
       const [lapD, lrnD] = state.pend[state.pend.length - 1];
+      const c = state.cum[0][0];
       [lapD[0], lrnD[0]].forEach((d, j) => {
-        state.cum[0][0][j] += score(d.logpdf(yv));
+        c[j] += score(d.logpdf(yv));
       });
+      // re-centre: the weights depend only on the difference
+      const mx = Math.max(c[0], c[1]);
+      c[0] -= mx;
+      c[1] -= mx;
     }
     current.offset = gate(P.gate, features(state, n, k));
     let lrn;

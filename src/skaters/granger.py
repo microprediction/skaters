@@ -23,7 +23,8 @@ and every prefix,
 
 so granger's total log score is never more than ``log(1/pi_lap)`` (log 4 at
 the shipped ``pi_lap = 0.25``) behind laplace's, up to floating-point rounding
-(which matters only when laplace's own log density is astronomically negative).
+(the running totals are re-centred after every update, so an astronomically
+bad step costs at most its own rounding and does not degrade later weights).
 
 A score of ``+inf`` (an exact hit on a lattice atom) counts as ``+1e6`` and a
 NaN or ``-inf`` as ``-1e6`` in the weights; the issued mixture's log density
@@ -83,6 +84,47 @@ def available() -> list:
     return sorted(f[:-5] for f in os.listdir(PARAMS_DIR) if f.endswith(".json"))
 
 
+_REQUIRED = {
+    "ema_transform": ("alpha",), "difference": (), "drift": ("alpha", "shrinkage"), "theta": ("alpha",),
+    "ar": ("order", "lam", "ridge", "decay"), "holt_linear": ("alpha", "beta"),
+    "seasonal_difference": ("period",), "seasonal_anchor": ("period", "alpha", "weight"),
+    "standardize": ("alpha", "eps"), "fractional_difference": ("d", "window"),
+    "garch": ("omega", "alpha", "beta", "mean_alpha", "eps"), "power_transform": ("p",),
+    "yeo_johnson": ("lmbda",),
+}
+_INT_RANGES = {"order": (1, 64), "period": (1, 10_000), "window": (1, 10_000)}
+
+
+def validate_params(P: dict) -> None:
+    """Raise ValueError unless ``P`` is a well-formed granger parameter set."""
+    if P.get("granger_format", 1) != 1:
+        raise ValueError(f"unsupported granger parameter format {P.get('granger_format')!r}")
+    pi = P.get("pi_lap")
+    if not isinstance(pi, (int, float)) or not 0.0 < pi < 1.0:
+        raise ValueError(f"pi_lap must lie in (0, 1), got {pi!r}")
+    n = len(P.get("candidates", []))
+    if n == 0 or len(P["trunk"]["prior_log_weights"]) != n:
+        raise ValueError("prior_log_weights must have one entry per candidate")
+    for c in P["candidates"]:
+        for name, kw in c["chain"]:
+            if name not in _REQUIRED:
+                raise ValueError(f"unknown transform {name!r}")
+            for key in _REQUIRED[name]:
+                if not isinstance(kw.get(key), (int, float)):
+                    raise ValueError(f"{name}: missing or non-numeric {key}")
+            for key, (lo, hi) in _INT_RANGES.items():
+                if key in kw and not (lo <= kw[key] <= hi and float(kw[key]).is_integer()):
+                    raise ValueError(f"{name}: {key} must be an integer in [{lo}, {hi}]")
+            if kw.get("exact"):
+                raise ValueError(f"{name}(exact=True) is not ported")
+    G = P["gate"]
+    hidden = len(G["l1_weight"])
+    if (hidden == 0 or len(G["l1_bias"]) != hidden or any(len(r) != n + 3 for r in G["l1_weight"])
+            or len(G["l2_weight"]) != n or len(G["l2_bias"]) != n
+            or any(len(r) != hidden for r in G["l2_weight"])):
+        raise ValueError(f"gate dimensions do not match {n} candidates (inputs must be {n + 3})")
+
+
 # ---------------------------------------------------------------------------
 # the trained expert: laplace's pipeline built from the parameter file
 # ---------------------------------------------------------------------------
@@ -129,11 +171,19 @@ def _trunk_state(expert_state):
 # the gate: features from the previous step -> offsets on the combining weights
 # ---------------------------------------------------------------------------
 
+def _dot(row, xs):
+    # plain left-to-right accumulation, as the Rust, JS, R and Julia ports do:
+    # Python >= 3.12's sum() is compensated, and on lattice series one ulp of
+    # gate offset can tip a sticky-projection decision
+    acc = 0.0
+    for w, x in zip(row, xs):
+        acc += w * x
+    return acc
+
+
 def _gate(G, feats):
-    hidden = [math.tanh(b + sum(w * x for w, x in zip(row, feats)))
-              for row, b in zip(G["l1_weight"], G["l1_bias"])]
-    return [b + sum(w * h for w, h in zip(row, hidden))
-            for row, b in zip(G["l2_weight"], G["l2_bias"])]
+    hidden = [math.tanh(b + _dot(row, feats)) for row, b in zip(G["l1_weight"], G["l1_bias"])]
+    return [b + _dot(row, hidden) for row, b in zip(G["l2_weight"], G["l2_bias"])]
 
 
 def _features(state, n, k):
@@ -244,11 +294,8 @@ def granger(k: int = 1, frequency: str = "monthly", params: dict | None = None):
     if k != 1:
         raise ValueError("granger is trained at horizon 1 only")
     P = params if params is not None else load_params(frequency)
-    if int(P.get("granger_format", 1)) != 1:
-        raise ValueError(f"unsupported granger parameter format {P.get('granger_format')}")
+    validate_params(P)
     pi = float(P["pi_lap"])
-    if not 0.0 < pi < 1.0:
-        raise ValueError(f"pi_lap must lie in (0, 1), got {pi}")
     log_prior = [math.log(pi), math.log(1.0 - pi)]
     ref = laplace(k)
     # the gate's offset for the current call only (not state: set before every call)
@@ -274,9 +321,15 @@ def granger(k: int = 1, frequency: str = "monthly", params: dict | None = None):
                 if h <= m:
                     lap_d, lrn_d = pend[m - h]
                     ph = t % h
+                    c = state["cum"][h - 1][ph]
                     for j, d in enumerate((lap_d[h - 1], lrn_d[h - 1])):
-                        lp = float(d.logpdf(yv))
-                        state["cum"][h - 1][ph][j] += _score(lp)
+                        c[j] += _score(float(d.logpdf(yv)))
+                    # re-centre: the weights depend only on the difference, and an
+                    # astronomically bad step would otherwise leave both totals so
+                    # large that later differences are lost to rounding
+                    mx = max(c)
+                    c[0] -= mx
+                    c[1] -= mx
         # 2. the trained expert, its combining weights shifted by the gate (which
         #    reads step t-1's state), then laplace
         _current["offset"] = _gate(G, _features(state, n, k))
