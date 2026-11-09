@@ -20,7 +20,12 @@ unit is part of the affine map ``inverse_k`` applies; the standardized value
 is not clipped.
 
 Observations are clamped to ``±1e150`` before they enter the window, so a
-difference of two of them, and the MAD scale, stay finite.
+difference of two of them, and the MAD scale, stay finite. As with
+:func:`skaters.transform.standardize`, the emitted value is not bounded
+relative to the learned scale, so a huge jump on a tiny-scale series can
+overflow a bare downstream leaf. Run the conjugate inside
+:func:`skaters.parade.parade`, as ``laplace`` does: it clamps each
+observation relative to the 1-step predictive before the tree sees it.
 """
 
 from __future__ import annotations
