@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Gaussian-mixture quantiles in the stdlib, JavaScript and Rust cores use a
+  scale-relative tolerance below unit scale and a 2100-step default budget
+  (including forwarding wrappers), fixing tiny components and extreme separation.
+  Float-resolution handling preserves historical rounding for resolved components
+  where the old absolute tolerance could not stop, and handles collapsed components
+  and atom jumps explicitly. Nonfinite search brackets fail explicitly. The optional
+  Torch implementation is unchanged. See `parity/QUANTILE_CONTRACT.md`.
+
 - `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace
   at worst. Two experts, the frozen reference `laplace` and a trainable torch
   `laplace` with a state-conditioned gate added to the trunk's prequential log

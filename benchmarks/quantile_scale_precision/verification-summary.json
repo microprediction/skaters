@@ -1,0 +1,82 @@
+{
+  "baseline": "8baee06362f82504fe47e25f7b91fe6d8b55eb84",
+  "full_suite": {
+    "passed": 1588,
+    "skipped": 24,
+    "expected_failures": 18
+  },
+  "focused_python_contracts": 70,
+  "shared_js_contract_cases": 64,
+  "native_rust_contract_tests": 4,
+  "python_contract_versions": [
+    "3.11.15",
+    "3.12.13",
+    "3.14.6"
+  ],
+  "benchmark_runtime": {
+    "python": "3.14.6",
+    "numpy": "2.5.4",
+    "pytest": "9.2.0",
+    "node": "26.11.1",
+    "rust": "1.97.1"
+  },
+  "signature_harness": {
+    "pr": 323,
+    "source_sha": "f57fe72ef483ca0ae8f088f1c388cdb29b7b3704",
+    "file": "parity/laplace_k1_signatures.py",
+    "sha256": "f24ff8e5d9f8b1ca8ee9c6ab4d3b20033d449256cf04aec199ad889b624731d2",
+    "copied_without_modification": true,
+    "upstream_merge_not_assumed": true
+  },
+  "candidate_changes": [
+    ".github/workflows/rust.yml",
+    "CHANGELOG.md",
+    "docs/js/skaters/CHANGELOG.md",
+    "docs/js/skaters/dist.mjs",
+    "docs/js/skaters/tails.mjs",
+    "rust/src/dist.rs",
+    "rust/src/tails.rs",
+    "src/skaters/dist.py",
+    "src/skaters/homogenize.py",
+    "src/skaters/pushforward.py",
+    "src/skaters/residual_transform.py",
+    "src/skaters/tails.py",
+    "tests/test_js_parity.py",
+    "parity/QUANTILE_CONTRACT.md",
+    "parity/quantile_contract.json",
+    "parity/quantile_contract.mjs",
+    "rust/tests/quantile_contract.rs",
+    "tests/test_quantile_inverse_contract.py"
+  ],
+  "independent_implementation_review": {
+    "reviewer": "Claude Code CLI 2.1.300",
+    "model": "claude-fable-5-1",
+    "final_scope": "focused corrective delta after initial actual-diff and corrective review",
+    "verdict": "No material findings in focused delta; compatibility blockers cleared",
+    "post_review_delta": "Only three appended documentation lines distinguishing intentional accuracy assertions from historical-main goldens. Complete delta inspected; all executable/test/config bytes unchanged; review and execution evidence carried.",
+    "limits": [
+      "Analytical reviewer; local execution proof collected separately.",
+      "Implementation review does not cover the subsequently prepared evidence packaging script."
+    ]
+  },
+  "not_run": [
+    "wasm",
+    "MSRV",
+    "remote CI"
+  ],
+  "unchanged_out_of_scope": [
+    "optional Torch implementation"
+  ],
+  "limits": [
+    "Finite corpus/fixture evidence, not universal output invariance.",
+    "FRED full precision preserves binary64 values; canonical writer rounds to six decimal places.",
+    "Raw FRED caches and per-step prediction tapes are not included. Hashes alone cannot reconstruct the original snapshot."
+  ],
+  "independent_packaging_review": {
+    "model": "claude-fable-5-1",
+    "mode": "analytical read-only; no execution",
+    "verdict": "no material defects; conditional clean-clone check cleared by exact tracked/new-file comparison",
+    "post_review_changes": "verification and documentation refinements checked locally; see packaging-review.json",
+    "status": "local and unpublished; not committed"
+  }
+}
