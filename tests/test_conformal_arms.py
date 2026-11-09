@@ -42,11 +42,33 @@ def test_roll_recovers_the_quantiles_of_a_miscalibrated_base():
     assert np.max(np.abs(a[mid] - exact[mid])) < 0.12
 
 
-def test_identity_wrapper_issues_the_base_quantiles():
-    d = Dist.gaussian(1.0, 2.0)
-    out = ca.wrap([d] * ca.TEST, [0.0] * ca.TEST, "id")
-    q50 = out[-1].quantile(0.5)
-    assert abs(q50 - 1.0) < 0.05
+def test_identity_wrapper_is_the_base_exactly():
+    d = Dist([(0.6, 1.0, 2.0), (0.4, -3.0, 0.5)])
+    g = ca.wrap([d] * ca.TEST, [0.0] * ca.TEST, "id")[-1]
+    for x in (-4.0, -1.0, 0.3, 2.5):
+        assert abs(g.logpdf(x) - d.logpdf(x)) < 1e-9     # the strict-increase nudge on the knots
+        assert abs(g.cdf(x) - d.cdf(x)) < 1e-9
+    for p in (0.05, 0.5, 0.9):
+        assert abs(g.quantile(p) - d.quantile(p)) < 1e-9
+
+
+def test_recalibrated_quantiles_hit_the_chosen_base_levels_and_density_integrates():
+    d = Dist.gaussian(0.0, 1.0)
+    a = np.clip(ca.LEVELS ** 1.7, 1e-6, None)               # an arbitrary monotone level map
+    g = ca.Recalibrated(d, a)
+    for t, ai in zip(ca.LEVELS, a):
+        assert abs(g.quantile(t) - d.quantile(ai)) < 1e-9
+        assert abs(g.cdf(d.quantile(ai)) - t) < 1e-6
+    xs = np.linspace(-9, 9, 36001)
+    mass = np.trapezoid(np.exp([g.logpdf(x) for x in xs]), xs)
+    assert abs(mass - 1.0) < 1e-3
+
+
+def test_crps_by_quantile_integral_matches_the_base():
+    d = Dist.gaussian(0.5, 1.5)
+    g = ca.Recalibrated(d, ca.LEVELS)
+    for y in (-2.0, 0.5, 3.0):
+        assert abs(g.crps(y) - d.crps(y)) < 0.01
 
 
 def test_histogram_system_on_iid_normals_matches_normal_quantiles():
