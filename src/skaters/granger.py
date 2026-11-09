@@ -22,7 +22,16 @@ and every prefix,
     sum_t -log q_t(y_t)  <=  sum_t -log p_lap,t(y_t)  +  log(1 / pi_lap)
 
 so granger's total log score is never more than ``log(1/pi_lap)`` (log 4 at
-the shipped ``pi_lap = 0.25``) behind laplace's.
+the shipped ``pi_lap = 0.25``) behind laplace's, up to floating-point rounding
+(which matters only when laplace's own log density is astronomically negative).
+
+A score of ``+inf`` (an exact hit on a lattice atom) counts as ``+1e6`` and a
+NaN or ``-inf`` as ``-1e6`` in the weights; the issued mixture's log density
+is ``+inf`` when either component's is.
+
+A granger skater is not thread-safe: the gate's offset for the current call is
+held by the instance, so share one instance only within one thread (the state,
+as everywhere in skaters, is per series and pure data).
 
 The trained values ship as one JSON file per frequency in
 ``skaters/granger_params``; they were fitted with :mod:`skaters.torch.learned`
@@ -49,6 +58,14 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 PARAMS_DIR = os.path.join(_HERE, "granger_params")
 FREQUENCIES = ("monthly", "weekly", "hourly")
 _NONFINITE_LP = -1e6
+_INF_LP = 1e6
+
+
+def _score(lp):
+    """A component log density as it enters the mixture weights."""
+    if lp == math.inf:
+        return _INF_LP
+    return lp if math.isfinite(lp) else _NONFINITE_LP
 
 
 def load_params(frequency: str = "monthly") -> dict:
@@ -151,8 +168,13 @@ class MixtureDist:
         self.w = [math.exp(v) for v in self.log_w]
 
     def logpdf(self, x):
-        terms = [lw + d.logpdf(x) for lw, d in zip(self.log_w, self.dists)]
+        terms = []
+        for lw, d in zip(self.log_w, self.dists):
+            v = d.logpdf(x)
+            terms.append(-math.inf if v != v else lw + v)    # a NaN component contributes nothing
         m = max(terms)
+        if m == math.inf:
+            return math.inf
         if m == -math.inf:
             return -math.inf
         return m + math.log(sum(math.exp(t - m) for t in terms))
@@ -222,7 +244,11 @@ def granger(k: int = 1, frequency: str = "monthly", params: dict | None = None):
     if k != 1:
         raise ValueError("granger is trained at horizon 1 only")
     P = params if params is not None else load_params(frequency)
+    if int(P.get("granger_format", 1)) != 1:
+        raise ValueError(f"unsupported granger parameter format {P.get('granger_format')}")
     pi = float(P["pi_lap"])
+    if not 0.0 < pi < 1.0:
+        raise ValueError(f"pi_lap must lie in (0, 1), got {pi}")
     log_prior = [math.log(pi), math.log(1.0 - pi)]
     ref = laplace(k)
     # the gate's offset for the current call only (not state: set before every call)
@@ -250,7 +276,7 @@ def granger(k: int = 1, frequency: str = "monthly", params: dict | None = None):
                     ph = t % h
                     for j, d in enumerate((lap_d[h - 1], lrn_d[h - 1])):
                         lp = float(d.logpdf(yv))
-                        state["cum"][h - 1][ph][j] += lp if math.isfinite(lp) else _NONFINITE_LP
+                        state["cum"][h - 1][ph][j] += _score(lp)
         # 2. the trained expert, its combining weights shifted by the gate (which
         #    reads step t-1's state), then laplace
         _current["offset"] = _gate(G, _features(state, n, k))
@@ -279,5 +305,5 @@ def granger(k: int = 1, frequency: str = "monthly", params: dict | None = None):
         state["t"] = t + 1
         return out, state
 
-    _skater.__name__ = f"granger(k={k}, frequency={frequency!r})"
+    _skater.__name__ = f"granger(k={k}, frequency={P.get('frequency', frequency)!r})"
     return _skater

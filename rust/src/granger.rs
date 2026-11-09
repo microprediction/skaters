@@ -8,7 +8,8 @@
 //! leaf's eta and scale rate, and a gate (two dense layers, tanh) that shifts
 //! the ensemble's combining weights each step. The issued predictive is the
 //! Aggregating-Algorithm mixture of laplace and the expert under log loss, so
-//! its total log score is never more than log(1/pi_lap) behind laplace's.
+//! its total log score is never more than log(1/pi_lap) behind laplace's (up to
+//! floating-point rounding).
 //!
 //! The shipped parameter sets (monthly, weekly, hourly) are compiled into the
 //! binary from rust/params/*.json.
@@ -28,6 +29,19 @@ use crate::transform::{
 };
 
 const NONFINITE_LP: f64 = -1e6;
+const INF_LP: f64 = 1e6;
+
+/// A component log density as it enters the mixture weights: +inf (an exact
+/// hit on a lattice atom) counts as +1e6, NaN or -inf as -1e6.
+fn score(lp: f64) -> f64 {
+    if lp == f64::INFINITY {
+        INF_LP
+    } else if lp.is_finite() {
+        lp
+    } else {
+        NONFINITE_LP
+    }
+}
 
 pub const MONTHLY_JSON: &str = include_str!("../params/monthly.json");
 pub const WEEKLY_JSON: &str = include_str!("../params/weekly.json");
@@ -70,11 +84,76 @@ pub struct GrangerParams {
     pub gate: GateParams,
     #[serde(default)]
     pub frequency: String,
+    #[serde(default = "format_one")]
+    pub granger_format: u32,
 }
+
+fn format_one() -> u32 {
+    1
+}
+
+const KNOWN: &[(&str, &[&str])] = &[
+    ("ema_transform", &["alpha"]),
+    ("difference", &[]),
+    ("drift", &["alpha", "shrinkage"]),
+    ("theta", &["alpha"]),
+    ("ar", &["order", "lam", "ridge", "decay"]),
+    ("holt_linear", &["alpha", "beta"]),
+    ("seasonal_difference", &["period"]),
+    ("seasonal_anchor", &["period", "alpha", "weight"]),
+    ("standardize", &["alpha", "eps"]),
+    ("fractional_difference", &["d", "window"]),
+    ("garch", &["omega", "alpha", "beta", "mean_alpha", "eps"]),
+    ("power_transform", &["p"]),
+    ("yeo_johnson", &["lmbda"]),
+];
 
 impl GrangerParams {
     pub fn from_json(s: &str) -> Result<GrangerParams, serde_json::Error> {
         serde_json::from_str(s)
+    }
+
+    /// Check everything the builder relies on, so a bad file is an error, not a panic.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.granger_format != 1 {
+            return Err(format!("unsupported granger parameter format {}", self.granger_format));
+        }
+        if !(self.pi_lap > 0.0 && self.pi_lap < 1.0) {
+            return Err(format!("pi_lap must lie in (0, 1), got {}", self.pi_lap));
+        }
+        let n = self.candidates.len();
+        if n == 0 || self.trunk.prior_log_weights.len() != n {
+            return Err("prior_log_weights must have one entry per candidate".into());
+        }
+        for c in &self.candidates {
+            for (name, kw) in &c.chain {
+                let keys = KNOWN
+                    .iter()
+                    .find(|(k, _)| *k == name.as_str())
+                    .ok_or_else(|| format!("unknown transform {name}"))?
+                    .1;
+                for key in keys {
+                    if kw.get(*key).and_then(Value::as_f64).is_none() {
+                        return Err(format!("{name}: missing or non-numeric {key}"));
+                    }
+                }
+                if kw.get("exact").and_then(Value::as_bool).unwrap_or(false) {
+                    return Err(format!("{name}(exact=True) is not ported"));
+                }
+            }
+        }
+        let g = &self.gate;
+        let hidden = g.l1_weight.len();
+        if hidden == 0
+            || g.l1_bias.len() != hidden
+            || g.l1_weight.iter().any(|r| r.len() != n + 3)
+            || g.l2_weight.len() != n
+            || g.l2_bias.len() != n
+            || g.l2_weight.iter().any(|r| r.len() != hidden)
+        {
+            return Err(format!("gate dimensions do not match {n} candidates (inputs must be {})", n + 3));
+        }
+        Ok(())
     }
 
     /// A shipped parameter set: "monthly", "weekly" or "hourly".
@@ -210,8 +289,15 @@ impl Mixture {
     }
 
     pub fn logpdf(&self, x: f64) -> f64 {
-        let t = [self.log_w[0] + self.dists[0].logpdf(x), self.log_w[1] + self.dists[1].logpdf(x)];
+        let term = |i: usize| {
+            let v = self.dists[i].logpdf(x);
+            if v.is_nan() { f64::NEG_INFINITY } else { self.log_w[i] + v } // a NaN component contributes nothing
+        };
+        let t = [term(0), term(1)];
         let m = t[0].max(t[1]);
+        if m == f64::INFINITY {
+            return f64::INFINITY;
+        }
         if m == f64::NEG_INFINITY {
             return f64::NEG_INFINITY;
         }
@@ -296,7 +382,17 @@ pub struct Granger {
 }
 
 impl Granger {
+    /// Build from validated parameters (see [`Granger::try_new`] for a fallible build).
     pub fn new(params: GrangerParams) -> Granger {
+        Granger::try_new(params).expect("granger parameters")
+    }
+
+    pub fn try_new(params: GrangerParams) -> Result<Granger, String> {
+        params.validate()?;
+        Ok(Granger::build(params))
+    }
+
+    fn build(params: GrangerParams) -> Granger {
         let expert = expert(&params);
         let log_prior = [libm::log(params.pi_lap), libm::log(1.0 - params.pi_lap)];
         Granger {
@@ -324,7 +420,10 @@ impl Granger {
         let n = self.params.candidates.len();
         let z = self.z.map(|v| v.clamp(-8.0, 8.0)).unwrap_or(0.0);
         let mut f = vec![z, self.repeat_frac, self.abs_z_mean];
-        if self.t == 0 {
+        // zeros until the ensemble has stepped once (a leading missing value
+        // leaves it unstepped, as in the Python reference)
+        let stepped = trunk_mut(&mut self.expert).qdist.first().map_or(false, |q| !q.is_empty());
+        if !stepped {
             f.extend(std::iter::repeat(0.0).take(n));
         } else {
             let lw = &trunk_mut(&mut self.expert).log_w;
@@ -340,8 +439,7 @@ impl Granger {
         if finite {
             if let Some((lap_d, lrn_d)) = &self.pend {
                 for (j, d) in [lap_d, lrn_d].iter().enumerate() {
-                    let lp = d.logpdf(y);
-                    self.cum[j] += if lp.is_finite() { lp } else { NONFINITE_LP };
+                    self.cum[j] += score(d.logpdf(y));
                 }
             }
         }

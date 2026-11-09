@@ -227,7 +227,9 @@ impl Granger {
             None => GrangerParams::shipped(frequency)
                 .ok_or_else(|| PyValueError::new_err(format!("no shipped granger parameters for {frequency:?}")))?,
         };
-        Ok(Granger { inner: CoreGranger::new(params), frequency: frequency.to_string() })
+        let inner = CoreGranger::try_new(params)
+            .map_err(|e| PyValueError::new_err(format!("bad granger parameters: {e}")))?;
+        Ok(Granger { inner, frequency: frequency.to_string() })
     }
 
     /// Feed one observation; returns [GrangerDist] (horizon 1).

@@ -1,7 +1,8 @@
 """Vectors for the Rust granger parity test: the pure-Python granger's issued
 mixture at every step (log density at the next observation, mean, spread,
 laplace's mixture weight, 10% and 90% quantiles) on seeded streams, for each
-shipped parameter set.
+shipped parameter set. Missing observations are null in ``ys``; the log
+density at a missing next value is null.
 
     PYTHONPATH=src python parity/gen_granger_vectors.py   # -> parity/granger_vectors.json
 """
@@ -28,6 +29,10 @@ def streams(n=200):
             v += 0.25 * rng.choice((-1, 1))
         xs.append(v)
     out["sticky"] = xs
+    # missing values: leading (the expert's ensemble has not stepped yet) and mid-series
+    ys = [rng.gauss(0, 1) for _ in range(n)]
+    out["leading_nan"] = [float("nan")] * 3 + ys[3:]
+    out["mid_nan"] = [v if t not in (40, 41, 120) else float("nan") for t, v in enumerate(ys)]
     return out
 
 
@@ -41,8 +46,11 @@ def main():
             for t, y in enumerate(ys[:-1]):
                 d, s = g(y, s)
                 m = d[0]
-                rows.append([m.logpdf(ys[t + 1]), m.mean, m.std, m.w[0], m.quantile(0.1), m.quantile(0.9)])
-            out[f"{freq}/{name}"] = {"ys": ys, "rows": rows}
+                nxt = ys[t + 1]
+                lp = m.logpdf(nxt) if nxt == nxt else None      # no score at a missing value
+                rows.append([lp, m.mean, m.std, m.w[0], m.quantile(0.1), m.quantile(0.9)])
+            # JSON has no NaN: a missing observation is null
+            out[f"{freq}/{name}"] = {"ys": [None if v != v else v for v in ys], "rows": rows}
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "granger_vectors.json")
     with open(path, "w") as fh:
         json.dump(out, fh)

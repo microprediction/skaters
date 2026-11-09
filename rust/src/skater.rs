@@ -309,10 +309,11 @@ impl TerminalEnsemble {
             q.push_back(all_dists[i][0].clone());
         }
 
-        let lwc: Vec<f64> = match &self.gate_offset {
-            Some(off) => self.log_w.iter().zip(off.iter()).map(|(a, b)| a + b).collect(),
-            None => self.log_w.clone(),
-        };
+        let shifted: Option<Vec<f64>> = self
+            .gate_offset
+            .as_ref()
+            .map(|off| self.log_w.iter().zip(off.iter()).map(|(a, b)| a + b).collect());
+        let lwc: &[f64] = shifted.as_deref().unwrap_or(&self.log_w);
         let max_lw = lwc.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let w: Vec<f64> = lwc.iter().map(|&lw| libm::exp(lw - max_lw)).collect();
         let tot = fsum(w.iter().copied());

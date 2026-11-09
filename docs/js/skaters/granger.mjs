@@ -5,7 +5,8 @@
 // After Clive Granger, whose work with Bates (1969) founded forecast
 // combination. The issued predictive is the Aggregating-Algorithm mixture of
 // laplace and its trained twin under log loss, so its total log score is never
-// more than log(1/piLap) behind laplace's (log 4 at the shipped 0.25).
+// more than log(1/piLap) behind laplace's (log 4 at the shipped 0.25), up to
+// floating-point rounding.
 //
 // Parameters: the JSON files in src/skaters/granger_params (also copied next
 // to this module). granger(params) takes the parsed object, so it runs in a
@@ -24,6 +25,14 @@ import {
 } from "./transform.mjs";
 
 const NONFINITE_LP = -1e6;
+const INF_LP = 1e6;
+
+// a component log density as it enters the mixture weights: +inf (an exact hit
+// on a lattice atom) counts as +1e6, NaN or -inf as -1e6
+function score(lp) {
+  if (lp === Infinity) return INF_LP;
+  return Number.isFinite(lp) ? lp : NONFINITE_LP;
+}
 
 function noExact(kw, name) {
   if (kw.exact) throw new Error(`granger: ${name}(exact=True) is not ported`);
@@ -127,8 +136,12 @@ export class MixtureDist {
   }
 
   logpdf(x) {
-    const t = this.dists.map((d, i) => this.logW[i] + d.logpdf(x));
+    const t = this.dists.map((d, i) => {
+      const v = d.logpdf(x);
+      return Number.isNaN(v) ? -Infinity : this.logW[i] + v;   // a NaN component contributes nothing
+    });
     const m = Math.max(...t);
+    if (m === Infinity) return Infinity;
     if (m === -Infinity) return -Infinity;
     return m + Math.log(t.reduce((a, v) => a + Math.exp(v - m), 0.0));
   }
@@ -173,6 +186,8 @@ export class MixtureDist {
 export function granger(params, k = 1) {
   if (k !== 1) throw new Error("granger is trained at horizon 1 only");
   const P = params;
+  if ((P.granger_format ?? 1) !== 1) throw new Error(`unsupported granger parameter format ${P.granger_format}`);
+  if (!(P.pi_lap > 0 && P.pi_lap < 1)) throw new Error(`pi_lap must lie in (0, 1), got ${P.pi_lap}`);
   const logPrior = [Math.log(P.pi_lap), Math.log(1.0 - P.pi_lap)];
   const ref = laplace(k);
   const current = { offset: null };   // the gate's offset for the current call only
@@ -194,8 +209,7 @@ export function granger(params, k = 1) {
     if (finite && state.pend.length > 0) {
       const [lapD, lrnD] = state.pend[state.pend.length - 1];
       [lapD[0], lrnD[0]].forEach((d, j) => {
-        const lp = d.logpdf(yv);
-        state.cum[0][0][j] += Number.isFinite(lp) ? lp : NONFINITE_LP;
+        state.cum[0][0][j] += score(d.logpdf(yv));
       });
     }
     current.offset = gate(P.gate, features(state, n, k));

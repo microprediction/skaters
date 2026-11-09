@@ -78,3 +78,44 @@ def test_js_port_matches_python():
     r = subprocess.run(["node", os.path.join(root, "parity", "check_granger.mjs")],
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+class _Const:
+    """A stand-in component with a fixed log density."""
+
+    def __init__(self, lp):
+        self.lp = lp
+
+    def logpdf(self, x):
+        return self.lp
+
+
+def test_mixture_logpdf_with_infinite_and_nan_components():
+    from skaters.granger import MixtureDist
+    assert MixtureDist([_Const(math.inf), _Const(-1.0)], [math.log(0.25), math.log(0.75)]).logpdf(0.0) == math.inf
+    v = MixtureDist([_Const(float("nan")), _Const(-1.0)], [math.log(0.25), math.log(0.75)]).logpdf(0.0)
+    assert abs(v - (math.log(0.75) - 1.0)) < 1e-12
+    assert MixtureDist([_Const(-math.inf), _Const(-math.inf)], [0.0, 0.0]).logpdf(0.0) == -math.inf
+
+
+def test_an_exact_hit_counts_for_the_forecaster_not_against_it():
+    from skaters.granger import _score
+    assert _score(math.inf) > 0 and _score(float("nan")) < 0 and _score(-math.inf) < 0 and _score(-2.0) == -2.0
+
+
+def test_leading_and_mid_series_missing_values_are_handled():
+    g = granger(1, frequency=available()[0])
+    s = None
+    ys = [float("nan"), None, 1.0, 1.2, float("nan"), 0.9] + [0.1 * i for i in range(40)]
+    for y in ys:
+        d, s = g(y, s)
+        m = d[0]
+        assert math.isfinite(m.mean) and math.isfinite(m.std) and m.std > 0
+
+
+def test_bad_parameters_are_rejected():
+    from skaters.granger import load_params
+    P = load_params(available()[0])
+    for bad in ({**P, "pi_lap": 0.0}, {**P, "pi_lap": 1.0}, {**P, "granger_format": 2}):
+        with pytest.raises(ValueError):
+            granger(1, params=bad)

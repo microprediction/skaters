@@ -11,8 +11,8 @@ const RTOL: f64 = 1e-6;
 
 #[derive(serde::Deserialize)]
 struct Stream {
-    ys: Vec<f64>,
-    rows: Vec<Vec<f64>>,
+    ys: Vec<Option<f64>>,    // null = a missing observation
+    rows: Vec<Vec<Option<f64>>>,
 }
 
 #[test]
@@ -24,10 +24,12 @@ fn granger_matches_python() {
     for (key, st) in &all {
         let freq = key.split('/').next().unwrap();
         let mut g = Granger::shipped(freq).expect("shipped set");
-        for (t, y) in st.ys[..st.ys.len() - 1].iter().enumerate() {
+        let ys: Vec<f64> = st.ys.iter().map(|v| v.unwrap_or(f64::NAN)).collect();
+        for (t, y) in ys[..ys.len() - 1].iter().enumerate() {
             let m = g.step(*y);
-            let got = [m.logpdf(st.ys[t + 1]), m.mean(), m.std(), m.w[0], m.quantile(0.1), m.quantile(0.9)];
+            let got = [m.logpdf(ys[t + 1]), m.mean(), m.std(), m.w[0], m.quantile(0.1), m.quantile(0.9)];
             for (a, b) in got.iter().zip(st.rows[t].iter()) {
+                let Some(b) = b else { continue }; // no score at a missing next value
                 let dev = (a - b).abs();
                 worst = worst.max(dev / b.abs().max(1.0));
                 assert!(

@@ -57,6 +57,7 @@ jobs:
           PYTHONPATH: src
         run: |
           python parity/gen_vectors.py
+          python parity/gen_granger_vectors.py
           cargo test --release --manifest-path rust/Cargo.toml
 
       - name: Publish to crates.io
