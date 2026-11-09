@@ -47,7 +47,26 @@ MODELS = {
     "TimesFM 2.5":            ("TimesFM(wide)", "TimesFM-2.5-200M", "google--timesfm-2.5-200m-pytorch", "fm"),
     "TiRex":                  ("TiRex(wide)", "TiRex", "NX-AI--TiRex", "fm"),
     "Chronos-Bolt-small":     ("Chronos(wide)", "Chronos-Bolt-small", "amazon--chronos-bolt-small", "fm"),
+    "TimeH2O-v1":             ("TimeH2O-v1(wide)", "TimeH2O-v1", "h2oai--timeh2o-v1", "fm"),
+    # classical rows refit every step; footprint is the installed package alone
+    "AutoARIMA":              ("AutoARIMA", "ARIMA (order fixed, refit)", "pkg:statsforecast", "classical"),
+    "AutoETS":                ("AutoETS", "AutoETS (refit)", "pkg:statsforecast", "classical"),
+    "AutoTheta":              ("AutoTheta", "AutoTheta (refit)", "pkg:statsforecast", "classical"),
+    "GARCH-t":                ("GARCH-t", "GARCH-t (refit)", "pkg:arch", "classical"),
+    # laplace++: the run shown on each stratum; it has no daily run, so its
+    # accuracy pools weekly and monthly only (the label says so)
+    "laplace++ (weekly, monthly)": ({"weekly:econ": "learned(gpswa)", "monthly:econ": "learned(swa5)"},
+                                    "laplace++ (torch) k=1", "ckpt:learned_ckpt/monthly_k1_swa5.pt", "laplace"),
 }
+PKG_PY = os.path.join(ROOT, ".venv-sota", "bin", "python")
+
+
+def package_bytes(name):
+    """Installed size of one package directory (its dependencies not counted)."""
+    import subprocess
+    d = subprocess.run([PKG_PY, "-c", f"import {name}, os; print(os.path.dirname({name}.__file__))"],
+                       capture_output=True, text=True, timeout=120).stdout.strip()
+    return sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(d) for f in fs)
 # Sundial and FlowState are left out: only their tight-reconstruction runs exist
 # in the store, and the reconstruction study showed that nozzle, not the model,
 # sets most of such a gap (Sundial reads -2.8 nats through 30 sampled paths).
@@ -65,27 +84,31 @@ def weight_bytes(repo):
 
 
 def accuracy(store):
-    """Paired median dLL vs laplace per store method, pooled over STRATA,
-    mirroring summarize_canonical (per-series mean logpdf floored at -20)."""
+    """Per-series dLL vs laplace, {(study, method): [dLL, ...]}, mirroring
+    summarize_canonical (per-series mean logpdf floored at -20)."""
     import summarize_canonical as sc
-    by_method = {}
+    out = {}
     for (study, s, m), d in store.items():
         if study not in STRATA or m == "laplace":
             continue
         bl = store.get((study, s, "laplace"))
         if bl is None or len(bl["logpdf"]) != len(d["logpdf"]):
             continue
-        by_method.setdefault(m, []).append(sc._series_mean(d["logpdf"], -20.0)
-                                           - sc._series_mean(bl["logpdf"], -20.0))
-    out = {}
-    for m, v in by_method.items():
-        v = np.asarray(v, float)
-        v = v[np.isfinite(v)]
-        if len(v):
-            out[m] = {"med_dll": float(np.median(v)), "q25": float(np.percentile(v, 25)),
-                      "q75": float(np.percentile(v, 75)), "n_series": int(len(v)),
-                      "win_frac": float(np.mean(v > 0))}
+        out.setdefault((study, m), []).append(sc._series_mean(d["logpdf"], -20.0)
+                                              - sc._series_mean(bl["logpdf"], -20.0))
     return out
+
+
+def pooled(acc, method):
+    """Median and quartiles of dLL pooled over STRATA; ``method`` is a store
+    method, or {stratum: method} for a model with a different run per stratum."""
+    pairs = method.items() if isinstance(method, dict) else [(st, method) for st in STRATA]
+    v = np.asarray([x for st, m in pairs for x in acc.get((st, m), [])], float)
+    v = v[np.isfinite(v)]
+    if not len(v):
+        return None
+    return {"med_dll": float(np.median(v)), "q25": float(np.percentile(v, 25)),
+            "q75": float(np.percentile(v, 75)), "n_series": int(len(v)), "win_frac": float(np.mean(v > 0))}
 
 
 def main():
@@ -104,12 +127,18 @@ def main():
         acc = accuracy(sc.load_all())
         points = []
     for name, (method, pmodel, repo, group) in ([] if points else MODELS.items()):
-        a = acc.get(method) if method != "laplace" else {"med_dll": 0.0, "q25": 0.0, "q75": 0.0,
-                                                          "n_series": None, "win_frac": None}
+        a = pooled(acc, method) if method != "laplace" else {"med_dll": 0.0, "q25": 0.0, "q75": 0.0,
+                                                              "n_series": None, "win_frac": None}
         if a is None or pmodel not in warm:
             print(f"[frontier3d] skip {name}: acc={a is not None} perf={pmodel in warm}")
             continue
-        if repo:
+        if repo and repo.startswith("pkg:"):
+            mb = package_bytes(repo[4:]) / 1e6
+            foot = f"the installed {repo[4:]} package, dependencies not counted"
+        elif repo and repo.startswith("ckpt:"):
+            mb = (fp["wheel_bytes"] + os.path.getsize(os.path.join(HERE, repo[5:]))) / 1e6
+            foot = "published wheel plus the 4,202-parameter checkpoint; runs on PyTorch, not counted"
+        elif repo:
             mb = weight_bytes(repo) / 1e6
             foot = "weight files as cached from the Hub"
         elif "Rust" in name:
@@ -118,7 +147,7 @@ def main():
         else:
             mb = fp["wheel_bytes"] / 1e6
             foot = "published wheel, no dependencies"
-        points.append({"name": name, "group": group, "method": method, "ms": warm[pmodel],
+        points.append({"name": name, "group": group, "method": method if isinstance(method, str) else "laplace++", "ms": warm[pmodel],
                        "mb": mb, "footprint_how": foot, **a})
     meta = {"date": time.strftime("%Y-%m-%d"), "strata": list(STRATA),
             "perf_meta": perf.get("meta", {}), "footprint_date": fp["meta"]["date"]}
@@ -126,6 +155,7 @@ def main():
     fms = [p for p in points if p["group"] == "fm"]
     lo, hi = min(p["med_dll"] for p in fms), max(p["med_dll"] for p in fms)
     lap = next(p for p in points if "Rust" in p["name"])
+    n_cls = sum(p["group"] == "classical" for p in points)
     lightest_fm = min(fms, key=lambda p: p["mb"])
     fastest_fm = min(fms, key=lambda p: p["ms"])
     n_pairs = min(p["n_series"] for p in fms)
@@ -137,7 +167,9 @@ def main():
                f"laplace's bytes and the fastest takes {fastest_fm['ms'] / lap['ms']:,.0f}× as long "
                f"per new observation. Speed is one machine, CPU, streaming regime "
                f"(benchmarks/perf_results.json); footprint is the weight files as cached "
-               f"({meta['date']}). " + OMITTED)
+               f"({meta['date']}). The {n_cls} classical models refit at every step; their footprint is the "
+               f"installed package without its dependencies. laplace++ has no daily run, so its accuracy pools "
+               f"weekly and monthly only. " + OMITTED)
     js = f"""// generated by benchmarks/make_frontier3d.py on {meta['date']}; do not edit by hand
 (function () {{
   var P = {json.dumps(points)};
@@ -147,7 +179,7 @@ def main():
   function trace(group, color, symbol) {{
     var pts = P.filter(function (p) {{ return p.group === group; }});
     return {{
-      type: 'scatter3d', mode: 'markers+text', name: group === 'laplace' ? 'laplace' : 'foundation models',
+      type: 'scatter3d', mode: 'markers+text', name: group === 'laplace' ? 'laplace and laplace++' : group === 'classical' ? 'classical, refit every step' : 'foundation models',
       x: pts.map(function (p) {{ return p.mb; }}), y: pts.map(function (p) {{ return p.ms; }}),
       z: pts.map(function (p) {{ return p.med_dll; }}),
       text: pts.map(function (p) {{ return p.name; }}), textposition: 'top center',
@@ -189,7 +221,7 @@ def main():
   function render() {{
     var el = document.getElementById('frontier3d');
     if (!el || typeof Plotly === 'undefined') return;
-    Plotly.newPlot(el, [plane, stems, trace('fm', '#8f84ff', 'circle'), trace('laplace', '#1a8c4a', 'diamond')], layout,
+    Plotly.newPlot(el, [plane, stems, trace('fm', '#8f84ff', 'circle'), trace('classical', '#e09b2d', 'square'), trace('laplace', '#1a8c4a', 'diamond')], layout,
       {{ displayModeBar: false, responsive: true }});
     var cap = document.getElementById('frontier3d-caption');
     if (cap) cap.textContent = CAPTION;

@@ -39,14 +39,22 @@ MINOBS = int(os.environ.get("FX_MINOBS", 61))
 MAXR = float(os.environ.get("FX_MAX", 0.5))
 OVERLAP = int(os.environ.get("FX_OVERLAP", 60))
 SHARDS = int(os.environ.get("FX_SHARDS", 12))
+# FX_CUTOFF=YYYY-MM truncates every candidate before that month, so no training
+# change overlaps the scored test windows that start after it; FX_MINCH is then
+# the minimum number of changes kept; FX_NAME names the output corpora
+CUTOFF = os.environ.get("FX_CUTOFF", "")
+MINCH = int(os.environ.get("FX_MINCH", 0))
+NAME = os.environ.get("FX_NAME", "monthly-fx")
 CHUNK = 2000
 
 
 def used_ids():
+    """FRED ids in the canonical corpora (derived training corpora do not count)."""
     out = set()
-    for f in os.listdir(PREDS):
-        if f.startswith("_corpus_") and f.endswith(".jsonl"):
-            for line in open(os.path.join(PREDS, f)):
+    for arm in ("daily", "weekly", "monthly", "m4-hourly"):
+        f = os.path.join(PREDS, f"_corpus_{arm}.jsonl")
+        if os.path.exists(f):
+            for line in open(f):
                 out.add(json.loads(line)["sid"].split(":")[-1])
     return out
 
@@ -97,7 +105,10 @@ def main():
         if len(lv) < MINOBS:
             continue
         r = monthly_changes(lv)
-        if r and len(r) >= MINOBS - 1:
+        if r and CUTOFF:
+            cy, cm = map(int, CUTOFF.split("-"))
+            r = {k: v for k, v in r.items() if k < cy * 12 + cm - 1}
+        if r and len(r) >= max(MINOBS - 1, MINCH):
             cands.append((sid, r))
     print(f"[fx] {len(cands)} unused train-family monthly candidates x {len(valid)} held-out monthly series", flush=True)
 
@@ -121,14 +132,14 @@ def main():
         print(f"[fx] checked {min(a + CHUNK, len(cands))}/{len(cands)}", flush=True)
 
     keep = [c for c, w in zip(cands, worst) if abs(w) <= MAXR]
-    with open(os.path.join(HERE, "fred_extra_corpus.tsv"), "w") as fh:
+    with open(os.path.join(HERE, f"fred_extra_corpus{'_' + NAME if NAME != 'monthly-fx' else ''}.tsv"), "w") as fh:
         fh.write("candidate\theld_out_partner\tr\n")
         for (sid, _), w, p in zip(cands, worst, partner):
             if abs(w) > MAXR:
                 fh.write(f"{sid}\t{valid[p][0]}\t{w:+.3f}\n")
     random.Random(0).shuffle(keep)
     for s in range(SHARDS):
-        out = os.path.join(PREDS, f"_corpus_monthly-fx{s}.jsonl")
+        out = os.path.join(PREDS, f"_corpus_{NAME}{s if SHARDS > 1 else ''}.jsonl")
         with open(out + ".tmp", "w") as fh:
             for sid, r in keep[s::SHARDS]:
                 fh.write(json.dumps({"sid": f"fx:{sid}", "title": "",
