@@ -18,6 +18,7 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use skaters::api::{laplace as core_laplace, Forecaster};
+use skaters::granger::{Granger as CoreGranger, GrangerParams, Mixture};
 use skaters::tails::PDist;
 
 /// A single-horizon distributional prediction handle.
@@ -157,6 +158,101 @@ fn laplace(k: usize) -> PyResult<Laplace> {
     Laplace::new(k)
 }
 
+/// granger's issued predictive: the mixture of laplace and its trained twin.
+#[pyclass(module = "skaters_fast", name = "GrangerDist", skip_from_py_object)]
+#[derive(Clone)]
+struct GrangerDist {
+    inner: Mixture,
+}
+
+#[pymethods]
+impl GrangerDist {
+    fn logpdf(&self, x: f64) -> f64 {
+        self.inner.logpdf(x)
+    }
+
+    fn cdf(&self, x: f64) -> f64 {
+        self.inner.cdf(x)
+    }
+
+    fn quantile(&self, p: f64) -> PyResult<f64> {
+        if !(p > 0.0 && p < 1.0) {
+            return Err(PyValueError::new_err("quantile needs 0 < p < 1"));
+        }
+        Ok(self.inner.quantile(p))
+    }
+
+    fn crps(&self, x: f64) -> f64 {
+        self.inner.crps(x)
+    }
+
+    #[getter]
+    fn mean(&self) -> f64 {
+        self.inner.mean()
+    }
+
+    #[getter]
+    fn std(&self) -> f64 {
+        self.inner.std()
+    }
+
+    /// Mixture weights: [laplace, trained twin].
+    #[getter]
+    fn w(&self) -> Vec<f64> {
+        self.inner.w.to_vec()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("GrangerDist(mean={:.6}, std={:.6}, w_laplace={:.4})", self.inner.mean(), self.inner.std(), self.inner.w[0])
+    }
+}
+
+/// granger at horizon 1 on the accelerated backend.
+#[pyclass(module = "skaters_fast", name = "Granger")]
+struct Granger {
+    inner: CoreGranger,
+    frequency: String,
+}
+
+#[pymethods]
+impl Granger {
+    /// `frequency`: a shipped parameter set ("monthly", "weekly", "hourly"),
+    /// or pass `params_json` (a granger parameter file's contents) instead.
+    #[new]
+    #[pyo3(signature = (frequency="monthly", params_json=None))]
+    fn new(frequency: &str, params_json: Option<&str>) -> PyResult<Self> {
+        let params = match params_json {
+            Some(s) => GrangerParams::from_json(s)
+                .map_err(|e| PyValueError::new_err(format!("bad granger parameters: {e}")))?,
+            None => GrangerParams::shipped(frequency)
+                .ok_or_else(|| PyValueError::new_err(format!("no shipped granger parameters for {frequency:?}")))?,
+        };
+        Ok(Granger { inner: CoreGranger::new(params), frequency: frequency.to_string() })
+    }
+
+    /// Feed one observation; returns [GrangerDist] (horizon 1).
+    fn step(&mut self, y: f64) -> Vec<GrangerDist> {
+        vec![GrangerDist { inner: self.inner.step(y) }]
+    }
+
+    /// The trained twin's calibration z after the last step.
+    #[getter]
+    fn z(&self) -> Option<f64> {
+        self.inner.z
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Granger(frequency={:?})", self.frequency)
+    }
+}
+
+/// Build a granger forecaster on the accelerated backend (horizon 1).
+#[pyfunction]
+#[pyo3(signature = (frequency="monthly"))]
+fn granger(frequency: &str) -> PyResult<Granger> {
+    Granger::new(frequency, None)
+}
+
 #[pymodule]
 fn skaters_fast(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
@@ -172,5 +268,8 @@ fn skaters_fast(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(laplace, m)?)?;
     m.add_class::<Laplace>()?;
     m.add_class::<Dist>()?;
+    m.add_function(wrap_pyfunction!(granger, m)?)?;
+    m.add_class::<Granger>()?;
+    m.add_class::<GrangerDist>()?;
     Ok(())
 }

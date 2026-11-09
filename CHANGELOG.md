@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- New forecaster `granger` (horizon 1), after Clive Granger: laplace with
+  trained values for its continuous hyperparameters plus a small gate on the
+  ensemble's combining weights, mixed with laplace by the Aggregating
+  Algorithm, so its total log score is never more than log 4 behind laplace's
+  on any series. Pure Python (`skaters.granger`), Rust (`skaters::Granger`,
+  and `skaters_fast.granger`) and JavaScript (`granger.mjs`), parity-checked
+  against the torch training twin (1e-8) and each other (1e-6 gate; observed
+  1.5e-8). Parameters per frequency ship in `skaters/granger_params`
+  (monthly, weekly, hourly), exported by `benchmarks/granger_export.py`.
+  `terminal_leaf_ensemble` gains an optional `gate_hook`; laplace is unchanged
+  (output signatures identical).
 - `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace
   at worst. Two experts, the frozen reference `laplace` and a trainable torch
   `laplace` with a state-conditioned gate added to the trunk's prequential log
