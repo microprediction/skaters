@@ -124,13 +124,13 @@ def fixed_bandwidth_quantile_dist(
 
 
 # ------------------------------------------------------------------ laplace baseline
-def laplace_dists(ch, h=1, tails="gpd"):
+def laplace_dists(ch, h=1, tails="gpd", nsteps=None):
     """Per-step laplace predictive over the test window (the h-step forecast made
     h observations earlier). Mirrors foundation_study.laplace_scores but returns
     the Dist objects so the canonical store records laplace per step too.
     `tails` is passed through to laplace (``"gaussian"`` = no GPD splice)."""
     f = laplace(h, tails=tails); st = None; queue = []; out = []
-    start = len(ch) - TEST
+    start = len(ch) - (nsteps or TEST)          # nsteps > TEST: calibration steps first (conformal_arms)
     for i, yv in enumerate(ch):
         if len(queue) >= h and i >= start:
             out.append(queue[-h][h - 1])
@@ -1167,7 +1167,7 @@ def _season():
     return {"monthly": 12, "m4-hourly": 24}.get(c, 1)
 
 
-def statsforecast_dists(ch, h=1, model="AutoARIMA"):
+def statsforecast_dists(ch, h=1, model="AutoARIMA", nsteps=None):
     """TEST per-step Gaussian predictives from a statsforecast model refit every
     step (rolling CV, refit=1), the 90% band read as the Gaussian scale.
     AutoARIMA's order search at every step costs minutes per series, so its
@@ -1178,11 +1178,12 @@ def statsforecast_dists(ch, h=1, model="AutoARIMA"):
     from statsforecast import StatsForecast
     from statsforecast.models import ARIMA, AutoARIMA, AutoETS, AutoTheta
     import bench_core as bc
-    y = np.asarray(ch, float)[-(CLASSICAL_FIT_WIN + TEST + h):]
+    ns = nsteps or TEST                    # nsteps > TEST: calibration steps first (conformal_arms)
+    y = np.asarray(ch, float)[-(CLASSICAL_FIT_WIN + ns + h):]
     n = len(y)
     m = _season()
     def _arima():
-        pre = y[:n - TEST]
+        pre = y[:n - ns]
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             a = AutoARIMA(season_length=m).fit(pre)
@@ -1198,7 +1199,7 @@ def statsforecast_dists(ch, h=1, model="AutoARIMA"):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             sf = StatsForecast(models=[mk()], freq="D", n_jobs=1)
-            cv = sf.cross_validation(df=df, h=h, step_size=1, n_windows=TEST, level=[90],
+            cv = sf.cross_validation(df=df, h=h, step_size=1, n_windows=ns, level=[90],
                                      refit=1).sort_values(["cutoff", "ds"])
     except Exception:                                   # noqa: BLE001
         return None
@@ -1211,7 +1212,7 @@ def statsforecast_dists(ch, h=1, model="AutoARIMA"):
         if not (math.isfinite(mu) and math.isfinite(lo) and math.isfinite(hi)):
             return None                                  # the fit failed on this series: not scored
         out.append(bc.gauss_dist(mu, lo, hi))
-    return out if len(out) == TEST else None
+    return out if len(out) == ns else None
 
 
 def garch_t_dists(ch, h=1):
@@ -1406,6 +1407,9 @@ def make_registry(h=1):
         "PyMC@lap":    pit_sandwich(_memoized(pymc_dists, "PyMC"), h),
         "PyMC&lap":    portfolio_sandwich(_memoized(pymc_dists, "PyMC"), h=h),
         "NPTS&lap":    portfolio_sandwich(npts_dists, h=h),
+        # conformal methods for time series: wrappers on laplace and AutoARIMA
+        # (id, roll, nexcp, aci, pid) and Vovk's histogram predictive system
+        **__import__("conformal_arms").registry(h),
     }
 
 
