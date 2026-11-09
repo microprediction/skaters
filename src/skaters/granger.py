@@ -79,6 +79,9 @@ def _candidate(chain, k):
 
 
 def _expert(P, k=1, gate_hook=None):
+    n = len(P["candidates"])
+    if len(P["trunk"]["prior_log_weights"]) != n or len(P["gate"]["l2_weight"]) != n or len(P["gate"]["l2_bias"]) != n:
+        raise ValueError("granger: prior_log_weights and the gate output need one entry per candidate")
     cands = [_candidate(c["chain"], k) for c in P["candidates"]]
     depths = [int(c["depth"]) for c in P["candidates"]]
     t = P["trunk"]
@@ -181,7 +184,9 @@ class MixtureDist:
             raise ValueError(f"quantile needs 0 < p < 1, got {p}")
         lo = min(d.quantile(p) for d in self.dists)
         hi = max(d.quantile(p) for d in self.dists)
-        if hi - lo < tol:
+        # absolute tol at scale >= 1, relative below it so small-scale series keep their digits
+        tol = tol * min(1.0, max(abs(lo), abs(hi)))
+        if hi - lo <= tol:
             return 0.5 * (lo + hi)
         for _ in range(max_iter):
             mid = 0.5 * (lo + hi)
@@ -189,7 +194,7 @@ class MixtureDist:
                 lo = mid
             else:
                 hi = mid
-            if hi - lo < tol:
+            if hi - lo <= tol:
                 break
         return 0.5 * (lo + hi)
 

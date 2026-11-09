@@ -64,7 +64,8 @@ def main(ckpt, freq):
                 for u, v in ((float(a.logpdf(nxt)), b.logpdf(nxt)), (float(a.mean), b.mean),
                              (float(a.std), b.std), (float(a.weights[0]), b.w[0])):
                     if math.isfinite(u) or math.isfinite(v):
-                        dev = max(dev, abs(u - v) / max(1.0, abs(u)))
+                        d = abs(u - v) / max(1.0, abs(u))
+                        dev = max(dev, d) if d == d else math.inf   # NaN deviation fails the gate
         worst = max(worst, dev)
         print(f"  {name:12s} max relative deviation {dev:.2e}")
     print(f"[granger parity] {freq}: worst {worst:.2e} ({'OK' if worst < TOL else 'FAIL'} at {TOL:g})")

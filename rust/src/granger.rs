@@ -129,6 +129,9 @@ fn transform(name: &str, kw: &Map<String, Value>) -> Transform {
 }
 
 fn expert(p: &GrangerParams) -> Parade {
+    let n = p.candidates.len();
+    assert!(p.trunk.prior_log_weights.len() == n, "granger: prior_log_weights needs one entry per candidate");
+    assert!(p.gate.l2_weight.len() == n && p.gate.l2_bias.len() == n, "granger: gate needs one output per candidate");
     let cands: Vec<Sk> = p
         .candidates
         .iter()
@@ -243,11 +246,12 @@ impl Mixture {
 
     pub fn quantile(&self, p: f64) -> f64 {
         assert!(0.0 < p && p < 1.0, "quantile needs 0 < p < 1");
-        let tol = 1e-9;
         let q0 = self.dists[0].quantile(p);
         let q1 = self.dists[1].quantile(p);
         let (mut lo, mut hi) = (q0.min(q1), q0.max(q1));
-        if hi - lo < tol {
+        // absolute 1e-9 at scale >= 1, relative below it so small-scale series keep their digits
+        let tol = 1e-9 * lo.abs().max(hi.abs()).min(1.0);
+        if hi - lo <= tol {
             return 0.5 * (lo + hi);
         }
         for _ in 0..200 {
@@ -257,7 +261,7 @@ impl Mixture {
             } else {
                 hi = mid;
             }
-            if hi - lo < tol {
+            if hi - lo <= tol {
                 break;
             }
         }

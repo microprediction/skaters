@@ -151,11 +151,13 @@ export class MixtureDist {
     const qs = this.dists.map((d) => d.quantile(p));
     let lo = Math.min(...qs);
     let hi = Math.max(...qs);
-    if (hi - lo < tol) return 0.5 * (lo + hi);
+    // absolute tol at scale >= 1, relative below it so small-scale series keep their digits
+    tol *= Math.min(1.0, Math.max(Math.abs(lo), Math.abs(hi)));
+    if (hi - lo <= tol) return 0.5 * (lo + hi);
     for (let i = 0; i < maxIter; i++) {
       const mid = 0.5 * (lo + hi);
       if (this.cdf(mid) < p) lo = mid; else hi = mid;
-      if (hi - lo < tol) break;
+      if (hi - lo <= tol) break;
     }
     return 0.5 * (lo + hi);
   }
