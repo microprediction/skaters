@@ -66,6 +66,18 @@ T0_MODEL_ID = "theforecastingcompany/t0-gamma"
 T0_MODEL_REVISION = "e08aee083778f1f32da4974c0a34276776a35c52"
 T0_SOURCE_COMMIT = "5896313cf7a5da5e320a9070c2aff0f8fed79747"
 
+# TimeH2O (H2O.ai, released 2026-10-23; issue #298). Weights are gated and
+# non-commercial (a Hugging Face token with the licence accepted is needed);
+# the inference package h2ofm is Apache-2.0 and pinned in
+# benchmarks/timeh2o_requirements.lock. The model is trained on the nine
+# deciles only; levels outside 0.1..0.9 would be Gaussian-tail extrapolations
+# by the package, so the arms ask for the deciles and reconstruct like the
+# other nine-decile models (tight quantile_dist, and the generous nozzle).
+TIMEH2O_REVISIONS = {
+    "v1":      "c5569904b2a718ca59f4b3f375c42ffeb782f460",   # 108.8M
+    "v1-tiny": "3f9561e0d00459d47f76d3b96606115cf6cc827d",   # 5.8M
+}
+
 # Kumo Tabular (NVIDIA, released 2026-09-23; issue #294): a tabular in-context
 # model used as a forecaster exactly as the pre-registered TabFM study used
 # TabFM: the 128-change context arranged as an 8-lag table, refreshed every
@@ -491,6 +503,70 @@ def kumo_dists(ch, h=1, size="large", arm="reg(q21)"):
         raise ValueError(f"unknown Kumo arm {arm!r}")
     except Exception as e:                                 # noqa: BLE001
         print(f"  kumo failed: {e}", flush=True); return None
+
+
+_timeh2o = {}
+_timeh2o_memo = {}
+def timeh2o_quantiles_from_contexts(contexts, h=1, size="v1"):
+    """TimeH2O's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``.
+
+    Package defaults kept for the model's own ensembling (``patch_ensemble``
+    over trained patch sizes, ``flip_equivariant`` blend); the two
+    post-processing switches that would truncate or round a signed change
+    series are off (``clip_nonnegative=False``, ``snap_integer=False``).
+    One forward pass per (series, horizon, window) is memoised so the tight
+    and generous reconstructions share it.
+    """
+    from h2ofm import TimeH2O
+    if h < 1:
+        raise ValueError("h must be positive")
+    if size not in TIMEH2O_REVISIONS:
+        raise ValueError(f"unknown TimeH2O size {size!r}")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    key = (size, h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _timeh2o_memo:
+        return _timeh2o_memo[key]
+    if size not in _timeh2o:
+        _timeh2o[size] = TimeH2O.from_pretrained(
+            f"h2oai/timeh2o-{size}", device=DEVICE, revision=TIMEH2O_REVISIONS[size])
+    model = _timeh2o[size]
+    batch = int(os.environ.get("TIMEH2O_BATCH", "64"))
+    rows = []
+    for i in range(0, len(values), batch):
+        fcs = model.forecast_many(values[i:i + batch], horizon=h, quantile_levels=tuple(LEVELS9),
+                                  clip_nonnegative=False, snap_integer=False)
+        for fc in fcs:
+            q = np.asarray(fc.quantiles, dtype=float)              # (h, 9)
+            if q.shape != (h, len(LEVELS9)):
+                raise ValueError(f"unexpected TimeH2O forecast shape {q.shape}")
+            rows.append(q[h - 1])
+    quantiles = np.stack(rows)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected TimeH2O quantile shape {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("TimeH2O produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("TimeH2O produced crossing quantiles")
+    _timeh2o_memo.clear(); _timeh2o_memo[key] = quantiles
+    return quantiles
+
+
+def timeh2o_dists(ch, h=1, size="v1", recon=None):
+    """TimeH2O deciles reconstructed as benchmark ``Dist`` objects: the tight
+    ``quantile_dist`` by default (comparable with the other nine-decile
+    models' tight arms), or ``recon`` such as ``nozzles.nozzle_wide``."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = timeh2o_quantiles_from_contexts(contexts, h=h, size=size)
+        rec = recon or fs.quantile_dist
+        return [rec(LEVELS9, row) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  timeh2o failed: {e}", flush=True); return None
 
 
 _Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
@@ -1350,6 +1426,11 @@ def make_registry(h=1):
         "t0-gamma(q21)":     lambda ch: t0_dists(ch, h, "q21"),
         "t0-gamma":          lambda ch: t0_dists(ch, h, "q9"),
         "t0-gamma(q21+sym)": lambda ch: t0_dists(ch, h, "q21", symmetric_averaging=True),
+        # TimeH2O (#298): nine native deciles, tight and generous reconstructions
+        "TimeH2O-v1":            lambda ch: timeh2o_dists(ch, h, "v1"),
+        "TimeH2O-v1(wide)":      lambda ch: timeh2o_dists(ch, h, "v1", recon=_wide_recon()),
+        "TimeH2O-v1-tiny":       lambda ch: timeh2o_dists(ch, h, "v1-tiny"),
+        "TimeH2O-v1-tiny(wide)": lambda ch: timeh2o_dists(ch, h, "v1-tiny", recon=_wide_recon()),
         # Kumo Tabular (#294): regressor on its native quantiles (21 and 99 levels),
         # and the TabFM clf8 replication, small and large checkpoints
         "Kumo-large-reg(q21)": lambda ch: kumo_dists(ch, h, "large", "reg(q21)"),
