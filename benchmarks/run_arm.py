@@ -70,6 +70,7 @@ OUT = os.environ.get("PRED_OUT", "")
 ARM_MAX = int(os.environ.get("ARM_MAX", 0))
 REGIME = os.environ.get("ARM_REGIME", "")     # econ | price | "" (both)
 SPLIT = os.environ.get("ARM_SPLIT", "")       # train | valid | "" (both): the family split (learned_split)
+PREMAX = int(os.environ.get("ARM_PREMAX", 0))  # cap series before the split (0 = none)
 ARM_H = int(os.environ.get("ARM_H", "1"))     # forecast horizon k (1 = canonical study)
 NSHARD = int(os.environ.get("ARM_NSHARD", 1))
 SHARDS = {int(s) for s in os.environ.get("ARM_SHARDS", "0").split(",") if s != ""}
@@ -96,6 +97,8 @@ def main():
     series = list(iter_series(ARM))
     if REGIME:
         series = [x for x in series if regime(x[1]) == REGIME]
+    if PREMAX:                                  # cap BEFORE the split: pairs with a capped laplace run
+        series = series[:PREMAX]
     if SPLIT:
         from learned_split import split_of
         series = [x for x in series if split_of(x[0]) == SPLIT]

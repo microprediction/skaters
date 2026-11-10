@@ -53,6 +53,39 @@
     "horizon": 12,
     "series": 64,
     "date": "2026-10-28"
+   },
+   "classical2": {
+    "version": "0.16.0",
+    "commit": "6c5da15",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-09"
+   },
+   "learned": {
+    "version": "0.16.0",
+    "commit": "6c5da15",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-09"
+   },
+   "timeh2o": {
+    "version": "0.16.0",
+    "commit": "6c5da15",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-09"
    }
   }
  },
@@ -320,6 +353,78 @@
    "regime": "warm",
    "ms": 108.42766612768173,
    "note": "stateless: full re-forward"
+  },
+  {
+   "model": "laplace++ (torch) k=1",
+   "regime": "cold",
+   "ms": 3244.2139172926545,
+   "note": "replays 256 points"
+  },
+  {
+   "model": "laplace++ (torch) k=1",
+   "regime": "warm",
+   "ms": 12.579547916539013,
+   "note": "one online update"
+  },
+  {
+   "model": "TimeH2O-v1",
+   "regime": "cold b=1",
+   "ms": 255.3649453111575,
+   "note": "108.8M params, batched"
+  },
+  {
+   "model": "TimeH2O-v1",
+   "regime": "cold b=16",
+   "ms": 155.31636132800486,
+   "note": "108.8M params, batched"
+  },
+  {
+   "model": "TimeH2O-v1",
+   "regime": "cold b=64",
+   "ms": 128.60471811291063,
+   "note": "108.8M params, batched"
+  },
+  {
+   "model": "TimeH2O-v1",
+   "regime": "warm",
+   "ms": 215.75874974951148,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "AutoTheta (refit)",
+   "regime": "cold",
+   "ms": 7.265291642397642,
+   "note": "fit on 256 points"
+  },
+  {
+   "model": "AutoTheta (refit)",
+   "regime": "warm",
+   "ms": 7.265291642397642,
+   "note": "refits from scratch every step"
+  },
+  {
+   "model": "ARIMA (order fixed, refit)",
+   "regime": "cold",
+   "ms": 7.250125054270029,
+   "note": "a typical order, (1,1,1); the leaderboard arm searches the order once per series and refits coefficients every step"
+  },
+  {
+   "model": "ARIMA (order fixed, refit)",
+   "regime": "warm",
+   "ms": 7.250125054270029,
+   "note": "coefficients refit every step"
+  },
+  {
+   "model": "GARCH-t (refit)",
+   "regime": "cold",
+   "ms": 29.631665907800198,
+   "note": "fit on 256 points"
+  },
+  {
+   "model": "GARCH-t (refit)",
+   "regime": "warm",
+   "ms": 29.631665907800198,
+   "note": "refits from scratch every step"
   }
  ]
 }
