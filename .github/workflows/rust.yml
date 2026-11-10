@@ -8,8 +8,9 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: PYTHONPATH=src python parity/gen_vectors.py
+      - run: PYTHONPATH=src python parity/gen_granger_vectors.py
       - uses: actions/upload-artifact@v4
-        with: {name: vectors, path: parity/vectors.json}
+        with: {name: vectors, path: "parity/*vectors.json"}
 
   core:
     needs: vectors
@@ -36,6 +37,7 @@ jobs:
           cargo test --release --test parity -- --nocapture | tee parity.out
           cargo test --release --test robustness
           cargo test --release --test quantile_contract
+          cargo test --release --test granger_parity -- --nocapture
           grep -o 'PARITY_DIGEST=[0-9a-f]*' parity.out > "digest-${{ matrix.os }}.txt"
       - uses: actions/upload-artifact@v4
         with: {name: "digest-${{ matrix.os }}", path: "rust/digest-${{ matrix.os }}.txt"}

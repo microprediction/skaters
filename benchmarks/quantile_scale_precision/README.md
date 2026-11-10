@@ -2,7 +2,7 @@
 
 This study supports the narrow successor to [#176](https://github.com/microprediction/skaters/pull/176), using the [maintainer's acceptance criteria](https://github.com/microprediction/skaters/pull/176#issuecomment-6691384453).
 
-Baseline: `8baee06362f82504fe47e25f7b91fe6d8b55eb84`. The tested implementation was published in commit `b163cc6d20fa96d8a8d4755f8721ca0aad4cf2b9` and is identified by `source-identity.json`. These evidence files are a subsequent overlay and are not part of that implementation snapshot's hashes. This packaging update leaves those pinned implementation contents unchanged.
+Baseline: `8baee06362f82504fe47e25f7b91fe6d8b55eb84`. The tested implementation was published in commit `b163cc6d20fa96d8a8d4755f8721ca0aad4cf2b9` and is identified by `source-identity.json`. These evidence files are a subsequent overlay and are not part of that implementation snapshot's hashes. The packaging-only update at `7bd54c1d876a7579ca6c79f84ad03a76b1540414` preserved those pinned implementation contents; the later integration is described below.
 
 ## Recorded results
 
@@ -76,16 +76,18 @@ It recomputes corpus summaries, verifies the complete pinned series sets and 64-
 
 ## Replay forecasts using the original caches
 
-Use the candidate checkout and a compatible environment with its declared dependencies. The recorded benchmark runtime was Python 3.14.6 with NumPy 2.5.4. Keep the baseline source in a separate directory:
+The recorded evidence belongs to the original implementation, not to a later tree combined with upstream changes. Use a separate archive of the recorded commit and a compatible environment with its declared dependencies. The recorded benchmark runtime was Python 3.14.6 with NumPy 2.5.4. Keep the baseline source in a separate directory:
 
 Recording is deliberately locked to the listed candidate file contents, including workflows and changelogs. Later edits to any pinned file require a new validated identity record; a different Git commit with identical pinned contents is acceptable. The M4 input hash identifies the complete 414-row `benchmarks/preds/_corpus_m4-hourly.jsonl` cache, from which the first 200 series were scored.
 
 ```sh
-mkdir -p /tmp/skaters-quantile-baseline
+mkdir -p /tmp/skaters-quantile-recording /tmp/skaters-quantile-baseline
+git archive b163cc6d20fa96d8a8d4755f8721ca0aad4cf2b9 | tar -x -C /tmp/skaters-quantile-recording
 git archive 8baee06362f82504fe47e25f7b91fe6d8b55eb84 src | tar -x -C /tmp/skaters-quantile-baseline
+cd /tmp/skaters-quantile-recording
 ```
 
-The following example assumes the original hashed corpus cache is available at the repository's normal cache location. Use a fresh output directory. Both arms run in separate processes; the tool validates source and cache hashes and disables network access.
+The following example runs inside that recorded archive and assumes the original hashed corpus cache has been supplied at its normal cache location. Use a fresh output directory. Both arms run in separate processes; the tool validates source and cache hashes and disables network access.
 
 ```sh
 python benchmarks/quantile_scale_precision/reproduce.py record \
@@ -125,3 +127,7 @@ The portable evidence script, package, and draft PR text received a separate ana
 ## Ports still owed
 
 This PR implements the correction in Python, JavaScript and Rust. The [R port](https://github.com/microprediction/skaters-r) and [Julia port](https://github.com/microprediction/Skaters.jl) still need the matching change; maintainer assistance is requested for those repositories. This does not claim cross-port completion.
+
+## Integration with later upstream changes
+
+The contribution branch incorporates upstream `ead4a03b80f47d49860476455c97f5100e808204`. Conflict resolution retains both the quantile and Granger changelog entries and both native Rust test commands, including upstream Granger vector generation. The numerical quantile implementation is unchanged. The recorded FRED/M4 evidence and `source-identity.json` retain their original source identities; they are not relabeled as measurements of this combined tree. Use the archived-checkout instructions above for historical replay. Current integration checks are recorded in the PR.

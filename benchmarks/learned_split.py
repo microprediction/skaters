@@ -14,11 +14,18 @@ from __future__ import annotations
 
 import os
 import sys
+import re
 import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fred_universe as fu  # noqa: E402
 
 
+_M4 = re.compile(r"^H[0-9]+$")   # M4 hourly ids only (FRED has M1, M2)
+
+
 def split_of(sid: str) -> str:
-    return "valid" if zlib.crc32(fu.family(sid).encode()) % 2 else "train"
+    # M4 ids (H1..H414 etc.) are independent series that the FRED family key
+    # would lump into one family; split those by the id itself
+    key = sid if _M4.match(sid) else fu.family(sid)
+    return "valid" if zlib.crc32(key.encode()) % 2 else "train"

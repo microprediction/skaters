@@ -39,6 +39,8 @@ jobs:
         run: |
           python parity/gen_vectors.py
           node parity/check.mjs
+          python parity/gen_granger_vectors.py
+          node parity/check_granger.mjs
 
       - name: Publish to npm
         working-directory: docs/js/skaters

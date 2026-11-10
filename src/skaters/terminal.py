@@ -49,6 +49,7 @@ def terminal_leaf_ensemble(
     adaptive_temperature: bool = False,
     temp_rho: float = 0.03,
     temp_band: float = 3.0,
+    gate_hook=None,
 ):
     """Create a terminal-leaf ensemble.
 
@@ -87,6 +88,11 @@ def terminal_leaf_ensemble(
         temp_band: adaptive eta is clipped to
             ``[learning_rate / temp_band, learning_rate * temp_band]`` so it
             cannot run away.
+        gate_hook: optional zero-argument callable returning per-candidate
+            offsets (or None) added to the log weights when they combine the
+            candidates this step; the weight recursion is unchanged. Used by
+            :func:`skaters.granger`; it holds only the offset for the current
+            call, so state stays pure data.
     """
     n = len(skaters)
     assert n > 0
@@ -182,6 +188,12 @@ def terminal_leaf_ensemble(
             q.append(all_dists[i][0])
 
         log_w = state["log_w"]
+        # An optional per-candidate offset (granger's gate) shifts the combining
+        # weights for this step only; the weight recursion above is untouched.
+        # laplace passes no hook.
+        off = gate_hook() if gate_hook is not None else None
+        if off is not None:
+            log_w = [lw + o for lw, o in zip(log_w, off)]
         max_lw = max(log_w)
         w = [math.exp(lw - max_lw) for lw in log_w]
         tot = sum(w)
