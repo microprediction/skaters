@@ -19,6 +19,10 @@ import urllib.request
 
 HERE = Path(__file__).resolve().parent
 FIELDS = ('y', 'mean', 'std', 'q05', 'q50', 'q95', 'logpdf', 'crps')
+EVIDENCE_SHA256 = {
+    'canonical-per-series.json': '55cf44a47412c1a9190220a407616a097efb668d656cbbde8c8c0a2559ab8472',
+    'full-precision-per-series.json': '6e28134409feea6053890625a2c4c319b8327e795f54e7ffe37d2a242e3d29c7',
+}
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -222,7 +226,9 @@ def main():
         summarize_parser.add_argument('--'+name,required=True)
     summarize_parser.add_argument('--baseline-raw')
     summarize_parser.add_argument('--candidate-raw')
-    sub.add_parser('verify-results')
+    verify_parser=sub.add_parser('verify-results')
+    verify_parser.add_argument('--results-dir', type=Path, required=True,
+                               help='directory containing both downloaded per-series release assets')
     args=parser.parse_args()
     if args.command=='record':
         if not 1 <= args.max_series <= 200:
@@ -235,7 +241,13 @@ def main():
         write_json(args.output,{'per_series':rows,'aggregate':aggregate(rows)})
     else:
         for precision in ('canonical','full-precision'):
-            rows=read_json(HERE/f'results/{precision}-per-series.json')
+            name=precision+'-per-series.json'
+            evidence=args.results_dir/name
+            if not evidence.is_file():
+                parser.error('Missing release asset: '+str(evidence)+'; see the study README for download links')
+            if sha(evidence)!=EVIDENCE_SHA256[name]:
+                raise ValueError('Release asset SHA-256 mismatch: '+name)
+            rows=read_json(evidence)
             expected=read_json(HERE/f'results/{precision}-summary.json')
             validate_series_set(rows, complete=True)
             corpora={r['study'].split(':',1)[0] for r in rows}

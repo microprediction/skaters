@@ -2,7 +2,7 @@
 
 This study supports the narrow successor to [#176](https://github.com/microprediction/skaters/pull/176), using the [maintainer's acceptance criteria](https://github.com/microprediction/skaters/pull/176#issuecomment-6691384453).
 
-Baseline: `8baee06362f82504fe47e25f7b91fe6d8b55eb84`. The implementation is an uncommitted snapshot on that baseline, identified by `source-identity.json`. These evidence files are a subsequent overlay and are not part of that implementation snapshot's hashes.
+Baseline: `8baee06362f82504fe47e25f7b91fe6d8b55eb84`. The tested implementation was published in commit `b163cc6d20fa96d8a8d4755f8721ca0aad4cf2b9` and is identified by `source-identity.json`. These evidence files are a subsequent overlay and are not part of that implementation snapshot's hashes. This packaging update leaves those pinned implementation contents unchanged.
 
 ## Recorded results
 
@@ -33,28 +33,43 @@ Full-precision outputs are **not all bit-identical**. Maximum observed quantile 
 
 ## Frozen synthetic signatures
 
-`vendor/laplace_k1_signatures.py` is copied without modification from [#323](https://github.com/microprediction/skaters/pull/323), commit `f57fe72ef483ca0ae8f088f1c388cdb29b7b3704`. This does not assume that PR has merged. Its SHA-256 and upstream location are in `verification-summary.json`; the upstream MIT license is included.
+Use the repository harness at `parity/laplace_k1_signatures.py`, introduced by [#323](https://github.com/microprediction/skaters/pull/323). The recorded study used its unmodified contents at commit `f57fe72ef483ca0ae8f088f1c388cdb29b7b3704`; its SHA-256 and upstream location are in `verification-summary.json`. No copy is vendored here. Rerunning the signature commands requires a checkout containing #323. At this packaging update #323 is still open; the maintainer plans to merge it before this PR.
 
-All seven stream digests change. On the six ordinary streams, the largest absolute field movement is `4.936708819514024e-10`, below `tol/2 = 5e-10`. The separately reported near-constant stream moves by at most `4.98943997229162e-10`. CDF and log-density values remain unchanged on all seven streams. The input generator and complete synthetic before/after arrays are included.
+All seven stream digests change. On the six ordinary streams, the largest absolute field movement is `4.936708819514024e-10`, below `tol/2 = 5e-10`. The separately reported near-constant stream moves by at most `4.98943997229162e-10`. CDF and log-density values remain unchanged on all seven streams. The input generator is in the repository harness; complete synthetic before/after arrays remain included here.
 
 ## Files and evidence boundaries
 
-- `results/*-per-series.json`: one result per series, including score means, exact coverage counts, individual decision-flip counts, and maximum field movements.
+- External `*-per-series.json` release assets listed below: one result per series, including score means, exact coverage counts, individual decision-flip counts, and maximum field movements.
 - `results/*-summary.json`: derived frequency/regime aggregates. `boundary_flips` order is central90, at/below median, lower bound, upper bound; coverage arrays are central90 and at/below median counts.
 - `results/signatures-*.json` and `signature-measurements.json`: complete synthetic output arrays and derived measurements.
 - `inputs.json`: selected series identifiers, corpus-cache hashes, retrieval times where recorded, and selection rules.
 - `source-identity.json`: pinned baseline, complete implementation file hashes, baseline source hashes, and the recorded documentation-only delta after implementation review. The file set comprises 898 already-tracked files and the five new files in the implementation patch; it has no unrelated untracked-file dependency.
 - `verification-summary.json`: local test counts, runtime versions, independent implementation-review scope, and limits.
-- `reproduce.py`: portable recorder and paired-summary tool, reviewed separately from the implementation. `packaging-review.json` records that scope and the subsequent verification/documentation changes.
+- `reproduce.py`: portable recorder and paired-summary tool, reviewed separately from the implementation. `packaging-review.json` is the dated historical record of that original scope and the subsequent verification/documentation changes; its unpublished status describes that earlier point in time.
 
-No credentials, `.env` files, local absolute paths, private consultation transcripts, downloaded FRED observations, or per-step economic prediction tapes are included. Original caches and tapes were retained locally. **Hashes alone do not reconstruct the original data.** Exact replay requires caches matching `inputs.json`; fresh FRED retrieval may reflect revisions or changed rankings and constitutes a new run. Aggregates can be recomputed from the included per-series results without the raw caches.
+No credentials, `.env` files, local absolute paths, private consultation transcripts, downloaded FRED observations, or per-step economic prediction tapes are included. Original caches and tapes were retained locally. **Hashes alone do not reconstruct the original data.** Exact replay requires caches matching `inputs.json`; fresh FRED retrieval may reflect revisions or changed rankings and constitutes a new run. Aggregates can be recomputed from the downloaded, hash-verified per-series results without the raw caches.
 
-## Verify the included results
+## Download and verify the recorded results
 
-Only Python's standard library is needed for this command:
+The maintainer hosts the two bulky result files in the [benchmarking-data release](https://github.com/microprediction/skaters-benchmarking-data/releases/tag/quantile-scale-precision-pr328). They are byte-identical to the files originally committed in `b163cc6d20fa96d8a8d4755f8721ca0aad4cf2b9` and are excluded from this repository:
+
+| File | SHA-256 |
+| --- | --- |
+| [canonical-per-series.json](https://github.com/microprediction/skaters-benchmarking-data/releases/download/quantile-scale-precision-pr328/canonical-per-series.json) | `55cf44a47412c1a9190220a407616a097efb668d656cbbde8c8c0a2559ab8472` |
+| [full-precision-per-series.json](https://github.com/microprediction/skaters-benchmarking-data/releases/download/quantile-scale-precision-pr328/full-precision-per-series.json) | `6e28134409feea6053890625a2c4c319b8327e795f54e7ffe37d2a242e3d29c7` |
+
+To independently check the original-file claim, run `git show b163cc6d20fa96d8a8d4755f8721ca0aad4cf2b9:benchmarks/quantile_scale_precision/results/canonical-per-series.json | shasum -a 256` and repeat for `full-precision-per-series.json`; compare with the table.
+
+Download them outside the checkout. The verifier uses only Python's standard library and checks each SHA-256 hash before interpreting that file's results. It performs no downloads itself:
 
 ```sh
-python benchmarks/quantile_scale_precision/reproduce.py verify-results
+mkdir -p /tmp/skaters-quantile-evidence
+curl --fail --location --output /tmp/skaters-quantile-evidence/canonical-per-series.json \
+  https://github.com/microprediction/skaters-benchmarking-data/releases/download/quantile-scale-precision-pr328/canonical-per-series.json
+curl --fail --location --output /tmp/skaters-quantile-evidence/full-precision-per-series.json \
+  https://github.com/microprediction/skaters-benchmarking-data/releases/download/quantile-scale-precision-pr328/full-precision-per-series.json
+python benchmarks/quantile_scale_precision/reproduce.py verify-results \
+  --results-dir /tmp/skaters-quantile-evidence
 ```
 
 It recomputes corpus summaries, verifies the complete pinned series sets and 64-step counts, asserts canonical acceptance and full-precision score/boundary predicates, and verifies synthetic row digests and movement summaries. It does not rerun forecasting or independently authenticate the omitted raw input caches. The general `summarize` command permits a leading subset of pinned series for smoke checks and does not by itself certify the complete 200-series acceptance run.
@@ -92,11 +107,11 @@ Repeat for weekly and monthly using their respective caches. Use `--precision ca
 
 The recorder invokes the existing `benchmarks/run_arm.py` and its registry. It changes only source/cache routing, adds the `laplace_old` alias, and optionally replaces numeric serialization and records an unfloored score sidecar. It preserves the canonical `-20` log-score floor. `summarize_canonical.py` remains the authoritative canonical summarizer; run it with `CANON_BASELINE=laplace_old` and the chosen prediction directory. The saved original canonical results used that summarizer; the portable summarizer additionally reports per-step differences and boundary flips.
 
-Synthetic signatures can be rerun against each source without FRED data:
+Synthetic signatures can be rerun against each source without FRED data. These commands use the harness from a separate checkout containing #323, while `src` still refers to the pinned candidate checkout above. This keeps historical source verification valid after unrelated upstream changes. Verify that the harness SHA-256 matches `verification-summary.json` before using it:
 
 ```sh
-PYTHONPATH=/tmp/skaters-quantile-baseline/src python benchmarks/quantile_scale_precision/vendor/laplace_k1_signatures.py --write /tmp/signatures-before.json
-PYTHONPATH=src python benchmarks/quantile_scale_precision/vendor/laplace_k1_signatures.py --compare /tmp/signatures-before.json
+PYTHONPATH=/tmp/skaters-quantile-baseline/src python /path/to/checkout-with-323/parity/laplace_k1_signatures.py --write /tmp/signatures-before.json
+PYTHONPATH=src python /path/to/checkout-with-323/parity/laplace_k1_signatures.py --compare /tmp/signatures-before.json
 ```
 
 The upstream signature tool reports changed digests; a nonzero comparison exit alone is not this change's acceptance criterion. Compare the measured ordinary-stream movements against `tol/2` and inspect near-constant separately.
@@ -105,4 +120,8 @@ The upstream signature tool reports changed digests; a nonzero comparison exit a
 
 The implementation completed independent Claude Code review. The final focused correction review used `claude-fable-5-1` and found no material defects in that delta. A documentation-only clarification followed; executable/test/configuration bytes remained unchanged. Execution evidence was collected separately. The reviewed model code is unchanged by this study.
 
-The portable evidence script, package, and draft PR text received a separate analytical, read-only `claude-fable-5-1` review. It found no material defects and requested a conditional clean-clone file check; that check confirmed only the five intended new implementation files are untracked. Subsequent changes strengthen verification and clarify documentation; their local proof and review-carry limits are recorded in `packaging-review.json`. The reviewer did not execute the scripts or recompute hashes. Cross-platform GitHub CI, WebAssembly, and minimum-supported-Rust checks have not run on this unpublished candidate. Optional Torch behavior was not changed. No universal accuracy, output-invariance, merge-readiness, or release claim is made.
+The portable evidence script, package, and draft PR text received a separate analytical, read-only `claude-fable-5-1` review. It found no material defects and requested a conditional clean-clone file check; that check confirmed only the five intended new implementation files are untracked. Subsequent changes strengthen verification and clarify documentation; their local proof and review-carry limits are recorded in `packaging-review.json`. The reviewer did not execute the scripts or recompute hashes. This candidate is published as draft [#328](https://github.com/microprediction/skaters/pull/328); cross-platform GitHub CI, WebAssembly, and minimum-supported-Rust checks remain required. The packaging update changes evidence locations and verification input routing, without changing numerical implementation or recorded results. Optional Torch behavior was not changed. No universal accuracy, output-invariance, merge-readiness, or release claim is made.
+
+## Ports still owed
+
+This PR implements the correction in Python, JavaScript and Rust. The [R port](https://github.com/microprediction/skaters-r) and [Julia port](https://github.com/microprediction/Skaters.jl) still need the matching change; maintainer assistance is requested for those repositories. This does not claim cross-port completion.

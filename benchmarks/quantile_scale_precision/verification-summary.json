@@ -25,8 +25,9 @@
     "source_sha": "f57fe72ef483ca0ae8f088f1c388cdb29b7b3704",
     "file": "parity/laplace_k1_signatures.py",
     "sha256": "f24ff8e5d9f8b1ca8ee9c6ab4d3b20033d449256cf04aec199ad889b624731d2",
-    "copied_without_modification": true,
-    "upstream_merge_not_assumed": true
+    "upstream_merge_not_assumed": true,
+    "historical_run_used_unmodified_harness": true,
+    "current_reference": "Repository path; not vendored. Requires checkout containing #323."
   },
   "candidate_changes": [
     ".github/workflows/rust.yml",
@@ -77,6 +78,6 @@
     "mode": "analytical read-only; no execution",
     "verdict": "no material defects; conditional clean-clone check cleared by exact tracked/new-file comparison",
     "post_review_changes": "verification and documentation refinements checked locally; see packaging-review.json",
-    "status": "local and unpublished; not committed"
+    "status": "Completed before original draft publication; this is the historical review record."
   }
 }
