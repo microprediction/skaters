@@ -32,6 +32,14 @@ unit tests, and all three gate every release:
    Changing its contract requires editing that test deliberately, plus a
    changelog entry and a version bump, in the same pull request.
 
+A change that can move laplace's issued predictive (`Dist`, tails,
+transforms) also needs the output-signature check. Run
+`PYTHONPATH=src python parity/laplace_k1_signatures.py --write before.json`
+on main, apply the change, then run it with `--compare before.json`. The
+ordinary streams should stay identical or move by no more than the change's
+stated tolerance; report the printed moves in the pull request. Reference
+digests at main are in `parity/laplace_k1_signatures.txt`.
+
 ## Ground rules
 
 - Pure stdlib in `src/skaters/`; dependencies belong in benchmarks only.
@@ -40,8 +48,23 @@ unit tests, and all three gate every release:
   future or whole-series statistics.
 - New estimators forget: prefer EWMA-style memory to cumulative counts.
 - Benchmark claims come with committed study files. If you assert a
-  number, commit the harness and results that produce it (see
-  `benchmarks/anomaly/RESULTS.md` for the format).
+  number, commit the harness and the summary results that produce it (see
+  `benchmarks/anomaly/RESULTS.md` for the format): a README, the script that
+  reproduces the numbers, and the summary tables.
+- Bulky evidence does not go in this repository. Per-series results, raw
+  outputs and anything over a few hundred lines are published as a release
+  asset in
+  [microprediction/skaters-benchmarking-data](https://github.com/microprediction/skaters-benchmarking-data/releases)
+  and linked from your README with their sha256. A maintainer can host them
+  for you; say so in the pull request. Do not vendor copies of scripts that
+  already live here: refer to them by path.
+- A numerical change reaches every port. The Python package is the
+  reference; Rust and JavaScript live here, R in
+  [microprediction/skaters-r](https://github.com/microprediction/skaters-r)
+  and Julia in [microprediction/Skaters.jl](https://github.com/microprediction/Skaters.jl),
+  all parity-checked against vectors generated from this package. Either port
+  the change to all of them or say in the pull request which ports it still
+  needs, so they do not drift.
 
 ## Reporting issues
 
