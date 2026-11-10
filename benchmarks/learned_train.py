@@ -31,6 +31,7 @@ validation number is the harness's.
 """
 from __future__ import annotations
 
+import copy
 import json
 import math
 import os
@@ -103,6 +104,7 @@ def save(model, opt, series, epoch, done, history, path=OUT):
 
 
 _SWA = {"n": 0, "avg": None}
+_SKIPS = {"series": 0, "windows": 0}   # robustness counters, printed per epoch
 
 
 def swa_update(model):
@@ -126,6 +128,49 @@ def save_swa(model, series, epoch, done, history):
     os.replace(path + ".tmp", path)
 
 
+def _train_series(model, opt, ch, tot_lrn, tot_lap, n_scored):
+    """Prequential truncated-BPTT pass over one series; returns the running totals.
+    A window whose gradient is not finite is skipped (no optimizer step)."""
+    state = None
+    pend = []                       # learned-expert dists issued earlier (graph kept)
+    pend_lap = []
+    loss = torch.zeros((), dtype=torch.float64)
+    steps_in_window = 0
+    for t, y in enumerate(ch):
+        # score matured forecasts for y_t (issued h steps earlier), horizons 1..k
+        for h in range(1, K + 1):
+            if len(pend) >= h and math.isfinite(y):
+                lp = pend[-h][h - 1].logpdf(y)
+                lp = torch.clamp(lp, min=FLOOR) if torch.isfinite(lp) else torch.as_tensor(FLOOR, dtype=torch.float64)
+                loss = loss - lp
+                lpl = float(pend_lap[-h][h - 1].logpdf(y))
+                tot_lrn += float(lp); tot_lap += max(lpl, FLOOR) if math.isfinite(lpl) else FLOOR
+                n_scored += 1
+        dists, state = model(y, state)
+        # the experts' own forecasts are the last entry of the pending deque
+        lap_d, lrn_d = state["pend"][-1]
+        pend.append(lrn_d); pend_lap.append(lap_d)
+        if len(pend) > K:
+            pend.pop(0); pend_lap.pop(0)
+        steps_in_window += 1
+        if steps_in_window >= WINDOW:
+            if loss.requires_grad:
+                opt.zero_grad()
+                loss.backward()
+                gnorm = torch.nn.utils.clip_grad_norm_(model.trainable_parameters(), CLIP)
+                if torch.isfinite(gnorm):
+                    opt.step()
+                    model.project_()
+                else:                       # a non-finite gradient would write NaN into the weights
+                    opt.zero_grad()
+                    _SKIPS["windows"] += 1
+            loss = torch.zeros((), dtype=torch.float64)
+            steps_in_window = 0
+            state = detach_state(state)
+            pend = [[_detach(d) for d in ds] for ds in pend]
+    return tot_lrn, tot_lap, n_scored
+
+
 def run_epoch(model, opt, series, epoch, start_at=0, history=None):
     """One pass over the series; returns (mean learned LL, mean laplace LL, n).
     Saves a checkpoint every CKPT_EVERY series (resumable with LT_RESUME)."""
@@ -136,39 +181,17 @@ def run_epoch(model, opt, series, epoch, start_at=0, history=None):
         if j < start_at:
             continue
         ch = [float(v) for v in ch[-HIST:]]
-        state = None
-        pend = []                       # learned-expert dists issued earlier (graph kept)
-        pend_lap = []
-        loss = torch.zeros((), dtype=torch.float64)
-        steps_in_window = 0
-        for t, y in enumerate(ch):
-            # score matured forecasts for y_t (issued h steps earlier), horizons 1..k
-            for h in range(1, K + 1):
-                if len(pend) >= h and math.isfinite(y):
-                    lp = pend[-h][h - 1].logpdf(y)
-                    lp = torch.clamp(lp, min=FLOOR) if torch.isfinite(lp) else torch.as_tensor(FLOOR, dtype=torch.float64)
-                    loss = loss - lp
-                    lpl = float(pend_lap[-h][h - 1].logpdf(y))
-                    tot_lrn += float(lp); tot_lap += max(lpl, FLOOR) if math.isfinite(lpl) else FLOOR
-                    n_scored += 1
-            dists, state = model(y, state)
-            # the experts' own forecasts are the last entry of the pending deque
-            lap_d, lrn_d = state["pend"][-1]
-            pend.append(lrn_d); pend_lap.append(lap_d)
-            if len(pend) > K:
-                pend.pop(0); pend_lap.pop(0)
-            steps_in_window += 1
-            if steps_in_window >= WINDOW:
-                if loss.requires_grad:
-                    opt.zero_grad()
-                    loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.trainable_parameters(), CLIP)
-                    opt.step()
-                    model.project_()
-                loss = torch.zeros((), dtype=torch.float64)
-                steps_in_window = 0
-                state = detach_state(state)
-                pend = [[_detach(d) for d in ds] for ds in pend]
+        # one bad series must not end a multi-day run: on an exception the weights,
+        # optimizer and running totals go back to where this series started
+        snap = (copy.deepcopy(model.state_dict()), copy.deepcopy(opt.state_dict()),
+                tot_lrn, tot_lap, n_scored)
+        try:
+            tot_lrn, tot_lap, n_scored = _train_series(model, opt, ch, tot_lrn, tot_lap, n_scored)
+        except (ValueError, RuntimeError, FloatingPointError) as e:
+            model.load_state_dict(snap[0]); opt.load_state_dict(snap[1])
+            tot_lrn, tot_lap, n_scored = snap[2], snap[3], snap[4]
+            _SKIPS["series"] += 1
+            print(f"[skip] series {j + 1} {sid}: {type(e).__name__}: {str(e)[:120]}", flush=True)
         if (j + 1) % 10 == 0 or j + 1 == len(series):
             dt = time.time() - t0
             done_here = j + 1 - start_at
@@ -231,6 +254,7 @@ def main():
         save(model, opt, series, epoch, len(series), history)
         # keep every epoch's end state: a later epoch's periodic checkpoints overwrite OUT
         save(model, opt, series, epoch, len(series), history, path=OUT.replace(".pt", f"_e{epoch}.pt"))
+        print(f"[learned_train] skipped {_SKIPS['series']} series, {_SKIPS['windows']} non-finite gradient windows", flush=True)
         print(f"[learned_train] epoch {epoch}: learned {lrn:+.4f} laplace {lap:+.4f} "
               f"delta {lrn - lap:+.4f} nats/step (in-sample); checkpoint -> {OUT}", flush=True)
     with open(OUT + ".json", "w") as fh:
