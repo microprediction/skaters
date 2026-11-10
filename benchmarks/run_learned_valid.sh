@@ -25,7 +25,7 @@ pids=()
 for r in $(seq 0 $((NSHARD - 1))); do
   OMP_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS \
   LEARNED_TAG="$RUN" ARM_METHODS="$ARMS" ARM_CORPUS=$CORPUS ARM_REGIME=econ ARM_SPLIT=valid \
-  ARM_MAX=$MAX ARM_NSHARD=$NSHARD ARM_SHARDS=$r \
+  ARM_MAX=$MAX ARM_PREMAX=${LV_PREMAX:-0} ARM_NSHARD=$NSHARD ARM_SHARDS=$r \
   PRED_OUT="benchmarks/preds/learned-${TAG}${RUN:+-$RUN}__${CORPUS}.s${r}.csv" \
     "$PY" -u benchmarks/run_arm.py > "benchmarks/_learned_valid_${TAG}.s${r}.log" 2>&1 &
   pids+=($!)

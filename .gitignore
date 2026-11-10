@@ -288,3 +288,4 @@ papers/stronger-benchmark/*.bbl
 papers/stronger-benchmark/*.blg
 papers/stronger-benchmark/*.out
 benchmarks/learned_ckpt/
+benchmarks/data/giftpre/
