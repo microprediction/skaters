@@ -1328,7 +1328,7 @@ def garch_t_dists(ch, h=1):
 # same three seasonal families added at extra periods (seasonal difference,
 # hedged seasonal anchor, and seasonal difference + EMA), everything else
 # identical. laplace's defaults are untouched.
-def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_grid=(), octave=False):
+def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_grid=(), octave=False, extra=None):
     from functools import partial
     from skaters import api as _api
     from skaters.conjugate import conjugate as _conj
@@ -1360,6 +1360,8 @@ def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_gri
             for a in (0.05, 0.1):
                 cands.append(_conj(_conj(_leaf(k=kk), ema_transform(a), k=kk), seasonal_difference(p), k=kk))
                 depths.append(2)
+        for chain, depth in (extra(kk) if extra else ()):   # untested transforms: POOL_EXTRAS
+            cands.append(chain); depths.append(depth)
         f = terminal_leaf_ensemble(cands, k=kk, leaf_fn=_api._objective_leaf("crps", 0.03),
                                    learning_rate=0.8, complexity_penalty=0.005, depths=depths,
                                    max_components=20, forget=0.99)
@@ -1371,8 +1373,8 @@ def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_gri
     return _api._parade(f, k=k)
 
 
-def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(), octave=False):
-    f = laplace_extra_periods(h, periods, fourier=fourier, shash_grid=shash_grid, octave=octave); st = None; queue = []; out = []
+def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(), octave=False, extra=None):
+    f = laplace_extra_periods(h, periods, fourier=fourier, shash_grid=shash_grid, octave=octave, extra=extra); st = None; queue = []; out = []
     start = len(ch) - TEST
     for i, yv in enumerate(ch):
         if len(queue) >= h and i >= start:
@@ -1382,6 +1384,53 @@ def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(
         if len(queue) > h:
             queue.pop(0)
     return out
+
+
+# ---- untested pool transforms (queue from the transform audit) ----
+# Each entry adds candidate chains to laplace's pool, everything else
+# identical, so laplace(+x) against laplace isolates the transform. Ranked by
+# prior: level reversion first. pool_transforms.py holds the new ones (h=1).
+def _pool_extras(kk):
+    from skaters.conjugate import conjugate as C
+    from skaters.leaf import leaf as L
+    from skaters.transform import ar, drift, ema_transform, grouped_ar, ou_transform, standardize
+    from skaters.markov import markov_drift
+    import pool_transforms as pt
+
+    def c(*ts):                       # leaf <- ts[0] <- ts[1] ...: ts listed innermost first
+        f = L(k=kk)
+        for t in ts:
+            f = C(f, t, k=kk)
+        return f
+
+    return {
+        # level mean reversion: OU on the running level of the changes
+        "+lou": [(c(ou_transform(kap, a), pt.integrate()), 2)
+                 for kap in (0.02, 0.05, 0.15) for a in (0.01, 0.03)]
+                + [(c(standardize(0.02), ou_transform(kap, 0.01), pt.integrate()), 3)
+                   for kap in (0.02, 0.05, 0.15)],
+        # long-lag and grouped autoregression (stationarity-projected, #235)
+        "+gar": [(c(grouped_ar(16)), 1), (c(grouped_ar(64)), 1),
+                 (c(ar(4)), 1), (c(ar(8, decay=1.0)), 1),
+                 (c(standardize(0.02), grouped_ar(16)), 2)],
+        # partial reversion of the change toward its running mean
+        "+ou": [(c(ou_transform(kap, a)), 1) for kap in (0.3, 0.6, 0.9) for a in (0.005, 0.02)]
+               + [(c(ar(1), drift(0.002, 0.001)), 2)],
+        # MA(1) on changes (overdifferencing)
+        "+ma": [(c(pt.ma1(th)), 1) for th in (-0.6, -0.3, 0.3)]
+               + [(c(pt.ma1(th), ema_transform(0.1)), 2) for th in (-0.3,)],
+        # outlier-robust level
+        "+huber": [(c(pt.huber_ema(a, cc)), 1) for a in (0.05, 0.1, 0.3) for cc in (1.5, 3.0)],
+        # per-phase Holt anchor (#113)
+        "+ptrend": [(c(pt.phase_trend_anchor(p, 0.2, 0.1)), 1) for p in (7, 12, 24, 52)],
+        # two-regime AR(1)
+        "+setar": [(c(pt.setar1()), 1), (c(pt.setar1(), ema_transform(0.1)), 2)],
+        # regime drift (PR #116, old harness only)
+        "markov": [(c(markov_drift()), 1), (c(markov_drift(), ema_transform(0.1)), 2)],
+    }
+
+
+POOL_EXTRAS = ("+lou", "+gar", "+ou", "+ma", "+huber", "+ptrend", "+setar", "markov")
 
 
 def make_registry(h=1):
@@ -1403,6 +1452,9 @@ def make_registry(h=1):
         "laplace(shash)": lambda ch: laplace_extra_periods_dists(ch, h, (), shash_grid=__import__("shash").SHASH_GRID),
         "laplace(f52)": lambda ch: laplace_extra_periods_dists(ch, h, (), fourier=(365.25 / 7,)),   # Fourier annual, weekly data
         "laplace(s52f52)": lambda ch: laplace_extra_periods_dists(ch, h, (52,), fourier=(365.25 / 7,)),
+        # untested pool transforms, one arm each (h=1 only)
+        **{f"laplace({x})": (lambda x: lambda ch: laplace_extra_periods_dists(
+            ch, h, (), extra=lambda kk: _pool_extras(kk)[x]))(x) for x in POOL_EXTRAS},
         "learned":        lambda ch: learned_dists(ch, h, "mixture"),   # #297: laplace at worst
         "learned-expert": lambda ch: learned_dists(ch, h, "expert"),
         **({f"learned({LEARNED_TAG})": lambda ch: learned_dists(ch, h, "mixture"),
