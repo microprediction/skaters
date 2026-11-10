@@ -251,6 +251,11 @@ pub struct TerminalEnsemble {
     pub tleafs: Vec<Sk>,
     pub leaf_pred: Vec<Option<Dist>>,
     pub mean_q: Vec<VecDeque<f64>>,
+    /// granger's gate: per-candidate offsets added to the log weights when they
+    /// combine the candidates this step (the recursion is untouched). Set
+    /// before each step by the caller; laplace never sets it. Not state.
+    #[serde(skip)]
+    pub gate_offset: Option<Vec<f64>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -279,6 +284,7 @@ pub fn terminal_leaf_ensemble(
         tleafs,
         leaf_pred: vec![None; k],
         mean_q: vec![VecDeque::new(); k],
+        gate_offset: None,
     }))
 }
 
@@ -303,8 +309,13 @@ impl TerminalEnsemble {
             q.push_back(all_dists[i][0].clone());
         }
 
-        let max_lw = self.log_w.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let w: Vec<f64> = self.log_w.iter().map(|&lw| libm::exp(lw - max_lw)).collect();
+        let shifted: Option<Vec<f64>> = self
+            .gate_offset
+            .as_ref()
+            .map(|off| self.log_w.iter().zip(off.iter()).map(|(a, b)| a + b).collect());
+        let lwc: &[f64] = shifted.as_deref().unwrap_or(&self.log_w);
+        let max_lw = lwc.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let w: Vec<f64> = lwc.iter().map(|&lw| libm::exp(lw - max_lw)).collect();
         let tot = fsum(w.iter().copied());
 
         let mut combined = Vec::with_capacity(k);

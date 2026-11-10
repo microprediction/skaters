@@ -18,8 +18,10 @@ pub mod spec;
 pub mod tails;
 pub mod parade;
 pub mod api;
+pub mod granger;
 
 pub use api::{build_candidates, laplace, Forecaster};
+pub use granger::{Granger, GrangerParams, Mixture};
 pub use cov::{EmaCov, LedoitWolfCov, RunningCov};
 pub use dist::Dist;
 pub use periodicity::{top_periods, PeriodDetector};
