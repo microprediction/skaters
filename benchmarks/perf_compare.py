@@ -35,6 +35,10 @@ so one results file carries every model measured on the same machine:
     PERF_ONLY=t0        PYTHONPATH=src:benchmarks .venv-t0/bin/python        benchmarks/perf_compare.py
     PERF_ONLY=timesfm3  PYTHONPATH=src:benchmarks .venv-timesfm3/bin/python  benchmarks/perf_compare.py
     PERF_ONLY=sundial   PYTHONPATH=src:benchmarks .venv-sundial/bin/python   benchmarks/perf_compare.py
+    PERF_ONLY=timeh2o   PYTHONPATH=src:benchmarks .venv-timeh2o/bin/python   benchmarks/perf_compare.py
+    PERF_ONLY=learned   PERF_LEARNED_CKPT=benchmarks/learned_ckpt/monthly_k1_swa5.pt \
+                        PYTHONPATH=src:benchmarks .venv-kumo/bin/python      benchmarks/perf_compare.py
+    PERF_ONLY=classical2 PYTHONPATH=src:benchmarks .venv-sota/bin/python     benchmarks/perf_compare.py
 """
 from __future__ import annotations
 import os
@@ -99,6 +103,9 @@ GROUPS = {
     "t0": ("t0-gamma",),
     "timesfm3": ("TimesFM-3.0",),
     "sundial": ("Sundial-",),
+    "timeh2o": ("TimeH2O-",),
+    "learned": ("laplace++",),
+    "classical2": ("AutoTheta", "GARCH-t", "ARIMA (order fixed"),
 }
 
 
@@ -160,6 +167,66 @@ def measure_only(group):
             with torch.no_grad():
                 sd.generate(torch.tensor(np.asarray(cs, dtype=np.float32)), num_samples=30, max_new_tokens=1)
         fm("Sundial-base-128m", c_sd, "128M params, 30 sample paths")
+    elif group == "timeh2o":
+        from h2ofm import TimeH2O
+        m = TimeH2O.from_pretrained("h2oai/timeh2o-v1", device="cpu",
+                                    revision="c5569904b2a718ca59f4b3f375c42ffeb782f460")
+        def c_h2o(cs):
+            m.forecast_many(np.asarray(cs, dtype=np.float32), horizon=1, quantile_levels=tuple(LEV),
+                            clip_nonnegative=False, snap_integer=False)
+        fm("TimeH2O-v1", c_h2o, "108.8M params")
+    elif group == "learned":
+        # laplace++: online like laplace, so cold = replay the history, warm = one update
+        import torch
+        from skaters.torch.learned import LearnedLaplace
+        ck = torch.load(os.environ["PERF_LEARNED_CKPT"], map_location="cpu", weights_only=False)
+        m = LearnedLaplace(k=1, pi_lap=float(ck.get("pi_lap", 0.25)))
+        m.load_state_dict(ck["state_dict"]); m.eval()
+        def replay(c):
+            st_ = None
+            with torch.no_grad():
+                for y in c:
+                    _, st_ = m(float(y), st_)
+            return st_
+        warm_state = replay(CTX[0])
+        add("laplace++ (torch) k=1", "cold", med(lambda: replay(CTX[0]), reps=3) * 1000,
+            f"replays {L} points")
+        import copy
+        def one(st0=warm_state):
+            with torch.no_grad():
+                m(float(CTX[1][0]), copy.deepcopy(st0))
+        def copy_only(st0=warm_state):
+            copy.deepcopy(st0)
+        t = (med(lambda: [one() for _ in range(20)], reps=5) - med(lambda: [copy_only() for _ in range(20)], reps=5)) / 20
+        add("laplace++ (torch) k=1", "warm", t * 1000, "one online update")
+    elif group == "classical2":
+        from statsforecast.models import ARIMA, AutoARIMA, AutoTheta
+        def one_theta(c):
+            mm = AutoTheta(season_length=1)
+            mm.fit(np.asarray(c, dtype=np.float64)); mm.predict(h=1)
+        one_theta(CTX[0][:128])
+        t = med(lambda: one_theta(CTX[0]), reps=3) * 1000
+        add("AutoTheta (refit)", "cold", t, f"fit on {L} points")
+        add("AutoTheta (refit)", "warm", t, "refits from scratch every step")
+        # the contexts are random walks, on which the search picks (0,1,0) with nothing
+        # to fit; time a representative order with coefficients instead
+        p_, d_, q_ = 1, 1, 1
+        def one_arima(c):
+            mm = ARIMA(order=(p_, d_, q_), season_length=1)
+            mm.fit(np.asarray(c, dtype=np.float64)); mm.predict(h=1)
+        one_arima(CTX[0][:128])
+        t = med(lambda: one_arima(CTX[0]), reps=3) * 1000
+        add("ARIMA (order fixed, refit)", "cold", t, "a typical order, (1,1,1); the leaderboard arm searches the order once per series and refits coefficients every step")
+        add("ARIMA (order fixed, refit)", "warm", t, "coefficients refit every step, as the AutoARIMA leaderboard arm")
+        from arch import arch_model
+        def one_garch(c):
+            r = arch_model(np.diff(np.asarray(c, dtype=np.float64)), mean="Constant", vol="GARCH",
+                           p=1, q=1, dist="t", rescale=True).fit(disp="off")
+            r.forecast(horizon=1)
+        one_garch(CTX[0][:128])
+        t = med(lambda: one_garch(CTX[0]), reps=3) * 1000
+        add("GARCH-t (refit)", "cold", t, f"fit on {L} points")
+        add("GARCH-t (refit)", "warm", t, "refits from scratch every step")
     else:
         raise SystemExit(f"unknown PERF_ONLY group {group!r}; have {sorted(GROUPS)}")
     return rows

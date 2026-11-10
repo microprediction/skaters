@@ -91,6 +91,10 @@ MODELS = {
     "t0-gamma(q21)":     (".venv-t0", "C", {}),
     "t0-gamma":          (".venv-t0", "C", {}),
     "t0-gamma(q21+sym)": (".venv-t0", "C", {}),
+    "TimeH2O-v1": (".venv-timeh2o", "C", {}),
+    "TimeH2O-v1(wide)": (".venv-timeh2o", "C", {}),
+    "TimeH2O-v1-tiny": (".venv-timeh2o", "C", {}),
+    "TimeH2O-v1-tiny(wide)": (".venv-timeh2o", "C", {}),
     # sandwiches on the fair bases
     "Timestral-209M(q21)+lap": (".venv-timestral", "C", {}),
     "Timestral-209M(q21)~lap": (".venv-timestral", "C", {}),
