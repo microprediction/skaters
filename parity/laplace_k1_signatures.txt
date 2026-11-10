@@ -1,4 +1,4 @@
-# laplace(1) k=1 output digests at main 8baee06 (Python 3.12); regenerate with parity/laplace_k1_signatures.py
+# laplace(1) k=1 output digests at main ead4a03 (Python 3.12); regenerate with parity/laplace_k1_signatures.py
 benign          a8a5655d6131e13232c693aafad27de33c7c69d9c886a480b5f204fd69079742
 regimes_spike   30e6988e7f6d254738ef08e2bc43de2e03ab8e4312c67ac45ecf72109cc14700
 student_t3      f77264e3155deae7c21603cadfe86a89c1f3dd083212b52b47fa96e72c655915
