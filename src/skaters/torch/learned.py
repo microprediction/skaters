@@ -256,7 +256,11 @@ class LearnedLaplace(nn.Module):
                     ph = t % h
                     for j, d in enumerate((lap_d[h - 1], lrn_d[h - 1])):
                         lp = float(d.logpdf(yv))
-                        cum[h - 1, ph, j] += lp if math.isfinite(lp) else _NONFINITE_LP
+                        # +inf (an exact hit on a lattice atom) counts in the expert's favour
+                        cum[h - 1, ph, j] += 1e6 if lp == math.inf else (lp if math.isfinite(lp) else _NONFINITE_LP)
+                    # re-centre (the weights depend only on the difference; keeps
+                    # later differences out of rounding after an extreme step)
+                    cum[h - 1, ph] -= torch.max(cum[h - 1, ph])
             state["cum"] = cum
         # 2. the experts' forecasts for y_{t+1..t+k}; the gate reads step t-1's features
         self._set_gate_offsets(state)
