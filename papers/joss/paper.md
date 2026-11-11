@@ -142,7 +142,14 @@ leaderboards at https://foundationalprediction.com, which pair more than a
 dozen foundation models (Chronos-2, TimesFM 3.0, Timestral, t0, TimeH2O,
 Toto 2.0, TiRex-2, Moirai 2.0 and others) with classical baselines on
 identical series, one horizon at a time, with training-data overlap
-disclosed per model. Beyond the author's papers, `skaters` is the core dependency of
+disclosed per model. On those leaderboards `laplace` is the only training-free model
+that stays competitive with the foundation models in every stratum: it
+beats all of them on daily economic series, is level with them on prices,
+and trails the strongest by about 0.1 nats per step at the median on
+weekly and monthly series and 0.18 on hourly ones, while AutoARIMA, AutoETS
+and AutoTheta trail `laplace` itself by 0.1 to 0.4 nats on every economic
+stratum, and GARCH-t, close on monthly series, trails it by 0.24 nats on
+daily ones. Beyond the author's papers, `skaters` is the core dependency of
 `timemachines` [@cotton2021timemachines], an established
 anomaly-detection and sequential-decision package (445 stars and 54 forks
 since 2021) whose current releases are built on the calibrated surprise
