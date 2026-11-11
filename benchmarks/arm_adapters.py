@@ -290,16 +290,26 @@ def tirex2_quantiles_from_contexts(
     return quantiles
 
 
-def tirex2_dists(ch, h=1):
+_QMEMO = {}
+def _memo_quantiles(tag, contexts, h, fn):
+    """One forward pass per (model, horizon, window): the tight and wide arms of
+    a model run back to back on each series and share it."""
+    v = np.ascontiguousarray(contexts, dtype=np.float32)
+    key = (tag, h, hashlib.sha1(v.tobytes()).hexdigest())
+    if key not in _QMEMO:
+        _QMEMO.clear()
+        _QMEMO[key] = fn()
+    return _QMEMO[key]
+
+
+def tirex2_dists(ch, h=1, recon=None):
     """TiRex-2 native quantiles reconstructed as benchmark ``Dist`` objects."""
     try:
         source = ch if h == 1 else ch[:len(ch) - (h - 1)]
         contexts = fs._ctx_batch(source)
-        quantiles = tirex2_quantiles_from_contexts(contexts, h=h)
-        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
-        return [fixed_bandwidth_quantile_dist(
-            LEVELS9, row, spacing_multiplier=spacing
-        ) for row in quantiles]
+        quantiles = _memo_quantiles("tirex2", contexts, h,
+                                    lambda: tirex2_quantiles_from_contexts(contexts, h=h))
+        return _deciles_to_dists(quantiles, recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  tirex2 failed: {e}", flush=True); return None
 
@@ -573,12 +583,10 @@ def chronos2_quantiles_from_contexts(contexts, h=1, batch_size=None):
         raise ValueError(f"unexpected Chronos-2 forecast shape: {quantiles.shape}")
     if not np.all(np.isfinite(quantiles)):
         raise ValueError("Chronos-2 produced nonfinite quantiles")
-    # Chronos-2 does not enforce monotone levels: on WALCL q0.70 > q0.75 by
-    # 7.5e-5 of the q01..q99 range. Small crossings are rearranged (sorted,
-    # which never raises pinball loss); a material one is rejected.
-    tol = 1e-3 * (quantiles[:, -1] - quantiles[:, 0])[:, None] + 1e-12
-    if np.any(np.diff(quantiles, axis=1) < -tol):
-        raise ValueError("Chronos-2 produced crossing quantiles")
+    # Chronos-2 does not enforce monotone levels (on 1,093 of 18,000 study
+    # series a crossing exceeded 0.1% of the q01..q99 range). Crossings are
+    # rearranged by sorting, which never raises pinball loss (Chernozhukov,
+    # Fernandez-Val and Galichon 2010); rejecting them dropped those series.
     return np.sort(quantiles, axis=1)
 
 
@@ -672,17 +680,12 @@ def ttm3_quantiles_from_contexts(contexts, h=1):
     return quantiles
 
 
-def ttm3_dists(ch, h=1):
-    """Granite TTM-R3 native deciles through the same fixed-bandwidth
-    reconstruction as TiRex-2."""
+def ttm3_dists(ch, h=1, recon=None):
+    """Granite TTM-R3 native deciles reconstructed as benchmark ``Dist`` objects."""
     try:
         source = ch if h == 1 else ch[:len(ch) - (h - 1)]
         contexts = fs._ctx_batch(source)
-        quantiles = ttm3_quantiles_from_contexts(contexts, h=h)
-        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
-        return [fixed_bandwidth_quantile_dist(
-            LEVELS9, row, spacing_multiplier=spacing
-        ) for row in quantiles]
+        return _deciles_to_dists(ttm3_quantiles_from_contexts(contexts, h=h), recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  ttm3 failed: {e}", flush=True); return None
 
@@ -755,23 +758,29 @@ def moirai2_quantiles_from_contexts(contexts, h=1, size="small"):
         raise ValueError(f"unexpected Moirai 2.0 quantile shape {quantiles.shape}")
     if not np.all(np.isfinite(quantiles)):
         raise ValueError("Moirai 2.0 produced nonfinite quantiles")
-    if np.any(np.diff(quantiles, axis=1) < 0.0):
-        raise ValueError("Moirai 2.0 produced crossing quantiles")
+    # Moirai 2.0 does not enforce monotone deciles; crossings are rearranged
+    # by sorting (never raises pinball loss), as for Chronos-2
+    quantiles = np.sort(quantiles, axis=1)
     _moirai2_memo.clear(); _moirai2_memo[key] = quantiles
     return quantiles
 
 
-def moirai2_dists(ch, h=1, size="small"):
-    """Moirai 2.0 native deciles through the same fixed-bandwidth
-    reconstruction as TiRex-2."""
+def _deciles_to_dists(quantiles, recon=None):
+    """Nine native deciles per row as Dists: the TiRex-2 fixed-bandwidth
+    reconstruction by default, or ``recon`` such as ``nozzles.nozzle_wide``."""
+    if recon is not None:
+        return [recon(LEVELS9, row) for row in quantiles]
+    spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+    return [fixed_bandwidth_quantile_dist(LEVELS9, row, spacing_multiplier=spacing)
+            for row in quantiles]
+
+
+def moirai2_dists(ch, h=1, size="small", recon=None):
+    """Moirai 2.0 native deciles reconstructed as benchmark ``Dist`` objects."""
     try:
         source = ch if h == 1 else ch[:len(ch) - (h - 1)]
         contexts = fs._ctx_batch(source)
-        quantiles = moirai2_quantiles_from_contexts(contexts, h=h, size=size)
-        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
-        return [fixed_bandwidth_quantile_dist(
-            LEVELS9, row, spacing_multiplier=spacing
-        ) for row in quantiles]
+        return _deciles_to_dists(moirai2_quantiles_from_contexts(contexts, h=h, size=size), recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  moirai2 failed: {e}", flush=True); return None
 
@@ -858,18 +867,13 @@ def tinycast_quantiles_from_contexts(contexts, h=1, force_flip_invariance=False)
     return quantiles
 
 
-def tinycast_dists(ch, h=1, force_flip_invariance=False):
-    """TinyCast native deciles through the same fixed-bandwidth
-    reconstruction as TiRex-2."""
+def tinycast_dists(ch, h=1, force_flip_invariance=False, recon=None):
+    """TinyCast native deciles reconstructed as benchmark ``Dist`` objects."""
     try:
         source = ch if h == 1 else ch[:len(ch) - (h - 1)]
         contexts = fs._ctx_batch(source)
-        quantiles = tinycast_quantiles_from_contexts(
-            contexts, h=h, force_flip_invariance=force_flip_invariance)
-        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
-        return [fixed_bandwidth_quantile_dist(
-            LEVELS9, row, spacing_multiplier=spacing
-        ) for row in quantiles]
+        return _deciles_to_dists(tinycast_quantiles_from_contexts(
+            contexts, h=h, force_flip_invariance=force_flip_invariance), recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  tinycast failed: {e}", flush=True); return None
 
@@ -954,17 +958,14 @@ def toto2_quantiles_from_contexts(contexts, h=1, size="22m"):
     return quantiles
 
 
-def toto2_dists(ch, h=1, size="22m"):
-    """Toto 2.0 native deciles through the same fixed-bandwidth
-    reconstruction as TiRex-2."""
+def toto2_dists(ch, h=1, size="22m", recon=None):
+    """Toto 2.0 native deciles reconstructed as benchmark ``Dist`` objects."""
     try:
         source = ch if h == 1 else ch[:len(ch) - (h - 1)]
         contexts = fs._ctx_batch(source)
-        quantiles = toto2_quantiles_from_contexts(contexts, h=h, size=size)
-        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
-        return [fixed_bandwidth_quantile_dist(
-            LEVELS9, row, spacing_multiplier=spacing
-        ) for row in quantiles]
+        quantiles = _memo_quantiles(f"toto2-{size}", contexts, h,
+                                    lambda: toto2_quantiles_from_contexts(contexts, h=h, size=size))
+        return _deciles_to_dists(quantiles, recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  toto2 failed: {e}", flush=True); return None
 
@@ -1883,6 +1884,14 @@ def make_registry(h=1):
         "TinyCast(flip)": lambda ch: tinycast_dists(ch, h, force_flip_invariance=True),   # as published on GIFT-Eval
         # Toto 2.0 (#329): five sizes, to test the scaling claim at h=1
         **{f"Toto2-{s}": (lambda s: lambda ch: toto2_dists(ch, h, s))(s) for s in TOTO2_REVISIONS},
+        # the generous nozzle for the nine-decile #329 models, as TimeH2O(wide) and
+        # TimesFM3(wide): log score on nine deciles depends on the reconstruction
+        "TiRex-2(wide)":  lambda ch: tirex2_dists(ch, h, recon=_wide_recon()),
+        "TTM-R3(wide)":   lambda ch: ttm3_dists(ch, h, recon=_wide_recon()),
+        "Moirai-2.0-small(wide)": lambda ch: moirai2_dists(ch, h, "small", recon=_wide_recon()),
+        "TinyCast(wide)": lambda ch: tinycast_dists(ch, h, recon=_wide_recon()),
+        **{f"Toto2-{s}(wide)": (lambda s: lambda ch: toto2_dists(ch, h, s, recon=_wide_recon()))(s)
+           for s in TOTO2_REVISIONS},
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),

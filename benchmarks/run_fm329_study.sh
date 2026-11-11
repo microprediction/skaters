@@ -18,13 +18,13 @@ CORPORA=${FM329_CORPORA:-"m4-hourly weekly daily monthly"}
 # group | venv | arms
 GROUPS_ALL="
 Chronos-2|.venv-chronos|Chronos-2
-TiRex-2|.venv-tirex2|TiRex-2
-TTM-R3|.venv-ttm3|TTM-R3
-Moirai-2.0-small|.venv-moirai2|Moirai-2.0-small
-TinyCast|.venv-tinycast|TinyCast,TinyCast(flip)
-Toto2-small|.venv-toto2|Toto2-4m,Toto2-22m,Toto2-313m
-Toto2-1B|.venv-toto2|Toto2-1B
-Toto2-2.5B|.venv-toto2|Toto2-2.5B
+TiRex-2|.venv-tirex2|TiRex-2,TiRex-2(wide)
+TTM-R3|.venv-ttm3|TTM-R3,TTM-R3(wide)
+Moirai-2.0-small|.venv-moirai2|Moirai-2.0-small,Moirai-2.0-small(wide)
+TinyCast|.venv-tinycast|TinyCast,TinyCast(flip),TinyCast(wide)
+Toto2-small|.venv-toto2|Toto2-4m,Toto2-4m(wide),Toto2-22m,Toto2-22m(wide),Toto2-313m,Toto2-313m(wide)
+Toto2-1B|.venv-toto2|Toto2-1B,Toto2-1B(wide)
+Toto2-2.5B|.venv-toto2|Toto2-2.5B,Toto2-2.5B(wide)
 "
 WANT=${FM329_GROUPS:-all}
 

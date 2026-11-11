@@ -13,7 +13,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 aa = pytest.importorskip("arm_adapters")
 
 ARMS = ("Chronos-2", "TTM-R3", "Moirai-2.0-small", "TinyCast", "TinyCast(flip)",
-        "Toto2-4m", "Toto2-22m", "Toto2-313m", "Toto2-1B", "Toto2-2.5B")
+        "Toto2-4m", "Toto2-22m", "Toto2-313m", "Toto2-1B", "Toto2-2.5B",
+        "TiRex-2(wide)", "TTM-R3(wide)", "Moirai-2.0-small(wide)", "TinyCast(wide)", "Toto2-1B(wide)")
 
 
 def test_pins_are_recorded():
