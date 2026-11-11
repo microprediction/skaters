@@ -17,7 +17,9 @@ registry entry is imported lazily so a venv missing a package still loads.
 Attribution (research use): TabPFN "Built with PriorLabs-TabPFN"; legacy TiRex
 includes materials developed at NXAI under the NXAI Community License;
 TiRex-2 is Apache-2.0; flowstate uses the ibm-research research checkpoint
-(arXiv:2508.05287), research-use only.
+(arXiv:2508.05287), research-use only. Chronos-2, TTM-R3, TinyCast and
+Toto 2.0 are Apache-2.0; Moirai 2.0 weights are CC-BY-NC-4.0, research use
+only.
 """
 from __future__ import annotations
 import hashlib
@@ -47,7 +49,10 @@ LEVELS9 = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 DEVICE = os.environ.get("FM_DEVICE", "cpu")
 
 TIREX2_MODEL_ID = "NX-AI/TiRex-2"
-TIREX2_MODEL_REVISION = "05e5b26db52bfb256f1ae1bdf785589850482de3"
+# tirex-2 0.5.0 (2026-11-09) loads only config.json + model.safetensors, which
+# the repo added after 05e5b26; the weights are unchanged (same model.ckpt LFS
+# sha), outputs move by at most 7.6e-4 of the q10-q90 width (kernel rewrite).
+TIREX2_MODEL_REVISION = "30788a311699acba7e6393ad9700ea7b7cb9bb2d"
 
 # Timestral (Mistral, released 2026-10-15; issue #282). Package pinned to the
 # repository commit in benchmarks/timestral_requirements.lock; each checkpoint
@@ -251,7 +256,11 @@ def tirex2_quantiles_from_contexts(
 
     ``contexts`` is a two-dimensional array with one univariate context per row.
     The checkpoint revision and both test-time augmentations are explicit so
-    benchmark runs cannot silently change when upstream defaults move.
+    benchmark runs cannot silently change when upstream defaults move:
+    ``tta_sign_flip=False`` (checkpoint default) and ``tta_diff=False``
+    (checkpoint default True, a trend detector that differences trending
+    inputs; ours are already change series). ``pad_context`` stays at its
+    default. No covariates, torch.compile, CUDA graphs or flex attention.
     """
     global _tirex2
     import torch
@@ -265,10 +274,16 @@ def tirex2_quantiles_from_contexts(
     if not np.all(np.isfinite(values)):
         raise ValueError("contexts contain nonfinite values")
     if _tirex2 is None:
+        import inspect
+        # 0.5.0 switches, stated where the package has them (0.1.1, which the
+        # #138 run used, does not)
+        extra = {k: False for k in ("use_flex_attention", "compile", "cuda_graphs")
+                 if k in inspect.signature(load_model).parameters}
         _tirex2 = load_model(
             model_id,
             device=DEVICE,
             hf_kwargs={"revision": revision},
+            **extra,
         )
     configured_levels = np.asarray(_tirex2._quantile_levels(), dtype=float)
     if configured_levels.shape != (9,) or not np.allclose(configured_levels, LEVELS9):
@@ -301,16 +316,26 @@ def tirex2_quantiles_from_contexts(
     return quantiles
 
 
-def tirex2_dists(ch, h=1):
+_QMEMO = {}
+def _memo_quantiles(tag, contexts, h, fn):
+    """One forward pass per (model, horizon, window): the tight and wide arms of
+    a model run back to back on each series and share it."""
+    v = np.ascontiguousarray(contexts, dtype=np.float32)
+    key = (tag, h, hashlib.sha1(v.tobytes()).hexdigest())
+    if key not in _QMEMO:
+        _QMEMO.clear()
+        _QMEMO[key] = fn()
+    return _QMEMO[key]
+
+
+def tirex2_dists(ch, h=1, recon=None):
     """TiRex-2 native quantiles reconstructed as benchmark ``Dist`` objects."""
     try:
         source = ch if h == 1 else ch[:len(ch) - (h - 1)]
         contexts = fs._ctx_batch(source)
-        quantiles = tirex2_quantiles_from_contexts(contexts, h=h)
-        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
-        return [fixed_bandwidth_quantile_dist(
-            LEVELS9, row, spacing_multiplier=spacing
-        ) for row in quantiles]
+        quantiles = _memo_quantiles("tirex2", contexts, h,
+                                    lambda: tirex2_quantiles_from_contexts(contexts, h=h))
+        return _deciles_to_dists(quantiles, recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  tirex2 failed: {e}", flush=True); return None
 
@@ -529,6 +554,446 @@ def kumo_dists(ch, h=1, size="large", arm="reg(q21)"):
         raise ValueError(f"unknown Kumo arm {arm!r}")
     except Exception as e:                                 # noqa: BLE001
         print(f"  kumo failed: {e}", flush=True); return None
+
+
+# Chronos-2 (Amazon; arXiv 2510.15821, 2025-10-17; issue #329). Package
+# chronos-forecasting 2.3.1 (Apache-2.0), pinned in
+# benchmarks/chronos2_requirements.lock; weights amazon/chronos-2 (Apache-2.0,
+# not gated, 120M parameters) pinned to the Hugging Face revision below.
+# Encoder-only T5-style model with group attention; native output is the 21
+# levels in LEVELS21, read from the checkpoint config. Max context 8192.
+CHRONOS2_MODEL_ID = "amazon/chronos-2"
+CHRONOS2_MODEL_REVISION = "29ec3766d36d6f73f0696f85560a422f50e8498c"
+
+_chronos2 = None
+def chronos2_quantiles_from_contexts(contexts, h=1, batch_size=None):
+    """Chronos-2's native 21-level quantile forecast at horizon ``h``, one row
+    per context: shape ``(n, 21)`` at the levels in ``LEVELS21``.
+
+    ``Chronos2Pipeline.predict`` with every switch stated: univariate input
+    of shape ``(n, 1, CTX)`` with no covariates, so each row is its own group
+    and group attention sees only that series; ``cross_learning=False`` (the
+    output does not depend on batch composition); ``context_length`` left at
+    the model maximum. The package has no nonnegativity clip, integer
+    snapping or sign-flip averaging. Native defaults kept: the model's
+    arcsinh instance scaling, and the autoregressive unroll beyond 1024
+    steps (never reached here).
+    """
+    global _chronos2
+    import torch
+    from chronos import Chronos2Pipeline
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if _chronos2 is None:
+        _chronos2 = Chronos2Pipeline.from_pretrained(
+            CHRONOS2_MODEL_ID, revision=CHRONOS2_MODEL_REVISION, device_map=DEVICE)
+        _chronos2.model.eval()
+    levels = np.asarray(_chronos2.quantiles, dtype=float)
+    if levels.shape != (21,) or not np.allclose(levels, LEVELS21):
+        raise ValueError(f"unexpected Chronos-2 quantile levels: {levels.tolist()}")
+    batch = batch_size or int(os.environ.get("CHRONOS2_BATCH", "64"))
+    with torch.no_grad():
+        forecasts = _chronos2.predict(
+            torch.from_numpy(values[:, None, :]), prediction_length=h,
+            batch_size=batch, cross_learning=False, limit_prediction_length=False,
+        )                                               # list of (1, 21, h)
+    quantiles = np.stack(
+        [np.asarray(fc, dtype=float)[0, :, h - 1] for fc in forecasts])
+    if quantiles.shape != (len(values), len(LEVELS21)):
+        raise ValueError(f"unexpected Chronos-2 forecast shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Chronos-2 produced nonfinite quantiles")
+    # Chronos-2 does not enforce monotone levels (on 1,093 of 18,000 study
+    # series a crossing exceeded 0.1% of the q01..q99 range). Crossings are
+    # rearranged by sorting, which never raises pinball loss (Chernozhukov,
+    # Fernandez-Val and Galichon 2010); rejecting them dropped those series.
+    return np.sort(quantiles, axis=1)
+
+
+def chronos2_dists(ch, h=1):
+    """Chronos-2 native 21-level quantiles through the same fixed-bandwidth
+    reconstruction as TiRex-2, Timestral and t0."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = chronos2_quantiles_from_contexts(np.asarray(contexts), h=h)
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        return [fixed_bandwidth_quantile_dist(
+            LEVELS21, row, spacing_multiplier=spacing
+        ) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  chronos2 failed: {e}", flush=True); return None
+
+
+# Granite TinyTimeMixer R3 (IBM Research, Hugging Face repo created 2026-05-21,
+# branch last updated 2026-07-02; issue #329). Apache-2.0 weights, ungated;
+# package granite-tsfm 0.3.12, pinned in benchmarks/ttm3_requirements.lock.
+# Checkpoints are tied to a native context length, one branch per (context,
+# horizon). FM_CTX is 128 and no R3 branch has context 128, so the arm uses
+# the nearest that does not exceed it, 90-30-dec-90-r3 (1.48M parameters,
+# trend/residual decomposed), and sees the LAST 90 of the 128 context values.
+# IBM's get_model would pick 512-30 and zero-pad instead. Multi-quantile head
+# on the nine deciles, monotone by construction.
+TTM3_MODEL_ID = "ibm-granite/granite-timeseries-ttm-r3"
+TTM3_BRANCH = "90-30-dec-90-r3"
+TTM3_MODEL_REVISION = "417bfc83545095031c2a002ddfe73ac6b700ea1a"   # head of TTM3_BRANCH
+TTM3_CONTEXT = 90
+
+_ttm3 = None
+_ttm3_memo = {}
+def ttm3_quantiles_from_contexts(contexts, h=1):
+    """Granite TTM-R3's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``.
+
+    Loaded directly as ``TinyTimeMixerForDecomposedPrediction`` at the pinned
+    revision (not through ``get_model``, whose branch selection could move).
+    Each row is truncated to its last ``TTM3_CONTEXT`` values. Univariate,
+    no exogenous or static inputs, no frequency token, no fine-tuning. The
+    model's own defaults are kept: per-series ``std`` scaling and the
+    checkpoint's ``combine_quantiles_via_variance=True`` join of the trend
+    and residual heads. The forward pass has no nonnegativity clip, integer
+    snapping or sign-flip averaging. ``h`` must be <= 30.
+    """
+    global _ttm3
+    import torch
+    from tsfm_public.models.tinytimemixer import TinyTimeMixerForDecomposedPrediction
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < TTM3_CONTEXT:
+        raise ValueError(f"contexts must be two-dimensional with at least {TTM3_CONTEXT} columns")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    values = np.ascontiguousarray(values[:, -TTM3_CONTEXT:])
+    key = (h, len(values), hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _ttm3_memo:
+        return _ttm3_memo[key]
+    if _ttm3 is None:
+        _ttm3 = TinyTimeMixerForDecomposedPrediction.from_pretrained(
+            TTM3_MODEL_ID, revision=TTM3_MODEL_REVISION).to(DEVICE).eval()
+    cfg = _ttm3.config
+    if cfg.context_length != TTM3_CONTEXT or cfg.num_input_channels != 1:
+        raise ValueError(f"unexpected TTM-R3 config: context {cfg.context_length}, "
+                         f"channels {cfg.num_input_channels}")
+    if not cfg.multi_quantile_head or not np.allclose(cfg.quantile_levels, LEVELS9):
+        raise ValueError(f"unexpected TTM-R3 quantile levels: {cfg.quantile_levels}")
+    if h > cfg.prediction_length:
+        raise ValueError(f"h={h} exceeds the checkpoint's prediction length {cfg.prediction_length}")
+    batch = int(os.environ.get("TTM3_BATCH", "256"))
+    rows = []
+    with torch.no_grad():
+        for i in range(0, len(values), batch):
+            x = torch.from_numpy(values[i:i + batch]).unsqueeze(-1).to(DEVICE)   # (b, 90, 1)
+            out = _ttm3(past_values=x, return_loss=False, return_dict=True)
+            q = out.quantile_outputs.float().cpu().numpy()                     # (b, 9, 30, 1)
+            if q.shape[1:] != (len(LEVELS9), cfg.prediction_length, 1):
+                raise ValueError(f"unexpected TTM-R3 forecast shape {q.shape}")
+            rows.append(q[:, :, h - 1, 0])
+    quantiles = np.concatenate(rows, axis=0).astype(float)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected TTM-R3 quantile shape {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("TTM-R3 produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("TTM-R3 produced crossing quantiles")
+    _ttm3_memo.clear(); _ttm3_memo[key] = quantiles
+    return quantiles
+
+
+def ttm3_dists(ch, h=1, recon=None):
+    """Granite TTM-R3 native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        return _deciles_to_dists(ttm3_quantiles_from_contexts(contexts, h=h), recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  ttm3 failed: {e}", flush=True); return None
+
+
+# Moirai 2.0 (Salesforce AI Research; weights released 2025-08-06, paper
+# arXiv:2511.11698; issue #329). Decoder-only, nine-decile quantile head.
+# Weights CC-BY-NC-4.0 ("for research purposes only"), not gated; package
+# uni2ts 2.0.0 (Apache-2.0), pinned in benchmarks/moirai2_requirements.lock.
+# Only R-small (11.4M) is public; the paper's base and large are unreleased.
+# CONTAMINATION: pretraining includes GIFT-Eval Pretrain, which contains the
+# Monash fred_md dataset (107 FRED-MD monthly series), and the GIFT-Eval train
+# split (all six M4 frequencies). Monthly FRED cells score series the model
+# has seen; disclose and stratify.
+MOIRAI2_MODEL_ID = "Salesforce/moirai-2.0-R-{size}"
+MOIRAI2_REVISIONS = {
+    "small": "30f43ff08c8494f4943ae1521e9d4e94a0fbb389",   # weights unchanged since 2025-08-06
+}
+
+_moirai2 = {}
+_moirai2_memo = {}
+def moirai2_quantiles_from_contexts(contexts, h=1, size="small"):
+    """Moirai 2.0's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``.
+
+    ``Moirai2Forecast.predict`` with ``context_length`` equal to the context
+    width, ``target_dim=1`` and no dynamic features (univariate, each row an
+    independent sample). uni2ts has no nonnegativity clip, integer snapping or
+    test-time augmentation for Moirai 2.0. The model's own causal instance
+    scaling is left at its default; dropout is 0 at inference. For ``h <= 64``
+    one forward pass emits the deciles directly. Nonfinite input is rejected
+    rather than mean-imputed by the package. One forward pass per (size,
+    horizon, window) is memoised.
+    """
+    import torch
+    from uni2ts.model.moirai2 import Moirai2Forecast, Moirai2Module
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    if size not in MOIRAI2_REVISIONS:
+        raise ValueError(f"unknown Moirai 2.0 size {size!r}")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    key = (size, h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _moirai2_memo:
+        return _moirai2_memo[key]
+    if size not in _moirai2:
+        _moirai2[size] = Moirai2Module.from_pretrained(
+            MOIRAI2_MODEL_ID.format(size=size), revision=MOIRAI2_REVISIONS[size])
+    module = _moirai2[size]
+    levels = np.asarray(module.quantile_levels, dtype=float)
+    if levels.shape != (9,) or not np.allclose(levels, LEVELS9):
+        raise ValueError(f"unexpected Moirai 2.0 quantile levels: {levels.tolist()}")
+    model = Moirai2Forecast(
+        module=module, prediction_length=h, context_length=values.shape[1],
+        target_dim=1, feat_dynamic_real_dim=0, past_feat_dynamic_real_dim=0,
+    ).to(DEVICE).eval()
+    batch = int(os.environ.get("MOIRAI2_BATCH", "128"))
+    rows = []
+    with torch.no_grad():
+        for i in range(0, len(values), batch):
+            q = np.asarray(model.predict([row for row in values[i:i + batch]]),
+                           dtype=float)                           # (b, 9, h)
+            if q.shape != (min(batch, len(values) - i), len(LEVELS9), h):
+                raise ValueError(f"unexpected Moirai 2.0 forecast shape {q.shape}")
+            rows.append(q[:, :, h - 1])
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected Moirai 2.0 quantile shape {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Moirai 2.0 produced nonfinite quantiles")
+    # Moirai 2.0 does not enforce monotone deciles; crossings are rearranged
+    # by sorting (never raises pinball loss), as for Chronos-2
+    quantiles = np.sort(quantiles, axis=1)
+    _moirai2_memo.clear(); _moirai2_memo[key] = quantiles
+    return quantiles
+
+
+def _deciles_to_dists(quantiles, recon=None):
+    """Nine native deciles per row as Dists: the TiRex-2 fixed-bandwidth
+    reconstruction by default, or ``recon`` such as ``nozzles.nozzle_wide``."""
+    if recon is not None:
+        return [recon(LEVELS9, row) for row in quantiles]
+    spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+    return [fixed_bandwidth_quantile_dist(LEVELS9, row, spacing_multiplier=spacing)
+            for row in quantiles]
+
+
+def moirai2_dists(ch, h=1, size="small", recon=None):
+    """Moirai 2.0 native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        return _deciles_to_dists(moirai2_quantiles_from_contexts(contexts, h=h, size=size), recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  moirai2 failed: {e}", flush=True); return None
+
+
+# TinyCast (RAWS Labs; weights on the Hub 2026-07-27, arXiv:2608.15767
+# submitted 2026-08-16; issue #329). 146,505 parameters, attention-free:
+# dilated causal Conv1d encoder, a periodogram phase prior, nine-decile
+# decoder, context 2048 (shorter contexts are left-padded with their first
+# value by the package). Apache-2.0 code and weights, not gated. Package
+# installed from github.com/raws-labs/tinycast at TINYCAST_SOURCE_COMMIT (no
+# PyPI release), pinned in benchmarks/tinycast_requirements.lock. Pretrained
+# on GIFT-Eval-Pretrain + KernelSynth + synthetic shards, with datasets that
+# overlap the GIFT-Eval and Chronos-ZS test sets removed (exclusion list not
+# published).
+TINYCAST_MODEL_ID = "raws-labs/tinycast"
+TINYCAST_MODEL_REVISION = "9635a27b66a73fedd6e88120c72c7f91427d216e"
+TINYCAST_SOURCE_COMMIT = "628c0bec8425240d5f12155add1d1d5bc2d92471"
+
+_tinycast = {}
+_tinycast_memo = {}
+def tinycast_quantiles_from_contexts(contexts, h=1, force_flip_invariance=False):
+    """TinyCast's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``.
+
+    The package's ``TinyCastPredictor.predict`` path, every switch stated:
+    ``force_flip_invariance=False`` (the predictor default; the published
+    GIFT-Eval numbers turn this sign-flip averaging on, so it is a named
+    ablation here), ``downsample_factor=1`` (no period-alignment
+    downsampling), ``freq=None, domain=None`` (seasonal scale factor 1.0),
+    ``single_shot=False`` and ``adaptive_ar_rollout=False`` (the deployed
+    48-step rollout). ``TINYCAST_INT8`` and ``TINYCAST_TILT_K`` must be unset.
+    No nonnegativity clip or integer snapping; the trained normalised-output
+    clamp is left in place. ``predict`` sorts the nine outputs. One forward
+    pass per (horizon, window) is memoised.
+    """
+    import pandas as pd
+    from huggingface_hub import hf_hub_download
+    from tinycast import TinyCastPredictor
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    for var in ("TINYCAST_INT8", "TINYCAST_TILT_K"):
+        if os.environ.get(var, "").strip() not in ("", "0"):
+            raise ValueError(f"{var} is set; it alters TinyCast's output")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    key = (h, bool(force_flip_invariance), fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _tinycast_memo:
+        return _tinycast_memo[key]
+    batch = int(os.environ.get("TINYCAST_BATCH", "64"))
+    pkey = (h, bool(force_flip_invariance), batch)
+    if pkey not in _tinycast:
+        hf_hub_download(TINYCAST_MODEL_ID, "config.json", revision=TINYCAST_MODEL_REVISION)
+        st = hf_hub_download(TINYCAST_MODEL_ID, "model.safetensors",
+                             revision=TINYCAST_MODEL_REVISION)
+        _tinycast[pkey] = TinyCastPredictor(
+            prediction_length=h, checkpoint_path=st, device=DEVICE,
+            batch_size=batch, downsample_factor=1,
+            force_flip_invariance=bool(force_flip_invariance),
+            freq=None, domain=None, single_shot=False, adaptive_ar_rollout=False)
+    pred = _tinycast[pkey]
+    levels = np.asarray(pred.quantiles, dtype=float)
+    if levels.shape != (9,) or not np.allclose(levels, LEVELS9):
+        raise ValueError(f"unexpected TinyCast quantile levels: {levels.tolist()}")
+    start = pd.Period("2000-01-01", freq="D")              # unused by the model
+    fcs = pred.predict([{"target": row, "start": start} for row in values],
+                       use_bf16_if_available=False)
+    rows = []
+    for fc in fcs:
+        q = np.asarray(fc.forecast_array, dtype=float)       # (9, h)
+        if q.shape != (len(LEVELS9), h):
+            raise ValueError(f"unexpected TinyCast forecast shape {q.shape}")
+        rows.append(q[:, h - 1])
+    quantiles = np.stack(rows)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected TinyCast quantile shape {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("TinyCast produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("TinyCast produced crossing quantiles")
+    _tinycast_memo.clear(); _tinycast_memo[key] = quantiles
+    return quantiles
+
+
+def tinycast_dists(ch, h=1, force_flip_invariance=False, recon=None):
+    """TinyCast native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        return _deciles_to_dists(tinycast_quantiles_from_contexts(
+            contexts, h=h, force_flip_invariance=force_flip_invariance), recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  tinycast failed: {e}", flush=True); return None
+
+
+# Toto 2.0 (Datadog, released 2026-05-14, arXiv:2605.20119; issue #329).
+# Apache-2.0 code and weights, not gated. Package toto-2 2.0.0 from
+# github.com/DataDog/toto (subdirectory toto2) at TOTO2_REPO_COMMIT, pinned in
+# benchmarks/toto2_requirements.lock; each checkpoint pinned to its Hugging
+# Face revision. Base checkpoints are trained on Datadog observability metrics
+# and synthetic series only, with no public forecasting data (the
+# GIFT-Eval-finetuned 2.5B-FT is not used). Native output: nine deciles.
+TOTO2_REPO_COMMIT = "1d3e1c97ccf615016d38fe910602c905ae31fbb7"
+TOTO2_REVISIONS = {
+    "4m":   "8306a9801cf98c0f5ffe4b2dcc8f496e616d84d9",   # 4.1M
+    "22m":  "685e4ae3e2be8d8998025e53dd98e7fdcb296a89",   # 21.9M
+    "313m": "a7bab288f5e95f8606f8306f86659357e1c001ef",   # 312.7M
+    "1B":   "1604e1a5242884fb9848f88c4ced14f4dc62d9d3",   # 1.04B
+    "2.5B": "51a2812bbe449437c01b79c0e425ed578f335f5b",   # 2.45B
+}
+
+_toto2 = {}
+def toto2_quantiles_from_contexts(contexts, h=1, size="22m"):
+    """Toto 2.0's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``.
+
+    Direct ``Toto2Model.forecast`` path, one variate per series, no
+    covariates, no cross-series attention. Every switch stated:
+    ``quantile_real_cap_k=0`` (the direct-API default; the GluonTS wrapper's
+    clip at 1e4 scales is left off); ``scaler_fallback_min_obs=0`` (a no-op
+    on fully observed contexts); ``decode_block_size=768`` (model-card value,
+    no effect for h <= 32); ``has_missing_values`` only when the context is
+    left-padded to a multiple of the 32-step patch (padding masked). The
+    model has no nonnegativity clip, integer snapping or sign-flip; its own
+    post-processing sorts the nine quantiles.
+    """
+    import torch
+    from toto2 import Toto2Model
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    if size not in TOTO2_REVISIONS:
+        raise ValueError(f"unknown Toto 2.0 size {size!r}")
+    values = np.asarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if size not in _toto2:
+        _toto2[size] = Toto2Model.from_pretrained(
+            f"Datadog/Toto-2.0-{size}", revision=TOTO2_REVISIONS[size],
+            map_location=DEVICE).to(DEVICE).eval()
+    model = _toto2[size]
+    knots = np.asarray(model.output_head.knots, dtype=float)
+    if knots.shape != (9,) or not np.allclose(knots, LEVELS9):
+        raise ValueError(f"unexpected Toto 2.0 quantile levels: {knots.tolist()}")
+    patch = int(model.config.patch_size)
+    pad = (-values.shape[1]) % patch
+    batch = int(os.environ.get("TOTO2_BATCH", "64"))
+    rows = []
+    for i in range(0, len(values), batch):
+        x = torch.from_numpy(values[i:i + batch]).to(DEVICE)[:, None, :]   # (b, 1, ctx)
+        mask = torch.ones_like(x, dtype=torch.bool)
+        if pad:
+            x = torch.nn.functional.pad(x, (pad, 0))
+            mask = torch.nn.functional.pad(mask, (pad, 0), value=False)
+        ids = torch.zeros(x.shape[0], 1, dtype=torch.long, device=DEVICE)
+        q = model.forecast(
+            {"target": x, "target_mask": mask, "series_ids": ids},
+            horizon=h, decode_block_size=768, has_missing_values=bool(pad),
+            scaler_fallback_min_obs=0, quantile_real_cap_k=0.0,
+        )                                                    # (9, b, 1, h)
+        q = q.float().cpu().numpy()
+        if q.shape != (9, x.shape[0], 1, h):
+            raise ValueError(f"unexpected Toto 2.0 forecast shape {q.shape}")
+        rows.append(q[:, :, 0, h - 1].T.astype(float))
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected Toto 2.0 quantile shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Toto 2.0 produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("Toto 2.0 produced crossing quantiles")
+    return quantiles
+
+
+def toto2_dists(ch, h=1, size="22m", recon=None):
+    """Toto 2.0 native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = _memo_quantiles(f"toto2-{size}", contexts, h,
+                                    lambda: toto2_quantiles_from_contexts(contexts, h=h, size=size))
+        return _deciles_to_dists(quantiles, recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  toto2 failed: {e}", flush=True); return None
 
 
 _timeh2o = {}
@@ -1354,7 +1819,7 @@ def garch_t_dists(ch, h=1):
 # same three seasonal families added at extra periods (seasonal difference,
 # hedged seasonal anchor, and seasonal difference + EMA), everything else
 # identical. laplace's defaults are untouched.
-def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_grid=(), octave=False):
+def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_grid=(), octave=False, extra=None):
     from functools import partial
     from skaters import api as _api
     from skaters.conjugate import conjugate as _conj
@@ -1386,6 +1851,8 @@ def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_gri
             for a in (0.05, 0.1):
                 cands.append(_conj(_conj(_leaf(k=kk), ema_transform(a), k=kk), seasonal_difference(p), k=kk))
                 depths.append(2)
+        for chain, depth in (extra(kk) if extra else ()):   # untested transforms: POOL_EXTRAS
+            cands.append(chain); depths.append(depth)
         f = terminal_leaf_ensemble(cands, k=kk, leaf_fn=_api._objective_leaf("crps", 0.03),
                                    learning_rate=0.8, complexity_penalty=0.005, depths=depths,
                                    max_components=20, forget=0.99)
@@ -1397,8 +1864,8 @@ def laplace_extra_periods(k=1, periods=(52,), tails="gpd", fourier=(), shash_gri
     return _api._parade(f, k=k)
 
 
-def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(), octave=False):
-    f = laplace_extra_periods(h, periods, fourier=fourier, shash_grid=shash_grid, octave=octave); st = None; queue = []; out = []
+def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(), octave=False, extra=None):
+    f = laplace_extra_periods(h, periods, fourier=fourier, shash_grid=shash_grid, octave=octave, extra=extra); st = None; queue = []; out = []
     start = len(ch) - TEST
     for i, yv in enumerate(ch):
         if len(queue) >= h and i >= start:
@@ -1408,6 +1875,53 @@ def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(
         if len(queue) > h:
             queue.pop(0)
     return out
+
+
+# ---- untested pool transforms (queue from the transform audit) ----
+# Each entry adds candidate chains to laplace's pool, everything else
+# identical, so laplace(+x) against laplace isolates the transform. Ranked by
+# prior: level reversion first. pool_transforms.py holds the new ones (h=1).
+def _pool_extras(kk):
+    from skaters.conjugate import conjugate as C
+    from skaters.leaf import leaf as L
+    from skaters.transform import ar, drift, ema_transform, grouped_ar, ou_transform, standardize
+    from skaters.markov import markov_drift
+    import pool_transforms as pt
+
+    def c(*ts):                       # leaf <- ts[0] <- ts[1] ...: ts listed innermost first
+        f = L(k=kk)
+        for t in ts:
+            f = C(f, t, k=kk)
+        return f
+
+    return {
+        # level mean reversion: OU on the running level of the changes
+        "+lou": [(c(ou_transform(kap, a), pt.integrate()), 2)
+                 for kap in (0.02, 0.05, 0.15) for a in (0.01, 0.03)]
+                + [(c(standardize(0.02), ou_transform(kap, 0.01), pt.integrate()), 3)
+                   for kap in (0.02, 0.05, 0.15)],
+        # long-lag and grouped autoregression (stationarity-projected, #235)
+        "+gar": [(c(grouped_ar(16)), 1), (c(grouped_ar(64)), 1),
+                 (c(ar(4)), 1), (c(ar(8, decay=1.0)), 1),
+                 (c(standardize(0.02), grouped_ar(16)), 2)],
+        # partial reversion of the change toward its running mean
+        "+ou": [(c(ou_transform(kap, a)), 1) for kap in (0.3, 0.6, 0.9) for a in (0.005, 0.02)]
+               + [(c(ar(1), drift(0.002, 0.001)), 2)],
+        # MA(1) on changes (overdifferencing)
+        "+ma": [(c(pt.ma1(th)), 1) for th in (-0.6, -0.3, 0.3)]
+               + [(c(pt.ma1(th), ema_transform(0.1)), 2) for th in (-0.3,)],
+        # outlier-robust level
+        "+huber": [(c(pt.huber_ema(a, cc)), 1) for a in (0.05, 0.1, 0.3) for cc in (1.5, 3.0)],
+        # per-phase Holt anchor (#113)
+        "+ptrend": [(c(pt.phase_trend_anchor(p, 0.2, 0.1)), 1) for p in (7, 12, 24, 52)],
+        # two-regime AR(1)
+        "+setar": [(c(pt.setar1()), 1), (c(pt.setar1(), ema_transform(0.1)), 2)],
+        # regime drift (PR #116, old harness only)
+        "markov": [(c(markov_drift()), 1), (c(markov_drift(), ema_transform(0.1)), 2)],
+    }
+
+
+POOL_EXTRAS = ("+lou", "+gar", "+ou", "+ma", "+huber", "+ptrend", "+setar", "markov")
 
 
 def make_registry(h=1):
@@ -1433,6 +1947,9 @@ def make_registry(h=1):
         "laplace(shash)": lambda ch: laplace_extra_periods_dists(ch, h, (), shash_grid=__import__("shash").SHASH_GRID),
         "laplace(f52)": lambda ch: laplace_extra_periods_dists(ch, h, (), fourier=(365.25 / 7,)),   # Fourier annual, weekly data
         "laplace(s52f52)": lambda ch: laplace_extra_periods_dists(ch, h, (52,), fourier=(365.25 / 7,)),
+        # untested pool transforms, one arm each (h=1 only)
+        **{f"laplace({x})": (lambda x: lambda ch: laplace_extra_periods_dists(
+            ch, h, (), extra=lambda kk: _pool_extras(kk)[x]))(x) for x in POOL_EXTRAS},
         "learned":        lambda ch: learned_dists(ch, h, "mixture"),   # #297: laplace at worst
         "learned-expert": lambda ch: learned_dists(ch, h, "expert"),
         **({f"learned({LEARNED_TAG})": lambda ch: learned_dists(ch, h, "mixture"),
@@ -1442,6 +1959,21 @@ def make_registry(h=1):
         "Sundial":     lambda ch: sundial_dists(ch, h),
         "TiRex":       lambda ch: tirex_dists(ch, h),
         "TiRex-2":     lambda ch: tirex2_dists(ch, h),
+        "Chronos-2":   lambda ch: chronos2_dists(ch, h),   # #329: 21 native levels
+        "TTM-R3":      lambda ch: ttm3_dists(ch, h),       # #329: 90-30 branch, last 90 of the context
+        "Moirai-2.0-small": lambda ch: moirai2_dists(ch, h, "small"),   # #329: CC-BY-NC; saw fred_md
+        "TinyCast":    lambda ch: tinycast_dists(ch, h),   # #329
+        "TinyCast(flip)": lambda ch: tinycast_dists(ch, h, force_flip_invariance=True),   # as published on GIFT-Eval
+        # Toto 2.0 (#329): five sizes, to test the scaling claim at h=1
+        **{f"Toto2-{s}": (lambda s: lambda ch: toto2_dists(ch, h, s))(s) for s in TOTO2_REVISIONS},
+        # the generous nozzle for the nine-decile #329 models, as TimeH2O(wide) and
+        # TimesFM3(wide): log score on nine deciles depends on the reconstruction
+        "TiRex-2(wide)":  lambda ch: tirex2_dists(ch, h, recon=_wide_recon()),
+        "TTM-R3(wide)":   lambda ch: ttm3_dists(ch, h, recon=_wide_recon()),
+        "Moirai-2.0-small(wide)": lambda ch: moirai2_dists(ch, h, "small", recon=_wide_recon()),
+        "TinyCast(wide)": lambda ch: tinycast_dists(ch, h, recon=_wide_recon()),
+        **{f"Toto2-{s}(wide)": (lambda s: lambda ch: toto2_dists(ch, h, s, recon=_wide_recon()))(s)
+           for s in TOTO2_REVISIONS},
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),

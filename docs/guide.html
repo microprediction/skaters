@@ -131,16 +131,25 @@
         <tr><td><code>standardize(α)</code></td><td>$y'_t = (y_t - \hat\mu_t)/\hat\sigma_t$</td><td>Remove scale</td></tr>
         <tr><td><code>garch(ω, α, β)</code></td><td>$y'_t = y_t / \hat\sigma_t$</td><td>Volatility clustering</td></tr>
         <tr><td><code>seasonal_difference(s)</code></td><td>$y'_t = y_t - y_{t-s}$</td><td>Periodicity</td></tr>
+        <tr><td><code>seasonal_anchor(s, α, w)</code></td><td>$y'_t = y_t - \bigl(w\,\ell^{(s)}_t + (1-w)\,y_{t-s}\bigr)$</td><td>Periodicity, hedged between a per-phase level and last season</td></tr>
+        <tr><td><code>theta(α)</code></td><td>$y'_t = y_t - (\ell_t + \tfrac12 \hat b_t)$</td><td>Theta method (Assimakopoulos and Nikolopoulos 2000)</td></tr>
+        <tr><td><code>ou_transform(κ, α)</code></td><td>$y'_t = y_t - \bigl(\hat m + (1-\kappa)(y_{t-1} - \hat m)\bigr)$</td><td>Partial reversion toward a running mean</td></tr>
+        <tr><td><code>grouped_ar(L)</code></td><td>AR with one coefficient per geometric group of lags</td><td>Long lags without $L$ parameters</td></tr>
+        <tr><td><code>power_transform(p)</code></td><td>$y'_t = \operatorname{sign}(y_t)\,|y_t|^p$</td><td>Compress large values</td></tr>
         <tr><td><code>yeo_johnson(λ)</code></td><td>signed Box–Cox coordinate</td><td>Learn the coordinate (log / root / linear)</td></tr>
         <tr><td><code>markov_drift(η, λ)</code></td><td>$y'_t = y_t - g_t\,\hat\mu^{M}_t$</td><td>Regime response (machine-generated; opt-in)</td></tr>
       </tbody>
     </table>
 
     <p><code>markov_drift</code> is opt-in and composes like any other
-    transform. Standalone, or as an extra candidate beside the standard
-    population (the benchmarked form, +61% one-step log-likelihood wins over
-    plain <code>laplace</code> on the FRED daily universe, worst series
-    &minus;0.012 nats):</p>
+    transform, standalone or as an extra candidate beside the standard
+    population. As an extra candidate it does not improve on plain
+    <code>laplace</code>: in the canonical study it loses more series than it
+    wins on every economic stratum (monthly 916 to 993, daily 276 to 301, by
+    per-series Diebold&ndash;Mariano tests on log score), with the median
+    change under 0.001 nats. The same holds for the other untested transforms
+    run as pool additions in November 2026 (<a href="https://github.com/microprediction/skaters/pull/331">#331</a>).
+    The code shows the construction:</p>
 
     <pre><code># standalone: markov signal wrapping the standard leaf
 from skaters.conjugate import conjugate
@@ -223,6 +232,52 @@ f = search(
     replay_buffer=500,     # warm-start new candidates on recent history
     max_pool=30,
 )</code></pre>
+
+    <h2>The default: <code>laplace</code></h2>
+    <p><code>laplace(k)</code> assembles these pieces into one fixed pipeline. Sixty transform
+      chains of depth 0 to 2 (EMA, differencing, drift, Holt, theta, AR, seasonal difference and
+      anchor at periods 7, 12 and 24, fractional differencing, GARCH, power and Yeo&ndash;Johnson
+      coordinates, and fast/slow standardised variants) feed a Bayesian ensemble with learning rate
+      0.8, complexity penalty 0.005 and forgetting 0.99. The pool's chains act as mean forecasters;
+      a single CRPS-fitted terminal leaf sets the predictive's spread and shape. Then three wrappers:</p>
+    <ul>
+      <li><strong>sticky</strong>: a lattice projection for series that repeat values exactly;</li>
+      <li><strong>gpdtails</strong>: a generalised Pareto splice beyond the body of the distribution;</li>
+      <li><strong>parade</strong>: scores each arriving point against the forecast issued for it, so the
+        state carries a calibrated <code>z</code> and PIT.</li>
+    </ul>
+    <p>At $k &gt; 1$ the trunk runs on several clocks at once (multi-scale), so a 20-step forecast
+      comes from models that step 1, 2, 4, &hellip; at a time. Nothing is fitted offline: every
+      parameter above is fixed, and the ensemble weights are learned online, per series.</p>
+
+    <h2><code>granger</code>: laplace with trained parameters</h2>
+    <p><code>granger(frequency=...)</code> is laplace's pipeline with its hyperparameters trained on
+      large panels of monthly, weekly and hourly series (FRED and public pretraining corpora), plus a
+      small gate that adjusts the ensemble's combining weights from the series' recent calibration
+      (its running $z$, how often values repeat) and the weights themselves. Its predictive is the
+      Aggregating-Algorithm mixture, under log loss, of that trained twin and plain
+      <code>laplace</code> with prior weight 0.25 on laplace. That bounds it: on any series its total
+      log score is never more than $\log 4$ nats behind laplace's, up to floating-point rounding.
+      The parameters ship as data in every port (Python, Rust, JavaScript, R, Julia).</p>
+<pre><code>from skaters import granger
+
+f = granger(frequency="monthly")      # or "weekly", "hourly"
+state = None
+for y in ys:
+    dists, state = f(y, state)        # dists[0] is a MixtureDist</code></pre>
+
+    <h2>How models are scored</h2>
+    <p>The study behind the benchmark pages and the
+      <a href="https://foundationalprediction.com/">foundational prediction leaderboards</a> scores
+      one horizon at a time, starting with the next observation. Every model forecasts the one-step
+      change of each series over a rolling test window, from a fixed context, and returns a full
+      predictive distribution; quantile-only models are turned into densities by an explicit, stated
+      reconstruction. Each model is paired against <code>laplace</code> on identical series and
+      windows: per series, the mean log-score differential is tested by Diebold&ndash;Mariano, and a
+      model's record is the share of series it wins, draws and loses, with the median per-series gap
+      in nats, CRPS ratio and interval coverage alongside. The leaderboards' own
+      <a href="https://foundationalprediction.com/methodology.html">methodology page</a> gives the
+      details, including training-data overlap.</p>
 
     <h2>Design</h2>
     <ul>

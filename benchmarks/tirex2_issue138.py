@@ -38,6 +38,11 @@ from predictions import PredictionWriter, load, mean_scores, pairwise_record
 from skaters.api import laplace
 
 SCHEMA = "tirex2-issue138-v1"
+# The #138 run used this checkpoint revision with tirex-2 0.1.1 (the legacy
+# model.ckpt files, pinned in tirex2_requirements.lock). The study arm has
+# since moved to tirex-2 0.5.0 (tirex2_0_5_requirements.lock), which loads the
+# same weights from a later revision of the repository.
+ISSUE138_REVISION = "05e5b26db52bfb256f1ae1bdf785589850482de3"
 STUDY = "issue138:m4-hourly"
 LEVELS = tuple(i / 10.0 for i in range(1, 10))
 DENSITY_CANDIDATES = (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0)
@@ -574,7 +579,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--model", default=aa.TIREX2_MODEL_ID)
-    parser.add_argument("--revision", default=aa.TIREX2_MODEL_REVISION)
+    parser.add_argument("--revision", default=ISSUE138_REVISION)
     args = parser.parse_args(argv)
 
     outputs = [args.output, args.raw_quantiles, args.summary, args.manifest,
