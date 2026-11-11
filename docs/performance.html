@@ -110,6 +110,18 @@
       <tr><td>TimesFM-2.5-200M</td><td class=num>317.0508</td><td class=num>25,869&times;</td></tr>
     </table>
 
+    <figure class="heater">
+      <img src="./assets/nbeats-heater.jpg" alt="A tall space heater glowing orange in a living room, the word NBEATS lit up on its side and its control panel set to NBEATS Mode." loading="lazy">
+      <figcaption>Re-running a forward pass for every new observation does have one use in winter.</figcaption>
+    </figure>
+    <style>
+      figure.heater { margin: 28px auto 34px; max-width: 620px; }
+      figure.heater img { width: 100%; height: auto; display: block; border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(120, 60, 10, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08); }
+      figure.heater figcaption { margin-top: 10px; text-align: center; font-style: italic;
+        font-size: 0.92rem; color: var(--muted, #777); }
+    </style>
+
     <h2>Batch: one forecast for a series never seen before</h2>
     <p>This is the benchmark protocol, and it is <em>laplace at its worst</em>: it must
       consume the whole history to warm up, while a foundation model amortises a batched
