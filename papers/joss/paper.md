@@ -33,7 +33,7 @@ distribution back through the inverse. Because the inner forecaster can
 itself be a conjugation, models nest onto a single distributional leaf, and
 an ensemble is just another forecaster.
 
-The library exposes one factory, `laplace`, with no required tuning
+The default factory, `laplace`, has no tuning
 parameters. Each call consumes one observation and returns k predictive
 distributions plus a calibration state: the probability integral transform
 and normalized surprise of the arriving point under the forecasts
