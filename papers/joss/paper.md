@@ -25,7 +25,14 @@ bibliography: paper.bib
 
 # Summary
 
-`skaters` is an online, univariate time-series forecaster whose every
+A forecast is more useful when it says how uncertain it is. `skaters` takes
+a stream of numbers, such as an interest rate, an unemployment figure or a
+sensor reading, one value at a time, and after each value states the whole
+range of what the next value might be and how likely each part of that
+range is. It needs no training, no settings and no other software, and it
+runs in Python, in a web browser and in four other languages.
+
+Technically, `skaters` is an online, univariate time-series forecaster whose every
 prediction is a full probability distribution. It is built by *conjugation*:
 an invertible transform wraps an inner forecaster, pushing each observation
 forward, forecasting in the transformed space, and pulling the predictive
@@ -86,7 +93,12 @@ distills ideas from the author's earlier `timemachines` package
 [@cotton2021timemachines] and from live distributional-prediction contests
 on the microprediction platform [@cotton2022microprediction], where
 multi-level prediction of residual streams anticipated the conjugation
-recursion.
+recursion. Contributing these ideas to an existing package was considered and
+rejected: each of those libraries is built around batch refitting, point
+forecasts or a numerical stack, and the requirements here (a predictive
+distribution at every step, state that is plain data, no dependencies, and
+identical results across languages) would have meant replacing their core
+abstractions rather than extending them.
 
 # Software design
 
@@ -101,6 +113,20 @@ protocol, models nest to any depth and an ensemble is just another
 skater. The public surface is two factories, `laplace`, whose defaults
 require no tuning, and `granger`, whose trained parameters ship as data
 in every port.
+
+The main trade-offs were these. Online updating can cost accuracy on
+series where a full refit would pick up structure late in the sample, in
+exchange for constant cost per observation and a forecast that is always
+current. A fixed, tuning-free population of transform chains, weighted by
+their running log score, gives up the bespoke fit of per-series model
+selection but cannot overfit a single series, and keeps every forecast
+reproducible. Pure Python keeps installation trivial at a speed cost of
+about twenty times, which the optional Rust core recovers. Keeping five
+ports parity-locked to $10^{-6}$ makes every numerical change land
+everywhere at once, a maintenance cost the parity suite turns into a
+check rather than a hope. Finally, `granger` trades a little of
+`laplace`'s simplicity for trained parameters, and the Aggregating
+Algorithm bounds what that trade can cost.
 
 # Research impact statement
 
