@@ -55,8 +55,8 @@ with independent ports in JavaScript (`npm install skaters`), Rust (an
 optional compiled backend), R and Julia. A parity suite checks about
 100,000 probe values to $10^{-6}$ agreement in continuous integration, so a
 model trained on a server continues in a browser via Pyodide
-[@pyodide2021] or in another language mid-stream. Since v0.17.0 a second
-forecaster, `granger`, mixes `laplace` with a copy of itself whose
+[@pyodide2021] or in another language mid-stream. A second forecaster,
+`granger`, mixes `laplace` with a copy of itself whose
 parameters were trained on large panels of economic and hourly series; the
 mixture is the Aggregating Algorithm under log loss, so on any series its
 total log score is never more than $\log 4$ behind `laplace`'s.
