@@ -53,3 +53,21 @@ def test_exact_pushforward_is_refused():
     for name in ("power_transform", "yeo_johnson"):
         with pytest.raises(NotImplementedError):
             from_reference(name, exact=True)
+
+
+def test_power_transform_gradient_is_finite_at_exact_zero():
+    """An exact zero (a repeated value in the level series) must not turn the
+    exponent's gradient into NaN: d/dp |y|**p at 0 is 0 * log(0) in autograd.
+    Found on the weekly granger training run, where it voided a quarter of the
+    windows; values are unchanged by the fix."""
+    from skaters.torch.transforms_shape import PowerTransform
+    t = PowerTransform(0.5)
+    ys = torch.tensor([0.0, 0.0, 1.7, -0.3, 0.0, 2.5], dtype=torch.float64)
+    out = torch.stack([t._fwd(y) for y in ys])
+    back = torch.stack([t._inv(v) for v in out])
+    (out.sum() + back.sum()).backward()
+    assert torch.isfinite(t.p.grad).all()
+    p = float(t.p.detach())
+    expect = [math.copysign(abs(float(y)) ** p, float(y)) for y in ys]
+    assert [float(v) for v in out] == expect
+    assert torch.allclose(back, ys)
