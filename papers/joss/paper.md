@@ -142,9 +142,16 @@ leaderboards at https://foundationalprediction.com, which pair more than a
 dozen foundation models (Chronos-2, TimesFM 3.0, Timestral, t0, TimeH2O,
 Toto 2.0, TiRex-2, Moirai 2.0 and others) with classical baselines on
 identical series, one horizon at a time, with training-data overlap
-disclosed per model. The browser build drives teaching demonstrations at
-https://skaters.microprediction.org, and outside contributors have landed
-changes through public pull requests.
+disclosed per model. Beyond the author's papers, `skaters` is the core dependency of
+`timemachines` [@cotton2021timemachines], an established
+anomaly-detection and sequential-decision package (445 stars and 54 forks
+since 2021) whose current releases are built on the calibrated surprise
+streams `skaters` produces. In October and November 2026 it was downloaded
+about 2,800 times a month from PyPI and 440 times a month from npm; the
+repository has been forked by six other developers, and three outside
+contributors have landed changes through public pull requests. The
+browser build drives teaching demonstrations at
+https://skaters.microprediction.org.
 
 # AI usage disclosure
 
