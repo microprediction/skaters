@@ -94,14 +94,21 @@
     </div>
 
 
+    <figure class="hero-figure">
+      <img src="./assets/laplace-foundational-models.gif" alt="A cyclist pops a wheelie on a mountain bike alongside a professional peloton; the peloton is labelled Foundational Models and the wheelie rider Laplace." style="width:100%;height:auto;">
+    </figure>
+
     <p>
-      On 894 continuous non-price FRED series, scored one step ahead per series,
-      <code>laplace</code> has the best held-out log-likelihood among the tested baselines, ahead of
-      AutoARIMA, AutoETS, SARIMAX, conformal methods, the heavy-tail GARCH-t, and four
-      zero-shot foundation models. It gives up ground only on CRPS, to the CRPS
-      specialists, and on price and return series, where GARCH-t is the better choice.
-      <a href="/benchmarks.html">The benchmarks →</a>
+      On FRED change-series scored one step ahead, <code>laplace</code> beats AutoARIMA,
+      AutoETS, AutoTheta, GARCH-t and NPTS on held-out log score at every frequency, and on
+      2,179 daily series it beats every zero-shot foundation model tested. On 5,576 monthly
+      series the newest foundation models (Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma) are
+      ahead, by 0.05 to 0.10 nats per step at the median, and on 3,013 weekly series three of
+      the four are. On price and return series <code>laplace</code>, GARCH-t and the
+      foundation models are level.
+      <a href="https://foundationalprediction.com/">The leaderboards →</a>
     </p>
+
 
     <p>
       Each language is an independent, parity-locked port, checked against the reference to
@@ -130,15 +137,16 @@
     <script src="./assets/frontier3d.js"></script>
 
     <figure class="hero-figure">
-      <img src="./assets/radar.svg" alt="Radar chart of per-regime win-rate against laplace on
-        log-likelihood for CSP, Theta, nnetar and GARCH-t. All sit inside the dashed laplace ring
-        except GARCH-t, which breaks out on the price/returns axis, and CSP, which edges past on the
-        hard waveforms." />
-      <figcaption>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split;
-        <code>laplace</code> is the dashed ring). Outside the ring the challenger wins that regime.
-        GARCH-t breaks out on price/returns; CSP edges past on the hard, repeating waveforms, where
-        it is handed the period and <code>laplace</code> is not.
-        <a href="/challengers.html">Explore it interactively →</a></figcaption>
+      <img src="./assets/radar-canonical.svg" alt="Radar chart of strength against laplace on
+        log score, by stratum, for Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma and GARCH-t. On
+        daily economic series every challenger sits inside the dashed laplace ring; on weekly,
+        monthly and hourly series most foundation models sit outside it; on price and returns all
+        are on the ring." />
+      <figcaption>Strength against <code>laplace</code> by stratum: per-series Diebold–Mariano
+        verdicts on log score, draws split; <code>laplace</code> is the dashed ring. Outside the
+        ring the challenger is ahead on that stratum. Each foundation model is shown with its
+        stronger density reconstruction.
+        <a href="https://foundationalprediction.com/">The leaderboards →</a></figcaption>
     </figure>
 
     <p>
