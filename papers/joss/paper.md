@@ -146,8 +146,11 @@ disclosed per model. Beyond the author's papers, `skaters` is the core dependenc
 `timemachines` [@cotton2021timemachines], an established
 anomaly-detection and sequential-decision package (445 stars and 54 forks
 since 2021) whose current releases are built on the calibrated surprise
-streams `skaters` produces, and of `prophet-laplace`, which wraps Prophet
-[@taylor2018forecasting] in `laplace` to give it calibrated densities. In October and November 2026 it was downloaded
+streams `skaters` produces. Two smaller packages build on it as well:
+`ice-skaters` turns each numeric stream in a `river` [@montiel2021river]
+pipeline into calibrated forecast features, and `prophet-laplace` wraps
+Prophet [@taylor2018forecasting] in `laplace` to give it calibrated
+densities. In October and November 2026 `skaters` itself was downloaded
 about 2,800 times a month from PyPI and 440 times a month from npm; the
 repository has been forked by six other developers, and three outside
 contributors have landed changes through public pull requests. The
