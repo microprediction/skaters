@@ -2032,7 +2032,12 @@ def npts_dists(ch, h=1):
     idx0 = _pd.Period("2000-01-01", freq="D")
     out = []
     for j in range(lo, n):
-        hist = ch[max(0, j - fs.CTX):j]
+        # the h-step forecast for y[j] is issued at origin j-h+1 (as laplace_dists and
+        # the foundation-model arms do); the history ends there, not at j
+        o = j - h + 1
+        if o < 8:
+            return None
+        hist = ch[max(0, o - fs.CTX):o]
         ts = _pd.Series(hist, index=_pd.period_range(idx0, periods=len(hist), freq="D"))
         try:
             fc = pred.predict_time_series(ts, num_samples=500)
