@@ -1,8 +1,11 @@
 ---
-title: 'skaters: online distributional time-series forecasting by conjugation, in Python and JavaScript'
+title: 'skaters: online distributional time-series forecasting by conjugation'
 tags:
   - Python
   - JavaScript
+  - Rust
+  - R
+  - Julia
   - time series
   - probabilistic forecasting
   - online learning
@@ -16,13 +19,20 @@ authors:
 affiliations:
   - name: Independent researcher, United States
     index: 1
-date: 2 August 2026
+date: 11 November 2026
 bibliography: paper.bib
 ---
 
 # Summary
 
-`skaters` is an online, univariate time-series forecaster whose every
+A forecast is more useful when it says how uncertain it is. `skaters` takes
+a stream of numbers, such as an interest rate, an unemployment figure or a
+sensor reading, one value at a time, and after each value states the whole
+range of what the next value might be and how likely each part of that
+range is. It needs no training, no settings and no other software, and it
+runs in Python, in a web browser and in four other languages.
+
+Technically, `skaters` is an online, univariate time-series forecaster whose every
 prediction is a full probability distribution. It is built by *conjugation*:
 an invertible transform wraps an inner forecaster, pushing each observation
 forward, forecasting in the transformed space, and pulling the predictive
@@ -30,7 +40,7 @@ distribution back through the inverse. Because the inner forecaster can
 itself be a conjugation, models nest onto a single distributional leaf, and
 an ensemble is just another forecaster.
 
-The library exposes one factory, `laplace`, with no required tuning
+The default factory, `laplace`, has no tuning
 parameters. Each call consumes one observation and returns k predictive
 distributions plus a calibration state: the probability integral transform
 and normalized surprise of the arriving point under the forecasts
@@ -40,11 +50,16 @@ generalized-Pareto tails fitted online by censored maximum likelihood
 frequencies: on 142 economic series the nominal 99.9% central interval
 covers 99.85% empirically, where a Gaussian read covers 99.13%.
 
-The package is written twice, in pure Python with no dependencies
-(`pip install skaters`) and in zero-dependency JavaScript
-(`npm install skaters`). A parity suite checks about 100,000 probe values
-to $10^{-6}$ agreement on every run, so a model trained on a server
-continues bit-compatibly in a browser via Pyodide [@pyodide2021].
+The reference is pure Python with no dependencies (`pip install skaters`),
+with independent ports in JavaScript (`npm install skaters`), Rust (an
+optional compiled backend), R and Julia. A parity suite checks about
+100,000 probe values to $10^{-6}$ agreement in continuous integration, so a
+model trained on a server continues in a browser via Pyodide
+[@pyodide2021] or in another language mid-stream. A second forecaster,
+`granger`, mixes `laplace` with a copy of itself whose
+parameters were trained on large panels of economic and hourly series; the
+mixture is the Aggregating Algorithm under log loss, so on any series its
+total log score is never more than $\log 4$ behind `laplace`'s.
 
 # Statement of need
 
@@ -54,16 +69,15 @@ forecasting software returns point forecasts or intervals, refits in
 batch, or requires a scientific-computing stack. Practitioners who need a
 predictive *distribution* per tick, updated online at microsecond-to-second
 cadence, on a server or in a browser, have had to assemble one from parts.
-`skaters` supplies one as a single dependency-free function. On 894
-continuous non-price FRED series it leads classical, neural, and
-foundation-model baselines on held-out log-likelihood under a rolling
-one-step protocol; on asset prices a GARCH-t model remains preferable, a
-split reported rather than averaged away. The calibration state turns the
-forecaster into an anomaly detector with stated false-alarm rates: alarm
-when $\mathrm{erfc}(|z|/\sqrt{2}) < \alpha$, with measured rates near
-nominal on economic series. Methods, benchmarks, and the tail-calibration
-studies are documented in a companion methods paper [@cotton2026transforms]
-in the repository and at https://skaters.microprediction.org.
+`skaters` supplies one as a single dependency-free function. Scored one
+step ahead on FRED change series, it beats AutoARIMA, AutoETS, AutoTheta
+and GARCH-t on held-out log score at every frequency and every zero-shot
+foundation model on daily series; the newest foundation models are ahead
+on monthly and weekly series at hundreds to thousands of times its cost
+per forecast, and on asset prices `laplace`, GARCH-t and the foundation
+models are level. These splits are reported rather than averaged away
+[@cotton2026stronger]. The calibration state doubles as an anomaly detector with stated
+false-alarm rates.
 
 # State of the field
 
@@ -79,11 +93,12 @@ distills ideas from the author's earlier `timemachines` package
 [@cotton2021timemachines] and from live distributional-prediction contests
 on the microprediction platform [@cotton2022microprediction], where
 multi-level prediction of residual streams anticipated the conjugation
-recursion. The repository's benchmark harness compares against
-representatives of each corner (AutoARIMA, AutoETS, the reference R
-forecasters, GARCH-t, neural and zero-shot foundation baselines) under a
-common rolling protocol, and the split of regimes is reported rather than
-averaged away.
+recursion. Contributing these ideas to an existing package was considered and
+rejected: each of those libraries is built around batch refitting, point
+forecasts or a numerical stack, and the requirements here (a predictive
+distribution at every step, state that is plain data, no dependencies, and
+identical results across languages) would have meant replacing their core
+abstractions rather than extending them.
 
 # Software design
 
@@ -95,38 +110,81 @@ JSON, resumed elsewhere, or handed across a language boundary mid-stream.
 Conjugation is function composition under this protocol: a transform wraps
 an inner skater, and because the wrapped object satisfies the same
 protocol, models nest to any depth and an ensemble is just another
-skater. The public surface is one factory, `laplace`, whose defaults
-require no tuning. The package has no runtime dependencies in any of its
-five ports (Python, JavaScript, R, Julia, Rust); the ports are locked to
-the Python reference by a parity suite of roughly 100,000 probe values at
-$10^{-6}$ agreement, run in continuous integration, which is what allows a
-model trained on a server to continue bit-compatibly in a browser via
-Pyodide [@pyodide2021].
+skater. The public surface is two factories, `laplace`, whose defaults
+require no tuning, and `granger`, whose trained parameters ship as data
+in every port.
+
+The main trade-offs were these. Online updating can cost accuracy on
+series where a full refit would pick up structure late in the sample, in
+exchange for constant cost per observation and a forecast that is always
+current. A fixed, tuning-free population of transform chains, weighted by
+their running log score, gives up the bespoke fit of per-series model
+selection but cannot overfit a single series, and keeps every forecast
+reproducible. Pure Python keeps installation trivial at a speed cost of
+about twenty times, which the optional Rust core recovers. Keeping five
+ports parity-locked to $10^{-6}$ makes every numerical change land
+everywhere at once, a maintenance cost the parity suite turns into a
+check rather than a hope. Finally, `granger` trades a little of
+`laplace`'s simplicity for trained parameters, and the Aggregating
+Algorithm bounds what that trade can cost.
 
 # Research impact statement
 
-The package is the measurement instrument in an ongoing empirical study of
-representation value in conformal prediction, whose experiment scripts
-live in this repository's `benchmarks` directory, and the companion
-methods paper [@cotton2026transforms] reports the underlying benchmark
-across 5,402 FRED series.
-Beyond its own results, the harness gives researchers a reproducible
-rolling-protocol comparison of distributional forecasters under
-log-likelihood and CRPS, with per-regime splits, and the calibration state
-gives applied users anomaly alarms with stated false-alarm rates. The
-browser build is used for interactive teaching demonstrations at
+The package is the measurement instrument in three research papers: the
+methods paper [@cotton2026transforms]; a study of the conformal
+information gap, which uses `laplace` and its transforms as a nested
+ladder of representations [@cotton2026gap]; and a benchmark study of
+foundation time-series models, which supplies the online distributional
+reference that published suites omit and shows that the density
+reconstruction of a quantile model can move a comparison by half a nat
+[@cotton2026stronger]. Its benchmark harness also generates the public
+leaderboards at https://foundationalprediction.com, which pair more than a
+dozen foundation models (Chronos-2, TimesFM 3.0, Timestral, t0, TimeH2O,
+Toto 2.0, TiRex-2, Moirai 2.0 and others) with classical baselines on
+identical series, one horizon at a time, with training-data overlap
+disclosed per model. On those leaderboards `laplace` is the only training-free model
+that stays competitive with the foundation models in every stratum: it
+beats all of them on daily economic series, is level with them on prices,
+and trails the strongest by about 0.1 nats per step at the median on
+weekly and monthly series and 0.18 on hourly ones, while AutoARIMA, AutoETS
+and AutoTheta trail `laplace` itself by 0.1 to 0.4 nats on every economic
+stratum, and GARCH-t, close on monthly series, trails it by 0.24 nats on
+daily ones. Beyond the author's papers, `skaters` is the core dependency of
+`timemachines` [@cotton2021timemachines], an established
+anomaly-detection and sequential-decision package (445 stars and 54 forks
+since 2021) whose current releases are built on the calibrated surprise
+streams `skaters` produces. Two smaller packages build on it as well:
+`ice-skaters` turns each numeric stream in a `river` [@montiel2021river]
+pipeline into calibrated forecast features, and `prophet-laplace` wraps
+Prophet [@taylor2018forecasting] in `laplace` to give it calibrated
+densities. In October and November 2026 `skaters` itself was downloaded
+about 2,800 times a month from PyPI and 440 times a month from npm; the
+repository has been forked by six other developers, and three outside
+contributors have landed changes through public pull requests. The
+browser build drives teaching demonstrations at
 https://skaters.microprediction.org.
 
 # AI usage disclosure
 
-Portions of the source code, the multi-language ports, the parity and test
-suites, and drafts of this manuscript were produced with the assistance of
-a large language model (Claude, Anthropic) operated interactively by the
-author, who directed the design, reviewed the output, and takes
-responsibility for the content. The numerical claims are reproducible from
-the scripts in `benchmarks/`, and the cross-language parity suite checks
-the ports against the Python reference on every continuous-integration
-run.
+The author used Anthropic's Claude models through Claude Code throughout
+development: Claude Opus 4.6, 4.7, 4.8, 5 and 5.5, Sonnet 5, and Fable 5
+and 5.1. At least 525 of the 1,916 commits on the main branch name a
+Claude model as co-author (squash merges drop the trailer, so this is a
+floor). The assistance covered code generation and refactoring, the R,
+Julia, Rust and JavaScript ports, test and parity scaffolding, benchmark
+scripts, numerical debugging, and drafting and copy-editing of
+documentation and this paper. The author framed the problem and made the
+core design decisions: conjugation of a forecaster by an invertible
+transform as the single abstraction, a predictive distribution as the only
+output, state as plain data, a fixed-parameter default with no tuning,
+Python as the reference with every port parity-locked to it, the
+Aggregating-Algorithm construction of `granger` and its bound, and the
+evaluation protocol of isolated horizons, paired per-series tests and
+stated density reconstructions. The author reviewed and validated the
+generated code and text and is responsible for their accuracy; every
+benchmark number is regenerated from version-controlled results by the
+scripts in `benchmarks/`, and the parity suite checks every port against
+the reference in continuous integration.
 
 # Acknowledgements
 
