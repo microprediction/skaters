@@ -25,6 +25,8 @@ TinyCast|.venv-tinycast|TinyCast,TinyCast(flip),TinyCast(wide)
 Toto2-small|.venv-toto2|Toto2-4m,Toto2-4m(wide),Toto2-22m,Toto2-22m(wide),Toto2-313m,Toto2-313m(wide)
 Toto2-1B|.venv-toto2|Toto2-1B,Toto2-1B(wide)
 Toto2-2.5B|.venv-toto2|Toto2-2.5B,Toto2-2.5B(wide)
+Simons-small|.venv-simons|Simons-25M,Simons-25M(wide),Simons-60M,Simons-60M(wide)
+Simons-large|.venv-simons|Simons-178M,Simons-178M(wide),Simons-297M,Simons-297M(wide)
 "
 WANT=${FM329_GROUPS:-all}
 
@@ -35,7 +37,7 @@ while IFS='|' read -r group venv arms; do
   (
     for corpus in $CORPORA; do
       max=0; [ "$corpus" = monthly ] && max=5600
-      OMP_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS VECLIB_MAXIMUM_THREADS=$THREADS \
+      nice -n 10 env OMP_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS VECLIB_MAXIMUM_THREADS=$THREADS \
       FM_DEVICE=cpu ARM_METHODS="$arms" ARM_CORPUS=$corpus ARM_MAX=$max \
       PRED_OUT="benchmarks/preds/${group}__${corpus}.csv" \
         "$VENV_ROOT/$venv/bin/python" -u benchmarks/run_arm.py || exit 1

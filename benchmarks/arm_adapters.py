@@ -19,7 +19,7 @@ includes materials developed at NXAI under the NXAI Community License;
 TiRex-2 is Apache-2.0; flowstate uses the ibm-research research checkpoint
 (arXiv:2508.05287), research-use only. Chronos-2, TTM-R3, TinyCast and
 Toto 2.0 are Apache-2.0; Moirai 2.0 weights are CC-BY-NC-4.0, research use
-only.
+only; Simons code is Apache-2.0 and its weights OpenMDW-1.1 (permissive).
 """
 from __future__ import annotations
 import hashlib
@@ -968,6 +968,104 @@ def toto2_dists(ch, h=1, size="22m", recon=None):
         return _deciles_to_dists(quantiles, recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  toto2 failed: {e}", flush=True); return None
+
+
+# Simons (Abel AI Lab; Hugging Face repos created 2026-10-29, code released
+# 2026-11-11 as simons 0.1.0, dataset 2026-11-09; issue #329, second batch). Code Apache-2.0
+# (github.com/Abel-ai-lab/Simons, pinned at SIMONS_SOURCE_COMMIT = simons 0.1.1
+# in benchmarks/simons_requirements.lock, .venv-simons); weights OpenMDW-1.1,
+# not gated (permissive: use, modification, redistribution, commercial use;
+# outputs unrestricted). Four sizes, each pinned to its Hugging Face revision.
+# Patch-32 causal transformer plus a cross-variate layer; native output the
+# nine deciles; context 16,384 (25M, 60M) or 32,768 (178M, 297M), so the
+# 128-step harness context is left-padded with NaN by the package. Pretrained
+# on synthetic series plus real data; the public part is released as
+# abel-lab/Simons-Pretrain (no FRED, fred_md or M4 in it; Monash copies of
+# traffic_hourly, pedestrian counts, wind farms, NN5, CIF 2016 and M1 are in),
+# with fev-bench, GIFT-Eval and TIME test overlaps removed. 34% of the real
+# tokens are private (111 sources, incl. 15 multivariate economics/finance
+# sources = 7.6% of real tokens) and cannot be checked.
+SIMONS_SOURCE_COMMIT = "24110a634c60ea5eda1ba18ce20ef3c7618c4c6c"
+SIMONS_MODEL_ID = "abel-lab/Simons-{size}"
+SIMONS_REVISIONS = {
+    "25M":  "ea871af33d47bae63a695b2def374ed7a8839953",   # 25.1M
+    "60M":  "7e637d0bd8e51fb4b7b8ef17f4b636d020a92cc7",   # 60.3M
+    "178M": "b36d6364647d75a89a17703d9bfb2109b13c2427",   # 177.7M
+    "297M": "4a5ab590fdcfbbcc630737188cdec1ba9e069a5a",   # 297.2M
+}
+
+_simons = {}
+def simons_quantiles_from_contexts(contexts, h=1, size="25M"):
+    """Simons' native nine-decile forecast at horizon ``h``, shape ``(n, 9)``
+    at the levels in ``LEVELS9``.
+
+    ``Simons.forecast`` on a ``[batch, time]`` history: univariate, no
+    covariates, ``series_ids`` left at zero per row so each row is its own
+    one-variate group (the cross-variate layer sees only that series). Every
+    switch stated. The two checkpoint post-processing rules that would alter
+    a signed change series are turned off in the loaded config:
+    ``sign_clip=False`` (default True: clips to the sign of a one-signed
+    history) and ``integer_snap=False`` (default True: rounds forecasts of
+    non-negative integer histories). Native ensembling kept at its default,
+    ``views=True``: the per-quantile median of four views (native, sign
+    flipped, and the square-root views, which are used only when the whole
+    context is nonnegative and otherwise fall back to native and flipped),
+    then sorted. ``mixed`` is off on CPU. The multi-block rollout and its
+    tail paths apply only beyond 512 steps (never reached here). Any
+    crossing is impossible after the package's final sort (checked anyway).
+    """
+    import dataclasses
+    import torch
+    from simons import QUANTILES, Simons
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    if size not in SIMONS_REVISIONS:
+        raise ValueError(f"unknown Simons size {size!r}")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if not np.allclose(QUANTILES, LEVELS9):
+        raise ValueError(f"unexpected Simons quantile levels: {list(QUANTILES)}")
+    if size not in _simons:
+        model = Simons.from_pretrained(
+            SIMONS_MODEL_ID.format(size=size), device=DEVICE,
+            revision=SIMONS_REVISIONS[size])
+        model.config = dataclasses.replace(model.config, sign_clip=False, integer_snap=False)
+        _simons[size] = model.eval()
+    model = _simons[size]
+    batch = int(os.environ.get("SIMONS_BATCH", "64"))
+    rows = []
+    with torch.no_grad():
+        for i in range(0, len(values), batch):
+            q = model.forecast(torch.from_numpy(values[i:i + batch]), horizon=h,
+                               views=True)                   # (b, h, 9)
+            q = q.float().cpu().numpy()
+            if q.shape != (min(batch, len(values) - i), h, len(LEVELS9)):
+                raise ValueError(f"unexpected Simons forecast shape {q.shape}")
+            rows.append(q[:, h - 1, :].astype(float))
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected Simons quantile shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Simons produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("Simons produced crossing quantiles")
+    return quantiles
+
+
+def simons_dists(ch, h=1, size="25M", recon=None):
+    """Simons native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = _memo_quantiles(f"simons-{size}", contexts, h,
+                                    lambda: simons_quantiles_from_contexts(contexts, h=h, size=size))
+        return _deciles_to_dists(quantiles, recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  simons failed: {e}", flush=True); return None
 
 
 _timeh2o = {}
@@ -1944,6 +2042,10 @@ def make_registry(h=1):
         "TinyCast(wide)": lambda ch: tinycast_dists(ch, h, recon=_wide_recon()),
         **{f"Toto2-{s}(wide)": (lambda s: lambda ch: toto2_dists(ch, h, s, recon=_wide_recon()))(s)
            for s in TOTO2_REVISIONS},
+        # Simons (Abel AI Lab, 2026-11): four sizes, tight and wide
+        **{f"Simons-{s}": (lambda s: lambda ch: simons_dists(ch, h, s))(s) for s in SIMONS_REVISIONS},
+        **{f"Simons-{s}(wide)": (lambda s: lambda ch: simons_dists(ch, h, s, recon=_wide_recon()))(s)
+           for s in SIMONS_REVISIONS},
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),
