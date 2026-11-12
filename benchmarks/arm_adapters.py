@@ -1407,6 +1407,101 @@ def timessm_dists(ch, h=1, recon=None):
         print(f"  timessm failed: {e}", flush=True); return None
 
 
+# Hirondel-7M (Tncrd, a single anonymous author "The Hirondel Author"; Hugging
+# Face repo created 2026-10-23, code v1.0.0 the same week, v1.1.0 2026-11-02;
+# issue #329). 7.5M parameters: patch-16 looped stack of delta-rule and
+# attention blocks, asinh input transform, plus a coarse 4x block-mean reading
+# of history beyond the 2,048-step fine window (inactive at our CTX). Apache-2.0
+# code and weights, not gated (NOTICE must be kept when redistributing).
+# Package hirondel 1.1.0 from github.com/tncrd/hirondel at
+# HIRONDEL_SOURCE_COMMIT (tag v1.1.0; PyPI release not out), pinned in
+# benchmarks/hirondel_requirements.lock (.venv-hirondel); weights pinned to
+# HIRONDEL_MODEL_REVISION. Native output: the nine deciles 0.1..0.9, monotone
+# by construction (softplus increments outward from the median). The
+# package's 0.01/0.05/0.95/0.99 levels are exponential-tail extrapolations
+# (GluonTS ExponentialTailApproximation), not model outputs, and are not used.
+# Training data (DATA.md): 56 real sources plus ~50% synthetic windows. No
+# FRED, fred_md, M4 or GIFT-Eval test data; no Monash archive copies (sources
+# taken from their origins), but ERA5 was accessed via GiftEvalPretrain. M1,
+# M3, Eurostat short-term business statistics (sts_inpr_m, sts_trtu_m,
+# sts_copr_m) and Statistics Canada tables 16-10-0047-01, 20-10-0008-01,
+# 25-10-0015-01 are in: the same national industrial-production, retail and
+# manufacturing quantities appear in our monthly FRED corpus as OECD MEI
+# re-publications (e.g. DEUPROINDMISMEI, CANPROINDMISMEI).
+HIRONDEL_MODEL_ID = "Tncrd/Hirondel-7M"
+HIRONDEL_MODEL_REVISION = "52f2a78363dc92a37257daf4a469066dc7103c5e"
+HIRONDEL_SOURCE_COMMIT = "89a23388694637bea7365d06fa2ac982ff1546e1"   # tag v1.1.0
+
+_hirondel = None
+def hirondel_quantiles_from_contexts(contexts, h=1):
+    """Hirondel's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``
+    at the levels in ``LEVELS9``.
+
+    ``HirondelForecaster.forecast`` on a ``[n, ctx]`` array: each row its own
+    univariate series, no covariates (``future_covariates=None``, so the
+    ridge/gate path never runs), no cross-series information (the model has
+    none). Every switch stated. Turned OFF because it alters a signed change
+    series: ``clip_nonnegative=False`` (config default true: clamps every
+    quantile at 0 when the whole context is >= 0). Left at the shipped
+    default, the model's own ensembling: ``flip=True`` (the average of the
+    forecast of x and the mirrored forecast of -x, two passes). Internal
+    bounds kept, both inert on change series: ``output_clip=15`` in asinh
+    units (|z| <= sinh(15) ~ 1.6e6 context standard deviations) and
+    ``range_margin=1e4`` (outputs bounded to the context range widened by
+    1e4 standard deviations). The coarse reading is used only for histories
+    longer than 2,048 steps (never at our CTX). The model always decodes its
+    native 720-step horizon and the package cuts it to ``h``. There is no
+    integer snapping. ``HIRONDEL_BATCH`` rows per forward pass.
+    """
+    import torch
+    from hirondel import HirondelForecaster
+
+    global _hirondel
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    batch = int(os.environ.get("HIRONDEL_BATCH", "256"))
+    if _hirondel is None:
+        _hirondel = HirondelForecaster.from_pretrained(
+            HIRONDEL_MODEL_ID, device="cuda" if DEVICE == "cuda" else "cpu",
+            revision=HIRONDEL_MODEL_REVISION)
+    model = _hirondel
+    model.batch_size = batch
+    levels = np.asarray(model.cfg.quantile_levels, dtype=float)
+    if levels.shape != (9,) or not np.allclose(levels, LEVELS9):
+        raise ValueError(f"unexpected Hirondel quantile levels: {levels.tolist()}")
+    if values.shape[1] > model.cfg.context_length:
+        raise ValueError("context longer than Hirondel's fine window (coarse path not intended)")
+    with torch.no_grad():
+        fc = model.forecast(values, prediction_length=h, flip=True,
+                            clip_nonnegative=False, future_covariates=None)
+    q = np.asarray(fc.quantiles, dtype=float)              # (n, h, 9)
+    if q.shape != (len(values), h, len(LEVELS9)):
+        raise ValueError(f"unexpected Hirondel forecast shape {q.shape}")
+    quantiles = q[:, h - 1, :]
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("Hirondel produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("Hirondel produced crossing quantiles")   # monotone head; checked anyway
+    return quantiles
+
+
+def hirondel_dists(ch, h=1, recon=None):
+    """Hirondel native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = _memo_quantiles("hirondel", contexts, h,
+                                    lambda: hirondel_quantiles_from_contexts(contexts, h=h))
+        return _deciles_to_dists(quantiles, recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  hirondel failed: {e}", flush=True); return None
+
+
 # ---- registry lines (inside make_registry) ----
 #       "TimeSSM-2.5M":       lambda ch: timessm_dists(ch, h),   # #329
 #       "TimeSSM-2.5M(wide)": lambda ch: timessm_dists(ch, h, recon=_wide_recon()),
@@ -2396,6 +2491,8 @@ def make_registry(h=1):
         "iAmTime-base":   lambda ch: iamtime_dists(ch, h),   # 21 native levels
         "TimeSSM-2.5M":   lambda ch: timessm_dists(ch, h),
         "TimeSSM-2.5M(wide)": lambda ch: timessm_dists(ch, h, recon=_wide_recon()),
+        "Hirondel-7M":    lambda ch: hirondel_dists(ch, h),
+        "Hirondel-7M(wide)": lambda ch: hirondel_dists(ch, h, recon=_wide_recon()),
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),
