@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Gaussian-mixture quantiles in the stdlib, JavaScript and Rust cores use a
+  scale-relative tolerance below unit scale and a 2100-step default budget
+  (including forwarding wrappers), fixing tiny components and extreme separation.
+  Float-resolution handling preserves historical rounding for resolved components
+  where the old absolute tolerance could not stop, and handles collapsed components
+  and atom jumps explicitly. Nonfinite search brackets fail explicitly. The optional
+  Torch implementation is unchanged. See `parity/QUANTILE_CONTRACT.md`.
+
 - New forecaster `granger` (horizon 1), after Clive Granger: laplace with
   trained values for its continuous hyperparameters plus a small gate on the
   ensemble's combining weights, mixed with laplace by the Aggregating

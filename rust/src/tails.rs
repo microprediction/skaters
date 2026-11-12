@@ -256,7 +256,7 @@ impl SplicedDist {
     }
 
     pub fn quantile(&self, p: f64) -> f64 {
-        self.quantile_tol(p, 1e-9, 100)
+        self.quantile_tol(p, 1e-9, 2100)
     }
 
     pub fn quantile_tol(&self, p: f64, tol: f64, max_iter: usize) -> f64 {
@@ -300,13 +300,12 @@ impl SplicedDist {
         let q = self.qgrid();
         let n = q.len() as f64;
         let t1 = fsum(q.iter().map(|&v| (v - x).abs())) / n;
-        let t2 = 2.0
-            * fsum(
+        let t2 =
+            2.0 * fsum(
                 q.iter()
                     .enumerate()
                     .map(|(i, &v)| v * (2.0 * (i as f64 + 0.5) / n - 1.0)),
-            )
-            / n;
+            ) / n;
         t1 - t2 * 0.5
     }
 }

@@ -36,6 +36,7 @@ jobs:
           cd rust
           cargo test --release --test parity -- --nocapture | tee parity.out
           cargo test --release --test robustness
+          cargo test --release --test quantile_contract
           cargo test --release --test granger_parity -- --nocapture
           grep -o 'PARITY_DIGEST=[0-9a-f]*' parity.out > "digest-${{ matrix.os }}.txt"
       - uses: actions/upload-artifact@v4
@@ -56,6 +57,7 @@ jobs:
           cd rust
           export CARGO_TARGET_WASM32_WASIP1_RUNNER="wasmtime --dir=.. --env SKATERS_VECTORS=../parity/vectors.json"
           cargo test --release --target wasm32-wasip1 --test parity -- --nocapture | tee parity.out
+          cargo test --release --target wasm32-wasip1 --test quantile_contract
           grep -o 'PARITY_DIGEST=[0-9a-f]*' parity.out > digest-wasm.txt
       - uses: actions/upload-artifact@v4
         with: {name: digest-wasm, path: rust/digest-wasm.txt}

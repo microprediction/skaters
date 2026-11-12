@@ -107,29 +107,120 @@ impl Dist {
         t1 - 0.5 * t2
     }
 
-    /// Inverse CDF via bisection (tol 1e-9, 100 iterations, as in Python).
+    /// Inverse CDF: relative x tolerance below unit scale, with a binary64
+    /// convergence budget. An explicit smaller budget may return a midpoint
+    /// before convergence. Mirrors Python/JS, including exact atom jumps.
     pub fn quantile(&self, p: f64) -> f64 {
-        self.quantile_tol(p, 1e-9, 100)
+        self.quantile_tol(p, 1e-9, 2100)
     }
 
     pub fn quantile_tol(&self, p: f64, tol: f64, max_iter: usize) -> f64 {
         assert!(0.0 < p && p < 1.0);
         let mu = self.mean();
         let sigma = self.var().sqrt();
+        assert!(
+            sigma.is_finite(),
+            "quantile needs a finite mixture variance"
+        );
+        let mut min_sigma = f64::INFINITY;
+        for &(w, _, s) in &self.components {
+            if w > 0.0 && s > 0.0 {
+                min_sigma = min_sigma.min(s);
+            }
+        }
+        if !min_sigma.is_finite() {
+            min_sigma = 1.0;
+        }
+        let x_tol = tol * min_sigma.min(1.0);
         let mut lo = mu - 8.0 * sigma;
         let mut hi = mu + 8.0 * sigma;
+        let seed = (16.0 * sigma).max(1e-12 * mu.abs().max(1.0));
+        let mut width = seed;
+        let mut found = false;
+        for _ in 0..120 {
+            if self.cdf(lo) < p {
+                found = true;
+                break;
+            }
+            lo -= width;
+            width *= 2.0;
+        }
+        assert!(found, "could not bracket quantile from below");
+        width = seed;
+        found = false;
+        for _ in 0..120 {
+            if self.cdf(hi) >= p {
+                found = true;
+                break;
+            }
+            hi += width;
+            width *= 2.0;
+        }
+        assert!(found, "could not bracket quantile from above");
+        assert!(
+            lo.is_finite() && hi.is_finite(),
+            "quantile needs a finite search bracket"
+        );
         for _ in 0..max_iter {
-            let mid = 0.5 * (lo + hi);
+            let mut mid = 0.5 * (lo + hi);
+            if !mid.is_finite() {
+                mid = 0.5 * lo + 0.5 * hi;
+            }
+            if !(lo < mid && mid < hi) {
+                let gap = hi - lo;
+                if 0.0 < tol && tol <= 2.0 * gap {
+                    let (mut lower, mut upper, mut swapped_lower, mut swapped_upper) =
+                        (0.0, 0.0, 0.0, 0.0);
+                    for &(w, m, s) in &self.components {
+                        let cl = w * gaussian_cdf(lo, m, s);
+                        let cu = w * gaussian_cdf(hi, m, s);
+                        lower += cl;
+                        upper += cu;
+                        let unresolved = w > 0.0 && s <= gap;
+                        swapped_lower += if unresolved { cu } else { cl };
+                        swapped_upper += if unresolved { cl } else { cu };
+                    }
+                    if swapped_lower == lower && swapped_upper == upper {
+                        return mid;
+                    }
+                }
+                return hi;
+            }
             if self.cdf(mid) < p {
                 lo = mid;
             } else {
                 hi = mid;
             }
-            if hi - lo < tol {
+            if hi - lo < x_tol {
+                for &(w, m, s) in &self.components {
+                    if w > 0.0 && s == 0.0 && lo <= m && m <= hi {
+                        let mut left = 0.0;
+                        for &(wi, mi, si) in &self.components {
+                            left += wi
+                                * if si == 0.0 {
+                                    if mi < m {
+                                        1.0
+                                    } else {
+                                        0.0
+                                    }
+                                } else {
+                                    gaussian_cdf(m, mi, si)
+                                };
+                        }
+                        if left < p && p <= self.cdf(m) {
+                            return m;
+                        }
+                    }
+                }
                 break;
             }
         }
-        0.5 * (lo + hi)
+        let mid = 0.5 * (lo + hi);
+        if mid.is_finite() {
+            mid
+        } else {
+            0.5 * lo + 0.5 * hi
+        }
     }
 
     pub fn mean(&self) -> f64 {

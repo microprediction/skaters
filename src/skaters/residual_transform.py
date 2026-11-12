@@ -163,7 +163,7 @@ class CorrectedDist:
         lp = self.logpdf(y)
         return math.exp(lp) if lp > -700.0 else 0.0
 
-    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
+    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 2100) -> float:
         assert 0 < p < 1
         hp = self.family.quantile(p, self.theta)
         u = _clamp01(_STD_NORMAL.cdf(hp))

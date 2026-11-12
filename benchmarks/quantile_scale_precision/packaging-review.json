@@ -1,0 +1,70 @@
+{
+  "completed_utc": "2026-11-09T20:13:14.998214+00:00",
+  "reviewer": "Claude Code CLI 2.1.300",
+  "actual_model": "claude-fable-5-1",
+  "scope": "one analytical read-only review of the complete evidence package, portable script, surrounding benchmark source and draft PR text",
+  "verdict": "No material defects; conditional clean-clone dependency check resolved",
+  "conditional_check": {
+    "tracked_files": 898,
+    "untracked_files": [
+      "parity/QUANTILE_CONTRACT.md",
+      "parity/quantile_contract.json",
+      "parity/quantile_contract.mjs",
+      "rust/tests/quantile_contract.rs",
+      "tests/test_quantile_inverse_contract.py"
+    ],
+    "all_untracked_files_in_implementation_patch": true,
+    "conclusion": "No unrelated untracked file is required by the pinned file list"
+  },
+  "hook_policy_check": "The tracked no-bespoke-benchmarks hook requires the canonical pipeline. The recorder calls the existing run_arm/registry/PredictionWriter path; canonical evidence used summarize_canonical. Supplementary checks disclose their scope and do not replace the pipeline or derive new win-rate claims. No hook/settings change made.",
+  "supported_refinements": [
+    "Assert complete pinned corpus/series/step sets and acceptance predicates in verify-results.",
+    "Check pinned series sets in summarize; allow only leading prefixes for explicitly partial smoke runs.",
+    "Identify the complete 414-row M4 corpus cache and its scored 200-row prefix.",
+    "Disclose canonical six-decimal quantile/CRPS differences and exact-file-content replay restriction.",
+    "Use an absolute proposed branch URL in the PR description; remove internal workflow wording and orphan manifest references."
+  ],
+  "post_review_proof": {
+    "positive_results": "passed: packaged corpus summaries, acceptance predicates, complete pinned sets and synthetic signatures",
+    "negative_controls": [
+      {
+        "case": "nonzero_median",
+        "rejected": true,
+        "reason": "ValueError: Canonical acceptance predicate failed"
+      },
+      {
+        "case": "raw_score_change",
+        "rejected": true,
+        "reason": "ValueError: Full-precision score/boundary predicate failed"
+      },
+      {
+        "case": "wrong_series",
+        "rejected": true,
+        "reason": "ValueError: Series set differs from pinned inputs"
+      },
+      {
+        "case": "standalone_series_set",
+        "rejected": true
+      }
+    ],
+    "unchanged_AST_functions": [
+      "record",
+      "verify",
+      "read_rows",
+      "aggregate",
+      "sha",
+      "read_json",
+      "write_json"
+    ],
+    "recorder_smoke_evidence": "carried: four two-series runs, each 128 rows exactly matching original tapes; record/verify unchanged",
+    "candidate_files_unchanged": 903
+  },
+  "review_carry": "Inspected the entire later delta. Recording, source verification and aggregation semantics are unchanged; added rejection checks preserve all accepted evidence and reject negative controls. Documentation/data-provenance updates match recorded facts. Prior review reasoning remains valid; no additional review round was run.",
+  "limits": [
+    "Reviewer did not execute code, recompute hashes or independently authenticate raw caches.",
+    "The verification/documentation refinements followed the review and were checked locally, not independently rereviewed.",
+    "Raw FRED caches and original economic prediction tapes remain local; the package is still uncommitted and unpublished.",
+    "Original M4 replay driver was not separately supplied in the review snapshot; recorded results and source-context limits are retained.",
+    "Cross-platform GitHub CI, wasm and MSRV remain pending; optional Torch unchanged."
+  ]
+}

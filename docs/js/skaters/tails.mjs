@@ -163,7 +163,7 @@ export class SplicedDist {
     return lp < 700.0 ? Math.exp(lp) : Infinity;
   }
 
-  quantile(p, tol = 1e-9, maxIter = 100) {
+  quantile(p, tol = 1e-9, maxIter = 2100) {
     if (!(p > 0 && p < 1)) throw new Error("quantile p must be in (0, 1)");
     let z;
     if (p < this.zetaLo) {
