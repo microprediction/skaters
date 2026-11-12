@@ -2606,6 +2606,13 @@ def make_registry(h=1):
         # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
         "CSP":         lambda ch: csp_dists(ch, h),
         "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),
+        # CSP in conjunction with laplace: the wrappers the foundation models get
+        # (vincentize, laplace's residual scale, PIT recalibration, the online
+        # log-score portfolio that tilts toward laplace until CSP earns weight)
+        "CSP+lap":     _sandwich(csp_dists, h),
+        "CSP~lap":     _resid_sandwich(csp_dists, h),
+        "CSP@lap":     pit_sandwich(csp_dists, h),
+        "CSP&lap":     portfolio_sandwich(csp_dists, h=h),
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),
