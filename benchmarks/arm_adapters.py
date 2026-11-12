@@ -1502,6 +1502,116 @@ def hirondel_dists(ch, h=1, recon=None):
         print(f"  hirondel failed: {e}", flush=True); return None
 
 
+# ---- CSP: Conformal Seasonal Pools (Manokhin, arXiv:2605.03789; issue #329) ----
+# Training-free sampler (not a foundation model; same integration pattern). The
+# author's reference package valeman/csp-forecaster, MIT licence, numpy only,
+# not on PyPI: pip install git+https://github.com/valeman/csp-forecaster.git@
+# 529d91865b2c8c6c0c08192c1a2ea35cfb94877c (v0.2.0 code, 2026-07-28; the two
+# later commits are README only). benchmarks/csp_requirements.lock.
+# The earlier comparison (comparisons/laplace-vs-csp, opponents.py) ran v0.1.4.
+# v0.2.0 changes only _residuals_lag: when the calibration window yields fewer
+# than MIN_RESIDUALS=8 lag-L residuals it widens to the full history, then to a
+# shorter lag rescaled by sqrt(L/l). At h=1 that never fires here: run_arm
+# guarantees >= CTX+12 = 140 points of history, so the half-history calibration
+# window minus lag m <= 52 leaves >= 18 residuals. At h > m (lag 2m) it can.
+#
+# Protocol. At each of the fs.TEST test steps the pool is fit on the trailing
+# CSP_FIT_WIN observations ending at the forecast origin (h-1 steps before the
+# target, the same origin convention as laplace_dists and the FM arms) and
+# draws CSP_NSAMPLES samples; samples[h-1] becomes a Dist by fs.sample_dist,
+# the Silverman KDE every canonical sampling arm uses (Sundial, NPTS, PyMC).
+# The old comparison used bench_core.grid_dist on a 41-point quantile grid
+# (taus 0.02..0.98); those numbers are therefore not byte-comparable with the
+# July table, by design: the canonical store converts samples one way.
+#
+# Context. fs.CTX=128 is too short for CSP: at m=52 it is 2.5 cycles, so the
+# adaptive rule caps the seasonal pool weight at 0.3, each phase pool holds 2-3
+# values, and the lag-52 calibration set has 12 residuals. CSP is a fitted-on-
+# history method like the classical arms, so it gets their fit window
+# (CLASSICAL_FIT_WIN, default 750, the same 750 the July study used): 14 weekly
+# cycles, 62 monthly, 31 hourly. run_arm caps ch at fs.HIST=1000, so the window
+# is min(750, available history).
+#
+# Season period from ARM_CORPUS (corpus.ARMS): daily m=5 (business-day week,
+# prices included), weekly 52, monthly 12, m4-hourly 24. Derived corpora match
+# on prefix (weekly-gp -> 52, monthly-fx3 -> 12, hourly-gp -> 24, daily-gp ->
+# 5, null-*/perm-daily -> 5). CSP_M overrides. Unknown corpus: m=1 (no
+# seasonal pool; CSP reduces to random-walk point + conformal residuals), with
+# a one-time warning.
+CSP_FIT_WIN = int(os.environ.get("CSP_FIT_WIN", os.environ.get("CLASSICAL_FIT_WIN", 750)))
+CSP_NSAMPLES = int(os.environ.get("CSP_NSAMPLES", 256))
+CSP_REVISION = "529d91865b2c8c6c0c08192c1a2ea35cfb94877c"
+# variant -> ConformalSeasonalPool kwargs. "default" = the package's recommended
+# defaults (README): adaptive=True, residual_mode="h_step", decay_unit="step",
+# exp_lambda=0.01, pool_weight=0.5, cal_fraction=0.5, mode="fast",
+# orientation=False (orientation moves reported interval bounds only, never the
+# samples). "paper" = the paper-exact pool construction. At h <= m the residual
+# lag is m under either residual_mode, so at h=1 "paper" isolates decay_unit.
+CSP_VARIANTS = {
+    "default": dict(adaptive=True, residual_mode="h_step", decay_unit="step",
+                    exp_lambda=0.01, pool_weight=0.5, cal_fraction=0.5,
+                    mode="fast", orientation=False),
+    "paper":   dict(adaptive=True, residual_mode="paper", decay_unit="cycle",
+                    exp_lambda=0.01, pool_weight=0.5, cal_fraction=0.5,
+                    mode="fast", orientation=False),
+}
+_CSP_SEASON = (("m4-hourly", 24), ("hourly", 24), ("weekly", 52),
+               ("monthly", 12), ("daily", 5), ("null-", 5), ("perm-daily", 5))
+_csp_warned = False
+
+
+def csp_season():
+    """Season period m for the current ARM_CORPUS (CSP_M overrides)."""
+    global _csp_warned
+    if os.environ.get("CSP_M"):
+        return max(1, int(os.environ["CSP_M"]))
+    c = os.environ.get("ARM_CORPUS", "")
+    for prefix, m in _CSP_SEASON:
+        if c.startswith(prefix):
+            return m
+    if not _csp_warned:
+        print(f"  csp: no season period for ARM_CORPUS={c!r}; using m=1 (non-seasonal)",
+              flush=True)
+        _csp_warned = True
+    return 1
+
+
+def csp_dists(ch, h=1, variant="default"):
+    """TEST per-step CSP predictives at horizon h, refit at every step on the
+    trailing CSP_FIT_WIN observations ending at the forecast origin.
+
+    Seeded: one base seed per series from the SHA-1 of its values, combined with
+    the step index, so reruns and shards reproduce exactly and both variants
+    share common random numbers.
+    """
+    try:
+        from csp_forecaster import ConformalSeasonalPool
+        kw = CSP_VARIANTS[variant]
+        y = np.asarray(ch, float)
+        n = len(y)
+        if not np.all(np.isfinite(y)):
+            raise ValueError("non-finite values in the series")
+        start = n - fs.TEST
+        m = csp_season()
+        base = int(hashlib.sha1(y.tobytes()).hexdigest()[:8], 16)
+        out = []
+        for t in range(start, n):
+            org = t - (h - 1)                    # history ends at the forecast origin
+            hist = y[max(0, org - CSP_FIT_WIN):org]
+            if len(hist) <= max(2 * m, 10):
+                raise ValueError(f"history {len(hist)} too short for m={m}")
+            rs = np.random.default_rng([base, t])
+            f = ConformalSeasonalPool(random_state=rs, **kw).fit(hist, seasonal_period=m)
+            s = np.asarray(f.predict(H=h, n_samples=CSP_NSAMPLES).samples[h - 1], float)
+            if s.shape != (CSP_NSAMPLES,) or not np.all(np.isfinite(s)):
+                raise ValueError("bad sample block")
+            out.append(fs.sample_dist(s))
+        return out
+    except Exception as e:                       # noqa: BLE001
+        print(f"  csp failed: {e}", flush=True)
+        return None
+
+
 # ---- registry lines (inside make_registry) ----
 #       "TimeSSM-2.5M":       lambda ch: timessm_dists(ch, h),   # #329
 #       "TimeSSM-2.5M(wide)": lambda ch: timessm_dists(ch, h, recon=_wide_recon()),
@@ -2493,6 +2603,9 @@ def make_registry(h=1):
         "TimeSSM-2.5M(wide)": lambda ch: timessm_dists(ch, h, recon=_wide_recon()),
         "Hirondel-7M":    lambda ch: hirondel_dists(ch, h),
         "Hirondel-7M(wide)": lambda ch: hirondel_dists(ch, h, recon=_wide_recon()),
+        # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
+        "CSP":         lambda ch: csp_dists(ch, h),
+        "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),
