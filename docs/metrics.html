@@ -294,6 +294,34 @@
       and you know it.
     </p>
 
+    <h2>Interval scores judge one interval</h2>
+    <p>
+      Interval methods are often compared by the Winkler (interval) score. For a
+      central interval $[l,u]$ at level $1-\alpha$ it charges the width, plus a
+      penalty for any miss:
+    </p>
+    $$W_\alpha(l,u;y) = (u-l) + \tfrac{2}{\alpha}(l-y)\,\mathbf{1}\{y<l\} + \tfrac{2}{\alpha}(y-u)\,\mathbf{1}\{y>u\}.$$
+    <p>
+      It is proper, but only for the interval. A forecaster can get the central
+      95% right and be wrong everywhere else, and $W_{0.05}$ will not see it.
+      That matters when one side of a comparison is a conformal method, because
+      the central 95% is the very interval conformal calibration is built to
+      deliver. Scoring at that level tests the one thing such a method is
+      designed to get right. CRPS is the Winkler score's natural extension: it
+      is twice the pinball loss integrated over every quantile level, so it checks
+      all of them at once. The log score checks every level too, and the tails
+      hardest.
+    </p>
+    <p>
+      How results are pooled matters as much as the score. Counting "datasets
+      won" gives a 30-series dataset the same vote as a 3,000-series one.
+      <code>skaters</code> benchmarks score each series separately and run a
+      Diebold&ndash;Mariano test on its log scores, then report how many series
+      each model wins, how many are too close to call, and the median gap. The
+      <a href="https://conformalprediction.net/csp.html">review of Conformal
+      Seasonal Pools</a> shows both effects on one comparison.
+    </p>
+
     <h2>Summary, for now</h2>
     <p>
       The user chooses the target. If the target is a threshold, quantile,
