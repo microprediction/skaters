@@ -1292,6 +1292,126 @@ def iamtime_dists(ch, h=1):
         print(f"  iamtime failed: {e}", flush=True); return None
 
 
+# TimeSSM-2.5M (Yvann Vincent, independent; weights on the Hub 2026-10-11;
+# issue #329). 2,525,772 parameters: six gated S4D blocks (complex diagonal
+# state, d_model 192, d_state 32), one token per step, a learned future token,
+# a nine-quantile head (0.1..0.9) built monotone by construction (median plus
+# cumulative softplus widths). Apache-2.0 code and weights, not gated. Package
+# installed from github.com/IUseAMouse/TimeSSM at TIMESSM_SOURCE_COMMIT (no
+# PyPI release), pinned in benchmarks/timessm_requirements.lock. Trained from
+# scratch on 106 corpus files (corpus_v3_frequencies.yaml in the HF repo):
+# LOTSA subsets at revision 8191fd29, three Chronos datasets (ercot,
+# mexico_city_bikes, ushcn_daily, plus their 2x/3x decimations; dominick is on
+# the allowlist of TimeJEPA's prepare_chronos.py but absent from the 106-file
+# table) and synthetic families. Every LOTSA subset matching m4/m3/m1, any
+# GIFT-Eval source, nn5 aside, or the Nixtla long-horizon sets is excluded by
+# TimeJEPA's lotsa.py; no fred_md, no M4 (hourly or otherwise), no tourism/M1/M3
+# in the table. Monash-origin sets that ARE in it: australian_electricity_demand,
+# bitcoin_with_missing, london_smart_meters_with_missing, nn5_daily_with_missing,
+# pedestrian_counts, solar_power, sunspot_with_missing, wind_farms_with_missing,
+# wind_power. Known defect (model card): q90 equals q80 on practically every
+# input, so the upper fan has eight distinct quantiles.
+TIMESSM_MODEL_ID = "IUseAMouse/timessm-2.5m"
+TIMESSM_MODEL_REVISION = "b0c5f6894652823201e56b82020dda55e39c57fb"
+TIMESSM_SOURCE_COMMIT = "969e006d711763a1ff92488b80f02d436a2fe320"
+
+# Season of the reference cycle in steps, per corpus arm (ARM_CORPUS prefix),
+# by the package's own FlowState rule (timessm.frequency.season_length): weekly
+# 365/7, monthly 12, daily 365 (FRED daily is Econ/Fin: no weekly rhythm),
+# hourly 24. The rate scale is w = 24 / season clamped to the trained range.
+TIMESSM_SEASONS = {"weekly": 365.0 / 7.0, "monthly": 12.0, "daily": 365.0,
+                   "m4-hourly": 24.0, "hourly": 24.0}
+
+_timessm = None
+def _timessm_season():
+    s = os.environ.get("TIMESSM_SEASON")
+    if s:
+        return float(s)
+    arm = os.environ.get("ARM_CORPUS", "")
+    for prefix in sorted(TIMESSM_SEASONS, key=len, reverse=True):
+        if arm == prefix or arm.startswith(prefix + "-"):
+            return TIMESSM_SEASONS[prefix]
+    raise ValueError(f"TimeSSM needs a declared frequency: unknown ARM_CORPUS {arm!r} "
+                     "(set TIMESSM_SEASON)")
+
+
+def timessm_quantiles_from_contexts(contexts, h=1):
+    """TimeSSM-2.5M's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``.
+
+    The bare model, as the package's public ``model.forecast(context, h, w=w)``
+    ships it: one forward pass per context row, each row its own univariate
+    series (no covariates, no cross-series state). The rate scale ``w`` comes
+    from the corpus frequency (``_timessm_season``), as the card requires
+    ("evaluated without the frequency it is not the model of this card").
+
+    Switches, every one stated. The package has no nonnegativity clip and no
+    integer snapping. Its robust arcsinh scaler clamps the inverse to the
+    context envelope [min - 10*w, max + 10*w], w = max(range, scale); this is
+    monotone, inactive on any plausible forecast and not exposed as a switch,
+    so it is left on. Not applied (they live in the TimeJEPA GIFT harness, not
+    in the package): RateIN backtest resampling (20 to 40 forecasts per
+    series), sign-flip averaging, and the nine per-level calibration factors
+    (calibration_gamma.json). The card reports both; this is its "bare model"
+    configuration. Dropout is off (eval mode).
+    """
+    import torch
+    from timessm import from_pretrained, delta_scale
+
+    global _timessm
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if _timessm is None:
+        torch.set_num_threads(int(os.environ.get("OMP_NUM_THREADS", "4")))
+        _timessm = from_pretrained(TIMESSM_MODEL_ID, device=DEVICE,
+                                   revision=TIMESSM_MODEL_REVISION)
+    model = _timessm
+    w = delta_scale(_timessm_season(), *model.delta_range)
+    batch = int(os.environ.get("TIMESSM_BATCH", "64"))
+    rows = []
+    with torch.no_grad():
+        for i in range(0, len(values), batch):
+            x = torch.from_numpy(values[i:i + batch]).to(DEVICE)
+            out = model.forecast(x, h, w=w)
+            levels = np.asarray(out["quantile_levels"].cpu() if hasattr(out["quantile_levels"], "cpu")
+                                else out["quantile_levels"], dtype=float).reshape(-1)
+            if levels.shape != (9,) or not np.allclose(levels, LEVELS9):
+                raise ValueError(f"unexpected TimeSSM quantile levels: {levels.tolist()}")
+            q = out["quantiles_denorm"].float().cpu().numpy()          # (b, h, 9)
+            if q.shape != (len(x), h, len(LEVELS9)):
+                raise ValueError(f"unexpected TimeSSM forecast shape {q.shape}")
+            rows.append(q[:, h - 1, :].astype(float))
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected TimeSSM quantile shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("TimeSSM produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("TimeSSM produced crossing quantiles")   # monotone by construction
+    return quantiles
+
+
+def timessm_dists(ch, h=1, recon=None):
+    """TimeSSM-2.5M native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = _memo_quantiles("timessm", contexts, h,
+                                    lambda: timessm_quantiles_from_contexts(contexts, h=h))
+        return _deciles_to_dists(quantiles, recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  timessm failed: {e}", flush=True); return None
+
+
+# ---- registry lines (inside make_registry) ----
+#       "TimeSSM-2.5M":       lambda ch: timessm_dists(ch, h),   # #329
+#       "TimeSSM-2.5M(wide)": lambda ch: timessm_dists(ch, h, recon=_wide_recon()),
+
+
 _timeh2o = {}
 _timeh2o_memo = {}
 def timeh2o_quantiles_from_contexts(contexts, h=1, size="v1"):
@@ -2274,6 +2394,8 @@ def make_registry(h=1):
         "ci-proto":       lambda ch: ciproto_dists(ch, h),
         "ci-proto(wide)": lambda ch: ciproto_dists(ch, h, recon=_wide_recon()),
         "iAmTime-base":   lambda ch: iamtime_dists(ch, h),   # 21 native levels
+        "TimeSSM-2.5M":   lambda ch: timessm_dists(ch, h),
+        "TimeSSM-2.5M(wide)": lambda ch: timessm_dists(ch, h, recon=_wide_recon()),
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),

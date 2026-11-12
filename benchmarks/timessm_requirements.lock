@@ -1,0 +1,42 @@
+# TimeSSM arm venv (.venv-timessm, Python 3.12.13); issue #329
+# timessm 0.1.0 from github.com/IUseAMouse/TimeSSM@969e006d711763a1ff92488b80f02d436a2fe320 (Apache-2.0 code and weights; not gated); weights IUseAMouse/timessm-2.5m b0c5f6894652823201e56b82020dda55e39c57fb
+antlr4-python3-runtime==4.9.3
+anyio==4.16.0
+click==8.5.1
+contourpy==1.4.0
+cycler==0.12.1
+einops==0.8.2
+filelock==4.2.10
+fonttools==4.68.0
+fsspec==2026.9.0
+h11==0.16.0
+hf-xet==1.8.0
+httpcore2==2.16.0
+httpx2==2.16.0
+huggingface_hub==2.4.0
+hydra-core==1.3.8
+idna==3.20
+Jinja2==3.1.6
+kiwisolver==1.5.1
+MarkupSafe==3.0.4
+matplotlib==3.11.2
+mpmath==1.3.0
+networkx==3.7
+numpy==2.5.4
+omegaconf==2.3.1
+packaging==26.3
+pandas==3.1.1
+pillow==13.0.0
+pyparsing==3.3.3
+python-dateutil==4.0.0
+PyYAML==6.0.3
+safetensors==0.8.0
+scipy==1.18.1
+setuptools==84.2.1
+sympy==1.14.0
+timessm @ git+https://github.com/IUseAMouse/TimeSSM.git@969e006d711763a1ff92488b80f02d436a2fe320
+torch==2.15.0
+tqdm==4.70.1
+truststore==0.10.5
+typing_extensions==4.16.0
+tzdata==2026.6
