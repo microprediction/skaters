@@ -1068,6 +1068,123 @@ def simons_dists(ch, h=1, size="25M", recon=None):
         print(f"  simons failed: {e}", flush=True); return None
 
 
+# ci-proto (Continuous Intelligence Limited, UK; code and weights released
+# 2026-11-11: HF repo created 2026-11-11T10:21Z, fev-bench submission
+# autogluon/fev#211 merged 2026-11-11; issue #329). 167,190,592 parameters
+# (config.json), patch model with Mamba-3 and multivariate attention, components
+# adapted from TiRex-2 and xLSTM (Apache-2.0, see the package NOTICE). Nine
+# deciles 0.1..0.9. model.ckpt takes histories up to 16,384 steps; longer
+# histories switch to model-long.ckpt (never reached at our CTX). Package
+# continuousintelligence 0.1.1 from PyPI (github.com/continuousintelligence/ci),
+# pinned in benchmarks/ciproto_requirements.lock; weights pinned to
+# CIPROTO_MODEL_REVISION. Licence: "ci-proto Code and Model Licence" v1.0
+# (Apache-2.0 plus Section 10: public attribution "Uses ci-proto, released by
+# Continuous Intelligence. Continuous Intelligence does not endorse or approve
+# this product or service." and a one-time e-mail notification to
+# contact@continuousintelligence.co.uk when the work, or a product, service or
+# AI model that uses its code, weights or OUTPUTS, is distributed or made
+# available; purely internal use is exempt). Not gated. Training data is
+# undisclosed ("a large corpus of real-world and synthetic time series"); the
+# fev-bench submission declares trained_on_datasets = [] (no fev-bench data).
+# Nothing is published about FRED, M4, Monash or GIFT-Eval.
+CIPROTO_MODEL_ID = "ContinuousIntelligence/ci-proto"
+CIPROTO_MODEL_REVISION = "ee3031351a151e3f6febf8c62b53e6ea1008bef6"
+
+_ciproto = None
+def ciproto_quantiles_from_contexts(contexts, h=1):
+    """ci-proto's native nine-decile forecast at horizon ``h``, shape ``(n, 9)``.
+
+    Each context row is forecast as its own univariate series: one target
+    channel, no covariates, no timestamps, no ``series_ids``. The cohort path
+    (``series_ids``) is deliberately NOT used: with the shipped tta.json it
+    forecasts up to 100 rows jointly (``chunk_joint=100``) or adds the 8 most
+    correlated other rows as joint targets (``joint_neighbours=8``). Our rows
+    are rolling windows of one series sharing a synthetic time axis, so that
+    path would mix series and leak later windows into earlier forecasts.
+
+    Batching: ``CIPROTO_BATCH`` rows are stacked as independent *samples*
+    (``[b, 1, ctx]``) into the package's internal ``_forecast._predict``,
+    which is exactly what the public ``Forecaster.forecast(history[1, ctx])``
+    calls with one sample; ``forecast_layout`` gives every sample its own group,
+    so samples never attend to each other. ``CIPROTO_BATCH=1`` uses the public
+    per-row ``forecast`` call instead.
+
+    tta.json switches, every one stated. Turned OFF because they alter a
+    signed change series: ``clip_nonnegative=False`` (default true: clamps at 0
+    when the context is nonnegative), ``integer_round=False`` (default true:
+    rounds when the context is all integers). Left at the shipped defaults
+    (the model's own ensembling and calibration): ``postprocess=True`` with
+    ``tta_sign_flip=True`` (averages the forecast of x and -x),
+    ``tta_diff=True`` / ``tta_running_totals=True`` (forecasts differences of a
+    context with a strong linear trend, R^2 >= 0.87, or a monotone running
+    total, for h <= 48, then re-integrates), band calibration
+    (``raw_band_scale=1.0``, ``raw_band_exponent=0.5``: identity at h=1;
+    ``diff_band_scale=1.68``, ``diff_band_exponent=0.59`` on differenced rows),
+    quantile sorting, ``bfloat16=True`` autocast. Inactive here:
+    ``calendar_covariates`` (no timestamps), ``target_encode_categoricals``
+    (no covariates), ``static_groups`` / ``joint_neighbours`` / ``chunk_joint``
+    (no ``series_ids``).
+    """
+    import torch
+    import continuousintelligence as ci
+    from continuousintelligence.ci_proto._forecast import _predict
+
+    global _ciproto
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if _ciproto is None:
+        model = ci.load_model(CIPROTO_MODEL_ID, device="cuda" if DEVICE == "cuda" else "cpu",
+                              revision=CIPROTO_MODEL_REVISION)
+        model._tta = dict(model._tta, clip_nonnegative=False, integer_round=False)
+        _ciproto = model
+    model = _ciproto
+    levels = model.quantiles.numpy().astype(float)
+    if levels.shape != (9,) or not np.allclose(levels, LEVELS9):
+        raise ValueError(f"unexpected ci-proto quantile levels: {levels.tolist()}")
+    limit = model._model.config.context_len
+    if limit is not None and values.shape[1] > limit:
+        raise ValueError("context longer than the standard checkpoint's context_len")
+    batch = int(os.environ.get("CIPROTO_BATCH", "64"))
+    rows = []
+    for i in range(0, len(values), batch):
+        x = torch.from_numpy(values[i:i + batch])
+        if batch == 1:
+            q = model.forecast(x, horizon=h)[None]               # (1, 1, 9, h)
+        else:
+            q = _predict(model._model, x[:, None, :].to(model.device),
+                         x.new_empty((len(x), 0, h)).to(model.device),
+                         1, h, model._tta)                        # (b, 1, 9, h)
+        q = q.float().numpy()
+        if q.shape != (len(x), 1, 9, h):
+            raise ValueError(f"unexpected ci-proto forecast shape {q.shape}")
+        rows.append(q[:, 0, :, h - 1].astype(float))
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS9)):
+        raise ValueError(f"unexpected ci-proto quantile shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("ci-proto produced nonfinite quantiles")
+    if np.any(np.diff(quantiles, axis=1) < 0.0):
+        raise ValueError("ci-proto produced crossing quantiles")   # postprocess sorts them
+    return quantiles
+
+
+def ciproto_dists(ch, h=1, recon=None):
+    """ci-proto native deciles reconstructed as benchmark ``Dist`` objects."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = _memo_quantiles("ciproto", contexts, h,
+                                    lambda: ciproto_quantiles_from_contexts(contexts, h=h))
+        return _deciles_to_dists(quantiles, recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  ciproto failed: {e}", flush=True); return None
+
+
 _timeh2o = {}
 _timeh2o_memo = {}
 def timeh2o_quantiles_from_contexts(contexts, h=1, size="v1"):
@@ -2046,6 +2163,9 @@ def make_registry(h=1):
         **{f"Simons-{s}": (lambda s: lambda ch: simons_dists(ch, h, s))(s) for s in SIMONS_REVISIONS},
         **{f"Simons-{s}(wide)": (lambda s: lambda ch: simons_dists(ch, h, s, recon=_wide_recon()))(s)
            for s in SIMONS_REVISIONS},
+        # ci-proto (Continuous Intelligence, 2026-11-11); licence asks attribution for derived releases
+        "ci-proto":       lambda ch: ciproto_dists(ch, h),
+        "ci-proto(wide)": lambda ch: ciproto_dists(ch, h, recon=_wide_recon()),
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),
