@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; refund policy</title>
+  <meta name="description" content="How to claim a full refund on skaters, and the faster ways to get what you actually wanted." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters &mdash; refund policy" />
+  <meta property="og:description" content="Full refunds, processed instantly. Issues and PRs, processed faster." />
+  <meta property="og:url" content="https://skaters.microprediction.org/refunds.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .lede { color: #555; margin: 0 0 26px; font-size: 1.05em; }
+    table.res { border-collapse: collapse; margin: 0 0 24px; width: 100%; }
+    table.res th, table.res td { border-bottom: 1px solid #e3e3e3; padding: 6px 9px;
+      text-align: left; font-size: 0.94em; }
+    table.res th { border-bottom: 2px solid #bbb; font-weight: 600; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .receipt { font-family: ui-monospace, Menlo, monospace; background: #fafafa;
+      border: 1px dashed #bbb; padding: 14px 18px; margin: 0 0 26px; white-space: pre; overflow-x: auto; }
+    li { margin-bottom: 7px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/refunds.html">Refunds</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Refund policy</h1>
+    <p class="lede">
+      If <code>skaters</code> has disappointed you, you are entitled to a full refund
+      of everything you paid for it.
+    </p>
+
+    <h2>Calculating your refund</h2>
+    <div class="receipt">Licence fee                        $0.00
+Support contract                   $0.00
+Per-observation charge (12 µs)     $0.00
+GPU rental required                $0.00
+-------------------------------------
+Refund due                         $0.00</div>
+    <p>
+      Refunds are processed instantly. In fact, yours has already been issued.
+      Please check your account.
+    </p>
+
+    <h2>Complaint handling times</h2>
+    <p>
+      We measured how long each kind of feedback takes to change the package. The
+      method is the same one we use for forecasts: score every case, then report
+      the median.
+    </p>
+    <table class="res">
+      <thead><tr><th>channel</th><th>median time to a fix</th><th>notes</th></tr></thead>
+      <tbody>
+        <tr><td>Pull request with a failing test</td><td class="num">hours</td>
+          <td>Our favourite. You will be thanked in the changelog.</td></tr>
+        <tr><td>GitHub issue with a reproducible example</td><td class="num">a day or two</td>
+          <td>The route we hope everyone takes.</td></tr>
+        <tr><td>GitHub issue saying "it's slow"</td><td class="num">a week</td>
+          <td>We will ask which series, which horizon and which machine.</td></tr>
+        <tr><td>Social media post, with emoji</td><td class="num">&infin;</td>
+          <td>Not monitored by the issue tracker. Neither are horoscopes.</td></tr>
+        <tr><td>Social media post claiming a benchmark nobody can rerun</td><td class="num">&infin; + 1</td>
+          <td>Scored at the 95% Winkler level, it looks great.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Frequently heard</h2>
+    <p><strong>"It is slower than my method."</strong>
+      Probably, especially if yours just computes the empirical distribution! Please open an issue with the script that timed both, so we can run
+      it too. If yours wins, we will say so on the
+      <a href="/performance.html">performance page</a>.</p>
+    <p><strong>"You didn't run my method properly."</strong>
+      Very likely, as nobody reads a README the way its author does. The
+      <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">adapter</a>
+      is a few lines of Python. Send a PR that runs it properly and we will rerun
+      the whole study with it.</p>
+    <p><strong>"Your metric is unfair."</strong>
+      Then tell us which one, and why. The <a href="/metrics.html">metrics page</a>
+      explains ours, and every benchmark reports more than one. A metric chosen
+      after seeing which one you win is not on the list.</p>
+    <p><strong>"This package is garbage."</strong>
+      Your refund has been processed. See above.</p>
+
+    <h2>How to get more than $0.00</h2>
+    <ol>
+      <li><a href="https://github.com/microprediction/skaters/issues/new">File an issue.</a>
+        Include the data, the code and the number you expected.</li>
+      <li><a href="https://github.com/microprediction/skaters/pulls">Open a pull request.</a>
+        A failing test is worth more than a paragraph.</li>
+      <li>Read the <a href="/guide.html">methodology</a> first. It is long, but it
+        is shorter than a thread arguing about it.</li>
+    </ol>
+    <p>
+      Contributors get their name in the
+      <a href="/acknowledgements.html">acknowledgements</a>. Complainers get their
+      refund.
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>
