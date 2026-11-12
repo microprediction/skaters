@@ -1185,6 +1185,113 @@ def ciproto_dists(ch, h=1, recon=None):
         print(f"  ciproto failed: {e}", flush=True); return None
 
 
+# iAmTime-base-forecast (Anish Saha and Konstantin Shmakov, Walmart; paper
+# arXiv:2603.22586, March 2026; weights on the Hub 2026-09-25; fev-bench
+# submission autogluon/fev#206 merged 2026-10-28; issue #329). 302,139,264
+# parameters (F32): a T5-style encoder-decoder (12+12 layers, d_model 768)
+# with a hierarchical multi-scope encoder over semantic tokens and a
+# task-conditioned patch decoder with 4 routed experts. Patch 16, context
+# 8192 (longer histories are truncated by the pipeline), 64 output patches
+# (1024 steps) per forward pass. Native output: 21 quantile levels
+# (0.01, 0.05, 0.10, ..., 0.95, 0.99) = LEVELS21. Instance-normalised input
+# with an arcsinh squash (use_arcsinh=True) inverted by sinh on the way out:
+# signed series are untouched, no clipping or rounding anywhere.
+# Apache-2.0 code and weights, not gated. Package `iamtime` 0.1.0 installed
+# from github.com/anishsaha12/iAmTime at IAMTIME_SOURCE_COMMIT (no PyPI
+# release), pinned in benchmarks/iamtime_requirements.lock. Training corpus
+# (paper Section 4 and Appendix N.1, Tables 23-24): ~30M series from the
+# Chronos pretraining corpus (includes M4 Monthly and several Monash datasets:
+# London Smart Meters, Pedestrian Counts, Rideshare, Electricity, Kaggle web
+# traffic weekly), 2.5M series from a listed subset of GiftEvalPretrain,
+# 200K UCR classification series, plus TSMixup / KernelSynth / synthetic
+# multivariate augmentation. No FRED or FRED-MD in the training lists
+# (FRED-MD/QD appear only as fev-bench evaluation tasks).
+IAMTIME_MODEL_ID = "anishsaha/iAmTime-base-forecast"
+IAMTIME_MODEL_REVISION = "05d3b6f2469945e4da13a5f6d831ce9f9102077e"
+IAMTIME_SOURCE_COMMIT = "a4c90f1a7e2431c0f8b0767d7c6562adeb7a7ced"
+
+_iamtime = None
+def iamtime_quantiles_from_contexts(contexts, h=1):
+    """iAmTime's native 21-level quantile forecast at horizon ``h``, one row
+    per context: shape ``(n, 21)`` at the levels in ``LEVELS21``.
+
+    Each context row is its own univariate query (the pipeline's "Format 3",
+    a 2-D ``(batch, history)`` array): no covariates, no in-context
+    demonstrations (``example_*`` inputs empty), no multivariate grouping, so
+    rows never see each other. ``predict`` is called directly with
+    ``prediction_length=h`` (always <= 1024, one forward pass, no
+    autoregressive unroll) and ``limit_prediction_length=False`` (its
+    default). ``predict_quantiles`` is bypassed because it can interpolate;
+    we read the 21 trained levels unaltered.
+
+    Post-processing switches: the package has none that clip to nonnegative
+    or snap integers. Its own preprocessing is kept at the checkpoint
+    defaults: instance normalisation (mean / standard deviation of the
+    context) with ``use_arcsinh=True``, inverted exactly; contexts longer
+    than ``context_length=8192`` would be left-truncated (ours are shorter).
+    No ensembling (no sign-flip or patch averaging) exists in the package.
+    The model does not enforce monotone quantiles, so crossings are
+    rearranged by sorting (never raises pinball loss), as for Chronos-2 and
+    Moirai 2.0. Float32 on CPU. Batch size via ``IAMTIME_BATCH``.
+    """
+    global _iamtime
+    import torch
+    from iAmTime.pipeline import iAmTimePipeline
+
+    if h < 1:
+        raise ValueError("h must be positive")
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] < 1:
+        raise ValueError("contexts must be a nonempty two-dimensional array")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("contexts contain nonfinite values")
+    if _iamtime is None:
+        _iamtime = iAmTimePipeline.from_pretrained(
+            IAMTIME_MODEL_ID, revision=IAMTIME_MODEL_REVISION,
+            device_map="cuda" if DEVICE == "cuda" else "cpu", torch_dtype=torch.float32)
+        _iamtime.model.eval()
+    pipe = _iamtime
+    levels = np.asarray(pipe.quantiles, dtype=float)
+    if levels.shape != (21,) or not np.allclose(levels, LEVELS21):
+        raise ValueError(f"unexpected iAmTime quantile levels: {levels.tolist()}")
+    if values.shape[1] > pipe.model.iamtime_config.context_length:
+        raise ValueError("context longer than the checkpoint's context_length")
+    batch = int(os.environ.get("IAMTIME_BATCH", "64"))
+    rows = []
+    with torch.no_grad():
+        for i in range(0, len(values), batch):
+            q = pipe.predict(values[i:i + batch], prediction_length=h,
+                             limit_prediction_length=False)          # (b, 21, h)
+            q = np.asarray(q.float().cpu().numpy(), dtype=float)
+            if q.shape != (len(values[i:i + batch]), 21, h):
+                raise ValueError(f"unexpected iAmTime forecast shape {q.shape}")
+            rows.append(q[:, :, h - 1])
+    quantiles = np.concatenate(rows, axis=0)
+    if quantiles.shape != (len(values), len(LEVELS21)):
+        raise ValueError(f"unexpected iAmTime quantile shape: {quantiles.shape}")
+    if not np.all(np.isfinite(quantiles)):
+        raise ValueError("iAmTime produced nonfinite quantiles")
+    # iAmTime does not enforce monotone levels; crossings are rearranged by
+    # sorting (never raises pinball loss)
+    return np.sort(quantiles, axis=1)
+
+
+def iamtime_dists(ch, h=1):
+    """iAmTime native 21 quantile levels reconstructed as benchmark ``Dist``
+    objects through the TiRex-2 fixed-bandwidth reconstruction, as for
+    t0-gamma(q21) (spacing from ``FM_Q_SPACING``)."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        contexts = fs._ctx_batch(source)
+        quantiles = _memo_quantiles("iamtime", contexts, h,
+                                    lambda: iamtime_quantiles_from_contexts(contexts, h=h))
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        return [fixed_bandwidth_quantile_dist(LEVELS21, row, spacing_multiplier=spacing)
+                for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  iamtime failed: {e}", flush=True); return None
+
+
 _timeh2o = {}
 _timeh2o_memo = {}
 def timeh2o_quantiles_from_contexts(contexts, h=1, size="v1"):
@@ -2166,6 +2273,7 @@ def make_registry(h=1):
         # ci-proto (Continuous Intelligence, 2026-11-11); licence asks attribution for derived releases
         "ci-proto":       lambda ch: ciproto_dists(ch, h),
         "ci-proto(wide)": lambda ch: ciproto_dists(ch, h, recon=_wide_recon()),
+        "iAmTime-base":   lambda ch: iamtime_dists(ch, h),   # 21 native levels
         # Timestral (#282): four checkpoints on the nine deciles with the TiRex-2
         # reconstruction, plus the 28M on all 21 native levels
         "Timestral-5M":   lambda ch: timestral_dists(ch, h, "5M"),

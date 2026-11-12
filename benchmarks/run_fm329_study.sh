@@ -27,6 +27,7 @@ Toto2-1B|.venv-toto2|Toto2-1B,Toto2-1B(wide)
 Toto2-2.5B|.venv-toto2|Toto2-2.5B,Toto2-2.5B(wide)
 Simons-small|.venv-simons|Simons-25M,Simons-25M(wide),Simons-60M,Simons-60M(wide)
 Simons-large|.venv-simons|Simons-178M,Simons-178M(wide),Simons-297M,Simons-297M(wide)
+iAmTime|.venv-iamtime|iAmTime-base
 "
 WANT=${FM329_GROUPS:-all}
 
