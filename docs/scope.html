@@ -219,8 +219,11 @@
       The maintainer's own use is one step ahead, and sometimes a few steps,
       on daily and weekly economic series. That is where <code>laplace</code>
       has been exercised hardest, and where the benchmarks on this site live.
-      Multi-step forecasting to <code>k</code> of a dozen or more is supported
-      and tested, but it is not the daily workload.
+      Multi-step forecasting is supported and tested up to <code>k=12</code>,
+      which the author treats as the upper limit and as ongoing work: the
+      multi-scale mixture and the horizon-dependent pieces (tails, coordinate
+      inverses) are still being improved there. Beyond twelve steps, build the
+      stride into the clock (decimate) rather than asking for a longer fan.
     </p>
     <p>
       Heavily over-sampled data is a different regime: a physiological signal
