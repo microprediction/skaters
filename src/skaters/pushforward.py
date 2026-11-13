@@ -99,7 +99,7 @@ class PushforwardDist:
     the z -> y direction and the Jacobian exact instead of table-limited.
     """
 
-    __slots__ = ("inner", "ys", "zs", "inv_fn", "_comps")
+    __slots__ = ("inner", "ys", "zs", "inv_fn", "_comps", "_grid")
 
     def __init__(self, inner, ys: list, zs: list, inv_fn=None):
         self.inner = inner
@@ -107,6 +107,7 @@ class PushforwardDist:
         self.zs = zs
         self.inv_fn = inv_fn
         self._comps = None
+        self._grid = None
 
     # --- the map -----------------------------------------------------------
 
@@ -226,12 +227,27 @@ class PushforwardDist:
             self._comps = comps
         return self._comps
 
+    def _qgrid(self) -> list:
+        """Midpoint quantile grid, for an inner predictive with no mixture
+        components (laplace's tail-spliced SplicedDist); same rule as there."""
+        if self._grid is None:
+            n = 65
+            self._grid = [self.quantile((i + 0.5) / n) for i in range(n)]
+        return self._grid
+
     @property
     def mean(self) -> float:
+        if not hasattr(self.inner, "components"):
+            q = self._qgrid()
+            return sum(q) / len(q)
         return sum(w * m for w, m, _ in self.components)
 
     @property
     def var(self) -> float:
+        if not hasattr(self.inner, "components"):
+            q = self._qgrid()
+            mu = sum(q) / len(q)
+            return sum((x - mu) ** 2 for x in q) / len(q)
         mu = self.mean
         return sum(w * (s * s + (m - mu) ** 2) for w, m, s in self.components)
 

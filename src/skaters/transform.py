@@ -1027,6 +1027,54 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 # AR(p) transform with online recursive least squares
 # ---------------------------------------------------------------------------
 
+def log_transform(lower: float | None = None, upper: float | None = None):
+    """Log coordinate for a series with a one-sided bound.
+
+    Forward:   y' = log(y - lower)        (lower bound; the default, lower = 0)
+               y' = -log(upper - y)       (upper bound)
+    Inverse:   the exact pushforward through the inverse map, so the
+               predictive in y keeps the skew of the coordinate change, its
+               logpdf includes the Jacobian, and every quantile it reports
+               lies on the right side of the bound.
+
+    Unlike ``yeo_johnson(0)``, whose log1p bounds the predictive at -1, the
+    bound here is exactly ``lower`` (or ``upper``). PIT values are invariant
+    under the map, so calibration diagnostics read the same in either
+    coordinate. An observation on or past the bound raises ``ValueError``.
+
+    Args:
+        lower: the lower bound (default 0 when neither bound is given).
+        upper: the upper bound. Give one bound, not both.
+    """
+    if lower is not None and upper is not None:
+        raise ValueError("log_transform takes one bound: lower or upper")
+    if upper is None:
+        b = 0.0 if lower is None else float(lower)
+
+        def _fwd(y: float) -> float:
+            if not y > b:
+                raise ValueError(f"log_transform: observation {y!r} is not above lower={b}")
+            return math.log(y - b)
+
+        def _inv(z: float) -> float:
+            return b + math.exp(min(z, 700.0))
+    else:
+        b = float(upper)
+
+        def _fwd(y: float) -> float:
+            if not y < b:
+                raise ValueError(f"log_transform: observation {y!r} is not below upper={b}")
+            return -math.log(b - y)
+
+        def _inv(z: float) -> float:
+            return b - math.exp(min(-z, 700.0))
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        return _fwd(y), state or {}
+
+    return forward, _exact_inverse_k(_inv)
+
+
 def _ar_spectral_radius(phi: list[float]) -> float:
     """Spectral radius of the AR companion matrix (largest |characteristic root|).
 

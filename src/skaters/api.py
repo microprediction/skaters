@@ -349,6 +349,34 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
     return f
 
 
+def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
+              **laplace_kwargs):
+    """``laplace`` for a series that never crosses a known bound.
+
+    Forecasts log(y - lower) with :func:`laplace` and maps the predictive back
+    exactly (:func:`skaters.transform.log_transform`), so no probability ever
+    lands on the wrong side of the bound. The default bound is ``lower=0``:
+    rates, prices, volumes, volatilities, anything strictly positive. Pass
+    ``upper=`` instead for a ceiling. After Robert Gibrat, whose law of
+    proportionate effect (growth multiplicative, so log-size additive) is the
+    reason so many economic quantities are log-normal and strictly positive.
+
+    Every observation must be strictly inside the bound; a series with exact
+    zeros needs ``lower`` set a little below zero, or a different model.
+
+    Args:
+        k: forecast horizon.
+        lower: lower bound (default 0 when ``upper`` is not given).
+        upper: upper bound, instead of ``lower``.
+        **laplace_kwargs: passed to :func:`laplace` (``objective``, ``tails``, ...).
+    """
+    from skaters.conjugate import conjugate
+    from skaters.transform import log_transform
+    f = conjugate(laplace(k=k, **laplace_kwargs), log_transform(lower=lower, upper=upper), k=k)
+    f.__name__ = f"gibrat(k={k})"
+    return f
+
+
 def dantzig(k: int = 1, **kwargs):
     """Adaptive-search skater: grow the model space online instead of fixing it.
 

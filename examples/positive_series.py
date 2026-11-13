@@ -2,19 +2,18 @@
 
 ``laplace`` forecasts in the series' own coordinates, so on a positive series
 that drifts toward zero it can put probability below zero. If you know the
-series is positive (a rate, a price, a volume, a volatility), say so with a
-transform: forecast log(y), then map the predictive back through exp.
+series is positive (a rate, a price, a volume, a volatility), say so:
+``gibrat`` forecasts log(y) with ``laplace`` and maps the predictive back
+through exp exactly, so every quantile it reports is positive and its logpdf
+includes the Jacobian.
 
-``conjugate(skater, transform)`` does the bookkeeping. The transform is a
-(forward, inverse_k) pair. Here the inverse uses the exact change of
-variables (:class:`skaters.pushforward.PushforwardDist`), so the predictive
-in y keeps the right skew and its logpdf includes the Jacobian. Every
-quantile it reports is positive.
+``gibrat(lower=b)`` moves the bound to b, and ``gibrat(upper=b)`` makes it a
+ceiling. The same thing by hand is
+``conjugate(laplace(), log_transform(lower=0.0))``.
 
-The library's ``yeo_johnson(0, exact=True)`` is the packaged cousin. It uses
-log1p, so it bounds the predictive below by -1 rather than 0. On a series that
-lives near 0.05, log1p is nearly the identity and the bound does little; the
-last row below shows it on raw values.
+The built-in ``yeo_johnson(0, exact=True)`` uses log1p, so it bounds the
+predictive at -1 rather than 0. On a series near 0.05, log1p is nearly the
+identity and the bound does little; the last row below shows it.
 
 Usage:
     PYTHONPATH=src python examples/positive_series.py
@@ -23,37 +22,16 @@ Usage:
 import math
 import random
 
-from skaters import laplace
+from skaters import gibrat, laplace
 from skaters.conjugate import conjugate
-from skaters.pushforward import PushforwardDist, table_from_map
 from skaters.transform import yeo_johnson
-
-
-def log_transform():
-    """forward: y -> log(y); inverse: exact pushforward through exp."""
-
-    def forward(y, state):
-        return math.log(y), state or {}
-
-    def inverse_k(dists, state):
-        out = []
-        exp = lambda z: math.exp(min(z, 700.0))
-        for d in dists:
-            # table range: well past the predictive's own extreme quantiles
-            lo, hi = d.quantile(1e-6), d.quantile(1 - 1e-6)
-            pad = hi - lo
-            ys, zs = table_from_map(exp, lo - pad, hi + pad)
-            out.append(PushforwardDist(d, ys, zs, inv_fn=exp))
-        return out
-
-    return forward, inverse_k
 
 
 def positive_series(n=600, seed=7):
     """A mean-reverting rate on the log scale: positive, often close to zero,
     with noise proportional to its level. The series is built on the log scale,
-    so the comparison below favours the log transform by construction. It
-    demonstrates the mechanics; benchmark numbers live in benchmarks/."""
+    so the comparison below favours gibrat by construction. It demonstrates
+    the mechanics; benchmark numbers live in benchmarks/."""
     rng = random.Random(seed)
     x, out = math.log(0.5), []
     for t in range(n):
@@ -83,7 +61,7 @@ def run(name, f, series, burn=100):
 if __name__ == "__main__":
     ys = positive_series()
     print(f"\n  {len(ys)} positive observations, min {min(ys):.4f}, max {max(ys):.4f}\n")
-    run("laplace (levels)", laplace(), ys)
-    run("laplace on log(y)", conjugate(laplace(), log_transform(), k=1), ys)
+    run("laplace()", laplace(), ys)
+    run("gibrat()", gibrat(), ys)
     run("laplace on log1p(y)", conjugate(laplace(), yeo_johnson(0.0, exact=True), k=1), ys)
     print()
