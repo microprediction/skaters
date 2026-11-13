@@ -350,19 +350,32 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
 
 
 def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
-              **laplace_kwargs):
-    """``laplace`` for a series that never crosses a known bound.
+           **laplace_kwargs):
+    """``laplace`` for a series that never crosses a known bound. **Experimental.**
+
+    An example composition, not settled API: it may change, or move to
+    ``examples/``, in a later release. The building blocks underneath
+    (:func:`laplace`, :func:`skaters.transform.log_transform`,
+    :func:`skaters.conjugate.conjugate`) are the stable surface.
 
     Forecasts log(y - lower) with :func:`laplace` and maps the predictive back
-    exactly (:func:`skaters.transform.log_transform`), so no probability ever
-    lands on the wrong side of the bound. The default bound is ``lower=0``:
-    rates, prices, volumes, volatilities, anything strictly positive. Pass
-    ``upper=`` instead for a ceiling. After Robert Gibrat, whose law of
-    proportionate effect (growth multiplicative, so log-size additive) is the
-    reason so many economic quantities are log-normal and strictly positive.
+    by the exact change of variables, so every quantile it reports lies inside
+    the bound. The default bound is ``lower=0``: rates, prices, volumes,
+    volatilities, anything strictly positive. Pass ``upper=`` instead for a
+    ceiling. After Robert Gibrat, whose law of proportionate effect (growth
+    multiplicative, so log-size additive) is a classic account of why so many
+    economic quantities are log-normal and strictly positive.
 
-    Every observation must be strictly inside the bound; a series with exact
-    zeros needs ``lower`` set a little below zero, or a different model.
+    The returned state is laplace's own, so ``state["pit"]`` and ``state["z"]``
+    read as they do for :func:`laplace`; PIT values are invariant under the
+    log map. Missing values (``None``/NaN) pass through to laplace. Every
+    other observation must be strictly inside the bound (``ValueError``
+    otherwise); a series with exact zeros needs ``lower`` set a little below
+    zero, or a different model. The predictive is a
+    :class:`skaters.pushforward.PushforwardDist`; its ``.mean``/``.var`` on a
+    tail-spliced inner come from a quantile grid and run a little low when the
+    log-scale spread is large, and ``.components`` is unavailable, so it cannot
+    be fed to ``sticky`` or an ensemble.
 
     Args:
         k: forecast horizon.
@@ -370,11 +383,22 @@ def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
         upper: upper bound, instead of ``lower``.
         **laplace_kwargs: passed to :func:`laplace` (``objective``, ``tails``, ...).
     """
-    from skaters.conjugate import conjugate
+    from skaters.parade import _missing
     from skaters.transform import log_transform
-    f = conjugate(laplace(k=k, **laplace_kwargs), log_transform(lower=lower, upper=upper), k=k)
-    f.__name__ = f"gibrat(k={k})"
-    return f
+    forward, inverse_k = log_transform(lower=lower, upper=upper)
+    inner = laplace(k=k, **laplace_kwargs)
+
+    def _gibrat(y: float, state: dict | None) -> tuple[list, dict]:
+        if _missing(y):
+            dists, state = inner(y, state)
+        else:
+            yp, _ = forward(y, None)
+            dists, state = inner(yp, state)
+        return inverse_k(dists, {}), state
+
+    bound = f"upper={upper}" if upper is not None else f"lower={0.0 if lower is None else lower}"
+    _gibrat.__name__ = f"gibrat(k={k}, {bound})"
+    return _gibrat
 
 
 def dantzig(k: int = 1, **kwargs):

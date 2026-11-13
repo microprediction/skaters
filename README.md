@@ -184,7 +184,8 @@ pool keeps the default (its one-step spreads are where they agree).
 `laplace` on $\log(y)$ with the predictive mapped back exactly through `exp`,
 so every quantile it reports is positive. `gibrat(lower=b)` moves the bound and
 `gibrat(upper=b)` makes it a ceiling. Named after Robert Gibrat, whose law of
-proportionate growth is why so many economic quantities are log-normal. See
+proportionate growth is a classic account of why so many economic quantities
+are log-normal. Experimental: an example composition, not settled API. See
 [`examples/positive_series.py`](examples/positive_series.py).
 
 ```python

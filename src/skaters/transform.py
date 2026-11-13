@@ -851,13 +851,15 @@ def seasonal_scale(period: int, alpha: float = 0.05, center: bool = False,
 # Signed power transform (works on any real value)
 # ---------------------------------------------------------------------------
 
-def _exact_inverse_k(inv_fn):
+def _exact_inverse_k(inv_fn, window: tuple | None = None, fwd_fn=None):
     """Build an inverse_k that emits the exact pushforward.
 
     The table window adapts to each predictive: [m - 10s, m + 10s] over the
     mixture. A fixed window fails in level coordinates (positive levels live
     at z ~ 2 sqrt(y) under lambda = 0.5, far from any static range) and
     everything beyond a table extrapolates with the wrong curvature.
+    ``window=(z_min, z_max)`` clips the table to where ``inv_fn`` is finite
+    and strictly monotone (a log map saturates past exp's overflow).
     """
     from skaters.pushforward import PushforwardDist, table_from_map
 
@@ -873,8 +875,12 @@ def _exact_inverse_k(inv_fn):
                 # pad its extreme quantiles by their own span on each side
                 q_lo, q_hi = d.quantile(1e-6), d.quantile(1.0 - 1e-6)
                 lo, hi = 2.0 * q_lo - q_hi, 2.0 * q_hi - q_lo
+            if window is not None:
+                lo, hi = max(lo, window[0]), min(hi, window[1])
+                if not hi > lo:
+                    lo, hi = window
             ys, zs = table_from_map(inv_fn, lo, hi)
-            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
+            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn, fwd_fn=fwd_fn))
         return out
 
     return inverse_k
@@ -1041,6 +1047,7 @@ def log_transform(lower: float | None = None, upper: float | None = None):
     bound here is exactly ``lower`` (or ``upper``). PIT values are invariant
     under the map, so calibration diagnostics read the same in either
     coordinate. An observation on or past the bound raises ``ValueError``.
+    Experimental, alongside :func:`skaters.api.gibrat`.
 
     Args:
         lower: the lower bound (default 0 when neither bound is given).
@@ -1056,6 +1063,9 @@ def log_transform(lower: float | None = None, upper: float | None = None):
                 raise ValueError(f"log_transform: observation {y!r} is not above lower={b}")
             return math.log(y - b)
 
+        def _fwd_query(y: float) -> float:     # for Dist queries: no mass below b
+            return math.log(y - b) if y > b else -math.inf
+
         def _inv(z: float) -> float:
             return b + math.exp(min(z, 700.0))
     else:
@@ -1066,13 +1076,20 @@ def log_transform(lower: float | None = None, upper: float | None = None):
                 raise ValueError(f"log_transform: observation {y!r} is not below upper={b}")
             return -math.log(b - y)
 
+        def _fwd_query(y: float) -> float:     # for Dist queries: no mass above b
+            return -math.log(b - y) if y < b else math.inf
+
         def _inv(z: float) -> float:
             return b - math.exp(min(-z, 700.0))
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
         return _fwd(y), state or {}
 
-    return forward, _exact_inverse_k(_inv)
+    # exp overflows past ~709.8 and underflows to 0 below ~-745: the table must
+    # stay where the map is finite and strictly increasing (the upper-bound map
+    # mirrors the window)
+    win = (-745.0, 709.0) if upper is None else (-709.0, 745.0)
+    return forward, _exact_inverse_k(_inv, window=win, fwd_fn=_fwd_query)
 
 
 def _ar_spectral_radius(phi: list[float]) -> float:

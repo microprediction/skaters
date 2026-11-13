@@ -99,13 +99,17 @@ class PushforwardDist:
     the z -> y direction and the Jacobian exact instead of table-limited.
     """
 
-    __slots__ = ("inner", "ys", "zs", "inv_fn", "_comps", "_grid")
+    __slots__ = ("inner", "ys", "zs", "inv_fn", "fwd_fn", "_comps", "_grid")
 
-    def __init__(self, inner, ys: list, zs: list, inv_fn=None):
+    def __init__(self, inner, ys: list, zs: list, inv_fn=None, fwd_fn=None):
         self.inner = inner
         self.ys = ys
         self.zs = zs
         self.inv_fn = inv_fn
+        # the exact y -> z map, when the transform has one: then _z and the
+        # Jacobian do not depend on the table at all, and a bounded map sends
+        # the bound itself to -inf/+inf instead of a finite extrapolated z
+        self.fwd_fn = fwd_fn
         self._comps = None
         self._grid = None
 
@@ -120,6 +124,8 @@ class PushforwardDist:
         # not a bounded score. A study that wants bounded scores floors the
         # reported logpdf/CRPS itself (bench_core.score_dist already does),
         # which does not require the distribution's own coordinate map to lie.
+        if self.fwd_fn is not None:
+            return self.fwd_fn(y)
         return interp_table(y, self.ys, self.zs)
 
     def _y(self, z: float) -> float:
@@ -130,6 +136,11 @@ class PushforwardDist:
     def _slope(self, y: float) -> float:
         """dz/dy at y (central difference of the exact map when available,
         segment secant otherwise; end segments extend beyond the table)."""
+        if self.fwd_fn is not None:
+            h = 1e-5 * (1.0 + abs(y))
+            za, zb = self.fwd_fn(y + h), self.fwd_fn(y - h)
+            if math.isfinite(za) and math.isfinite(zb) and za > zb:
+                return (za - zb) / (2.0 * h)
         if self.inv_fn is not None:
             z = self._z(y)
             h = 1e-5 * (1.0 + abs(z))
@@ -144,13 +155,22 @@ class PushforwardDist:
     # --- queries (exact) ----------------------------------------------------
 
     def logpdf(self, x: float) -> float:
-        return self.inner.logpdf(self._z(x)) + math.log(self._slope(x))
+        z = self._z(x)
+        if not math.isfinite(z):                 # x on or past a bound of the map
+            return -math.inf
+        return self.inner.logpdf(z) + math.log(self._slope(x))
 
     def pdf(self, x: float) -> float:
-        return self.inner.pdf(self._z(x)) * self._slope(x)
+        z = self._z(x)
+        if not math.isfinite(z):
+            return 0.0
+        return self.inner.pdf(z) * self._slope(x)
 
     def cdf(self, x: float) -> float:
-        return self.inner.cdf(self._z(x))
+        z = self._z(x)
+        if not math.isfinite(z):
+            return 0.0 if z < 0 else 1.0
+        return self.inner.cdf(z)
 
     def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
         return self._y(self.inner.quantile(p, tol=tol, max_iter=max_iter))
@@ -229,9 +249,14 @@ class PushforwardDist:
 
     def _qgrid(self) -> list:
         """Midpoint quantile grid, for an inner predictive with no mixture
-        components (laplace's tail-spliced SplicedDist); same rule as there."""
+        components (laplace's tail-spliced SplicedDist); the rule used there,
+        on a denser grid. A midpoint grid truncates the tails at p = 1/(2n),
+        and a convex map such as exp amplifies what it drops, so the moments
+        run low when the inner spread is large (at n = 65 the std of a
+        log-normal with log-scale sigma = 1 came out 14% low). Quantiles,
+        cdf, logpdf and crps do not use this path and stay exact."""
         if self._grid is None:
-            n = 65
+            n = 257
             self._grid = [self.quantile((i + 0.5) / n) for i in range(n)]
         return self._grid
 

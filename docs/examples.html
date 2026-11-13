@@ -91,6 +91,7 @@
       <li><a href="#first">A first forecast</a></li>
       <li><a href="#horizons">Several steps ahead</a></li>
       <li><a href="#positive">Series that are always positive</a></li>
+      <li><a href="#scale">Units and scale</a></li>
       <li><a href="#calibration">Is it calibrated?</a></li>
       <li><a href="#anomalies">Spotting anomalies</a></li>
       <li><a href="#reversion">Mean-reverting spreads</a></li>
@@ -139,13 +140,16 @@ dists[11]     # twelve steps ahead
 
     <h2 id="positive">Series that are always positive</h2>
     <p>
-      Rates, prices, volumes and volatilities never go below zero, but a model
-      working on the raw values does not know that. <code>gibrat</code> runs
-      <code>laplace</code> on the log of the series and maps the forecast back
-      exactly, so every quantile it reports is positive and the skew of a
+      Rates, prices, volumes and volatilities never go below zero. A model
+      working on the raw values has no way to know that. <code>gibrat</code>
+      runs <code>laplace</code> on the log of the series and maps the forecast
+      back exactly, so every quantile it reports is positive and the skew of a
       multiplicative series comes out right. It is named after Robert Gibrat,
-      whose law of proportionate growth is the reason so many economic
-      quantities are log-normal.
+      whose law of proportionate growth is a classic account of why so many
+      economic quantities are log-normal. It is experimental: an example
+      composition that may change or move into <code>examples/</code>; the
+      pieces underneath (<code>laplace</code>, <code>log_transform</code>,
+      <code>conjugate</code>) are the stable surface.
     </p>
 <pre>from skaters import gibrat
 
@@ -161,10 +165,40 @@ gibrat(upper=1.0)          # or a ceiling (a share, a probability)</pre>
     <p>
       On a synthetic rate that dips toward zero, plain <code>laplace</code> put
       up to 33% of its probability below zero; <code>gibrat</code> put none
-      there. Every observation must lie strictly inside the bound, so a series
-      with exact zeros needs the floor set a little below zero. The full
-      comparison is
+      there (the series is generated on the log scale, so the comparison favours
+      <code>gibrat</code> by construction). Every observation must lie strictly
+      inside the bound, so a series with exact zeros needs the floor set a
+      little below zero. The full comparison is
       <a href="https://github.com/microprediction/skaters/blob/main/examples/positive_series.py"><code>examples/positive_series.py</code></a>.
+    </p>
+
+    <h2 id="scale">Units and scale</h2>
+    <p>
+      Bitcoin's hash rate is about 10<sup>20</sup> hashes per second. Fed to
+      <code>laplace</code> in those units it goes wrong: the transforms carry
+      constants in absolute units (a variance intercept, a ridge, division
+      floors), tuned for series whose values and steps sit roughly between
+      10<sup>-3</sup> and 10<sup>3</sup>. The same series in exahashes per
+      second is an ordinary series. Measured on a synthetic growth series
+      with true next value 16.35, scaled by 10<sup>20</sup> and then divided
+      back:
+    </p>
+    <table>
+      <thead><tr><th>input units</th><th><code>laplace</code> median</th><th><code>gibrat</code> median</th></tr></thead>
+      <tbody>
+        <tr><td>raw, values near 10<sup>20</sup></td><td>&minus;1.5 &times; 10<sup>9</sup></td><td>16.38</td></tr>
+        <tr><td>scaled, values near 16</td><td>16.36</td><td>16.40</td></tr>
+      </tbody>
+    </table>
+<pre>f = laplace()                      # feed it hash_rate / 1e18 (EH/s), not hash_rate
+f = gibrat()                       # or forecast the log: unit-free by construction</pre>
+    <p>
+      Pick units the way you would write them down, and keep values and steps
+      inside about 10<sup>-3</sup> to 10<sup>6</sup>. A series that climbs
+      across many orders of magnitude over its life, as the hash rate did, has
+      no fixed unit that fits all of it; that is the case for <code>gibrat</code>,
+      which works in the log coordinate. More on the
+      <a href="/scope.html">scope page</a>.
     </p>
 
     <h2 id="calibration">Is it calibrated?</h2>

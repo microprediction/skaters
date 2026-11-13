@@ -166,6 +166,77 @@
       <a href="https://github.com/microprediction/skaters/blob/main/skills/standardization-review.md">standardization-review skill</a> explains these trade-offs.
     </p>
 
+    <h2>Prior knowledge</h2>
+    <p>
+      What follows is obvious. It is written down because it turns out not to
+      be obvious to everyone on LinkedIn who calls themselves a data science
+      leader. The algorithm does not know that you are modelling a
+      non-negative series, if you are. It sees a stream of numbers on the real
+      line and forecasts a distribution on the real line, and nothing in it
+      recognises electricity demand or a hash rate as something that cannot
+      fall below zero.
+    </p>
+    <p>
+      If you know the series is positive, say so: choose a bijection from the
+      real line to the positive half, run <code>laplace</code> in the
+      transformed coordinate, and map the predictive back. That is what
+      <code>gibrat</code> does with the log map, and it is how every transform
+      in the package works, so adapting the same move to other kinds of prior
+      knowledge (a ceiling, a known periodicity, a known mean to revert to, a
+      known unit of account) is mostly mechanical, and Claude or a competent
+      intern will manage it from the <a href="/examples.html">examples</a>. The
+      forecaster is the last link in a chain, and the chain is where what you
+      know goes; see <a href="/tiki-taka.html">tiki-taka</a> for the passing
+      game.
+    </p>
+
+    <h2>Units and scale</h2>
+    <p>
+      A skater is not unit-free. Its transforms carry constants in absolute
+      units: a variance intercept, a ridge, floors that stop a division by zero.
+      They were tuned, and <code>granger</code> was trained, on series whose
+      values and typical steps sit roughly between 10<sup>-3</sup> and
+      10<sup>3</sup>. On a test series, <code>laplace</code> gave the same
+      forecast to four figures whether the data were scaled by 10<sup>-4</sup>
+      or 10<sup>8</sup>, drifted at 10<sup>10</sup> and 10<sup>-10</sup>, and
+      failed past 10<sup>14</sup>. A series at 10<sup>20</sup> or 10<sup>200</sup>
+      is representable in floating point, and the model will still run on it,
+      and get it wrong.
+    </p>
+    <p>
+      So choose units the way a person would. Hash rate in exahashes per second,
+      not hashes; GDP in billions, not dollars; a quantity that lives at
+      10<sup>-12</sup> in its own scaled unit. Keep values and steps inside about
+      10<sup>-3</sup> to 10<sup>6</sup> and nothing else needs changing. A
+      series that grows multiplicatively across many orders of magnitude over
+      its life is a different matter: no fixed unit fits all of it, and the
+      log coordinate is the right one (see <code>gibrat</code> on the
+      <a href="/examples.html#scale">examples page</a>).
+    </p>
+
+    <h2>Horizons and sampling rates</h2>
+    <p>
+      The maintainer's own use is one step ahead, and sometimes a few steps,
+      on daily and weekly economic series. That is where <code>laplace</code>
+      has been exercised hardest, and where the benchmarks on this site live.
+      Multi-step forecasting to <code>k</code> of a dozen or more is supported
+      and tested, but it is not the daily workload.
+    </p>
+    <p>
+      Heavily over-sampled data is a different regime: a physiological signal
+      at hundreds of samples a second, a sensor read far faster than anything
+      in it changes, tick data. Successive observations are then nearly
+      deterministic functions of each other, and a one-step predictive is
+      mostly a statement about interpolation. <code>laplace</code> will run,
+      but it may not be the right instrument, and no benchmark here says it
+      is. The better path is to treat the package as a toolkit: pick the
+      transforms that encode what you know about the signal, choose the clock
+      (decimate, or forecast at the stride that matters), and compose a skater
+      for the job from the same parts <code>laplace</code> is built from. The
+      <a href="/examples.html">examples page</a> and the
+      <a href="/guide.html">methodology guide</a> show how.
+    </p>
+
     <h2>The short version</h2>
     <p>
       Univariate distributional forecasting is not the whole system. It is the
