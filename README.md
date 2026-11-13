@@ -180,6 +180,10 @@ positive FRED levels it is worth a median +0.015 to +0.018 nats of held-out
 log-likelihood (72–78% of series), and at `h=1` the two agree. The candidate
 pool keeps the default (its one-step spreads are where they agree).
 
+For a series you know is strictly positive, forecast its log and map back
+through `exp`: [`examples/positive_series.py`](examples/positive_series.py)
+wraps `laplace` this way, so every quantile it reports is positive.
+
 `laplace(k>1)` already carries an OU group in its pool, so the general forecaster
 picks up reversion automatically at multi-step horizons. The OU-on-a-coordinate
 math (the CIR reading) is in [`papers/tweedie-note.md`](papers/tweedie-note.md).
