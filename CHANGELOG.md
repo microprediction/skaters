@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New transform `robust_mad_standardize(window, min_periods, eps)`: standardizes
+  by a sliding median and `1.4826 * MAD`, with a `Dist.affine` inverse at every
+  horizon and stream-owned state. A flat window keeps the last informative
+  scale instead of dividing by a floor. Not in laplace's pool. Benchmark arms
+  `leaf+robust-mad` and `leaf+standardize` are registered for `run_arm.py`.
+- New diagnostic `residual_variance_lens(burn_in, window, eps)`: the log ratio of
+  a trailing residual variance to a reference frozen after burn-in, silent
+  with `state["ready"]` False until the window is full. A
+  conditioning feature with no inverse, not a conjugate transform, and not in
+  laplace's pool.
 - New forecaster `granger` (horizon 1), after Clive Granger: laplace with
   trained values for its continuous hyperparameters plus a small gate on the
   ensemble's combining weights, mixed with laplace by the Aggregating
