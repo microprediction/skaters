@@ -864,8 +864,15 @@ def _exact_inverse_k(inv_fn):
     def inverse_k(dists: list, state: dict) -> list:
         out = []
         for d in dists:
-            lo = min(m - 10.0 * s for _, m, s in d.components)
-            hi = max(m + 10.0 * s for _, m, s in d.components)
+            comps = getattr(d, "components", None)
+            if comps is not None:
+                lo = min(m - 10.0 * s for _, m, s in comps)
+                hi = max(m + 10.0 * s for _, m, s in comps)
+            else:
+                # no mixture to read (e.g. laplace's tail-spliced SplicedDist):
+                # pad its extreme quantiles by their own span on each side
+                q_lo, q_hi = d.quantile(1e-6), d.quantile(1.0 - 1e-6)
+                lo, hi = 2.0 * q_lo - q_hi, 2.0 * q_hi - q_lo
             ys, zs = table_from_map(inv_fn, lo, hi)
             out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
         return out

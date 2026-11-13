@@ -11,9 +11,10 @@ variables (:class:`skaters.pushforward.PushforwardDist`), so the predictive
 in y keeps the right skew and its logpdf includes the Jacobian. Every
 quantile it reports is positive.
 
-The library's ``yeo_johnson(0, exact=True)`` is the packaged version of the
-same idea (it uses log1p, so it bounds the predictive below by -1 rather than
-0, and also accepts negative values).
+The library's ``yeo_johnson(0, exact=True)`` is the packaged cousin. It uses
+log1p, so it bounds the predictive below by -1 rather than 0. On a series that
+lives near 0.05, log1p is nearly the identity and the bound does little; the
+last row below shows it on raw values.
 
 Usage:
     PYTHONPATH=src python examples/positive_series.py
@@ -25,6 +26,7 @@ import random
 from skaters import laplace
 from skaters.conjugate import conjugate
 from skaters.pushforward import PushforwardDist, table_from_map
+from skaters.transform import yeo_johnson
 
 
 def log_transform():
@@ -83,4 +85,5 @@ if __name__ == "__main__":
     print(f"\n  {len(ys)} positive observations, min {min(ys):.4f}, max {max(ys):.4f}\n")
     run("laplace (levels)", laplace(), ys)
     run("laplace on log(y)", conjugate(laplace(), log_transform(), k=1), ys)
+    run("laplace on log1p(y)", conjugate(laplace(), yeo_johnson(0.0, exact=True), k=1), ys)
     print()

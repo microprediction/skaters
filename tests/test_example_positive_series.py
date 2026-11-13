@@ -21,3 +21,18 @@ def test_log_conjugated_laplace_stays_positive():
             d = dists[0]
             assert d.quantile(0.001) > 0.0
             assert d.cdf(0.0) < 1e-9    # table extrapolation, not mass
+
+
+def test_exact_yeo_johnson_wraps_laplace():
+    """exact=True used to read d.components, which laplace's SplicedDist lacks."""
+    from skaters import laplace
+    from skaters.conjugate import conjugate
+    from skaters.transform import yeo_johnson
+
+    f = conjugate(laplace(), yeo_johnson(0.0, exact=True), k=1)
+    state = None
+    for y in ex.positive_series(n=120):
+        dists, state = f(y, state)
+    d = dists[0]
+    assert d.quantile(0.1) < d.quantile(0.5) < d.quantile(0.9)
+    assert d.quantile(0.001) > -1.0
