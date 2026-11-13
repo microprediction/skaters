@@ -50,8 +50,8 @@ def log_transform():
 def positive_series(n=600, seed=7):
     """A mean-reverting rate on the log scale: positive, often close to zero,
     with noise proportional to its level. The series is built on the log scale,
-    so the comparison below favours the log transform by construction; it shows
-    the mechanics, not a benchmark."""
+    so the comparison below favours the log transform by construction. It
+    demonstrates the mechanics; benchmark numbers live in benchmarks/."""
     rng = random.Random(seed)
     x, out = math.log(0.5), []
     for t in range(n):
