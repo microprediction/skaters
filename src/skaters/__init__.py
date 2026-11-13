@@ -23,11 +23,11 @@ from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, ou_transform,
     garch, seasonal_difference, power_transform, ar, grouped_ar, drift, holt_linear, theta,
-    yeo_johnson,
+    yeo_johnson, log_transform,
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import laplace, dantzig
+from skaters.api import laplace, dantzig, gibrat
 from skaters.granger import granger
 from skaters.multiscale import multiscale
 from skaters.parade import parade
@@ -48,6 +48,7 @@ __all__ = [
     # Search policies (the main user API)
     "laplace",
     "granger",
+    "gibrat",
     "dantzig",
     "sticky",
     "period_detector",
@@ -68,6 +69,7 @@ __all__ = [
     "seasonal_difference",
     "power_transform",
     "yeo_johnson",
+    "log_transform",
     "ar",
     "grouped_ar",
     "drift",

@@ -180,6 +180,20 @@ positive FRED levels it is worth a median +0.015 to +0.018 nats of held-out
 log-likelihood (72–78% of series), and at `h=1` the two agree. The candidate
 pool keeps the default (its one-step spreads are where they agree).
 
+**Positive series** (rates, prices, volumes, volatilities): `gibrat()` is
+`laplace` on $\log(y)$ with the predictive mapped back exactly through `exp`,
+so every quantile it reports is positive. `gibrat(lower=b)` moves the bound and
+`gibrat(upper=b)` makes it a ceiling. Named after Robert Gibrat, whose law of
+proportionate growth is a classic account of why so many economic quantities
+are log-normal. Experimental: an example composition, not settled API. See
+[`examples/positive_series.py`](examples/positive_series.py).
+
+```python
+from skaters import gibrat
+
+f = gibrat(k=3)                    # every quantile > 0
+```
+
 `laplace(k>1)` already carries an OU group in its pool, so the general forecaster
 picks up reversion automatically at multi-step horizons. The OU-on-a-coordinate
 math (the CIR reading) is in [`papers/tweedie-note.md`](papers/tweedie-note.md).
@@ -246,6 +260,7 @@ Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inve
 | `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method (`exact=True` for the pushforward) | Tail compression |
 | `theta(`$\alpha$`)` | $y'_t = y_t - \text{SES}_t$ | Shift by smoothed level + drift | Theta method (M3 winner) |
 | `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Delta method (`exact=True` for the pushforward) | Coordinate learning (log/root/linear) |
+| `log_transform(lower=`$b$`)` | $y'_t = \log(y_t - b)$ (or $-\log(b - y_t)$ for `upper=`) | Exact pushforward through $\exp$ | One-sided bound (positive series) |
 | `ou_transform(`$\kappa$`)` | Deviation from running mean, OU speed $\kappa$ | Exact OU moments (scale + shift) | Mean reversion |
 
 ## Conjugation

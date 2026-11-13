@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters &mdash; examples</title>
+  <meta name="description" content="Short, runnable recipes: a first forecast, several steps ahead, positive series with gibrat, calibration checks, anomalies, mean reversion, custom transforms and the browser." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters &mdash; examples" />
+  <meta property="og:description" content="Runnable recipes for the skaters forecasting package." />
+  <meta property="og:url" content="https://skaters.microprediction.org/examples.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .lede { color: #555; margin: 0 0 22px; font-size: 1.05em; }
+    pre { background: #f7f7f7; border: 1px solid #e3e3e3; padding: 12px 14px;
+      overflow-x: auto; font-size: 0.9em; line-height: 1.45; }
+    .toc { columns: 2; column-gap: 32px; margin: 0 0 28px; padding-left: 18px; }
+    .toc li { margin-bottom: 4px; }
+    @media (max-width: 600px) { .toc { columns: 1; } }
+    h2 { margin-top: 34px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/guide.html">Methodology</a>
+        <a href="/examples.html">Examples</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/corrections.html">Corrections</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/refunds.html">Refunds</a>
+            <a href="/skills.html">Skills</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Examples</h1>
+    <p class="lede">
+      Short recipes you can paste and run. Each one feeds a series in one
+      observation at a time and reads a full predictive distribution back.
+      Install with <code>pip install skaters</code>.
+    </p>
+
+    <ol class="toc">
+      <li><a href="#first">A first forecast</a></li>
+      <li><a href="#horizons">Several steps ahead</a></li>
+      <li><a href="#positive">Series that are always positive</a></li>
+      <li><a href="#scale">Units and scale</a></li>
+      <li><a href="#calibration">Is it calibrated?</a></li>
+      <li><a href="#anomalies">Spotting anomalies</a></li>
+      <li><a href="#reversion">Mean-reverting spreads</a></li>
+      <li><a href="#transform">Your own transform</a></li>
+      <li><a href="#browser">In the browser</a></li>
+    </ol>
+
+    <h2 id="first">A first forecast</h2>
+    <p>
+      A skater is a function <code>f(y, state) -&gt; (dists, state)</code>.
+      Start with <code>state = None</code> and pass back whatever it returns.
+      <code>dists[0]</code> is the predictive distribution for the next
+      observation.
+    </p>
+<pre>from skaters import laplace
+
+f = laplace()
+state = None
+for y in observations:
+    dists, state = f(y, state)
+
+d = dists[0]
+d.mean                  # point forecast for the next value
+d.std                   # its uncertainty
+d.quantile(0.05), d.quantile(0.95)   # a 90% interval
+d.logpdf(y_next)        # log score, once y_next arrives</pre>
+    <p>
+      Score a forecast only against values that arrive after it was issued.
+      Keep the previous <code>dists</code> around and evaluate it when the next
+      <code>y</code> comes in.
+    </p>
+
+    <h2 id="horizons">Several steps ahead</h2>
+    <p>
+      Ask for <code>k</code> horizons and you get <code>k</code> distributions
+      back, one for each step.
+    </p>
+<pre>f = laplace(k=12)
+state = None
+for y in observations:
+    dists, state = f(y, state)
+
+dists[0]      # one step ahead
+dists[11]     # twelve steps ahead
+[d.quantile(0.9) for d in dists]   # the upper edge of the fan</pre>
+
+    <h2 id="positive">Series that are always positive</h2>
+    <p>
+      Rates, prices, volumes and volatilities never go below zero. A model
+      working on the raw values has no way to know that. <code>gibrat</code>
+      runs <code>laplace</code> on the log of the series and maps the forecast
+      back exactly, so every quantile it reports is positive and the skew of a
+      multiplicative series comes out right. It is named after Robert Gibrat,
+      whose law of proportionate growth is a classic account of why so many
+      economic quantities are log-normal. It is experimental: an example
+      composition that may change or move into <code>examples/</code>; the
+      pieces underneath (<code>laplace</code>, <code>log_transform</code>,
+      <code>conjugate</code>) are the stable surface.
+    </p>
+<pre>from skaters import gibrat
+
+f = gibrat(k=5)
+state = None
+for y in prices:
+    dists, state = f(y, state)
+
+dists[4].quantile(0.01)    # always &gt; 0
+
+gibrat(lower=-3.0)         # any floor
+gibrat(upper=1.0)          # or a ceiling (a share, a probability)</pre>
+    <p>
+      On a synthetic rate that dips toward zero, plain <code>laplace</code> put
+      up to 33% of its probability below zero; <code>gibrat</code> put none
+      there (the series is generated on the log scale, so the comparison favours
+      <code>gibrat</code> by construction). Every observation must lie strictly
+      inside the bound, so a series with exact zeros needs the floor set a
+      little below zero. The full comparison is
+      <a href="https://github.com/microprediction/skaters/blob/main/examples/positive_series.py"><code>examples/positive_series.py</code></a>.
+    </p>
+
+    <h2 id="scale">Units and scale</h2>
+    <p>
+      Bitcoin's hash rate is about 10<sup>20</sup> hashes per second. Fed to
+      <code>laplace</code> in those units it goes wrong: the transforms carry
+      constants in absolute units (a variance intercept, a ridge, division
+      floors), tuned for series whose values and steps sit roughly between
+      10<sup>-3</sup> and 10<sup>3</sup>. The same series in exahashes per
+      second is an ordinary series. Measured on a synthetic growth series
+      with true next value 16.35, scaled by 10<sup>20</sup> and then divided
+      back:
+    </p>
+    <table>
+      <thead><tr><th>input units</th><th><code>laplace</code> median</th><th><code>gibrat</code> median</th></tr></thead>
+      <tbody>
+        <tr><td>raw, values near 10<sup>20</sup></td><td>&minus;1.5 &times; 10<sup>9</sup></td><td>16.38</td></tr>
+        <tr><td>scaled, values near 16</td><td>16.36</td><td>16.40</td></tr>
+      </tbody>
+    </table>
+<pre>f = laplace()                      # feed it hash_rate / 1e18 (EH/s), not hash_rate
+f = gibrat()                       # or forecast the log: unit-free by construction</pre>
+    <p>
+      Pick units the way you would write them down, and keep values and steps
+      inside about 10<sup>-3</sup> to 10<sup>6</sup>. A series that climbs
+      across many orders of magnitude over its life, as the hash rate did, has
+      no fixed unit that fits all of it; that is the case for <code>gibrat</code>,
+      which works in the log coordinate. More on the
+      <a href="/scope.html">scope page</a>.
+    </p>
+
+    <h2 id="calibration">Is it calibrated?</h2>
+    <p>
+      <code>laplace</code> keeps score for you. When an observation arrives,
+      <code>state["pit"][0]</code> holds where it fell in the forecast made one
+      step earlier, as a probability between 0 and 1. If the forecasts are
+      calibrated these are uniform, so a 90% interval should contain about 90%
+      of outcomes.
+    </p>
+<pre>f = laplace()
+state, pits = None, []
+for y in observations:
+    dists, state = f(y, state)
+    if state["pit"][0] is not None:
+        pits.append(state["pit"][0])
+
+inside = sum(0.05 &lt;= u &lt;= 0.95 for u in pits) / len(pits)
+print(f"{inside:.1%} of outcomes inside the 90% interval")</pre>
+    <p>
+      <code>state["pit"][h-1]</code> does the same for the <code>h</code>-step
+      forecast.
+    </p>
+
+    <h2 id="anomalies">Spotting anomalies</h2>
+    <p>
+      <code>state["z"][0]</code> is the same surprise on the standard normal
+      scale. Values beyond 4 are rare under a calibrated forecast, so they make
+      a simple alarm.
+    </p>
+<pre>f = laplace()
+state = None
+for t, y in enumerate(observations):
+    dists, state = f(y, state)
+    z = state["z"][0]
+    if z is not None and abs(z) &gt; 4:
+        print(f"t={t}: surprise z={z:.1f}")</pre>
+    <p>
+      For several horizons at once, <code>skaters.mahalanobis</code> combines
+      the surprises into one score.
+    </p>
+
+    <h2 id="reversion">Mean-reverting spreads</h2>
+    <p>
+      If you know a series reverts to its mean (a pairs-trading spread, an
+      interest-rate differential), say so with a transform. The building
+      blocks compose: a transform changes the coordinates, a skater forecasts
+      in them, and <code>conjugate</code> maps the forecast back.
+    </p>
+<pre>from skaters import conjugate, leaf, ou_transform
+
+f = conjugate(leaf(k=10), ou_transform(kappa=0.1), k=10)</pre>
+    <p>
+      <code>laplace(k&gt;1)</code> already includes this in its pool, so reach for
+      it only when you want the specialist alone.
+    </p>
+
+    <h2 id="transform">Your own transform</h2>
+    <p>
+      A transform is a pair: <code>forward</code> maps one observation, and
+      <code>inverse_k</code> maps the list of forecasts back. Here is one that
+      lets a skater work in thousands.
+    </p>
+<pre>from skaters import Dist, conjugate, ema
+
+def in_thousands():
+    def forward(y, state):
+        return y / 1000.0, state or {}
+
+    def inverse_k(dists, state):
+        return [Dist([(w, 1000.0 * m, 1000.0 * s) for w, m, s in d.components])
+                for d in dists]
+
+    return forward, inverse_k
+
+f = conjugate(ema(alpha=0.1, k=1), in_thousands(), k=1)</pre>
+    <p>
+      <code>Dist</code> is a Gaussian mixture of <code>(weight, mean, std)</code>
+      components. <code>laplace</code> returns a richer distribution with
+      fitted tails, so a transform meant to wrap <code>laplace</code> should
+      map quantiles, as <code>log_transform</code> does. The
+      <a href="/guide.html">methodology guide</a> lists every built-in
+      transform.
+    </p>
+
+    <h2 id="browser">In the browser</h2>
+    <p>
+      The same library runs as plain JavaScript with no install. Rust, R and
+      Julia ports are on the <a href="/languages.html">languages</a> page.
+    </p>
+<pre>&lt;script type="module"&gt;
+  import { laplace } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  const f = laplace(1);
+  let state = null;
+  for (const y of observations) {
+    const [dists, st] = f(y, state); state = st;
+    console.log(dists[0].mean, dists[0].quantile(0.95));
+  }
+&lt;/script&gt;</pre>
+    <p>
+      The <a href="/demos/playground.html">playground</a> runs it live on series
+      you draw. More scripts are in the repository's
+      <a href="https://github.com/microprediction/skaters/tree/main/examples"><code>examples/</code></a>
+      folder.
+    </p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
+    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
+    <a href="http://schur.microprediction.org">schur</a>).
+  </footer>
+</body>
+</html>

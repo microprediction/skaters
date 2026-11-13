@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Experimental forecaster `gibrat` (after Robert Gibrat): `laplace` on
+  log(y - lower), mapped back by the exact pushforward, for series with a
+  one-sided bound (default `lower=0`; `upper=` for a ceiling). Every quantile
+  stays inside the bound; the state is laplace's own. An example composition,
+  not settled API: it may change or move to `examples/`. New transform
+  `log_transform(lower=, upper=)` underneath it. Python only. Example:
+  `examples/positive_series.py`.
+- Fix: `exact=True` on `yeo_johnson` / `power_transform` raised
+  `AttributeError` when wrapped around `laplace` once its tail splice was
+  live (the spliced predictive has no mixture components). The table window
+  now falls back to the predictive's extreme quantiles, and
+  `PushforwardDist.mean`/`var` fall back to a quantile grid (which runs low
+  for large inner spreads). `.components` remains unavailable on such a
+  predictive, so it cannot feed `sticky` or an ensemble. `PushforwardDist`
+  accepts an exact forward map (`fwd_fn`), used by `log_transform`, so the
+  bound itself maps to zero mass.
+- Docs: an Examples page of runnable recipes (`docs/examples.html`, in the
+  nav), and a units-and-scale note on the scope page: the transforms carry
+  constants in absolute units, so keep values and steps roughly within
+  1e-3 to 1e6.
 - New forecaster `granger` (horizon 1), after Clive Granger: laplace with
   trained values for its continuous hyperparameters plus a small gate on the
   ensemble's combining weights, mixed with laplace by the Aggregating
