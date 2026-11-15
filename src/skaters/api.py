@@ -359,23 +359,23 @@ def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
     :func:`skaters.conjugate.conjugate`) are the stable surface.
 
     Forecasts log(y - lower) with :func:`laplace` and maps the predictive back
-    by the exact change of variables, so every quantile it reports lies inside
-    the bound. The default bound is ``lower=0``: rates, prices, volumes,
-    volatilities, anything strictly positive. Pass ``upper=`` instead for a
-    ceiling. After Robert Gibrat, whose law of proportionate effect (growth
+    by the exact change of variables. The default bound is ``lower=0`` for
+    strictly positive series. Pass ``upper=`` for a one-sided ceiling. After
+    Robert Gibrat, whose law of proportionate effect (growth
     multiplicative, so log-size additive) is a classic account of why so many
     economic quantities are log-normal and strictly positive.
 
     The returned state is laplace's own, so ``state["pit"]`` and ``state["z"]``
     read as they do for :func:`laplace`; PIT values are invariant under the
-    log map. Missing values (``None``/NaN) pass through to laplace. Every
-    other observation must be strictly inside the bound (``ValueError``
+    log map. Missing values pass through to laplace. Every finite observation
+    must be strictly inside the bound (``ValueError``
     otherwise); a series with exact zeros needs ``lower`` set a little below
     zero, or a different model. The predictive is a
-    :class:`skaters.pushforward.PushforwardDist`; its ``.mean``/``.var`` on a
-    tail-spliced inner come from a quantile grid and run a little low when the
-    log-scale spread is large, and ``.components`` is unavailable, so it cannot
-    be fed to ``sticky`` or an ensemble.
+    :class:`skaters.pushforward.PushforwardDist`. CRPS uses quantile quadrature,
+    as do the moments of a spliced forecast. This can underestimate tail
+    contributions at wide log-scale spreads.
+    ``.components`` on a spliced forecast gives a moment-matched Gaussian.
+    Combining it into a plain Gaussian mixture can lose the support bound.
 
     Args:
         k: forecast horizon.
@@ -383,17 +383,13 @@ def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
         upper: upper bound, instead of ``lower``.
         **laplace_kwargs: passed to :func:`laplace` (``objective``, ``tails``, ...).
     """
-    from skaters.parade import _missing
     from skaters.transform import log_transform
     forward, inverse_k = log_transform(lower=lower, upper=upper)
     inner = laplace(k=k, **laplace_kwargs)
 
     def _gibrat(y: float, state: dict | None) -> tuple[list, dict]:
-        if _missing(y):
-            dists, state = inner(y, state)
-        else:
-            yp, _ = forward(y, None)
-            dists, state = inner(yp, state)
+        yp, _ = forward(y, None)
+        dists, state = inner(yp, state)
         return inverse_k(dists, {}), state
 
     bound = f"upper={upper}" if upper is not None else f"lower={0.0 if lower is None else lower}"

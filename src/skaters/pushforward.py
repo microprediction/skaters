@@ -22,16 +22,14 @@ and answer queries through the change of variables
     log p_Y(y)  = log p_Z(z(y)) + log dz/dy
     Q_Y(p)      = y(Q_Z(p))
 
-where y <-> z is a strictly increasing piecewise-linear table, so dz/dy is a
-segment slope and CRPS integrates in z-coordinates with a constant Jacobian
-per segment.
+The map can be supplied analytically or represented by a strictly increasing
+table. CRPS uses numerical quadrature in either case.
 
 Compatibility: consumers that need mixture components (``Dist.combine`` in
 ensemble warm-up, the sticky projection) get a ``components`` property that
-maps each inner component by 7-point Gauss-Hermite moment matching through
-the table. Moment matching is the KL(true || q) optimum among Gaussians, so
-the shim is the best answer the plain-``Dist`` representation admits; exact
-queries stay exact.
+maps each inner Gaussian by moment matching. When the inner has no Gaussian
+components, the compatibility view is a single Gaussian with moments estimated
+on a quantile grid. The forecast's own queries still use the original inner.
 
 Everything is stdlib-only and the state is pure data, as everywhere else.
 """
@@ -39,7 +37,6 @@ Everything is stdlib-only and the state is pure data, as everywhere else.
 from __future__ import annotations
 import bisect
 import math
-from skaters.dist import Dist
 
 _SQRT2 = math.sqrt(2.0)
 _SQRTPI = math.sqrt(math.pi)
@@ -56,6 +53,22 @@ _GH7 = (
     (1.6735516287674714, 5.451558281912703e-02),
     (2.6519613568352334, 9.717812450995192e-04),
 )
+
+
+def _quantile_rule(n: int) -> tuple:
+    # Fourth-power odds give the tails finer resolution under nonlinear maps.
+    edges = [i**4 / (i**4 + (n - i)**4) for i in range(n + 1)]
+    return tuple(((lo + hi) * 0.5, hi - lo) for lo, hi in zip(edges, edges[1:]))
+
+
+_QUANTILE_RULE = _quantile_rule(257)
+
+
+def _exp_or_inf(x: float) -> float:
+    try:
+        return math.exp(x)
+    except OverflowError:
+        return math.inf
 
 
 def interp_table(x: float, xs: list, fs: list) -> float:
@@ -93,23 +106,28 @@ def table_from_map(inv_fn, z_lo: float, z_hi: float, nodes: int = 400):
 class PushforwardDist:
     """A z-space predictive pushed through a monotone y <-> z map.
 
-    The map is carried two ways: a piecewise-linear (ys, zs) table, always
-    present, used for the y -> z direction and the CRPS segment weights; and
-    an optional ``inv_fn`` (the exact z -> y map) which, when given, makes
-    the z -> y direction and the Jacobian exact instead of table-limited.
+    Supply a table (``ys``, ``zs``) or an analytic map with ``inv_fn``,
+    ``fwd_fn`` and ``log_jacobian_fn`` (log(dz/dy), evaluated at z). With a table
+    and an optional inverse, the Jacobian is estimated by finite differences.
+    ``component_moments_fn`` optionally gives the mapped mean and standard
+    deviation of a Gaussian component. ``scaled_inv_fn(z, weight)`` evaluates
+    the inverse times a positive weight, useful when the inverse overflows.
     """
 
-    __slots__ = ("inner", "ys", "zs", "inv_fn", "fwd_fn", "_comps", "_grid")
+    __slots__ = ("inner", "ys", "zs", "inv_fn", "fwd_fn", "log_jacobian_fn",
+                 "component_moments_fn", "scaled_inv_fn", "_comps", "_grid")
 
-    def __init__(self, inner, ys: list, zs: list, inv_fn=None, fwd_fn=None):
+    def __init__(self, inner, ys: list | None = None, zs: list | None = None,
+                 inv_fn=None, fwd_fn=None, *, log_jacobian_fn=None,
+                 component_moments_fn=None, scaled_inv_fn=None):
         self.inner = inner
         self.ys = ys
         self.zs = zs
         self.inv_fn = inv_fn
-        # the exact y -> z map, when the transform has one: then _z and the
-        # Jacobian do not depend on the table at all, and a bounded map sends
-        # the bound itself to -inf/+inf instead of a finite extrapolated z
         self.fwd_fn = fwd_fn
+        self.log_jacobian_fn = log_jacobian_fn
+        self.component_moments_fn = component_moments_fn
+        self.scaled_inv_fn = scaled_inv_fn
         self._comps = None
         self._grid = None
 
@@ -156,31 +174,35 @@ class PushforwardDist:
 
     def logpdf(self, x: float) -> float:
         z = self._z(x)
-        if not math.isfinite(z):                 # x on or past a bound of the map
+        if math.isinf(z):                       # x on or past a bound of the map
             return -math.inf
+        if math.isnan(z):
+            return math.nan
+        if self.log_jacobian_fn is not None:
+            return self.inner.logpdf(z) + self.log_jacobian_fn(z)
         return self.inner.logpdf(z) + math.log(self._slope(x))
 
     def pdf(self, x: float) -> float:
-        z = self._z(x)
-        if not math.isfinite(z):
-            return 0.0
-        return self.inner.pdf(z) * self._slope(x)
+        return _exp_or_inf(self.logpdf(x))
 
     def cdf(self, x: float) -> float:
         z = self._z(x)
-        if not math.isfinite(z):
+        if math.isinf(z):
             return 0.0 if z < 0 else 1.0
+        if math.isnan(z):
+            return math.nan
         return self.inner.cdf(z)
 
     def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
         return self._y(self.inner.quantile(p, tol=tol, max_iter=max_iter))
 
     def crps(self, x: float) -> float:
-        """CRPS by trapezoid in z-coordinates, where the Jacobian y'(z) is
-        constant per table segment. The realization's z is always inserted as
-        a node, and the indicator side is decided per segment, so the kink
-        costs no accuracy. Validated to ~0.2% against ``Dist.crps`` through an
-        identity table."""
+        """CRPS by quadrature over quantiles or over the table in z-space."""
+        if not math.isfinite(x):
+            return abs(x)
+        if self.fwd_fn is not None or self.zs is None:
+            return self._crps_from_quantiles(x)
+
         zstar = self._z(x)
         zs = self.zs
         s_lo = 1.0 / self._slope(self.ys[0])
@@ -218,71 +240,86 @@ class PushforwardDist:
             prev_z, c_prev = z, c
         return total
 
+    def _crps_from_quantiles(self, x: float) -> float:
+        # Integrate twice the pinball loss, including observations outside the
+        # support. Apply the weights first if the unweighted difference overflows.
+        total = 0.0
+        for q, (p, w) in zip(self._qgrid(), _QUANTILE_RULE):
+            weight = 2.0 * w * ((1.0 - p) if q >= x else p)
+            gap = abs(q - x)
+            if math.isfinite(gap):
+                total += weight * gap
+            else:
+                weighted_q = weight * q
+                if math.isinf(q) and self.scaled_inv_fn is not None:
+                    weighted_q = self.scaled_inv_fn(self.inner.quantile(p), weight)
+                total += abs(weighted_q - weight * x)
+        return total
+
     # --- Dist-compatibility shim ---------------------------------------------
 
     @property
     def components(self) -> list:
         """Moment-matched mixture components in y-space (lazy, cached).
 
-        Each inner component is mapped by Gauss-Hermite through the table:
-        the resulting (weight, mean, std) triple carries the pushforward's
-        exact first two moments per component. This is the KL-optimal single
-        Gaussian per component, so consumers that must have a plain mixture
-        (``Dist.combine``, the sticky projection) get the best answer the
-        representation admits. Exact queries do not use this path.
+        For a spliced or already transformed inner, return one Gaussian fitted
+        to its mapped quantiles. This compatibility approximation can lose a
+        support bound when a caller uses it to build a plain ``Dist``.
         """
         if self._comps is None:
-            comps = []
-            for w, m, s in self.inner.components:
-                # Two passes, centered (skaters#225): m2 - mu*mu catastrophically
-                # cancels once the location is large relative to the spread
-                # (mu and m2 both blow up together while their difference does
-                # not). Accumulating (y - mu)^2 directly keeps the subtraction
-                # on the small, spread-scale residuals instead.
-                node_ys = [self._y(m + s * _SQRT2 * x) for x, _ in _GH7]
-                mu = sum((wt / _SQRTPI) * y for y, (_, wt) in zip(node_ys, _GH7))
-                var = sum((wt / _SQRTPI) * (y - mu) ** 2 for y, (_, wt) in zip(node_ys, _GH7))
-                sd = math.sqrt(max(var, 1e-24))
-                comps.append((w, mu, max(sd, 1e-15)))
-            self._comps = comps
+            inner_comps = (None if isinstance(self.inner, PushforwardDist)
+                           else getattr(self.inner, "components", None))
+            if inner_comps is None:
+                q = self._qgrid()
+                mu = sum(w * y for y, (_, w) in zip(q, _QUANTILE_RULE))
+                sd = math.inf if not math.isfinite(mu) else math.hypot(*(
+                    math.sqrt(w) * (y - mu) for y, (_, w) in zip(q, _QUANTILE_RULE)
+                ))
+                self._comps = [(1.0, mu, sd)]
+            else:
+                moments = self.component_moments_fn or self._gaussian_moments
+                self._comps = [(w, *moments(m, s)) for w, m, s in inner_comps if w > 0.0]
         return self._comps
 
+    def _gaussian_moments(self, m: float, s: float) -> tuple[float, float]:
+        # Centered quadrature (skaters#225). hypot also keeps std representable
+        # when the corresponding variance is too large or small for a float.
+        node_ys = [self._y(m + s * _SQRT2 * x) for x, _ in _GH7]
+        mu = sum((w / _SQRTPI) * y for y, (_, w) in zip(node_ys, _GH7))
+        if not math.isfinite(mu):
+            return mu, math.inf
+        sd = math.hypot(*(math.sqrt(w / _SQRTPI) * (y - mu)
+                          for y, (_, w) in zip(node_ys, _GH7)))
+        return mu, max(sd, 1e-12)
+
     def _qgrid(self) -> list:
-        """Midpoint quantile grid, for an inner predictive with no mixture
-        components (laplace's tail-spliced SplicedDist); the rule used there,
-        on a denser grid. A midpoint grid truncates the tails at p = 1/(2n),
-        and a convex map such as exp amplifies what it drops, so the moments
-        run low when the inner spread is large (at n = 65 the std of a
-        log-normal with log-scale sigma = 1 came out 14% low). Quantiles,
-        cdf, logpdf and crps do not use this path and stay exact."""
+        """Cache mapped quantiles used by numerical moments and CRPS."""
         if self._grid is None:
-            n = 257
-            self._grid = [self.quantile((i + 0.5) / n) for i in range(n)]
+            self._grid = [self.quantile(p) for p, _ in _QUANTILE_RULE]
         return self._grid
 
     @property
     def mean(self) -> float:
-        if not hasattr(self.inner, "components"):
-            q = self._qgrid()
-            return sum(q) / len(q)
         return sum(w * m for w, m, _ in self.components)
 
     @property
     def var(self) -> float:
-        if not hasattr(self.inner, "components"):
-            q = self._qgrid()
-            mu = sum(q) / len(q)
-            return sum((x - mu) ** 2 for x in q) / len(q)
-        mu = self.mean
-        return sum(w * (s * s + (m - mu) ** 2) for w, m, s in self.components)
+        sd = self.std
+        return sd * sd
 
     @property
     def std(self) -> float:
-        return math.sqrt(max(self.var, 0.0))
+        comps = self.components
+        if len(comps) == 1:
+            return comps[0][2]
+        mu = self.mean
+        if not math.isfinite(mu):
+            return math.inf
+        return math.hypot(*(math.sqrt(w) * math.hypot(s, m - mu) for w, m, s in comps))
 
     def __repr__(self) -> str:
-        return (f"PushforwardDist(knots={len(self.ys)}, "
+        return (f"PushforwardDist(knots={len(self.ys or ())}, "
                 f"inner={self.inner!r})")
 
     def __len__(self) -> int:
-        return len(self.inner)
+        return len(self.components)

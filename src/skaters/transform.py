@@ -851,22 +851,20 @@ def seasonal_scale(period: int, alpha: float = 0.05, center: bool = False,
 # Signed power transform (works on any real value)
 # ---------------------------------------------------------------------------
 
-def _exact_inverse_k(inv_fn, window: tuple | None = None, fwd_fn=None):
+def _exact_inverse_k(inv_fn):
     """Build an inverse_k that emits the exact pushforward.
 
     The table window adapts to each predictive: [m - 10s, m + 10s] over the
     mixture. A fixed window fails in level coordinates (positive levels live
     at z ~ 2 sqrt(y) under lambda = 0.5, far from any static range) and
     everything beyond a table extrapolates with the wrong curvature.
-    ``window=(z_min, z_max)`` clips the table to where ``inv_fn`` is finite
-    and strictly monotone (a log map saturates past exp's overflow).
     """
     from skaters.pushforward import PushforwardDist, table_from_map
 
     def inverse_k(dists: list, state: dict) -> list:
         out = []
         for d in dists:
-            comps = getattr(d, "components", None)
+            comps = None if isinstance(d, PushforwardDist) else getattr(d, "components", None)
             if comps is not None:
                 lo = min(m - 10.0 * s for _, m, s in comps)
                 hi = max(m + 10.0 * s for _, m, s in comps)
@@ -875,12 +873,8 @@ def _exact_inverse_k(inv_fn, window: tuple | None = None, fwd_fn=None):
                 # pad its extreme quantiles by their own span on each side
                 q_lo, q_hi = d.quantile(1e-6), d.quantile(1.0 - 1e-6)
                 lo, hi = 2.0 * q_lo - q_hi, 2.0 * q_hi - q_lo
-            if window is not None:
-                lo, hi = max(lo, window[0]), min(hi, window[1])
-                if not hi > lo:
-                    lo, hi = window
             ys, zs = table_from_map(inv_fn, lo, hi)
-            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn, fwd_fn=fwd_fn))
+            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
         return out
 
     return inverse_k
@@ -947,10 +941,9 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 
     A one-parameter family that picks the *coordinate in which the series is
     simple*. It subsumes log (lmbda=0, on the shifted level), identity
-    (lmbda=1), and reciprocal-ish (lmbda<0) shapes, but unlike Box-Cox it is
-    defined for all reals (no positivity requirement) — so the same primitive
-    expresses a non-negativity prior (lmbda~0 makes the inverse predictive
-    non-negative for non-negative data) and a generic re-scaling prior.
+    (lmbda=1), and reciprocal-ish (lmbda<0) shapes. Both positive and negative
+    observations have a branch. At lmbda=0 the inverse predictive can assign
+    mass anywhere on the real line, even for strictly positive observations.
 
     Forward:
         y >= 0:  ((y+1)**L - 1) / L            (L != 0);   log(y+1)      (L == 0)
@@ -1030,7 +1023,7 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 
 
 # ---------------------------------------------------------------------------
-# AR(p) transform with online recursive least squares
+# Log coordinate with a one-sided bound
 # ---------------------------------------------------------------------------
 
 def log_transform(lower: float | None = None, upper: float | None = None):
@@ -1043,53 +1036,91 @@ def log_transform(lower: float | None = None, upper: float | None = None):
                logpdf includes the Jacobian, and every quantile it reports
                lies on the right side of the bound.
 
-    Unlike ``yeo_johnson(0)``, whose log1p bounds the predictive at -1, the
-    bound here is exactly ``lower`` (or ``upper``). PIT values are invariant
-    under the map, so calibration diagnostics read the same in either
-    coordinate. An observation on or past the bound raises ``ValueError``.
-    Experimental, alongside :func:`skaters.api.gibrat`.
+    PIT values are invariant under the map. A finite observation on or past
+    the bound raises ``ValueError``. Missing observations pass through for
+    the inner skater to handle. Quantiles that round to the bound are rounded
+    inward by one floating-point step. A quantile beyond the representable
+    range returns the corresponding infinity. Experimental, alongside
+    :func:`skaters.api.gibrat`.
 
     Args:
         lower: the lower bound (default 0 when neither bound is given).
         upper: the upper bound. Give one bound, not both.
     """
+    from skaters.parade import _missing
+    from skaters.pushforward import PushforwardDist, _exp_or_inf
+
     if lower is not None and upper is not None:
         raise ValueError("log_transform takes one bound: lower or upper")
-    if upper is None:
-        b = 0.0 if lower is None else float(lower)
+    b = float(upper if upper is not None else (0.0 if lower is None else lower))
+    if not math.isfinite(b):
+        raise ValueError("log_transform needs a finite bound")
+    direction = -1.0 if upper is not None else 1.0
+    bound_label = "upper" if upper is not None else "lower"
+    log_two = math.log(2.0)
 
-        def _fwd(y: float) -> float:
-            if not y > b:
-                raise ValueError(f"log_transform: observation {y!r} is not above lower={b}")
-            return math.log(y - b)
+    def _fwd_query(y: float) -> float:
+        gap = direction * (y - b)
+        if gap <= 0.0:
+            return -direction * math.inf
+        if math.isinf(gap):
+            # A gap between finite floats can overflow even when its log fits.
+            half_gap = direction * (0.5 * y - 0.5 * b)
+            return direction * (math.log(half_gap) + log_two)
+        return direction * math.log(gap)
 
-        def _fwd_query(y: float) -> float:     # for Dist queries: no mass below b
-            return math.log(y - b) if y > b else -math.inf
+    def _inverse_at_scale(z: float, weight: float) -> float:
+        bound = weight * b
+        log_gap = direction * z + math.log(weight)
+        gap = _exp_or_inf(log_gap)
+        if math.isinf(gap):
+            # The shift by the bound can bring an overflowing gap into range.
+            return 2.0 * (0.5 * bound + direction * _exp_or_inf(log_gap - log_two))
+        return bound + direction * gap
 
-        def _inv(z: float) -> float:
-            return b + math.exp(min(z, 700.0))
-    else:
-        b = float(upper)
+    def _inv(z: float) -> float:
+        y = _inverse_at_scale(z, 1.0)
+        return math.nextafter(b, direction * math.inf) if y == b else y
 
-        def _fwd(y: float) -> float:
-            if not y < b:
-                raise ValueError(f"log_transform: observation {y!r} is not below upper={b}")
-            return -math.log(b - y)
+    def _log_jacobian(z: float) -> float:
+        return -direction * z
 
-        def _fwd_query(y: float) -> float:     # for Dist queries: no mass above b
-            return -math.log(b - y) if y < b else math.inf
-
-        def _inv(z: float) -> float:
-            return b - math.exp(min(-z, 700.0))
+    def _moments(m: float, s: float) -> tuple[float, float]:
+        variance = s * s
+        log_mean_gap = direction * m + 0.5 * variance
+        mean = _inverse_at_scale(direction * log_mean_gap, 1.0)
+        if s == 0.0:
+            return mean, 0.0
+        # log(sqrt(expm1(s**2))) remains stable as the spread approaches zero
+        # or grows large, where the correction to s**2 / 2 rounds to zero.
+        if variance < 1e-16:
+            log_relative_std = math.log(s)
+        elif variance > 40.0:
+            log_relative_std = 0.5 * variance
+        else:
+            log_relative_std = 0.5 * math.log(math.expm1(variance))
+        return mean, _exp_or_inf(log_mean_gap + log_relative_std)
 
     def forward(y: float, state: dict | None) -> tuple[float, dict]:
-        return _fwd(y), state or {}
+        if _missing(y):
+            return y, state or {}
+        z = _fwd_query(y)
+        if z == -direction * math.inf:
+            raise ValueError(f"log_transform: observation {y!r} must lie inside {bound_label}={b}")
+        return z, state or {}
 
-    # exp overflows past ~709.8 and underflows to 0 below ~-745: the table must
-    # stay where the map is finite and strictly increasing (the upper-bound map
-    # mirrors the window)
-    win = (-745.0, 709.0) if upper is None else (-709.0, 745.0)
-    return forward, _exact_inverse_k(_inv, window=win, fwd_fn=_fwd_query)
+    def inverse_k(dists: list, state: dict) -> list:
+        return [PushforwardDist(d, inv_fn=_inv, fwd_fn=_fwd_query,
+                                log_jacobian_fn=_log_jacobian, component_moments_fn=_moments,
+                                scaled_inv_fn=_inverse_at_scale)
+                for d in dists]
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
+# AR(p) transform with online recursive least squares
+# ---------------------------------------------------------------------------
 
 
 def _ar_spectral_radius(phi: list[float]) -> float:

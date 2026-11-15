@@ -11,9 +11,9 @@ includes the Jacobian.
 ceiling. The same thing by hand is
 ``conjugate(laplace(), log_transform(lower=0.0))``.
 
-The built-in ``yeo_johnson(0, exact=True)`` uses log1p, so it bounds the
-predictive at -1 rather than 0. On a series near 0.05, log1p is nearly the
-identity and the bound does little; the last row below shows it.
+The positive branch of ``yeo_johnson(0, exact=True)`` uses log1p. On a series
+near 0.05, that is nearly the identity. Its inverse also has a negative branch
+with no lower bound, so the last row can assign probability below zero.
 
 Usage:
     PYTHONPATH=src python examples/positive_series.py
@@ -63,5 +63,5 @@ if __name__ == "__main__":
     print(f"\n  {len(ys)} positive observations, min {min(ys):.4f}, max {max(ys):.4f}\n")
     run("laplace()", laplace(), ys)
     run("gibrat()", gibrat(), ys)
-    run("laplace on log1p(y)", conjugate(laplace(), yeo_johnson(0.0, exact=True), k=1), ys)
+    run("laplace on Yeo–Johnson", conjugate(laplace(), yeo_johnson(0.0, exact=True), k=1), ys)
     print()

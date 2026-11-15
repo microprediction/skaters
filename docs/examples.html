@@ -82,9 +82,9 @@
   <main>
     <h1>Examples</h1>
     <p class="lede">
-      Short recipes you can paste and run. Each one feeds a series in one
-      observation at a time and reads a full predictive distribution back.
-      Install with <code>pip install skaters</code>.
+      Install with <code>pip install skaters</code>. The Python streaming
+      recipes below use the imports and <code>observations</code> from the
+      first example.
     </p>
 
     <ol class="toc">
@@ -106,7 +106,11 @@
       <code>dists[0]</code> is the predictive distribution for the next
       observation.
     </p>
-<pre>from skaters import laplace
+<pre>import math
+from skaters import laplace
+
+observations = [20.0 + math.sin(t / 5) for t in range(120)]
+y_next = 20.0 + math.sin(len(observations) / 5)
 
 f = laplace()
 state = None
@@ -140,11 +144,10 @@ dists[11]     # twelve steps ahead
 
     <h2 id="positive">Series that are always positive</h2>
     <p>
-      Rates, prices, volumes and volatilities never go below zero. A model
-      working on the raw values has no way to know that. <code>gibrat</code>
-      runs <code>laplace</code> on the log of the series and maps the forecast
-      back exactly, so every quantile it reports is positive and the skew of a
-      multiplicative series comes out right. It is named after Robert Gibrat,
+      If you know a series is strictly positive, you can encode that in the
+      forecast. <code>gibrat</code> runs <code>laplace</code> on the log of the
+      series and maps the forecast back through the exponential, giving a
+      positive, possibly skewed predictive. It is named after Robert Gibrat,
       whose law of proportionate growth is a classic account of why so many
       economic quantities are log-normal. It is experimental: an example
       composition that may change or move into <code>examples/</code>; the
@@ -155,13 +158,13 @@ dists[11]     # twelve steps ahead
 
 f = gibrat(k=5)
 state = None
-for y in prices:
+for y in observations:
     dists, state = f(y, state)
 
 dists[4].quantile(0.01)    # always &gt; 0
 
 gibrat(lower=-3.0)         # any floor
-gibrat(upper=1.0)          # or a ceiling (a share, a probability)</pre>
+gibrat(upper=1.0)          # a ceiling, with support on (-infinity, 1)</pre>
     <p>
       On a synthetic rate that dips toward zero, plain <code>laplace</code> put
       up to 33% of its probability below zero; <code>gibrat</code> put none
@@ -174,30 +177,36 @@ gibrat(upper=1.0)          # or a ceiling (a share, a probability)</pre>
 
     <h2 id="scale">Units and scale</h2>
     <p>
-      Bitcoin's hash rate is about 10<sup>20</sup> hashes per second. Fed to
-      <code>laplace</code> in those units it goes wrong: the transforms carry
+      Rescaling a series can improve <code>laplace</code>. Its transforms carry
       constants in absolute units (a variance intercept, a ridge, division
       floors), tuned for series whose values and steps sit roughly between
-      10<sup>-3</sup> and 10<sup>3</sup>. The same series in exahashes per
-      second is an ordinary series. Measured on a synthetic growth series
-      with true next value 16.35, scaled by 10<sup>20</sup> and then divided
-      back:
+      10<sup>-3</sup> and 10<sup>3</sup>. The synthetic growth series below has
+      a held-out value of 29.00. The medians are both reported in the original
+      units.
     </p>
     <table>
       <thead><tr><th>input units</th><th><code>laplace</code> median</th><th><code>gibrat</code> median</th></tr></thead>
       <tbody>
-        <tr><td>raw, values near 10<sup>20</sup></td><td>&minus;1.5 &times; 10<sup>9</sup></td><td>16.38</td></tr>
-        <tr><td>scaled, values near 16</td><td>16.36</td><td>16.40</td></tr>
+        <tr><td>multiplied by 10<sup>20</sup></td><td>3.63 &times; 10<sup>7</sup></td><td>29.01</td></tr>
+        <tr><td>original</td><td>29.01</td><td>29.01</td></tr>
       </tbody>
     </table>
-<pre>f = laplace()                      # feed it hash_rate / 1e18 (EH/s), not hash_rate
-f = gibrat()                       # or forecast the log: unit-free by construction</pre>
+<pre>growth = [16.0 * math.exp(0.003 * t + 0.015 * math.sin(t / 7))
+          for t in range(200)]
+
+for scale in (1e20, 1.0):
+    medians = []
+    for make_skater in (laplace, gibrat):
+        f, state = make_skater(), None
+        for y in growth[:-1]:
+            dists, state = f(scale * y, state)
+        medians.append(dists[0].quantile(0.5) / scale)
+    print(scale, medians, growth[-1])</pre>
     <p>
       Pick units the way you would write them down, and keep values and steps
-      inside about 10<sup>-3</sup> to 10<sup>6</sup>. A series that climbs
-      across many orders of magnitude over its life, as the hash rate did, has
-      no fixed unit that fits all of it; that is the case for <code>gibrat</code>,
-      which works in the log coordinate. More on the
+      inside about 10<sup>-3</sup> to 10<sup>6</sup>. For a series that spans
+      many orders of magnitude, <code>gibrat</code> works in the log coordinate,
+      where changing units adds a constant to the observations. More on the
       <a href="/scope.html">scope page</a>.
     </p>
 
@@ -291,6 +300,7 @@ f = conjugate(ema(alpha=0.1, k=1), in_thousands(), k=1)</pre>
     </p>
 <pre>&lt;script type="module"&gt;
   import { laplace } from "https://skaters.microprediction.org/js/skaters/index.mjs";
+  const observations = Array.from({ length: 120 }, (_, t) =&gt; 20 + Math.sin(t / 5));
   const f = laplace(1);
   let state = null;
   for (const y of observations) {

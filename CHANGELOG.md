@@ -12,12 +12,11 @@
 - Fix: `exact=True` on `yeo_johnson` / `power_transform` raised
   `AttributeError` when wrapped around `laplace` once its tail splice was
   live (the spliced predictive has no mixture components). The table window
-  now falls back to the predictive's extreme quantiles, and
-  `PushforwardDist.mean`/`var` fall back to a quantile grid (which runs low
-  for large inner spreads). `.components` remains unavailable on such a
-  predictive, so it cannot feed `sticky` or an ensemble. `PushforwardDist`
-  accepts an exact forward map (`fwd_fn`), used by `log_transform`, so the
-  bound itself maps to zero mass.
+  now falls back to the predictive's extreme quantiles. For a spliced
+  predictive, `PushforwardDist` estimates moments by quantile quadrature and
+  exposes a moment-matched Gaussian for mixture consumers. `log_transform`
+  uses analytic maps and a log Jacobian, with quantile quadrature for CRPS
+  on either side of the bound.
 - Docs: an Examples page of runnable recipes (`docs/examples.html`, in the
   nav), and a units-and-scale note on the scope page: the transforms carry
   constants in absolute units, so keep values and steps roughly within
