@@ -85,7 +85,9 @@ def head_to_head(model="TimesFM3"):
 
 # The pretrained panel, as named in the store. Nine-decile models are scored
 # through the generous reconstruction ("(wide)", Section nozzle); models that
-# emit 21 native levels are scored on them. CSP is the conformal baseline.
+# emit 21 native levels are scored on them. CSP is the conformal baseline: ahead
+# of the reference on M4 hourly, like most of the pretrained roster there, and
+# behind on every FRED stratum, unlike them.
 PANEL = [
     ("TimeH2O-v1(wide)", "TimeH2O v1 (109M)"),
     ("Toto2-2.5B(wide)", "Toto 2.0 (2.5B)"),

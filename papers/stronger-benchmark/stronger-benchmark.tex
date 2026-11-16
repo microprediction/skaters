@@ -251,7 +251,9 @@ Foundation models batch in
 the cold regime, so the batched column is reported alongside the per-series one.
 In the warm regime \code{laplace} performs one state update; a stateless model
 re-runs its forward pass over a shifted window and a refitting baseline
-re-estimates from scratch, so for those the warm cost equals the cold cost.}
+re-estimates from scratch, so for those the warm column is a second measurement
+of the cold operation and differs from the batch-1 cold column only by timing
+noise.}
 \label{tab:perf}
 \end{table}
 
@@ -556,14 +558,16 @@ their 21 native levels. Strata as in Table~\ref{tab:raw}.}
 Three regularities hold across the roster. Daily economic series stay with the
 reference: every model loses there, the best of them on a quarter of the
 series. Monthly and hourly series go to the larger pretrained models by a few
-hundredths of a nat, with TimeH2O, Toto 2.0, Simons, Chronos-2 and iAmTime
-within $0.05$ nats of each other; weekly splits between them. Size buys
-little: Toto 2.0 improves by $0.03$ nats from 313M to 2.5B parameters and
-Simons by nothing from 60M to 297M, while the smallest models (TinyCast,
-TTM-R3, TimeSSM) lose everywhere. The conformal baseline reverses the picture
-of the pretrained models: it is the one arm that beats the reference on the
+hundredths of a nat: on monthly TimeH2O, Toto 2.0, Simons, Chronos-2 and
+iAmTime sit within $0.05$ nats of each other, and on hourly the same five lead
+by $0.06$ to $0.18$ nats with TimeH2O clear of the rest; weekly splits between
+them. Size buys little: Toto 2.0 improves by $0.03$ nats from 313M to 2.5B
+parameters and Simons by nothing from 60M to 297M, while the smallest models
+(TinyCast, TTM-R3, TimeSSM) lose everywhere. The conformal baseline has the
+opposite profile to the pretrained models: it beats the reference on the
 strongly seasonal M4 hourly series, by $0.06$ nats on 144 of 414, and it loses
-the four \proglang{FRED} strata by $0.13$ to $0.43$ nats. A phase-conditional
+every \proglang{FRED} stratum by $0.13$ to $0.43$ nats, where the larger
+pretrained models are level or ahead on three of four. A phase-conditional
 pool is the right tool for a series that repeats itself and nothing else; a
 likelihood-weighted portfolio of that pool and the reference keeps its hourly
 gain and loses nowhere else by more than $0.07$ nats, which is the sense in
