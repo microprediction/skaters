@@ -28,14 +28,18 @@ model's home metric to the opponent's away metric.
    fitting. Batch all windows into one call or CPU time will hurt.
 3. **Same windows for laplace.** Run `laplace(1)` over the full history but
    score only the identical test steps.
-4. **One `Dist` for everyone.** TimesFM emits quantiles: reconstruct a
-   smoothed mixture and FLAG the log-likelihood as tail-limited; read CRPS
-   as the fairer signal for quantile models. Sample outputs: Gaussian KDE.
+4. **One `Dist` for everyone.** TimesFM (2.5 and 3.0) emits nine deciles:
+   reconstruct a density and say which reconstruction. The step from
+   quantiles to a density moves the log score by about half a nat: under a
+   tight reconstruction `laplace` leads TimesFM 3.0 on the median series of
+   every stratum, under a generous one the two are level and TimesFM is ahead
+   on monthly. Report both, or state the one you used, and read CRPS as the
+   reconstruction-robust signal. Sample outputs: Gaussian KDE.
 5. **Score both** log-likelihood and CRPS per series, per step, then
    aggregate per series. Report per-series win rates, not pooled means; one
    degenerate series must not own the average.
 
-## The splits that keep you honest
+## The splits that keep the comparison clean
 
 - **Continuous vs repeat-heavy.** Compute the fraction of consecutive equal
   changes over the test window; below 0.05 is continuous. Constant and
@@ -62,7 +66,6 @@ def study(changes, fm_quantiles):        # fm_quantiles: [test_steps x q] from o
             fm = dist_from_quantiles(fm_quantiles[step])   # smoothed mixture
             rows.append((pend[0].logpdf(y), pend[0].crps(y),
                          fm.logpdf(y), fm.crps(y)))
-        pend, st = f(y, st), st
         pend, st = f(y, st)
     return rows
 ```

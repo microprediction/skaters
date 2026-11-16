@@ -2,7 +2,7 @@
 
 Shipping a univariate, one-step *distributional* forecaster (density, quantiles,
 samples, or a CDF)? Benchmark it against `skaters.laplace` first. `laplace` is a
-tiny, zero-dependency, online forecaster that emits a real predictive `Dist` — so
+tiny, zero-dependency, online forecaster that emits a real predictive `Dist`: so
 it scores on log-likelihood, not just an interval.
 
 ```
@@ -11,10 +11,12 @@ pip install skaters
 
 ## The one rule
 
-Turn *every* method — yours and `laplace` — into the same predictive object and
-score it with the same code on the same held-out points. Same target (the
-one-step **change**), same protocol (rolling one-step), same metrics
-(log-likelihood **and** CRPS).
+Turn *every* method, yours and `laplace`, into the same predictive object and
+score it with the same code on the same held-out points. Same series, same
+protocol (one step ahead over a rolling test window), same metrics
+(log-likelihood **and** CRPS), tested per series with Diebold-Mariano. That is
+what `benchmarks/run_arm.py` and `benchmarks/summarize_canonical.py` do; the
+current table is `benchmarks/canonical_summary_vs_laplace.csv`.
 
 ## Exactly how
 
@@ -38,12 +40,12 @@ def _acc(a, d, y):
 ```
 
 Quantiles/samples? Reconstruct a density and flag it as tail-limited. CDF-only
-(conformal)? It can't be log-likelihood-scored at all — report CRPS and say so;
+(conformal)? It can't be log-likelihood-scored at all: report CRPS and say so;
 `laplace` scores on both.
 
 ## What to report
 
-- **Per-series** win-rate (never family-clustered — it inflates), on LL *and* CRPS.
+- **Per-series** win-rate (never family-clustered: it inflates), on LL *and* CRPS.
 - Mean log-likelihood in nats, with continuous series split from repeat-heavy/grid.
 - Runtime: `laplace` is online and zero-dep. Winning at 100× the compute is not winning.
 
@@ -54,4 +56,4 @@ Quantiles/samples? Reconstruct a density and flag it as tail-limited. CDF-only
 - Hold the mean model constant across any wrapped comparison.
 
 If `laplace` wins, your method isn't earning its dependencies. If it loses, you
-have a real result — through one leak-free harness.
+have a real result: through one leak-free harness.

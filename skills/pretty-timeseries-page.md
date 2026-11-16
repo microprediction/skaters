@@ -1,7 +1,7 @@
 # pretty-timeseries-page skill
 
-When building or restyling a **time-series page in JavaScript** — a live chart,
-a forecast, a dashboard panel — apply these rules. They are distilled from the
+When building or restyling a **time-series page in JavaScript**: a live chart,
+a forecast, a dashboard panel: apply these rules. They are distilled from the
 [skaters playground](https://skaters.microprediction.org/demos/playground.html);
 steal from its source freely. No chart library required: a `<canvas>`, ~80 lines
 of drawing code, and discipline beat a default-themed Plotly embed every time.
@@ -10,21 +10,21 @@ of drawing code, and discipline beat a default-themed Plotly embed every time.
 
 One page, three hues, fixed roles. Everything else is grey.
 
-- **Ink** `#1a1a1a` — observed data. Data is ink; nothing else is this dark.
-- **Accent** `#4a3aff` — the model's *present* (fitted mean, current interval).
-- **Hot accent** `#ff8a3a` — the model's *future* (the forecast fan). The eye
+- **Ink** `#1a1a1a`: observed data. Data is ink; nothing else is this dark.
+- **Accent** `#4a3aff`: the model's *present* (fitted mean, current interval).
+- **Hot accent** `#ff8a3a`: the model's *future* (the forecast fan). The eye
   should find "what happens next" instantly, and warm-vs-cool does that.
 
 Uncertainty bands are the parent line's color at **16–18% alpha**
 (`rgba(74,58,255,0.16)`), never a new hue. If you need a fourth color, you have
-too many series on one panel — split the panel.
+too many series on one panel: split the panel.
 
 ## Uncertainty is the point
 
 A time-series page without a band is a lie of omission.
 
 - Draw intervals as one **closed filled band** (trace the upper edge forward,
-  the lower edge backward, `closePath`, `fill`) — not error bars, not two lines.
+  the lower edge backward, `closePath`, `fill`): not error bars, not two lines.
 - Use real quantiles (2.5/97.5%) from the predictive, not mean ± 2σ.
 - Bands must **widen with horizon**. If your forecast fan has constant width,
   say so in a caption or fix the model.
@@ -50,7 +50,7 @@ ctx.scale(dpr, dpr);
 ```
 
 **The read-back trap** (learned the hard way on the timemachines demo): never
-derive `cssW`/`cssH` from the canvas's own `width`/`height` attributes — you
+derive `cssW`/`cssH` from the canvas's own `width`/`height` attributes: you
 scaled those by `dpr` last frame, so on retina the canvas doubles every redraw
 and the page "jumps." Pin the CSS size somewhere nothing rewrites (a `data-h`
 attribute, a constant), and resize the backing store **only when the layout
@@ -60,7 +60,7 @@ out glides instead of snapping the axes.
 
 - One light baseline (`#e2e2e2`, 1px) is the only axis chrome. **No gridlines,
   no border box, no tick forest.** The data is the decoration.
-- Observations: small dots (~1.7px radius), never a connecting line — the line
+- Observations: small dots (~1.7px radius), never a connecting line: the line
   is the *model's* mean (1.8px), and keeping them distinct shows residuals.
 - Pad the drawing area (~36px) and recompute the y-range from what is visible
   *including the fan*, with ~8% headroom.
@@ -75,7 +75,7 @@ out glides instead of snapping the axes.
 
 ## Live diagnostics as ranked bars
 
-Whatever your model weighs — ensemble members, scales, features — show it as a
+Whatever your model weighs (ensemble members, scales, features) show it as a
 ranked bar list that updates each frame, because watching weights shift *is*
 the explanation:
 
@@ -130,7 +130,7 @@ needs tabs, it needs to be two pages.
 - Legends naming series "y", "yhat", "yhat_lower".
 - Percent axes that rescale every frame (pin the y-range to the revealed data
   plus fan, recompute smoothly).
-- Spinners. If compute takes time, reveal progressively — it is a stream.
+- Spinners. If compute takes time, reveal progressively: it is a stream.
 
 The test: pause the animation at any frame and screenshot it. If it could go in
 a paper without edits, the page is done.
