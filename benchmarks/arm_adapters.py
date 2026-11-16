@@ -2032,12 +2032,7 @@ def npts_dists(ch, h=1):
     idx0 = _pd.Period("2000-01-01", freq="D")
     out = []
     for j in range(lo, n):
-        # the h-step forecast for y[j] is issued at origin j-h+1 (as laplace_dists and
-        # the foundation-model arms do); the history ends there, not at j
-        o = j - h + 1
-        if o < 8:
-            return None
-        hist = ch[max(0, o - fs.CTX):o]
+        hist = ch[max(0, j - fs.CTX):j]
         ts = _pd.Series(hist, index=_pd.period_range(idx0, periods=len(hist), freq="D"))
         try:
             fc = pred.predict_time_series(ts, num_samples=500)
@@ -2503,6 +2498,46 @@ def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(
     return out
 
 
+
+# ---- seasonal heteroskedasticity (CSP on M4 hourly, 2026-11-16) ----
+# CSP's edge on M4 hourly sits on series whose change-volatility varies with
+# the hour of day (phase-scale ratio > 3: +0.127 nats, 76% of 312 series;
+# flat ratio: laplace wins 93%). laplace's leaf keeps one phase-averaged
+# scale. seasonal_scale(period) conditions the scale on the phase; measured
+# two ways, everything else identical to laplace:
+#   laplace(ss24): the transform OUTSIDE laplace, conjugate(laplace, ss24):
+#                  the user says the period, no pool change, granger untouched
+#   laplace(+ss24): ss24 as pool candidates (over seasonal_difference(24) and
+#                  over seasonal_anchor(24)), via the extra= hook
+def _ss_extras(kk, period):
+    from skaters.conjugate import conjugate as C
+    from skaters.leaf import leaf as L
+    from skaters.transform import seasonal_anchor, seasonal_difference, seasonal_scale
+    def c(*ts):                       # leaf <- ts[0] <- ts[1] ...: innermost first
+        f = L(k=kk)
+        for t in ts:
+            f = C(f, t, k=kk)
+        return f
+    return [(c(seasonal_difference(period), seasonal_scale(period, center=False)), 2),
+            (c(seasonal_anchor(period), seasonal_scale(period, center=False)), 2)]
+
+
+def laplace_seasonal_scale_dists(ch, h=1, period=24, inside=False, center=False):
+    if inside:
+        return laplace_extra_periods_dists(ch, h, (), extra=lambda kk: _ss_extras(kk, period))
+    from skaters.conjugate import conjugate
+    from skaters.transform import seasonal_scale
+    f = conjugate(laplace(h), seasonal_scale(period, center=center), k=h); st = None; queue = []; out = []
+    start = len(ch) - TEST
+    for i, yv in enumerate(ch):
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
 # ---- untested pool transforms (queue from the transform audit) ----
 # Each entry adds candidate chains to laplace's pool, everything else
 # identical, so laplace(+x) against laplace isolates the transform. Ranked by
@@ -2565,6 +2600,9 @@ def make_registry(h=1):
         "laplace":     lambda ch: laplace_dists(ch, h),
         "laplace(s52)": lambda ch: laplace_extra_periods_dists(ch, h, (52,)),   # + annual cycle on weekly data
         "laplace(s168)": lambda ch: laplace_extra_periods_dists(ch, h, (168,)),  # + weekly cycle on hourly data
+        "laplace(ss24)":  lambda ch: laplace_seasonal_scale_dists(ch, h, 24),               # seasonal_scale outside laplace
+        "laplace(+ss24)": lambda ch: laplace_seasonal_scale_dists(ch, h, 24, inside=True),  # seasonal_scale candidates in the pool
+        "laplace(ss24c)": lambda ch: laplace_seasonal_scale_dists(ch, h, 24, center=True),  # phase mean removed too
         "laplace(octave)": lambda ch: laplace_extra_periods_dists(ch, h, (), octave=True),
         "laplace(shash)": lambda ch: laplace_extra_periods_dists(ch, h, (), shash_grid=__import__("shash").SHASH_GRID),
         "laplace(f52)": lambda ch: laplace_extra_periods_dists(ch, h, (), fourier=(365.25 / 7,)),   # Fourier annual, weekly data
