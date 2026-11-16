@@ -5,7 +5,7 @@ A model like Chronos, TimesFM, or TiRex emits quantiles (deciles here), not a
 density. Turning those quantiles into something with a logpdf is a modeling
 choice independent of the underlying model, and that choice can move the
 measured score by more than the model comparison it is supposedly enabling
-(see papers/soft-benchmarks/paper.md, Section 5). This module makes that
+(see papers/soft-benchmarks/soft-benchmarks.md, Section 5). This module makes that
 choice explicit and comparable instead of silently fixed.
 
 Two of the four nozzles here are the ones already living, uncompared, in this

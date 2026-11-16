@@ -272,4 +272,4 @@ version-controlled store, and no number in this paper is retyped from memory.
 
 ## References
 
-See `paper.bib`.
+See `soft-benchmarks.bib`.

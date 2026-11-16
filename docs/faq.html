@@ -13,33 +13,26 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
-          <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
-          </span>
-        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
+            <a href="/skills.html">Skills</a>
+            <a href="/examples.html">Examples</a>
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
           </span>
+        </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
@@ -53,9 +46,20 @@
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
             <a href="/faq.html">FAQ</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="https://foundationalprediction.com/">All</a>
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
+          </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
@@ -82,8 +86,8 @@
     <p>
       Reasonable thing to ask of any leaderboard. Rather than take one slice on
       faith, the <a href="/robustness.html">robustness explorer</a> lets you cut
-      the non-price benchmark any way you like — at random, by category,
-      frequency, stickiness, martingality — and watch the per-series win-rate
+      the non-price benchmark any way you like (at random, by category,
+      frequency, stickiness, martingality) and watch the per-series win-rate
       recompute live with a bootstrap band. A cherry-picked edge falls apart under
       reslicing; a real one stays high and tight. The price caveat is stated
       plainly too: on equity/fx/commodity returns GARCH-t wins, and we say so.

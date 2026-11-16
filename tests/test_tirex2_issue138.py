@@ -10,6 +10,7 @@ np = pytest.importorskip("numpy")
 
 from benchmarks import arm_adapters as aa
 from benchmarks.tirex2_issue138 import (
+    ISSUE138_REVISION,
     archive_source,
     build_origins,
     online_laplace_dists,
@@ -29,7 +30,7 @@ def _validate_frozen_protocol(protocol):
         batch_size=128,
         device="cpu",
         model_id=aa.TIREX2_MODEL_ID,
-        revision=aa.TIREX2_MODEL_REVISION,
+        revision=ISSUE138_REVISION,
     )
 
 

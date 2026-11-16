@@ -110,11 +110,23 @@ class PowerTransform(TorchTransform):
     def reference_args(self):
         return {"p": float(self.p), "exact": False}
 
+    # |y|**p at y == 0 is 0, but its derivative in p is 0**p * log(0) = 0 * -inf,
+    # which autograd evaluates to NaN; one exact zero (common on repeat-heavy
+    # series) then poisons the whole window's gradient. The base is swapped for
+    # 1 where y == 0 (so the unused branch's gradient is finite) and the value
+    # set to 0: values are unchanged, and the gradient at 0 is 0.
+    @staticmethod
+    def _signed_pow(y, e):
+        a = torch.abs(y)
+        nz = a > 0
+        return torch.copysign(torch.where(nz, torch.where(nz, a, torch.ones_like(a)) ** e,
+                                          torch.zeros_like(a)), y)
+
     def _fwd(self, y):
-        return torch.copysign(torch.abs(y) ** self.p, y)
+        return self._signed_pow(y, self.p)
 
     def _inv(self, yp):
-        return torch.copysign(torch.abs(yp) ** (1.0 / self.p), yp)
+        return self._signed_pow(yp, 1.0 / self.p)
 
     def forward(self, y, state=None):
         y = _t(y)

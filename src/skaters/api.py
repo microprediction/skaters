@@ -349,6 +349,53 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
     return f
 
 
+def flesaker(k: int = 1, lower: float | None = None, upper: float | None = None,
+           **laplace_kwargs):
+    """``laplace`` for a series that never crosses a known bound. **Experimental.**
+
+    An example composition, not settled API: it may change, or move to
+    ``examples/``, in a later release. The building blocks underneath
+    (:func:`laplace`, :func:`skaters.transform.log_transform`,
+    :func:`skaters.conjugate.conjugate`) are the stable surface.
+
+    Forecasts log(y - lower) with :func:`laplace` and maps the predictive back
+    by the exact change of variables. The default bound is ``lower=0`` for
+    strictly positive series. Pass ``upper=`` for a one-sided ceiling. After Bjorn Flesaker, whose positive-interest framework with
+    Hughston builds the guarantee that rates stay positive into the model
+    rather than hoping for it.
+
+    The returned state is laplace's own, so ``state["pit"]`` and ``state["z"]``
+    read as they do for :func:`laplace`; PIT values are invariant under the
+    log map. Missing values pass through to laplace. Every finite observation
+    must be strictly inside the bound (``ValueError``
+    otherwise); a series with exact zeros needs ``lower`` set a little below
+    zero, or a different model. The predictive is a
+    :class:`skaters.pushforward.PushforwardDist`. CRPS uses quantile quadrature,
+    as do the moments of a spliced forecast. This can underestimate tail
+    contributions at wide log-scale spreads.
+    ``.components`` on a spliced forecast gives a moment-matched Gaussian.
+    Combining it into a plain Gaussian mixture can lose the support bound.
+
+    Args:
+        k: forecast horizon.
+        lower: lower bound (default 0 when ``upper`` is not given).
+        upper: upper bound, instead of ``lower``.
+        **laplace_kwargs: passed to :func:`laplace` (``objective``, ``tails``, ...).
+    """
+    from skaters.transform import log_transform
+    forward, inverse_k = log_transform(lower=lower, upper=upper)
+    inner = laplace(k=k, **laplace_kwargs)
+
+    def _flesaker(y: float, state: dict | None) -> tuple[list, dict]:
+        yp, _ = forward(y, None)
+        dists, state = inner(yp, state)
+        return inverse_k(dists, {}), state
+
+    bound = f"upper={upper}" if upper is not None else f"lower={0.0 if lower is None else lower}"
+    _flesaker.__name__ = f"flesaker(k={k}, {bound})"
+    return _flesaker
+
+
 def dantzig(k: int = 1, **kwargs):
     """Adaptive-search skater: grow the model space online instead of fixing it.
 

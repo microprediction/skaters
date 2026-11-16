@@ -71,3 +71,10 @@ digests at main are in `parity/laplace_k1_signatures.txt`.
 Open a GitHub issue with a minimal reproducing stream where possible.
 Calibration complaints are especially welcome: a PIT histogram from a
 quiet stretch of your data says more than an adjective.
+
+## Getting help
+
+Questions about using the package, choosing a forecaster or reading a result
+are welcome as GitHub issues; label them `question`. The maintainer answers
+issues and reviews pull requests on a best-effort basis. Documentation,
+worked examples and live demos are at https://skaters.microprediction.org.

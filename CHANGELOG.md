@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Experimental forecaster `flesaker` (after Bjorn Flesaker): `laplace` on
+  log(y - lower), mapped back by the exact pushforward, for series with a
+  one-sided bound (default `lower=0`; `upper=` for a ceiling). Every quantile
+  stays inside the bound; the state is laplace's own. An example composition,
+  not settled API: it may change or move to `examples/`. New transform
+  `log_transform(lower=, upper=)` underneath it. Python only. Example:
+  `examples/positive_series.py`.
+- Fix: `exact=True` on `yeo_johnson` / `power_transform` raised
+  `AttributeError` when wrapped around `laplace` once its tail splice was
+  live (the spliced predictive has no mixture components). The table window
+  now falls back to the predictive's extreme quantiles. For a spliced
+  predictive, `PushforwardDist` estimates moments by quantile quadrature and
+  exposes a moment-matched Gaussian for mixture consumers. `log_transform`
+  uses analytic maps and a log Jacobian, with quantile quadrature for CRPS
+  on either side of the bound.
+- Fix: `SplicedDist.affine`, so an affine transform (`standardize`, `garch`,
+  `seasonal_scale`, `ema_transform`) conjugated around `laplace` no longer
+  raises `AttributeError` once the GPD tail splice is live. The splice lives
+  in PIT space, so only the body moves; a negative multiplier swaps the tails.
+- Docs: an Examples page of runnable recipes (`docs/examples.html`, in the
+  nav), and a units-and-scale note on the scope page: the transforms carry
+  constants in absolute units, so keep values and steps roughly within
+  1e-3 to 1e6.
 - New forecaster `granger` (horizon 1), after Clive Granger: laplace with
   trained values for its continuous hyperparameters plus a small gate on the
   ensemble's combining weights, mixed with laplace by the Aggregating
@@ -14,7 +37,7 @@
   `terminal_leaf_ensemble` gains an optional `gate_hook`; laplace is unchanged
   (output signatures identical).
 - `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace
-  at worst. Two experts, the frozen reference `laplace` and a trainable torch
+  at worst; shipped as `granger` (above), for which it is the training twin. Two experts, the frozen reference `laplace` and a trainable torch
   `laplace` with a state-conditioned gate added to the trunk's prequential log
   weights at the combine step (`TerminalLeafEnsemble.gate_offset`), under an
   exact density mixture weighted by undiscounted cumulative log-likelihood (the

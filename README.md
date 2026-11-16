@@ -11,31 +11,31 @@ A light, accurate, autonomous distributional forecaster for non-price economic s
 
 Laplace beats (almost) everything.
 
-<p align="center">
-  <img src="docs/assets/frontier.png" alt="Accuracy vs. speed on 2,775 non-price FRED series: laplace sits top-right, fastest and tied for the best held-out log-likelihood; only the PyMC-laplace sandwich edges it on accuracy, at about ten times the compute, while AutoARIMA, AutoETS, SARIMAX and GARCH-t trade accuracy for speed." width="680">
-</p>
+One step ahead on economic series it beats the classical arms at every FRED frequency and every zero-shot foundation model on daily data. The larger foundation models are ahead on monthly and weekly series by a few hundredths of a nat under the generous density reconstruction, GARCH-t is level with it on prices, and Conformal Seasonal Pools is ahead on strongly seasonal hourly series[^csp]. Full panel, paired per series: [foundationalprediction.com](https://foundationalprediction.com/).
 
-And it beats them across nearly every regime, giving ground only on price/returns (to GARCH-t) and, narrowly, on the hard, repeating waveforms (to CSP[^csp]).
-
-[^csp]: On the hard-waveform arm (near-deterministic, repeating cycles) CSP is handed the seasonal period, while `laplace` is not and must infer structure generically. Its edge there reflects that head start, not a like-for-like loss.
+[^csp]: CSP pools same-phase values around a seasonal-naive forecast and is given the period. `laplace` carries seasonal candidates at periods 7, 12 and 24 but one phase-averaged scale, which is where the hourly gap comes from: on M4 hourly CSP wins 144 of 414 series and loses 19 (+0.06 nats); on every FRED stratum `laplace` is ahead by 0.13 to 0.43 nats. The portfolio of the two keeps the hourly gain. See the [review](https://conformalprediction.net/csp.html).
 
 <p align="center">
-  <img src="docs/assets/radar.png" alt="Radar chart of per-regime win-rate against laplace on log-likelihood for CSP, Theta, nnetar and GARCH-t. All sit inside the dashed laplace ring except GARCH-t, which breaks out on the price/returns axis, and CSP, which edges past on the hard waveforms." width="560">
+  <img src="docs/assets/laplace-foundational-models.gif" alt="A cyclist pops a wheelie on a mountain bike alongside a professional peloton; the peloton is labelled Foundational Models and the wheelie rider Laplace." width="640">
 </p>
 
-<p align="center"><sub>Per-regime win-rate against <code>laplace</code> (log-likelihood, ties split, <code>laplace</code> = the dashed ring). Outside the ring the challenger wins that regime; inside, <code>laplace</code> does. GARCH-t breaks out on price/returns; CSP edges past on the hard, repeating waveforms, where it is handed the period and <code>laplace</code> is not. <a href="https://skaters.microprediction.org/challengers.html">Explore it interactively →</a></sub></p>
+<p align="center">
+  <img src="docs/assets/radar-canonical.png" alt="Radar chart of strength against laplace on log score, by stratum, for Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma and GARCH-t. On daily economic series every challenger sits inside the dashed laplace ring; on weekly, monthly and hourly series most foundation models sit outside it; on price and returns all are on the ring." width="560">
+</p>
+
+<p align="center"><sub>Strength against <code>laplace</code> by stratum: per-series Diebold–Mariano verdicts on log score, draws split, <code>laplace</code> = the dashed ring. Outside the ring the challenger is ahead on that stratum; inside, <code>laplace</code> is. Each foundation model is shown with its stronger density reconstruction. <a href="https://foundationalprediction.com/">The leaderboards →</a></sub></p>
 
 
-Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**: on 5,402 continuous non-price FRED change-series *Laplace* wins the per-series held-out **log-likelihood** race against eleven of twelve baselines — AutoARIMA, AutoETS, the reference R forecasters (auto.arima, thetaf, ADAM, nnetar), conformal, and zero-shot foundation models — typically on 82–98% of series. The foundation-model margin depends on how their nine quantiles are turned into a density: half a nat under a tight reconstruction, level at the median under a generous one (see the [benchmark paper](https://skaters.microprediction.org/papers.html)). The lone exception is **GARCH-t**, a 50/50 coin-flip that the paper resolves by *martingality*: Laplace wins decisively on series with mean structure, GARCH-t on near-random-walks.
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**. On FRED change-series scored one step ahead, it beats AutoARIMA, AutoETS, AutoTheta, GARCH-t and NPTS on held-out **log score** at every frequency, and on 2,179 daily series it beats every zero-shot foundation model tested. On 5,576 monthly series the newest foundation models (Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma) are ahead, by 0.05 to 0.10 nats per step at the median, and on 3,013 weekly series three of the four are. On price and return series laplace, GARCH-t and the foundation models are level. Every foundation-model figure depends on how its quantiles are turned into a density (see the [benchmark paper](https://skaters.microprediction.org/papers.html)).
 
 **Not for price/return series:** 
 We recommend GARCH-t there instead. 
 
 **When CRPS is the target:**
-A scoring rule is a settlement rule — match it to what you actually want. `skaters` defaults to held-out
+A scoring rule is a settlement rule: match it to what you actually want. `skaters` defaults to held-out
 log-likelihood because it ranks reusable densities, and on CRPS `laplace` still beats most of the competition. But if
 your target really is CDF shape or threshold behaviour, CRPS is a reasonable contract and a method like conformal
-prediction may suit — just know it is a different contract, not a better density.
+prediction may suit: just know it is a different contract, not a better density.
 ([Why skaters ranks by likelihood, by default →](https://skaters.microprediction.org/metrics.html))
 
 
@@ -65,13 +65,19 @@ for y in observations:
 
 Score a forecast only against observations that arrive after it was issued; the predictive returned alongside `y` aims at the next tick, and the parade in `state["pit"]`/`state["z"]` does this bookkeeping for you. Every skater returns a list of predictive distributions, one for each horizon $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all aspects of the same object.
 
-## `laplace` — the general forecaster
+## `laplace`: the general forecaster
 
-`skaters` exposes **exactly one forecaster**, `laplace`. Everything else is a
-building block (transforms, leaves, ensembles) you can compose. ("skater" is the
-*concept* — any `(y, state) -> ([Dist], state)` function, borrowed from the old
-timemachines package.) At multi-step horizons (`k>1`) it is **multi-scale by
-default** (below).
+`skaters` exposes **one general forecaster**, `laplace`, and **one trained one**,
+`granger`: laplace's pipeline with its continuous hyperparameters trained per
+frequency and a small gate on the ensemble weights, mixed with laplace by the
+Aggregating Algorithm so that its total log score is never more than `log 4`
+behind laplace's on any series (`granger(frequency="monthly")`; parameters ship
+for monthly, weekly and hourly). Everything else is a building block
+(transforms, leaves, ensembles) you can compose; `flesaker` (experimental) is
+one such composition for series with a known bound. ("skater" is the *concept*,
+any `(y, state) -> ([Dist], state)` function, borrowed from the old timemachines
+package.) At multi-step horizons (`k>1`) `laplace` is **multi-scale by default**
+(below).
 
 ```python
 from skaters import laplace
@@ -81,18 +87,18 @@ f = laplace(k=1)
 
 A likelihood-weighted Bayesian ensemble over a large candidate population (EMA,
 differencing, drift, Holt, AR, fractional differencing, seasonal, a Yeo-Johnson
-**coordinate** grid, a fast/slow two-systems block, and — at multi-step horizons
-(`k>1`) — an **Ornstein–Uhlenbeck mean-reversion** group). Three things are on by
+**coordinate** grid, a fast/slow two-systems block, and, at multi-step horizons
+(`k>1`), an **Ornstein–Uhlenbeck mean-reversion** group). Three things are on by
 default, each a free or near-free win:
 
-- **model first, score-optimize last** — the trunk is weighted by **likelihood**;
+- **model first, score-optimize last**: the trunk is weighted by **likelihood**;
   the terminal leaf is fit by **CRPS** (`objective="crps"`). On a
   2,500-series FRED study this matches a CRPS specialist on CRPS *and* lifts
   likelihood on real data. Switch back with `objective="likelihood"`.
-- **lattice projection** (`sticky=True`) — near-Dirac atoms on the exact values a
+- **lattice projection** (`sticky=True`): near-Dirac atoms on the exact values a
   series revisits. *Free* on continuous data (it vanishes), a large win on
   grid/repeating series (policy rates, posted prices).
-- **coordinate learning** — a Yeo-Johnson λ-grid lets the ensemble learn whether
+- **coordinate learning**: a Yeo-Johnson λ-grid lets the ensemble learn whether
   the series is simple in a log/multiplicative, sqrt, or linear coordinate.
 
 ```python
@@ -108,8 +114,8 @@ integral transform under the m-step-ahead predictive issued m steps ago
 the standard-normal quantile (roughly N(0,1); z is clamped to ±7.03, never
 infinite). That calibrated-surprise signal is the null model streaming anomaly
 detection is built on, and that work lives in its own project:
-[**timemachines**](https://timemachines.microprediction.org/) — calibrated
-online anomaly detection with honest false-alarm rates, built on skaters.
+[**timemachines**](https://timemachines.microprediction.org/): calibrated
+online anomaly detection with stated false-alarm rates, built on skaters.
 
 **Tails that keep their stated rates (v0.13.0).** Every predictive carries censored-ML
 generalized-Pareto tails beyond the body's ~2% region (the *conditional tail
@@ -123,7 +129,7 @@ alarm when `erfc(|z|/sqrt(2)) < alpha`. Essay:
 long form: [When to alarm](papers/when-to-alarm.md).
 
 **Price/return series** (`garch_leaf`). The default terminal leaf tracks its scale
-with an EWMA (RiskMetrics/IGARCH — no variance mean-reversion). For series with
+with an EWMA (RiskMetrics/IGARCH: no variance mean-reversion). For series with
 volatility *clustering and reversion* (equity/fx/commodity returns), swap in a
 GARCH(1,1)-t terminal leaf:
 
@@ -132,14 +138,14 @@ from skaters import laplace, garch_leaf
 f = laplace(k=1, leaf=garch_leaf)         # GARCH(1,1) conditional variance + Student-t tails
 ```
 
-**Not for price/returns, though** — there a fitted GARCH-t still wins
+**Not for price/returns, though**: there a fitted GARCH-t still wins
 
 ### Multi-step horizons are multi-scale by default
 
 Natively, `laplace(k)` reaches horizon `h` by fanning its one-step model out,
 and on long horizons the fan-out can inflate the predictive variance. A model on
 a *decimated* clock (every s-th observation) reaches the same horizon in
-`round(h/s)` of its own steps and stays tight — but is blind to the skipped
+`round(h/s)` of its own steps and stays tight: but is blind to the skipped
 points. At `k>1`, `laplace` runs a full instance per scale (default strides
 `{1, ceil(sqrt(k)), k}`) and mixes their predictive `Dist`s per horizon with
 likelihood softmax weights, so each horizon selects its effective granularity
@@ -176,6 +182,20 @@ positive FRED levels it is worth a median +0.015 to +0.018 nats of held-out
 log-likelihood (72–78% of series), and at `h=1` the two agree. The candidate
 pool keeps the default (its one-step spreads are where they agree).
 
+**Positive series** (rates, prices, volumes, volatilities): `flesaker()` is
+`laplace` on $\log(y)$ with the predictive mapped back exactly through `exp`,
+so every quantile it reports is positive. `flesaker(lower=b)` moves the bound and
+`flesaker(upper=b)` makes it a ceiling. Named after Bjorn Flesaker, whose
+positive-interest framework (with Hughston) builds positivity into the model
+rather than hoping for it. Experimental: an example composition, not settled API. See
+[`examples/positive_series.py`](examples/positive_series.py).
+
+```python
+from skaters import flesaker
+
+f = flesaker(k=3)                    # every quantile > 0
+```
+
 `laplace(k>1)` already carries an OU group in its pool, so the general forecaster
 picks up reversion automatically at multi-step horizons. The OU-on-a-coordinate
 math (the CIR reading) is in [`papers/tweedie-note.md`](papers/tweedie-note.md).
@@ -190,11 +210,11 @@ The leaf estimates $\hat{D} = \mathcal{N}(0, \hat\sigma^2)$ from residuals via W
 
 $$\hat{D}_{\text{original}} = T_1^{-1}\bigl(T_2^{-1}\bigl(\cdots\bigl(\hat{D}\bigr)\bigr)\bigr)$$
 
-Every node returns `list[Dist]`. There is no separate "point forecast" vs "uncertainty" — both are aspects of the same $\hat{D}$.
+Every node returns `list[Dist]`. There is no separate "point forecast" vs "uncertainty": both are aspects of the same $\hat{D}$.
 
 ### The key insight
 
-Every "model" is really a transform. An EMA doesn't "predict" — it subtracts a running level $\ell_t$, leaving simpler residuals $\varepsilon_t = y_t - \ell_t$. The prediction comes from inverting the transform chain applied to the leaf's distributional estimate.
+Every "model" is really a transform. An EMA doesn't "predict": it subtracts a running level $\ell_t$, leaving simpler residuals $\varepsilon_t = y_t - \ell_t$. The prediction comes from inverting the transform chain applied to the leaf's distributional estimate.
 
 ## The Dist type
 
@@ -242,6 +262,7 @@ Online bijective maps. Each has a `forward` (scalar in, scalar out) and an `inve
 | `power_transform(`$p$`)` | $y'_t = \text{sign}(y_t)\|y_t\|^p$ | Delta method (`exact=True` for the pushforward) | Tail compression |
 | `theta(`$\alpha$`)` | $y'_t = y_t - \text{SES}_t$ | Shift by smoothed level + drift | Theta method (M3 winner) |
 | `yeo_johnson(`$\lambda$`)` | Signed Box–Cox to coordinate $\lambda$ | Delta method (`exact=True` for the pushforward) | Coordinate learning (log/root/linear) |
+| `log_transform(lower=`$b$`)` | $y'_t = \log(y_t - b)$ (or $-\log(b - y_t)$ for `upper=`) | Exact pushforward through $\exp$ | One-sided bound (positive series) |
 | `ou_transform(`$\kappa$`)` | Deviation from running mean, OU speed $\kappa$ | Exact OU moments (scale + shift) | Mean reversion |
 
 ## Conjugation
@@ -302,12 +323,12 @@ f = bayesian_ensemble(
 )
 ```
 
-### `dantzig` — adaptive search (beam search over transform grammar)
+### `dantzig`: adaptive search (beam search over transform grammar)
 
 Where `laplace` weights a fixed candidate population, `dantzig` explores a
 growing one: expand top performers with new transforms (including seasonal
 differences at periods its online detector finds), replay recent history to
-warm-start, prune losers. Named for Dantzig 1947 — the simplex method walks
+warm-start, prune losers. Named for Dantzig 1947: the simplex method walks
 from vertex to better neighbouring vertex without enumerating the polytope,
 which is exactly this expand-and-prune walk through the model grammar.
 (`search` remains exported as the underlying machinery.)
@@ -328,14 +349,14 @@ f = dantzig(
 
 Everything here is judged by predictive **log-likelihood**. A plain Gaussian leaf
 gets the *location* and *scale* right but the *shape* wrong on heavy-tailed
-residuals (returns, macro data), and — crucially — Bayesian model averaging
+residuals (returns, macro data), and (crucially) Bayesian model averaging
 preserves the mean and variance but **washes the kurtosis out**, so adding heavy
 leaves to the candidate pool doesn't help.
 
 The fix is the **scale-mixture leaf**: a fixed dictionary of zero-mean Gaussians
 `N(0, aᵢ·σ)` with weights learned online (a Student-t *is* a Gaussian scale
 mixture, so this approximates it). It's a plain `Dist`; the weights are the
-"discrepancy from N(0,1)" — all on `a=1` is Gaussian, mass on larger `a` is fat
+"discrepancy from N(0,1)": all on `a=1` is Gaussian, mass on larger `a` is fat
 tails. It matches the Gaussian leaf on Gaussian data and beats it as tails fatten.
 
 ```python
@@ -344,7 +365,7 @@ from skaters import scale_mixture_leaf, terminal_leaf_ensemble, leaf
 
 Because mixing washes out shape, the named policies use a **terminal-leaf
 ensemble**: the candidates are combined for the *mean*, then one terminal
-scale-mixture leaf models the combined residual — so the leaf's shape reaches the
+scale-mixture leaf models the combined residual: so the leaf's shape reaches the
 output undiluted. On Student-t₃ this takes `laplace` from a logpdf of ≈ −2.07
 (Gaussian-collapsed) to ≈ −1.93, with no cost on Gaussian data.
 
@@ -402,10 +423,12 @@ leaves, ensembles and the trunk are `nn.Parameter`s reachable from
 learning rates are plain floats. Gradients flow from a log score at the
 output back through every stage, with the weight recursions truncated at
 one step by default (`detach_carry`), so a streaming call without
-`torch.no_grad()` keeps a bounded graph. `skaters.torch.learned` builds on it:
-a trainable laplace with a learned gate, held under an Aggregating-Algorithm
-mixture with the frozen reference `laplace`, so its cumulative log loss can
-exceed laplace's by at most `h log 2` nats on any stream (#297).
+`torch.no_grad()` keeps a bounded graph. `skaters.torch.learned` is the
+training twin of `granger`: a trainable laplace with a learned gate, held under
+an Aggregating-Algorithm mixture with the frozen reference `laplace`, so its
+cumulative log loss can exceed laplace's by at most `log 4` nats on any stream
+(#297). The trained parameters are exported to `skaters.granger` (pure Python,
+Rust and JavaScript, parity-checked).
 
 ```python
 from skaters.leaf import leaf
@@ -435,7 +458,7 @@ loss = -dists[0].logpdf(y_next)       # differentiable in every parameter
 
 ## JavaScript, R, Julia, Rust & the browser
 
-The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`) — every
+The whole library is also a zero-dependency **JavaScript port** (`docs/js/skaters/`): every
 transform, ensemble, and named policy. It is verified against the Python reference by a parity
 suite that checks roughly 100,000 values to 1e-6 (`parity/`, run in the test
 suite via `tests/test_js_parity.py`).
@@ -473,11 +496,11 @@ Interactive demos (forecasting playground in native JS, and the real Python pack
 
 ## Design
 
-- **Online only** — $O(1)$ per observation, no batch recomputation
-- **Distributional** — every prediction is a $\text{Dist}$, not a point estimate
-- **Composable** — transforms chain, ensembles nest, everything returns $\text{Dist}$
-- **Pure Python** — zero dependencies, only `math.erf` and `math.exp`
-- **Pyodide compatible** — works in the browser via WebAssembly
+- **Online only**: $O(1)$ per observation, no batch recomputation
+- **Distributional**: every prediction is a $\text{Dist}$, not a point estimate
+- **Composable**: transforms chain, ensembles nest, everything returns $\text{Dist}$
+- **Pure Python**: zero dependencies, only `math.erf` and `math.exp`
+- **Pyodide compatible**: works in the browser via WebAssembly
 
 ## Papers
 
@@ -493,8 +516,8 @@ Interactive demos (forecasting playground in native JS, and the real Python pack
 
 The online recursions here are **score-driven updates** with a Bayesian reading.
 The EMA level update $\mu_t = \mu_{t-1} + \alpha\,(y_t - \mu_{t-1})$ and the GARCH
-variance update $h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$ — the `ema_transform`
-and `garch`/`garch_leaf` building blocks — are both inverse-Fisher-scaled
+variance update $h_t = h_{t-1} + (1-\delta)(y_t^2 - h_{t-1})$: the `ema_transform`
+and `garch`/`garch_leaf` building blocks: are both inverse-Fisher-scaled
 conditional-score corrections. Via **Tweedie's formula**, Hansen & Tong (2026,
 [arXiv:2605.15902](https://arxiv.org/abs/2605.15902)) show these are the *exact*
 Bayesian posterior-mean corrections under a conjugate prior with local precision
@@ -510,7 +533,7 @@ models**: the posterior mean of a clean signal given a noisy observation is
 lets a diffusion denoiser be read as a score estimator (Efron 2011; Vincent 2011;
 Song & Ermon 2019). Each forecast step here is the time-series analogue —
 denoising the next observation toward the latent level or variance. A short essay
-on this — Kalman, empirical Bayes, and diffusion as one identity — is in
+on this (Kalman, empirical Bayes, and diffusion as one identity) is in
 [`papers/tweedie-note.md`](papers/tweedie-note.md).
 
 ## Lineage

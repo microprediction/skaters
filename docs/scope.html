@@ -13,33 +13,26 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
-          <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
-          </span>
-        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
+            <a href="/skills.html">Skills</a>
+            <a href="/examples.html">Examples</a>
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <a href="/guide.html">Methodology</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
           </span>
+        </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
@@ -53,9 +46,20 @@
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
             <a href="/faq.html">FAQ</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+          <span class="drop">
+            <a href="https://foundationalprediction.com/">All</a>
+            <a href="/foundation/chronos.html">Chronos</a>
+            <a href="/foundation/tirex.html">TiRex</a>
+            <a href="/foundation/timesfm.html">TimesFM</a>
+            <a href="/foundation/timesfm3.html">TimesFM3</a>
+            <a href="/foundation/sundial.html">Sundial</a>
+            <a href="/foundation/flowstate.html">FlowState</a>
+            <a href="/foundation/timestral.html">Timestral</a>
+            <a href="/foundation/t0gamma.html">t0-gamma</a>
+          </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
@@ -161,6 +165,67 @@
       stateful alternative, with warm-up and additional computation, rather than
       an unconditional drop-in. The
       <a href="https://github.com/microprediction/skaters/blob/main/skills/standardization-review.md">standardization-review skill</a> explains these trade-offs.
+    </p>
+
+    <h2>Prior knowledge</h2>
+    <p>
+      On raw observations, <code>laplace</code> forecasts on the real line.
+      If the series has a known physical bound, you can encode it in the
+      forecast through a transform.
+    </p>
+    <p>
+      For a strictly positive series, <code>flesaker</code> applies the log,
+      runs <code>laplace</code> on the transformed series, and maps the
+      predictive back through the exponential. Other transforms can encode a
+      ceiling, seasonality, or mean reversion. The
+      <a href="/examples.html">examples</a> show how to compose them.
+    </p>
+
+    <h2>Units and scale</h2>
+    <p>
+      A skater is not unit-free. Its transforms carry constants in absolute
+      units: a variance intercept, a ridge, floors that stop a division by zero.
+      They were tuned, and <code>granger</code> was trained, on series whose
+      values and typical steps sit roughly between 10<sup>-3</sup> and
+      10<sup>3</sup>. The <a href="/examples.html#scale">units example</a>
+      shows how this affects the median forecast on a synthetic series
+      multiplied by 10<sup>20</sup>.
+    </p>
+    <p>
+      So choose units the way a person would. Hash rate in exahashes per second,
+      not hashes; GDP in billions, not dollars; a quantity that lives at
+      10<sup>-12</sup> in its own scaled unit. Values and steps between about
+      10<sup>-3</sup> and 10<sup>6</sup> are a starting point. A
+      series that grows multiplicatively across many orders of magnitude over
+      its life is a different matter: no fixed unit fits all of it, and the
+      log coordinate is the right one (see <code>flesaker</code> on the
+      <a href="/examples.html#scale">examples page</a>).
+    </p>
+
+    <h2>Horizons and sampling rates</h2>
+    <p>
+      The maintainer's own use is one step ahead, and sometimes a few steps,
+      on daily and weekly economic series. That is where <code>laplace</code>
+      has been exercised hardest, and where the benchmarks on this site live.
+      Multi-step forecasting is supported and tested up to <code>k=12</code>,
+      which the author treats as the upper limit and as ongoing work: the
+      multi-scale mixture and the horizon-dependent pieces (tails, coordinate
+      inverses) are still being improved there. Beyond twelve steps, build the
+      stride into the clock (decimate) rather than asking for a longer fan.
+    </p>
+    <p>
+      Heavily over-sampled data is a different regime: a physiological signal
+      at hundreds of samples a second, a sensor read far faster than anything
+      in it changes, tick data. Successive observations are then nearly
+      deterministic functions of each other, and a one-step predictive is
+      mostly a statement about interpolation. <code>laplace</code> will run,
+      but it may not be the right instrument, and no benchmark here says it
+      is. The better path is to treat the package as a toolkit: pick the
+      transforms that encode what you know about the signal, choose the clock
+      (decimate, or forecast at the stride that matters), and compose a skater
+      for the job from the same parts <code>laplace</code> is built from. The
+      <a href="/examples.html">examples page</a> and the
+      <a href="/guide.html">methodology guide</a> show how.
     </p>
 
     <h2>The short version</h2>

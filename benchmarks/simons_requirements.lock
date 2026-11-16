@@ -1,0 +1,36 @@
+# Simons arm venv (.venv-simons, Python 3.12.13); issue #329
+# simons 0.1.1 (code Apache-2.0) from github.com/Abel-ai-lab/Simons@24110a634c60ea5eda1ba18ce20ef3c7618c4c6c; weights (OpenMDW-1.1, not gated) abel-lab/Simons-25M ea871af33d47bae63a695b2def374ed7a8839953, abel-lab/Simons-60M 7e637d0bd8e51fb4b7b8ef17f4b636d020a92cc7, abel-lab/Simons-178M b36d6364647d75a89a17703d9bfb2109b13c2427, abel-lab/Simons-297M 4a5ab590fdcfbbcc630737188cdec1ba9e069a5a
+anyio==4.16.0
+click==8.5.1
+datasets==5.2.0
+dill==0.4.1
+filelock==4.2.10
+fsspec==2026.9.0
+h11==0.16.0
+hf-xet==1.8.0
+httpcore2==2.16.0
+httpx2==2.16.0
+huggingface_hub==2.4.0
+idna==3.20
+Jinja2==3.1.6
+MarkupSafe==3.0.4
+mpmath==1.3.0
+multiprocess==0.70.19
+networkx==3.7
+numpy==2.5.4
+packaging==26.3
+pandas==3.1.1
+pyarrow==26.0.1
+python-dateutil==4.0.0
+PyYAML==6.0.3
+safetensors==0.8.0
+scipy==1.18.1
+setuptools==84.2.1
+simons @ git+https://github.com/Abel-ai-lab/Simons@24110a634c60ea5eda1ba18ce20ef3c7618c4c6c
+sympy==1.14.0
+torch==2.15.0
+tqdm==4.70.1
+truststore==0.10.5
+typing_extensions==4.16.0
+tzdata==2026.6
+xxhash==4.1.0

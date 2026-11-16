@@ -1,0 +1,5 @@
+# CSP arm venv (.venv-csp, Python 3.12.13); issue #329
+# csp-forecaster 0.2.0 (MIT), github.com/valeman/csp-forecaster @ 529d91865b2c8c6c0c08192c1a2ea35cfb94877c (training-free; no weights); arXiv:2605.03789
+csp-forecaster @ git+https://github.com/valeman/csp-forecaster.git@529d91865b2c8c6c0c08192c1a2ea35cfb94877c
+numpy==2.5.4
+scipy==1.18.1
