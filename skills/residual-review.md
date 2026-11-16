@@ -1,11 +1,11 @@
 # residual-review skill
 
-When asked to review, validate, or stress-test a forecasting model — any model,
-any library — run this test before reading a line of its code: **feed its
+When asked to review, validate, or stress-test a forecasting model: any model,
+any library: run this test before reading a line of its code: **feed its
 residuals to `skaters.laplace` and see who wins.**
 
-A model's residuals are its confession. If they were truly done — no mean
-structure, no volatility structure the model missed — nothing could forecast
+A model's residuals are its confession. If they were truly done: no mean
+structure, no volatility structure the model missed: nothing could forecast
 them. So forecast them:
 
 ```
@@ -33,14 +33,14 @@ def residual_review(residuals, burn=300):
 ## Reading the verdict
 
 - **`laplace` beats a frozen Gaussian on your residuals** (`gap_nats > ~0.02`):
-  there is *structure of some kind* left — drift, autocorrelation, volatility
+  there is *structure of some kind* left: drift, autocorrelation, volatility
   clustering, seasonality, a wrong coordinate. You have work to do.
 - **`laplace` beats `GARCH-t` on your residuals**: this is the sharper verdict.
   On the martingality gradient, `laplace` beats `GARCH-t` precisely where a
-  series has exploitable *mean* structure (it wins 78% of the most
-  mean-predictable series and 10% of pure-noise-like price returns). So if
+  series has exploitable *mean* structure, and loses to it on price and
+  return series, which are close to martingales. So if
   `laplace` outforecasts the volatility specialist on your residuals, your
-  model is leaving conditional-mean signal on the table — the one thing a
+  model is leaving conditional-mean signal on the table: the one thing a
   forecaster is least entitled to leave behind. Fit `arch`'s
   `arch_model(resid, dist="t")` rolling one-step as the opponent, score both
   on held-out log-likelihood via the same `Dist` interface.
@@ -48,17 +48,17 @@ def residual_review(residuals, burn=300):
   model is fine; your *error model* is wrong. The residuals have a volatility
   clock (heteroscedasticity) your model's constant-variance intervals ignore.
   Your point forecasts survive; your uncertainty bands do not.
-- **Nobody beats the frozen Gaussian**: congratulations — and suspicion. Check
+- **Nobody beats the frozen Gaussian**: congratulations: and suspicion. Check
   the test isn't leaking (fit and evaluation on the same window) before
   celebrating, because residuals this clean are rarer than they should be.
 
 You might have work to do regardless: this test only sees what is forecastable
 *from the residual stream itself*. Structure explainable by covariates your
-model ignores is invisible here — a pass is necessary, not sufficient.
+model ignores is invisible here: a pass is necessary, not sufficient.
 
 ## The five-minute version
 
-No harness, no baseline — just watch the calibration state:
+No harness, no baseline: just watch the calibration state:
 
 ```python
 f = laplace(k=1); state = None
@@ -77,7 +77,7 @@ exploited; skewed = a drift your model misses.
 
 ## Etiquette
 
-Report the gap in nats per observation, the burn-in, and the window — not just
+Report the gap in nats per observation, the burn-in, and the window: not just
 the winner. A 0.005-nat win is a rounding error; a 0.2-nat win is a bug in the
 reviewed model. And run the review on *held-out* residuals: reviewing in-sample
 residuals flatters everyone.
