@@ -35,7 +35,7 @@ model's home metric to the opponent's away metric.
    aggregate per series. Report per-series win rates, not pooled means; one
    degenerate series must not own the average.
 
-## The splits that keep you honest
+## The splits that keep the comparison clean
 
 - **Continuous vs repeat-heavy.** Compute the fraction of consecutive equal
   changes over the test window; below 0.05 is continuous. Constant and

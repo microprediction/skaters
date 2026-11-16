@@ -253,7 +253,7 @@ f = search(
       comes from models that step 1, 2, 4, &hellip; at a time. Nothing is fitted offline: every
       parameter above is fixed, and the ensemble weights are learned online, per series.</p>
 
-    <h2><code>granger</code>: laplace with trained parameters</h2>
+    <h2 id="granger"><code>granger</code>: laplace with trained parameters</h2>
     <p><code>granger(frequency=...)</code> is laplace's pipeline with its hyperparameters trained on
       large panels of monthly, weekly and hourly series (FRED and public pretraining corpora), plus a
       small gate that adjusts the ensemble's combining weights from the series' recent calibration

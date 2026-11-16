@@ -66,13 +66,13 @@ flips, so the filling retrains less and generalizes further.
 
 - The bottom slice **is** the `residual-review` skill running continuously: if
   laplace finds nothing in your residuals, the sandwich's predictive collapses
-  to "your point + honest noise" and its mean equals your model's — that's a
+  to "your point + calibrated noise" and its mean equals your model's: that is a
   clean bill of health, not a failure.
 - The sandwich's own `state["pit"]`/`state["z"]` (the parade) now monitor the
   *combined* system: a drifting PIT histogram tells you the filling's regime
   broke before the P&L does.
 
-## The fixed point (honesty clause)
+## The fixed point (no-flattery clause)
 
 Sandwiching `laplace` itself does nothing — we tested it: stacking a second
 layer on laplace's own residuals *loses* to plain laplace, because the

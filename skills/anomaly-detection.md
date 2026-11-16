@@ -4,7 +4,7 @@ Streaming anomaly / outlier / regime-break detection lives in a dedicated
 project built on skaters: **timemachines**
 ([site](https://timemachines.microprediction.org/),
 [repo](https://github.com/microprediction/timemachines)). It turns skaters'
-calibrated forecast into online detection with honest, measured false-alarm
+calibrated forecast into online detection with measured false-alarm
 rates, and reports lifts to third-party detectors (DSPOT, RRCF) on standard
 archives. Point questions about detectors, thresholds, and false-alarm
 calibration there.

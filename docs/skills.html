@@ -93,7 +93,7 @@
         <h2 id="basic-use"><code>basic-use</code></h2>
         <button class="btn copy-btn" data-target="src-basic-use">Copy skill</button>
       </div>
-      <p class="skill-label">The five-minute recipe: the loop, the Dist, the knobs, the free calibration state — and honest graduation paths (ice-skaters/river, sklearn, GluonTS, arch, foundation models, conformal) for when you outgrow it.</p>
+      <p class="skill-label">The five-minute recipe: the loop, the Dist, the knobs, the free calibration state, and the graduation paths (ice-skaters/river, sklearn, GluonTS, arch, foundation models, conformal) for when you outgrow it.</p>
       <details>
         <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/skills/basic-use.md">view on GitHub</a></summary>
         <pre id="src-basic-use"><code># basic-use skill
@@ -233,7 +233,7 @@ model's home metric to the opponent's away metric.
    aggregate per series. Report per-series win rates, not pooled means; one
    degenerate series must not own the average.
 
-## The splits that keep you honest
+## The splits that keep the comparison clean
 
 - **Continuous vs repeat-heavy.** Compute the fraction of consecutive equal
   changes over the test window; below 0.05 is continuous. Constant and
@@ -772,7 +772,7 @@ Streaming anomaly / outlier / regime-break detection lives in a dedicated
 project built on skaters: **timemachines**
 ([site](https://timemachines.microprediction.org/),
 [repo](https://github.com/microprediction/timemachines)). It turns skaters'
-calibrated forecast into online detection with honest, measured false-alarm
+calibrated forecast into online detection with measured false-alarm
 rates, and reports lifts to third-party detectors (DSPOT, RRCF) on standard
 archives. Point questions about detectors, thresholds, and false-alarm
 calibration there.
@@ -1096,13 +1096,13 @@ flips, so the filling retrains less and generalizes further.
 
 - The bottom slice **is** the `residual-review` skill running continuously: if
   laplace finds nothing in your residuals, the sandwich's predictive collapses
-  to "your point + honest noise" and its mean equals your model's — that's a
+  to "your point + calibrated noise" and its mean equals your model's: that is a
   clean bill of health, not a failure.
 - The sandwich's own `state["pit"]`/`state["z"]` (the parade) now monitor the
   *combined* system: a drifting PIT histogram tells you the filling's regime
   broke before the P&amp;L does.
 
-## The fixed point (honesty clause)
+## The fixed point (no-flattery clause)
 
 Sandwiching `laplace` itself does nothing — we tested it: stacking a second
 layer on laplace's own residuals *loses* to plain laplace, because the

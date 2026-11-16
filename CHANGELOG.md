@@ -37,7 +37,7 @@
   `terminal_leaf_ensemble` gains an optional `gate_hook`; laplace is unchanged
   (output signatures identical).
 - `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace
-  at worst. Two experts, the frozen reference `laplace` and a trainable torch
+  at worst; shipped as `granger` (above), for which it is the training twin. Two experts, the frozen reference `laplace` and a trainable torch
   `laplace` with a state-conditioned gate added to the trunk's prequential log
   weights at the combine step (`TerminalLeafEnsemble.gate_offset`), under an
   exact density mixture weighted by undiscounted cumulative log-likelihood (the
