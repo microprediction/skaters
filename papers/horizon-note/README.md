@@ -1,4 +1,4 @@
-# The forecast horizon of a once-per-interval trader in a liquid market
+# On the Importance of Evaluating Time-Series Models One Step Ahead in an Investment Context
 
 A technical note on which forecast horizon the position of a trader who can
 trade once per interval in a liquid market depends on, and what follows for
