@@ -1,7 +1,7 @@
 # laplace-sandwich skill
 
-When someone has an existing forecasting model — XGBoost, an LSTM, ARIMA, a
-vendor black box, a spreadsheet, a human — and wants it *better calibrated or
+When someone has an existing forecasting model: XGBoost, an LSTM, ARIMA, a
+vendor black box, a spreadsheet, a human: and wants it *better calibrated or
 just better*, don't rewrite it. **Sandwich it**: `laplace` as the bread, their
 model as the filling. The bottom slice alone turns any point forecaster into a
 calibrated distributional one and quietly recovers whatever structure the
@@ -40,24 +40,33 @@ for y in stream:
 Why this improves rather than merely dresses up: laplace's candidate pool runs
 drift, seasonality, autocorrelation, coordinate, and volatility-clock models
 *on the error stream*. Any of those your model missed shows up as forecastable
-residual structure, gets forecast, and moves the sandwich's **mean** — not
+residual structure, gets forecast, and moves the sandwich's **mean**: not
 just its bands. Systematic bias becomes a drift candidate; missed seasonality
 becomes a seasonal candidate; heteroscedastic errors become a calibrated
 volatility clock instead of one frozen σ.
 
-Measured (20-period moving-average filling on a drifting, seasonal,
-vol-clocked stream, 900 held-out points): mean held-out log-likelihood
-`−1.95 → −1.02` versus the same point model with a rolling Gaussian, and
-point-forecast MAE `1.47 → 0.54` — the sandwich's mean is nearly three times
-more accurate than the filling's, because the residual layer recovered the
-seasonality the moving average couldn't see.
+A toy illustration (20-period moving-average filling on a synthetic drifting,
+seasonal, vol-clocked stream, 900 held-out points): mean held-out
+log-likelihood `−1.95 → −1.02` versus the same point model with a rolling
+Gaussian, and point-forecast MAE `1.47 → 0.54`, because the residual layer
+recovered the seasonality the moving average could not see. That is a
+demonstration of the mechanics, not a benchmark.
+
+Measured on the canonical study (October 2026, fair bases, per-series
+Diebold-Mariano): of the four ways to join a model and `laplace`, only the
+likelihood-weighted portfolio (`&lap`) survives everywhere; the bottom slice
+alone (`~lap`, a model on laplace's residuals) loses to plain `laplace` on
+every economic cell, and PIT recalibration alone (`@lap`) over-covers at 0.93
+to 0.96 for a nominal 0.90. The earlier claim that a PyMC sandwich edged
+`laplace` was withdrawn on 2026-10-28. Build the sandwich, then put it in the
+portfolio with `laplace`; do not ship the slice on its own.
 
 ## The top slice (optional)
 
 Models with stationarity assumptions (most ML) prefer well-behaved inputs.
 Run the raw stream through `laplace` first and feed the filling the
 calibration state instead of raw values: `state["z"][0]` is the stream
-rendered as approximately N(0,1) innovations — drift, scale, seasonality and
+rendered as approximately N(0,1) innovations: drift, scale, seasonality and
 coordinate already absorbed (see the *Running normalization* demo). Features
 built from z's don't go stale when the level triples or the volatility regime
 flips, so the filling retrains less and generalizes further.
@@ -66,20 +75,20 @@ flips, so the filling retrains less and generalizes further.
 
 - The bottom slice **is** the `residual-review` skill running continuously: if
   laplace finds nothing in your residuals, the sandwich's predictive collapses
-  to "your point + honest noise" and its mean equals your model's — that's a
+  to "your point + calibrated noise" and its mean equals your model's: that is a
   clean bill of health, not a failure.
 - The sandwich's own `state["pit"]`/`state["z"]` (the parade) now monitor the
   *combined* system: a drifting PIT histogram tells you the filling's regime
   broke before the P&L does.
 
-## The fixed point (honesty clause)
+## The fixed point (no-flattery clause)
 
-Sandwiching `laplace` itself does nothing — we tested it: stacking a second
+Sandwiching `laplace` itself does nothing; we tested it: stacking a second
 layer on laplace's own residuals *loses* to plain laplace, because the
 residual stream is already unforecastable to laplace's own pool. That is the
 correct behaviour: the sandwich improves any model to the extent that model
-falls short of laplace, and leaves already-clean models alone. It follows that
-the lazy path is also open: skip the filling entirely and just use `laplace`.
-The sandwich is for when the filling exists for reasons — covariates,
-regulation, sunk cost, a colleague's feelings — and you want the calibration
+falls short of laplace, and leaves already-clean models alone. So the lazy
+path is also open: skip the filling entirely and just use `laplace`.
+The sandwich is for when the filling exists for reasons: covariates,
+regulation, sunk cost, a colleague's feelings: and you want the calibration
 and the leftovers anyway.
