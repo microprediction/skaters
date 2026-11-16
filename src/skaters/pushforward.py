@@ -193,7 +193,7 @@ class PushforwardDist:
             return math.nan
         return self.inner.cdf(z)
 
-    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
+    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 2100) -> float:
         return self._y(self.inner.quantile(p, tol=tol, max_iter=max_iter))
 
     def crps(self, x: float) -> float:

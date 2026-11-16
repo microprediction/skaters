@@ -204,19 +204,63 @@ export class Dist {
     return t1 - 0.5 * t2;
   }
 
-  quantile(p, tol = 1e-9, maxIter = 100) {
+  // Same bracket, tolerance, atom and binary64 convergence rules as Python.
+  quantile(p, tol = 1e-9, maxIter = 2100) {
     if (!(p > 0 && p < 1)) throw new Error("quantile p must be in (0, 1)");
-    const mu = this.mean;
-    const sigma = Math.sqrt(this.var);
-    let lo = mu - 8 * sigma;
-    let hi = mu + 8 * sigma;
+    const mu = this.mean, sigma = Math.sqrt(this.var);
+    if (!Number.isFinite(sigma)) throw new Error("quantile needs a finite mixture variance");
+    let minSigma = Infinity;
+    for (const [w, , s] of this.components) if (w > 0 && s > 0) minSigma = Math.min(minSigma, s);
+    if (!Number.isFinite(minSigma)) minSigma = 1.0;
+    const xTol = tol * Math.min(1.0, minSigma);
+    let lo = mu - 8 * sigma, hi = mu + 8 * sigma;
+    const seed = Math.max(16 * sigma, 1e-12 * Math.max(1.0, Math.abs(mu)));
+    let width = seed, found = false;
+    for (let i = 0; i < 120; i++) {
+      if (this.cdf(lo) < p) { found = true; break; }
+      lo -= width; width *= 2.0;
+    }
+    if (!found) throw new Error("could not bracket quantile from below");
+    width = seed; found = false;
+    for (let i = 0; i < 120; i++) {
+      if (this.cdf(hi) >= p) { found = true; break; }
+      hi += width; width *= 2.0;
+    }
+    if (!found) throw new Error("could not bracket quantile from above");
+    if (!(Number.isFinite(lo) && Number.isFinite(hi))) throw new Error("quantile needs a finite search bracket");
     for (let i = 0; i < maxIter; i++) {
-      const mid = 0.5 * (lo + hi);
+      let mid = 0.5 * (lo + hi);
+      if (!Number.isFinite(mid)) mid = 0.5 * lo + 0.5 * hi;
+      if (!(lo < mid && mid < hi)) {
+        const gap = hi - lo;
+        if (0 < tol && tol <= 2 * gap) {
+          let lower = 0, upper = 0, swappedLower = 0, swappedUpper = 0;
+          for (const [w, m, s] of this.components) {
+            const cl = w * gaussianCdf(lo, m, s), cu = w * gaussianCdf(hi, m, s);
+            lower += cl; upper += cu;
+            const unresolved = w > 0 && s <= gap;
+            swappedLower += unresolved ? cu : cl;
+            swappedUpper += unresolved ? cl : cu;
+          }
+          if (swappedLower === lower && swappedUpper === upper) return mid;
+        }
+        return hi;
+      }
       if (this.cdf(mid) < p) lo = mid;
       else hi = mid;
-      if (hi - lo < tol) break;
+      if (hi - lo < xTol) {
+        for (const [w, m, s] of this.components) {
+          if (w > 0 && s === 0 && lo <= m && m <= hi) {
+            let left = 0.0;
+            for (const [wi, mi, si] of this.components) left += wi * (si === 0 ? Number(mi < m) : gaussianCdf(m, mi, si));
+            if (left < p && p <= this.cdf(m)) return m;
+          }
+        }
+        break;
+      }
     }
-    return 0.5 * (lo + hi);
+    const mid = 0.5 * (lo + hi);
+    return Number.isFinite(mid) ? mid : 0.5 * lo + 0.5 * hi;
   }
 
   get mean() {

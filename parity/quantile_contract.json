@@ -1,0 +1,1121 @@
+[
+  {
+    "name": "tiny_0.01",
+    "components": [
+      [
+        1,
+        0,
+        1e-11
+      ]
+    ],
+    "p": 0.01,
+    "expected": -2.3263478740408407e-11,
+    "atol": 1e-20,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "tiny_0.5",
+    "components": [
+      [
+        1,
+        0,
+        1e-11
+      ]
+    ],
+    "p": 0.5,
+    "expected": 0.0,
+    "atol": 1e-20,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "tiny_0.99",
+    "components": [
+      [
+        1,
+        0,
+        1e-11
+      ]
+    ],
+    "p": 0.99,
+    "expected": 2.3263478740408407e-11,
+    "atol": 1e-20,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "far_low_weight",
+    "components": [
+      [
+        0.9999,
+        0,
+        1
+      ],
+      [
+        0.0001,
+        1000,
+        1
+      ]
+    ],
+    "p": 0.999999,
+    "expected": 1002.326347874,
+    "atol": 1e-05,
+    "cdf_tol": 1e-12
+  },
+  {
+    "name": "separation_1000_0.25",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1000,
+        1
+      ]
+    ],
+    "p": 0.25,
+    "expected": 0,
+    "atol": 1e-20,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "separation_1000_0.75",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1000,
+        1
+      ]
+    ],
+    "p": 0.75,
+    "expected": 1000,
+    "atol": 1e-08,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "separation_1e+20_0.25",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1e+20,
+        1
+      ]
+    ],
+    "p": 0.25,
+    "expected": 0,
+    "atol": 1e-20,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "separation_1e+20_0.75",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1e+20,
+        1
+      ]
+    ],
+    "p": 0.75,
+    "expected": 1e+20,
+    "atol": 0,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "separation_1e+40_0.25",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1e+40,
+        1
+      ]
+    ],
+    "p": 0.25,
+    "expected": 0,
+    "atol": 1e-20,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "separation_1e+40_0.75",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1e+40,
+        1
+      ]
+    ],
+    "p": 0.75,
+    "expected": 1e+40,
+    "atol": 0,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "separation_1e+80_0.25",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1e+80,
+        1
+      ]
+    ],
+    "p": 0.25,
+    "expected": 0,
+    "atol": 1e-20,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "separation_1e+80_0.75",
+    "components": [
+      [
+        0.5,
+        0,
+        1e-11
+      ],
+      [
+        0.5,
+        1e+80,
+        1
+      ]
+    ],
+    "p": 0.75,
+    "expected": 1e+80,
+    "atol": 0,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "collapsed_first_landmark",
+    "components": [
+      [
+        0.5,
+        1000000000000000.0,
+        0.001
+      ],
+      [
+        0.5,
+        1000000000000010.0,
+        0.001
+      ]
+    ],
+    "p": 0.25,
+    "expected": 1000000000000000.0,
+    "atol": 0,
+    "cdf_tol": 0
+  },
+  {
+    "name": "upper_outer_tail",
+    "components": [
+      [
+        0.5,
+        0,
+        1
+      ],
+      [
+        0.5,
+        10,
+        1
+      ]
+    ],
+    "p": 0.9999999999999999,
+    "lower": 18,
+    "upper": 18.2
+  },
+  {
+    "name": "lower_outer_tail",
+    "components": [
+      [
+        0.5,
+        0,
+        1
+      ],
+      [
+        0.5,
+        10,
+        1
+      ]
+    ],
+    "p": 1e-16,
+    "lower": -8.2,
+    "upper": -8
+  },
+  {
+    "name": "single_atom",
+    "components": [
+      [
+        1,
+        3,
+        0
+      ]
+    ],
+    "p": 0.9,
+    "expected": 3,
+    "atol": 0
+  },
+  {
+    "name": "atom_and_narrow_atom_quantile",
+    "components": [
+      [
+        0.5,
+        0,
+        0
+      ],
+      [
+        0.5,
+        10,
+        1e-11
+      ]
+    ],
+    "p": 0.25,
+    "expected": 0,
+    "atol": 0
+  },
+  {
+    "name": "atom_and_narrow_continuous_quantile",
+    "components": [
+      [
+        0.5,
+        0,
+        0
+      ],
+      [
+        0.5,
+        10,
+        1e-11
+      ]
+    ],
+    "p": 0.75,
+    "expected": 10,
+    "atol": 0
+  },
+  {
+    "name": "two_atoms_left",
+    "components": [
+      [
+        0.5,
+        0,
+        0
+      ],
+      [
+        0.5,
+        10,
+        0
+      ]
+    ],
+    "p": 0.25,
+    "expected": 0,
+    "atol": 0
+  },
+  {
+    "name": "two_atoms_right",
+    "components": [
+      [
+        0.5,
+        0,
+        0
+      ],
+      [
+        0.5,
+        10,
+        0
+      ]
+    ],
+    "p": 0.75,
+    "expected": 10,
+    "atol": 0
+  },
+  {
+    "name": "deep_tail",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.999999999999,
+    "expected": 7.034481104929,
+    "atol": 0.0001
+  },
+  {
+    "name": "unit_gaussian_0.001",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.001,
+    "expected": -3.090232306625694,
+    "atol": 0
+  },
+  {
+    "name": "unit_gaussian_0.01",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.01,
+    "expected": -2.3263478740118444,
+    "atol": 0
+  },
+  {
+    "name": "unit_gaussian_0.1",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.1,
+    "expected": -1.2815515655092895,
+    "atol": 0
+  },
+  {
+    "name": "unit_gaussian_0.5",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.5,
+    "expected": -4.656612873077393e-10,
+    "atol": 0
+  },
+  {
+    "name": "unit_gaussian_0.9",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.9,
+    "expected": 1.2815515655092895,
+    "atol": 0
+  },
+  {
+    "name": "unit_gaussian_0.99",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.99,
+    "expected": 2.3263478740118444,
+    "atol": 0
+  },
+  {
+    "name": "unit_gaussian_0.999",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ]
+    ],
+    "p": 0.999,
+    "expected": 3.090232306625694,
+    "atol": 0
+  },
+  {
+    "name": "unit_mixture_0.001",
+    "components": [
+      [
+        0.2,
+        -2,
+        1
+      ],
+      [
+        0.5,
+        1,
+        2
+      ],
+      [
+        0.3,
+        5,
+        1.5
+      ]
+    ],
+    "p": 0.001,
+    "expected": -4.973180484581521,
+    "atol": 0
+  },
+  {
+    "name": "unit_mixture_0.01",
+    "components": [
+      [
+        0.2,
+        -2,
+        1
+      ],
+      [
+        0.5,
+        1,
+        2
+      ],
+      [
+        0.3,
+        5,
+        1.5
+      ]
+    ],
+    "p": 0.01,
+    "expected": -3.8632773162817626,
+    "atol": 0
+  },
+  {
+    "name": "unit_mixture_0.1",
+    "components": [
+      [
+        0.2,
+        -2,
+        1
+      ],
+      [
+        0.5,
+        1,
+        2
+      ],
+      [
+        0.3,
+        5,
+        1.5
+      ]
+    ],
+    "p": 0.1,
+    "expected": -2.311355260207714,
+    "atol": 0
+  },
+  {
+    "name": "unit_mixture_0.5",
+    "components": [
+      [
+        0.2,
+        -2,
+        1
+      ],
+      [
+        0.5,
+        1,
+        2
+      ],
+      [
+        0.3,
+        5,
+        1.5
+      ]
+    ],
+    "p": 0.5,
+    "expected": 1.4779582559784783,
+    "atol": 0
+  },
+  {
+    "name": "unit_mixture_0.9",
+    "components": [
+      [
+        0.2,
+        -2,
+        1
+      ],
+      [
+        0.5,
+        1,
+        2
+      ],
+      [
+        0.3,
+        5,
+        1.5
+      ]
+    ],
+    "p": 0.9,
+    "expected": 5.710347919485958,
+    "atol": 0
+  },
+  {
+    "name": "unit_mixture_0.99",
+    "components": [
+      [
+        0.2,
+        -2,
+        1
+      ],
+      [
+        0.5,
+        1,
+        2
+      ],
+      [
+        0.3,
+        5,
+        1.5
+      ]
+    ],
+    "p": 0.99,
+    "expected": 7.763100341973198,
+    "atol": 0
+  },
+  {
+    "name": "unit_mixture_0.999",
+    "components": [
+      [
+        0.2,
+        -2,
+        1
+      ],
+      [
+        0.5,
+        1,
+        2
+      ],
+      [
+        0.3,
+        5,
+        1.5
+      ]
+    ],
+    "p": 0.999,
+    "expected": 9.07631316877442,
+    "atol": 0
+  },
+  {
+    "name": "subunit_mixture_0.001",
+    "components": [
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        3,
+        2
+      ]
+    ],
+    "p": 0.001,
+    "expected": -2.7563290534618745,
+    "atol": 5e-10
+  },
+  {
+    "name": "subunit_mixture_0.01",
+    "components": [
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        3,
+        2
+      ]
+    ],
+    "p": 0.01,
+    "expected": -1.3095021751716174,
+    "atol": 5e-10
+  },
+  {
+    "name": "subunit_mixture_0.1",
+    "components": [
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        3,
+        2
+      ]
+    ],
+    "p": 0.1,
+    "expected": -0.49756657201629895,
+    "atol": 5e-10
+  },
+  {
+    "name": "subunit_mixture_0.5",
+    "components": [
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        3,
+        2
+      ]
+    ],
+    "p": 0.5,
+    "expected": 0.600000000389854,
+    "atol": 5e-10
+  },
+  {
+    "name": "subunit_mixture_0.9",
+    "components": [
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        3,
+        2
+      ]
+    ],
+    "p": 0.9,
+    "expected": 4.683242467135612,
+    "atol": 5e-10
+  },
+  {
+    "name": "subunit_mixture_0.99",
+    "components": [
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        3,
+        2
+      ]
+    ],
+    "p": 0.99,
+    "expected": 7.107497821046563,
+    "atol": 5e-10
+  },
+  {
+    "name": "subunit_mixture_0.999",
+    "components": [
+      [
+        0.5,
+        0,
+        0.5
+      ],
+      [
+        0.5,
+        3,
+        2
+      ]
+    ],
+    "p": 0.999,
+    "expected": 8.756323478282381,
+    "atol": 5e-10
+  },
+  {
+    "name": "collapsed_second_landmark",
+    "components": [
+      [
+        0.5,
+        1000000000000000.0,
+        0.001
+      ],
+      [
+        0.5,
+        1000000000000010.0,
+        0.001
+      ]
+    ],
+    "p": 0.75,
+    "expected": 1000000000000010.0,
+    "atol": 0,
+    "cdf_tol": 0
+  },
+  {
+    "name": "large_atom",
+    "components": [
+      [
+        1,
+        1000000000000000.0,
+        0
+      ]
+    ],
+    "p": 0.25,
+    "expected": 1000000000000000.0,
+    "atol": 0
+  },
+  {
+    "name": "inactive_tiny_scale",
+    "components": [
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        0,
+        10,
+        1e-30
+      ]
+    ],
+    "p": 0.9,
+    "expected": 1.2815515655092895,
+    "atol": 0
+  },
+  {
+    "name": "large_scale_historical_rounding",
+    "components": [
+      [
+        1,
+        1000000000000.0001,
+        10000000000.0
+      ]
+    ],
+    "p": 0.5,
+    "expected": 1000000000000.0,
+    "atol": 0,
+    "cdf_tol": 1e-12
+  },
+  {
+    "name": "large_level_unit_noise_0.1",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ]
+    ],
+    "p": 0.1,
+    "expected": 9999998.718448434,
+    "atol": 0,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "large_level_unit_noise_0.25",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ]
+    ],
+    "p": 0.25,
+    "expected": 9999999.325510249,
+    "atol": 0,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "large_level_unit_noise_0.75",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ]
+    ],
+    "p": 0.75,
+    "expected": 10000000.674489751,
+    "atol": 0,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "large_level_unit_noise_0.9",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ]
+    ],
+    "p": 0.9,
+    "expected": 10000001.281551566,
+    "atol": 0,
+    "cdf_tol": 1e-08
+  },
+  {
+    "name": "subunit_offset_0.1",
+    "components": [
+      [
+        0.9,
+        6000000.0,
+        0.5
+      ],
+      [
+        0.1,
+        6000000.0,
+        2
+      ]
+    ],
+    "p": 0.1,
+    "expected": 5999999.267411649,
+    "atol": 0
+  },
+  {
+    "name": "subunit_offset_0.25",
+    "components": [
+      [
+        0.9,
+        6000000.0,
+        0.5
+      ],
+      [
+        0.1,
+        6000000.0,
+        2
+      ]
+    ],
+    "p": 0.25,
+    "expected": 5999999.631154323,
+    "atol": 0
+  },
+  {
+    "name": "subunit_offset_0.5",
+    "components": [
+      [
+        0.9,
+        6000000.0,
+        0.5
+      ],
+      [
+        0.1,
+        6000000.0,
+        2
+      ]
+    ],
+    "p": 0.5,
+    "expected": 6000000.0,
+    "atol": 0
+  },
+  {
+    "name": "subunit_offset_0.75",
+    "components": [
+      [
+        0.9,
+        6000000.0,
+        0.5
+      ],
+      [
+        0.1,
+        6000000.0,
+        2
+      ]
+    ],
+    "p": 0.75,
+    "expected": 6000000.368845677,
+    "atol": 0
+  },
+  {
+    "name": "subunit_offset_0.9",
+    "components": [
+      [
+        0.9,
+        6000000.0,
+        0.5
+      ],
+      [
+        0.1,
+        6000000.0,
+        2
+      ]
+    ],
+    "p": 0.9,
+    "expected": 6000000.732588351,
+    "atol": 0
+  },
+  {
+    "name": "tiny_weight_residue_0.1",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ],
+      [
+        1e-301,
+        10000000.0,
+        1e-12
+      ]
+    ],
+    "p": 0.1,
+    "expected": 9999998.718448434,
+    "atol": 0
+  },
+  {
+    "name": "tiny_weight_residue_0.25",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ],
+      [
+        1e-301,
+        10000000.0,
+        1e-12
+      ]
+    ],
+    "p": 0.25,
+    "expected": 9999999.325510249,
+    "atol": 0
+  },
+  {
+    "name": "tiny_weight_residue_0.5",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ],
+      [
+        1e-301,
+        10000000.0,
+        1e-12
+      ]
+    ],
+    "p": 0.5,
+    "expected": 10000000.0,
+    "atol": 0
+  },
+  {
+    "name": "tiny_weight_residue_0.75",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ],
+      [
+        1e-301,
+        10000000.0,
+        1e-12
+      ]
+    ],
+    "p": 0.75,
+    "expected": 10000000.674489751,
+    "atol": 0
+  },
+  {
+    "name": "tiny_weight_residue_0.9",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ],
+      [
+        1e-301,
+        10000000.0,
+        1e-12
+      ]
+    ],
+    "p": 0.9,
+    "expected": 10000001.281551566,
+    "atol": 0
+  },
+  {
+    "name": "meaningful_low_weight_collapsed",
+    "components": [
+      [
+        0.9999,
+        0,
+        1
+      ],
+      [
+        0.0001,
+        1e+20,
+        1
+      ]
+    ],
+    "p": 0.99995,
+    "expected": 1e+20,
+    "atol": 0,
+    "cdf_tol": 1e-12
+  },
+  {
+    "name": "meaningful_tiny_weight_tail",
+    "components": [
+      [
+        1,
+        10000000.0,
+        1
+      ],
+      [
+        1e-301,
+        0,
+        1e-11
+      ]
+    ],
+    "p": 5e-302,
+    "expected": 0,
+    "atol": 1e-20,
+    "cdf_tol": 1e-310
+  },
+  {
+    "name": "invisible_residue_at_crossing",
+    "components": [
+      [
+        1,
+        10000000.000000002,
+        1
+      ],
+      [
+        1e-301,
+        10000000.000000002,
+        1e-12
+      ]
+    ],
+    "p": 0.5,
+    "expected": 10000000.0,
+    "atol": 0
+  },
+  {
+    "name": "visible_narrow_mass_at_crossing",
+    "components": [
+      [
+        0.9999,
+        10000000.000000002,
+        1
+      ],
+      [
+        0.0001,
+        10000000.000000002,
+        1e-12
+      ]
+    ],
+    "p": 0.5,
+    "expected": 10000000.000000002,
+    "atol": 0,
+    "cdf_tol": 1e-12
+  }
+]

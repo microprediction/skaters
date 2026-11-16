@@ -1,0 +1,64 @@
+{
+  "status": "passed",
+  "source_instrumentation": "portable packaging adaptation; independently reviewed; post-review checks strengthened without changing recording or aggregation",
+  "smoke_runs": [
+    {
+      "precision": "canonical",
+      "method": "laplace_old",
+      "rows_exactly_reproduced": 128
+    },
+    {
+      "precision": "canonical",
+      "method": "laplace",
+      "rows_exactly_reproduced": 128
+    },
+    {
+      "precision": "full",
+      "method": "laplace_old",
+      "rows_exactly_reproduced": 128
+    },
+    {
+      "precision": "full",
+      "method": "laplace",
+      "rows_exactly_reproduced": 128
+    }
+  ],
+  "all_aggregate_claims_match_original_receipts": true,
+  "synthetic_digests_and_movements_recomputed": true,
+  "limit": "Smoke checks cover two daily series per arm and precision. Original full acceptance runs remain the evidence for all 200 series per corpus; no new broad forecasting run performed.",
+  "post_review_verification": {
+    "positive_results": "passed: packaged corpus summaries, acceptance predicates, complete pinned sets and synthetic signatures",
+    "negative_controls": [
+      {
+        "case": "nonzero_median",
+        "rejected": true,
+        "reason": "ValueError: Canonical acceptance predicate failed"
+      },
+      {
+        "case": "raw_score_change",
+        "rejected": true,
+        "reason": "ValueError: Full-precision score/boundary predicate failed"
+      },
+      {
+        "case": "wrong_series",
+        "rejected": true,
+        "reason": "ValueError: Series set differs from pinned inputs"
+      },
+      {
+        "case": "standalone_series_set",
+        "rejected": true
+      }
+    ],
+    "unchanged_AST_functions": [
+      "record",
+      "verify",
+      "read_rows",
+      "aggregate",
+      "sha",
+      "read_json",
+      "write_json"
+    ],
+    "recorder_smoke_evidence": "carried: four two-series runs, each 128 rows exactly matching original tapes; record/verify unchanged",
+    "candidate_files_unchanged": 903
+  }
+}
