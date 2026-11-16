@@ -31,6 +31,7 @@
       <nav>
         <a href="/">Home</a>
         <a href="/guide.html">Methodology</a>
+        <a href="/examples.html">Examples</a>
         <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
             <a href="/benchmarks.html">Accuracy</a>
@@ -118,8 +119,64 @@ Refund due                         $0.00</div>
           <td>Not monitored by the issue tracker. Neither are horoscopes.</td></tr>
         <tr><td>Social media post claiming a benchmark nobody can rerun</td><td class="num">&infin; + 1</td>
           <td>Scored at the 95% Winkler level, it looks great.</td></tr>
+        <tr><td>Fifteen-minute Medium article, no issue filed</td><td class="num">&infin; + 2</td>
+          <td>Two documentation pages were written in response. Neither was needed by anyone who had read the first two.</td></tr>
       </tbody>
     </table>
+
+    <h2>A worked example: 228 datasets</h2>
+    <p>
+      A <a href="https://valeman.medium.com/laplace-beats-almost-everything-i-tested-it-on-228-datasets-f9a75e551ebe">recent
+      article</a> ran <code>laplace</code> on 228 datasets and reported, with
+      pictures, that it forecast negative electricity demand, produced an
+      interval reaching 10<sup>35</sup> on the Bitcoin hash rate, and was slow at
+      horizons of 96 and 336. All three are true. Here is what each one tells you.
+    </p>
+    <p>
+      <strong>Negative electricity demand.</strong> <code>laplace</code> forecasts
+      a distribution on the real line. It does not know that demand is positive,
+      because nothing in a stream of numbers says so. If you know it, you say it:
+      one log transform, and every quantile comes back positive. That is
+      <a href="/examples.html#positive">recipe three on the examples page</a>, and
+      it is how every transform in the package works. The author ran the model
+      on 2,460 windows of non-negative data and did not apply one. The
+      <a href="/scope.html">scope page</a> now spells this out, under the
+      heading <em>Prior knowledge</em>, for readers who need it spelled out.
+    </p>
+    <p>
+      <strong>Intervals at 10<sup>35</sup>.</strong> The hash rate was fed in as
+      hashes per second, a number near 10<sup>20</sup>. Nobody who works with
+      that series writes it that way; it is quoted in exahashes, where it is a
+      number near 100. The package's transforms carry constants in absolute units,
+      like every statistical package since the slide rule, and the
+      <a href="/scope.html">scope page</a> gives the working range. Dividing by
+      10<sup>18</sup> before calling the function is the whole fix. It did not
+      occur to the author to divide.
+    </p>
+    <p>
+      <strong>Slow at horizon 336.</strong> The documentation gives twelve steps
+      as the upper limit and says longer horizons are ongoing work. The article
+      ran it at 96 and estimated 336, then reported that it was slow and wrong
+      there. It was. The 12 microseconds per observation that the article
+      disputes is the Rust port, one step ahead, on a warm model, which is what
+      the <a href="/performance.html">performance page</a> says it is, next to
+      the Python numbers the article prefers.
+    </p>
+    <p>
+      So: a real-line model run on positive data without the one-line fix, a
+      series fed in units a million million million times too large, and a
+      horizon outside the stated scope. The parts of the article that stay
+      inside the documentation are correct and are already on this site: at one
+      step ahead on M4 hourly, the author's method beats <code>laplace</code> on
+      144 series and loses on 19, and the
+      <a href="https://conformalprediction.net/csp.html">review</a> says so in its
+      first table. The portfolio of the two beats both.
+    </p>
+    <p>
+      It is really hard to make any package idiot-proof. We keep trying: the
+      scope page, the examples page and <code>flesaker</code> all exist because
+      of this article. The refund stands at $0.00.
+    </p>
 
     <h2>Frequently heard</h2>
     <p><strong>"It is slower than my method."</strong>

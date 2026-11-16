@@ -289,6 +289,20 @@ class SplicedDist:
                            d["zeta_lo"], d["zeta_up"],
                            d["g_lo"], d["s_lo"], d["g_up"], d["s_up"])
 
+    def affine(self, a: float, b: float) -> "SplicedDist":
+        """x -> a*x + b. The splice lives in the body's PIT space, so the
+        thresholds, tail masses and GPD parameters are invariant: only the
+        body moves. A negative ``a`` reflects the PIT (u -> 1 - u), which swaps
+        the two tails and negates the z thresholds."""
+        if a == 0:
+            raise ValueError("affine multiplier must be nonzero")
+        body = self.body.affine(a, b)
+        if a > 0:
+            return SplicedDist(body, self.t_lo, self.t_up, self.zeta_lo, self.zeta_up,
+                               self.g_lo, self.s_lo, self.g_up, self.s_up)
+        return SplicedDist(body, -self.t_up, -self.t_lo, self.zeta_up, self.zeta_lo,
+                           self.g_up, self.s_up, self.g_lo, self.s_lo)
+
     def __repr__(self) -> str:
         return (f"SplicedDist(zeta=({self.zeta_lo:.4f},{self.zeta_up:.4f}), "
                 f"gamma=({self.g_lo:.3f},{self.g_up:.3f}), body={self.body!r})")

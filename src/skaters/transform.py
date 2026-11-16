@@ -864,8 +864,15 @@ def _exact_inverse_k(inv_fn):
     def inverse_k(dists: list, state: dict) -> list:
         out = []
         for d in dists:
-            lo = min(m - 10.0 * s for _, m, s in d.components)
-            hi = max(m + 10.0 * s for _, m, s in d.components)
+            comps = None if isinstance(d, PushforwardDist) else getattr(d, "components", None)
+            if comps is not None:
+                lo = min(m - 10.0 * s for _, m, s in comps)
+                hi = max(m + 10.0 * s for _, m, s in comps)
+            else:
+                # no mixture to read (e.g. laplace's tail-spliced SplicedDist):
+                # pad its extreme quantiles by their own span on each side
+                q_lo, q_hi = d.quantile(1e-6), d.quantile(1.0 - 1e-6)
+                lo, hi = 2.0 * q_lo - q_hi, 2.0 * q_hi - q_lo
             ys, zs = table_from_map(inv_fn, lo, hi)
             out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
         return out
@@ -934,10 +941,9 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 
     A one-parameter family that picks the *coordinate in which the series is
     simple*. It subsumes log (lmbda=0, on the shifted level), identity
-    (lmbda=1), and reciprocal-ish (lmbda<0) shapes, but unlike Box-Cox it is
-    defined for all reals (no positivity requirement) — so the same primitive
-    expresses a non-negativity prior (lmbda~0 makes the inverse predictive
-    non-negative for non-negative data) and a generic re-scaling prior.
+    (lmbda=1), and reciprocal-ish (lmbda<0) shapes. Both positive and negative
+    observations have a branch. At lmbda=0 the inverse predictive can assign
+    mass anywhere on the real line, even for strictly positive observations.
 
     Forward:
         y >= 0:  ((y+1)**L - 1) / L            (L != 0);   log(y+1)      (L == 0)
@@ -1017,8 +1023,105 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 
 
 # ---------------------------------------------------------------------------
+# Log coordinate with a one-sided bound
+# ---------------------------------------------------------------------------
+
+def log_transform(lower: float | None = None, upper: float | None = None):
+    """Log coordinate for a series with a one-sided bound.
+
+    Forward:   y' = log(y - lower)        (lower bound; the default, lower = 0)
+               y' = -log(upper - y)       (upper bound)
+    Inverse:   the exact pushforward through the inverse map, so the
+               predictive in y keeps the skew of the coordinate change, its
+               logpdf includes the Jacobian, and every quantile it reports
+               lies on the right side of the bound.
+
+    PIT values are invariant under the map. A finite observation on or past
+    the bound raises ``ValueError``. Missing observations pass through for
+    the inner skater to handle. Quantiles that round to the bound are rounded
+    inward by one floating-point step. A quantile beyond the representable
+    range returns the corresponding infinity. Experimental, alongside
+    :func:`skaters.api.flesaker`.
+
+    Args:
+        lower: the lower bound (default 0 when neither bound is given).
+        upper: the upper bound. Give one bound, not both.
+    """
+    from skaters.parade import _missing
+    from skaters.pushforward import PushforwardDist, _exp_or_inf
+
+    if lower is not None and upper is not None:
+        raise ValueError("log_transform takes one bound: lower or upper")
+    b = float(upper if upper is not None else (0.0 if lower is None else lower))
+    if not math.isfinite(b):
+        raise ValueError("log_transform needs a finite bound")
+    direction = -1.0 if upper is not None else 1.0
+    bound_label = "upper" if upper is not None else "lower"
+    log_two = math.log(2.0)
+
+    def _fwd_query(y: float) -> float:
+        gap = direction * (y - b)
+        if gap <= 0.0:
+            return -direction * math.inf
+        if math.isinf(gap):
+            # A gap between finite floats can overflow even when its log fits.
+            half_gap = direction * (0.5 * y - 0.5 * b)
+            return direction * (math.log(half_gap) + log_two)
+        return direction * math.log(gap)
+
+    def _inverse_at_scale(z: float, weight: float) -> float:
+        bound = weight * b
+        log_gap = direction * z + math.log(weight)
+        gap = _exp_or_inf(log_gap)
+        if math.isinf(gap):
+            # The shift by the bound can bring an overflowing gap into range.
+            return 2.0 * (0.5 * bound + direction * _exp_or_inf(log_gap - log_two))
+        return bound + direction * gap
+
+    def _inv(z: float) -> float:
+        y = _inverse_at_scale(z, 1.0)
+        return math.nextafter(b, direction * math.inf) if y == b else y
+
+    def _log_jacobian(z: float) -> float:
+        return -direction * z
+
+    def _moments(m: float, s: float) -> tuple[float, float]:
+        variance = s * s
+        log_mean_gap = direction * m + 0.5 * variance
+        mean = _inverse_at_scale(direction * log_mean_gap, 1.0)
+        if s == 0.0:
+            return mean, 0.0
+        # log(sqrt(expm1(s**2))) remains stable as the spread approaches zero
+        # or grows large, where the correction to s**2 / 2 rounds to zero.
+        if variance < 1e-16:
+            log_relative_std = math.log(s)
+        elif variance > 40.0:
+            log_relative_std = 0.5 * variance
+        else:
+            log_relative_std = 0.5 * math.log(math.expm1(variance))
+        return mean, _exp_or_inf(log_mean_gap + log_relative_std)
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if _missing(y):
+            return y, state or {}
+        z = _fwd_query(y)
+        if z == -direction * math.inf:
+            raise ValueError(f"log_transform: observation {y!r} must lie inside {bound_label}={b}")
+        return z, state or {}
+
+    def inverse_k(dists: list, state: dict) -> list:
+        return [PushforwardDist(d, inv_fn=_inv, fwd_fn=_fwd_query,
+                                log_jacobian_fn=_log_jacobian, component_moments_fn=_moments,
+                                scaled_inv_fn=_inverse_at_scale)
+                for d in dists]
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
 # AR(p) transform with online recursive least squares
 # ---------------------------------------------------------------------------
+
 
 def _ar_spectral_radius(phi: list[float]) -> float:
     """Spectral radius of the AR companion matrix (largest |characteristic root|).
