@@ -180,18 +180,18 @@ positive FRED levels it is worth a median +0.015 to +0.018 nats of held-out
 log-likelihood (72–78% of series), and at `h=1` the two agree. The candidate
 pool keeps the default (its one-step spreads are where they agree).
 
-**Positive series** (rates, prices, volumes, volatilities): `gibrat()` is
+**Positive series** (rates, prices, volumes, volatilities): `flesaker()` is
 `laplace` on $\log(y)$ with the predictive mapped back exactly through `exp`,
-so every quantile it reports is positive. `gibrat(lower=b)` moves the bound and
-`gibrat(upper=b)` makes it a ceiling. Named after Robert Gibrat, whose law of
-proportionate growth is a classic account of why so many economic quantities
-are log-normal. Experimental: an example composition, not settled API. See
+so every quantile it reports is positive. `flesaker(lower=b)` moves the bound and
+`flesaker(upper=b)` makes it a ceiling. Named after Bjorn Flesaker, whose
+positive-interest framework (with Hughston) builds positivity into the model
+rather than hoping for it. Experimental: an example composition, not settled API. See
 [`examples/positive_series.py`](examples/positive_series.py).
 
 ```python
-from skaters import gibrat
+from skaters import flesaker
 
-f = gibrat(k=3)                    # every quantile > 0
+f = flesaker(k=3)                    # every quantile > 0
 ```
 
 `laplace(k>1)` already carries an OU group in its pool, so the general forecaster

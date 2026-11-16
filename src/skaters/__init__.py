@@ -27,7 +27,7 @@ from skaters.transform import (
 )
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import laplace, dantzig, gibrat
+from skaters.api import laplace, dantzig, flesaker
 from skaters.granger import granger
 from skaters.multiscale import multiscale
 from skaters.parade import parade
@@ -48,7 +48,7 @@ __all__ = [
     # Search policies (the main user API)
     "laplace",
     "granger",
-    "gibrat",
+    "flesaker",
     "dantzig",
     "sticky",
     "period_detector",

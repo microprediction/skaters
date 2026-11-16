@@ -3,11 +3,11 @@
 ``laplace`` forecasts in the series' own coordinates, so on a positive series
 that drifts toward zero it can put probability below zero. If you know the
 series is positive (a rate, a price, a volume, a volatility), say so:
-``gibrat`` forecasts log(y) with ``laplace`` and maps the predictive back
+``flesaker`` forecasts log(y) with ``laplace`` and maps the predictive back
 through exp exactly, so every quantile it reports is positive and its logpdf
 includes the Jacobian.
 
-``gibrat(lower=b)`` moves the bound to b, and ``gibrat(upper=b)`` makes it a
+``flesaker(lower=b)`` moves the bound to b, and ``flesaker(upper=b)`` makes it a
 ceiling. The same thing by hand is
 ``conjugate(laplace(), log_transform(lower=0.0))``.
 
@@ -22,7 +22,7 @@ Usage:
 import math
 import random
 
-from skaters import gibrat, laplace
+from skaters import flesaker, laplace
 from skaters.conjugate import conjugate
 from skaters.transform import yeo_johnson
 
@@ -30,7 +30,7 @@ from skaters.transform import yeo_johnson
 def positive_series(n=600, seed=7):
     """A mean-reverting rate on the log scale: positive, often close to zero,
     with noise proportional to its level. The series is built on the log scale,
-    so the comparison below favours gibrat by construction. It demonstrates
+    so the comparison below favours flesaker by construction. It demonstrates
     the mechanics; benchmark numbers live in benchmarks/."""
     rng = random.Random(seed)
     x, out = math.log(0.5), []
@@ -62,6 +62,6 @@ if __name__ == "__main__":
     ys = positive_series()
     print(f"\n  {len(ys)} positive observations, min {min(ys):.4f}, max {max(ys):.4f}\n")
     run("laplace()", laplace(), ys)
-    run("gibrat()", gibrat(), ys)
+    run("flesaker()", flesaker(), ys)
     run("laplace on Yeo–Johnson", conjugate(laplace(), yeo_johnson(0.0, exact=True), k=1), ys)
     print()

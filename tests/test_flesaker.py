@@ -1,4 +1,4 @@
-"""gibrat / log_transform: forecasts never cross the bound, the pushforward is
+"""flesaker / log_transform: forecasts never cross the bound, the pushforward is
 the exact change of variables (closed-form log-normal checks for the floor,
 a shifted floor and a ceiling), the state is laplace's own, and exact=True
 transforms accept laplace's tail-spliced predictive once the splice is live."""
@@ -7,7 +7,7 @@ import random
 
 import pytest
 
-from skaters import Dist, conjugate, gibrat, laplace, log_transform
+from skaters import Dist, conjugate, flesaker, laplace, log_transform
 from skaters.tails import SplicedDist
 from skaters.transform import power_transform, yeo_johnson
 
@@ -34,7 +34,7 @@ N_SPLICED = 1500
 
 
 def test_lower_bound_holds_at_every_horizon_once_spliced():
-    dists, _ = _run(gibrat(k=3), _rate(N_SPLICED))
+    dists, _ = _run(flesaker(k=3), _rate(N_SPLICED))
     for d in dists:
         assert isinstance(d.inner, SplicedDist)
         assert d.quantile(1e-4) > 0.0
@@ -44,14 +44,14 @@ def test_lower_bound_holds_at_every_horizon_once_spliced():
 
 def test_upper_bound_and_shifted_lower_bound():
     ys = [1.0 - y for y in _rate(150)]
-    for d in _run(gibrat(k=2, upper=1.0), ys)[0]:
+    for d in _run(flesaker(k=2, upper=1.0), ys)[0]:
         assert d.quantile(1 - 1e-4) < 1.0
-    for d in _run(gibrat(lower=-3.0), [y - 3.0 for y in _rate(150)])[0]:
+    for d in _run(flesaker(lower=-3.0), [y - 3.0 for y in _rate(150)])[0]:
         assert d.quantile(1e-4) > -3.0
 
 
 def test_state_is_laplaces_own():
-    _, state = _run(gibrat(), _rate(80))
+    _, state = _run(flesaker(), _rate(80))
     assert state["pit"][0] is not None and 0.0 <= state["pit"][0] <= 1.0
     assert state["z"][0] is not None
     assert "s_state" not in state and "t_state" not in state
@@ -60,13 +60,13 @@ def test_state_is_laplaces_own():
 def test_missing_values_pass_through():
     ys = [None] + _rate(60)
     ys[30] = float("nan")
-    dists, state = _run(gibrat(), ys)
+    dists, state = _run(flesaker(), ys)
     composed, wrapped_state = _run(conjugate(laplace(), log_transform(), k=1), ys)
     assert dists[0].quantile(0.5) > 0.0
     assert dists[0].quantile(0.5) == composed[0].quantile(0.5)
     assert state["skipped"] == 2
     assert state["pit"][0] == wrapped_state["s_state"]["pit"][0]
-    d = gibrat()(None, None)[0][0]
+    d = flesaker()(None, None)[0][0]
     assert d.quantile(0.1) > 0.0
     assert d.mean == d.std == math.inf
 
@@ -198,7 +198,7 @@ def test_exact_transform_accepts_spliced_laplace(transform):
 def test_spliced_moments_are_plausible():
     """Quantile-grid mean/std for a spliced inner: the mean lies inside
     (q01, q99) and the std is of the order of the interquartile range."""
-    d = _run(gibrat(), _rate(N_SPLICED))[0][0]
+    d = _run(flesaker(), _rate(N_SPLICED))[0][0]
     assert d.quantile(0.01) < d.mean < d.quantile(0.99)
     iqr = d.quantile(0.75) - d.quantile(0.25)
     assert 0.3 * iqr < d.std < 3.0 * iqr
@@ -213,14 +213,14 @@ def test_spliced_moments_are_plausible():
     assert nested.quantile(0.5) == pytest.approx(math.expm1(d.quantile(0.5)))
 
 
-def test_hand_composition_matches_gibrat():
+def test_hand_composition_matches_flesaker():
     ys = _rate(120)
-    a = _run(gibrat(), ys)[0][0]
+    a = _run(flesaker(), ys)[0][0]
     b = _run(conjugate(laplace(), log_transform(lower=0.0), k=1), ys)[0][0]
     for p in (0.05, 0.5, 0.95):
         assert a.quantile(p) == b.quantile(p)
 
 
 def test_name_carries_the_bound():
-    assert gibrat(k=2).__name__ == "gibrat(k=2, lower=0.0)"
-    assert gibrat(upper=1.0).__name__ == "gibrat(k=1, upper=1.0)"
+    assert flesaker(k=2).__name__ == "flesaker(k=2, lower=0.0)"
+    assert flesaker(upper=1.0).__name__ == "flesaker(k=1, upper=1.0)"

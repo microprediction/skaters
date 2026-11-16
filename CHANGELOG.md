@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Experimental forecaster `gibrat` (after Robert Gibrat): `laplace` on
+- Experimental forecaster `flesaker` (after Bjorn Flesaker): `laplace` on
   log(y - lower), mapped back by the exact pushforward, for series with a
   one-sided bound (default `lower=0`; `upper=` for a ceiling). Every quantile
   stays inside the bound; the state is laplace's own. An example composition,

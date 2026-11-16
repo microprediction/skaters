@@ -349,7 +349,7 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
     return f
 
 
-def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
+def flesaker(k: int = 1, lower: float | None = None, upper: float | None = None,
            **laplace_kwargs):
     """``laplace`` for a series that never crosses a known bound. **Experimental.**
 
@@ -360,10 +360,9 @@ def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
 
     Forecasts log(y - lower) with :func:`laplace` and maps the predictive back
     by the exact change of variables. The default bound is ``lower=0`` for
-    strictly positive series. Pass ``upper=`` for a one-sided ceiling. After
-    Robert Gibrat, whose law of proportionate effect (growth
-    multiplicative, so log-size additive) is a classic account of why so many
-    economic quantities are log-normal and strictly positive.
+    strictly positive series. Pass ``upper=`` for a one-sided ceiling. After Bjorn Flesaker, whose positive-interest framework with
+    Hughston builds the guarantee that rates stay positive into the model
+    rather than hoping for it.
 
     The returned state is laplace's own, so ``state["pit"]`` and ``state["z"]``
     read as they do for :func:`laplace`; PIT values are invariant under the
@@ -387,14 +386,14 @@ def gibrat(k: int = 1, lower: float | None = None, upper: float | None = None,
     forward, inverse_k = log_transform(lower=lower, upper=upper)
     inner = laplace(k=k, **laplace_kwargs)
 
-    def _gibrat(y: float, state: dict | None) -> tuple[list, dict]:
+    def _flesaker(y: float, state: dict | None) -> tuple[list, dict]:
         yp, _ = forward(y, None)
         dists, state = inner(yp, state)
         return inverse_k(dists, {}), state
 
     bound = f"upper={upper}" if upper is not None else f"lower={0.0 if lower is None else lower}"
-    _gibrat.__name__ = f"gibrat(k={k}, {bound})"
-    return _gibrat
+    _flesaker.__name__ = f"flesaker(k={k}, {bound})"
+    return _flesaker
 
 
 def dantzig(k: int = 1, **kwargs):

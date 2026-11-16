@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters &mdash; examples</title>
-  <meta name="description" content="Short, runnable recipes: a first forecast, several steps ahead, positive series with gibrat, calibration checks, anomalies, mean reversion, custom transforms and the browser." />
+  <meta name="description" content="Short, runnable recipes: a first forecast, several steps ahead, positive series with flesaker, calibration checks, anomalies, mean reversion, custom transforms and the browser." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="skaters" />
   <meta property="og:title" content="skaters &mdash; examples" />
@@ -145,31 +145,31 @@ dists[11]     # twelve steps ahead
     <h2 id="positive">Series that are always positive</h2>
     <p>
       If you know a series is strictly positive, you can encode that in the
-      forecast. <code>gibrat</code> runs <code>laplace</code> on the log of the
+      forecast. <code>flesaker</code> runs <code>laplace</code> on the log of the
       series and maps the forecast back through the exponential, giving a
-      positive, possibly skewed predictive. It is named after Robert Gibrat,
-      whose law of proportionate growth is a classic account of why so many
-      economic quantities are log-normal. It is experimental: an example
+      positive, possibly skewed predictive. It is named after Bjorn Flesaker,
+      whose positive-interest framework with Hughston builds the guarantee
+      that rates stay positive into the model. It is experimental: an example
       composition that may change or move into <code>examples/</code>; the
       pieces underneath (<code>laplace</code>, <code>log_transform</code>,
       <code>conjugate</code>) are the stable surface.
     </p>
-<pre>from skaters import gibrat
+<pre>from skaters import flesaker
 
-f = gibrat(k=5)
+f = flesaker(k=5)
 state = None
 for y in observations:
     dists, state = f(y, state)
 
 dists[4].quantile(0.01)    # always &gt; 0
 
-gibrat(lower=-3.0)         # any floor
-gibrat(upper=1.0)          # a ceiling, with support on (-infinity, 1)</pre>
+flesaker(lower=-3.0)         # any floor
+flesaker(upper=1.0)          # a ceiling, with support on (-infinity, 1)</pre>
     <p>
       On a synthetic rate that dips toward zero, plain <code>laplace</code> put
-      up to 33% of its probability below zero; <code>gibrat</code> put none
+      up to 33% of its probability below zero; <code>flesaker</code> put none
       there (the series is generated on the log scale, so the comparison favours
-      <code>gibrat</code> by construction). Every observation must lie strictly
+      <code>flesaker</code> by construction). Every observation must lie strictly
       inside the bound, so a series with exact zeros needs the floor set a
       little below zero. The full comparison is
       <a href="https://github.com/microprediction/skaters/blob/main/examples/positive_series.py"><code>examples/positive_series.py</code></a>.
@@ -185,7 +185,7 @@ gibrat(upper=1.0)          # a ceiling, with support on (-infinity, 1)</pre>
       units.
     </p>
     <table>
-      <thead><tr><th>input units</th><th><code>laplace</code> median</th><th><code>gibrat</code> median</th></tr></thead>
+      <thead><tr><th>input units</th><th><code>laplace</code> median</th><th><code>flesaker</code> median</th></tr></thead>
       <tbody>
         <tr><td>multiplied by 10<sup>20</sup></td><td>3.63 &times; 10<sup>7</sup></td><td>29.01</td></tr>
         <tr><td>original</td><td>29.01</td><td>29.01</td></tr>
@@ -196,7 +196,7 @@ gibrat(upper=1.0)          # a ceiling, with support on (-infinity, 1)</pre>
 
 for scale in (1e20, 1.0):
     medians = []
-    for make_skater in (laplace, gibrat):
+    for make_skater in (laplace, flesaker):
         f, state = make_skater(), None
         for y in growth[:-1]:
             dists, state = f(scale * y, state)
@@ -205,7 +205,7 @@ for scale in (1e20, 1.0):
     <p>
       Pick units the way you would write them down, and keep values and steps
       inside about 10<sup>-3</sup> to 10<sup>6</sup>. For a series that spans
-      many orders of magnitude, <code>gibrat</code> works in the log coordinate,
+      many orders of magnitude, <code>flesaker</code> works in the log coordinate,
       where changing units adds a constant to the observations. More on the
       <a href="/scope.html">scope page</a>.
     </p>

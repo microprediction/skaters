@@ -1041,7 +1041,7 @@ def log_transform(lower: float | None = None, upper: float | None = None):
     the inner skater to handle. Quantiles that round to the bound are rounded
     inward by one floating-point step. A quantile beyond the representable
     range returns the corresponding infinity. Experimental, alongside
-    :func:`skaters.api.gibrat`.
+    :func:`skaters.api.flesaker`.
 
     Args:
         lower: the lower bound (default 0 when neither bound is given).

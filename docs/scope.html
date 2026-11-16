@@ -173,7 +173,7 @@
       forecast through a transform.
     </p>
     <p>
-      For a strictly positive series, <code>gibrat</code> applies the log,
+      For a strictly positive series, <code>flesaker</code> applies the log,
       runs <code>laplace</code> on the transformed series, and maps the
       predictive back through the exponential. Other transforms can encode a
       ceiling, seasonality, or mean reversion. The
@@ -197,7 +197,7 @@
       10<sup>-3</sup> and 10<sup>6</sup> are a starting point. A
       series that grows multiplicatively across many orders of magnitude over
       its life is a different matter: no fixed unit fits all of it, and the
-      log coordinate is the right one (see <code>gibrat</code> on the
+      log coordinate is the right one (see <code>flesaker</code> on the
       <a href="/examples.html#scale">examples page</a>).
     </p>
 
