@@ -17,6 +17,10 @@
   exposes a moment-matched Gaussian for mixture consumers. `log_transform`
   uses analytic maps and a log Jacobian, with quantile quadrature for CRPS
   on either side of the bound.
+- Fix: `SplicedDist.affine`, so an affine transform (`standardize`, `garch`,
+  `seasonal_scale`, `ema_transform`) conjugated around `laplace` no longer
+  raises `AttributeError` once the GPD tail splice is live. The splice lives
+  in PIT space, so only the body moves; a negative multiplier swaps the tails.
 - Docs: an Examples page of runnable recipes (`docs/examples.html`, in the
   nav), and a units-and-scale note on the scope page: the transforms carry
   constants in absolute units, so keep values and steps roughly within
