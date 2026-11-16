@@ -83,6 +83,50 @@ def head_to_head(model="TimesFM3"):
     return out
 
 
+# The pretrained panel, as named in the store. Nine-decile models are scored
+# through the generous reconstruction ("(wide)", Section nozzle); models that
+# emit 21 native levels are scored on them. CSP is the conformal baseline.
+PANEL = [
+    ("TimeH2O-v1(wide)", "TimeH2O v1 (109M)"),
+    ("Toto2-2.5B(wide)", "Toto 2.0 (2.5B)"),
+    ("Toto2-313m(wide)", "Toto 2.0 (313M)"),
+    ("Simons-297M(wide)", "Simons (297M)"),
+    ("Simons-60M(wide)", "Simons (60M)"),
+    ("Chronos-2", "Chronos-2 (120M, 21 levels)"),
+    ("iAmTime-base", "iAmTime-base (302M, 21 levels)"),
+    ("TimesFM3(wide)", "TimesFM 3.0"),
+    ("ci-proto(wide)", "ci-proto (167M)"),
+    ("Hirondel-7M(wide)", "Hirondel-7M"),
+    ("Moirai-2.0-small(wide)", "Moirai 2.0 small"),
+    ("TiRex-2(wide)", "TiRex-2"),
+    ("TinyCast(wide)", "TinyCast"),
+    ("TTM-R3(wide)", "TTM-R3"),
+    ("TimeSSM-2.5M(wide)", "TimeSSM (2.5M)"),
+    ("CSP", "Conformal Seasonal Pools"),
+]
+
+
+def panel():
+    """Median per-series log-score gap (model minus reference) and the share of
+    series the model loses, per stratum, for every arm in PANEL. Straight from
+    the store; a missing (stratum, arm) cell is reported as None."""
+    by = {(r["study"], r["model"]): r for r in _rows()}
+    out = {}
+    for key, label in PANEL:
+        rec = {"label": label}
+        for s in STRATA:
+            r = by.get((s, key))
+            if r is None:
+                rec[s] = None
+                continue
+            n = int(r["n_series"])
+            rec[s] = {"n_series": n, "win": int(r["win"]), "draw": int(r["draw"]),
+                      "loss": int(r["loss"]), "med_dLL": float(r["med_dLL"]),
+                      "loss_rate": int(r["loss"]) / n, "win_rate": int(r["win"]) / n}
+        out[key] = rec
+    return out
+
+
 def nozzle():
     """Reconstruction spread: the run record from nozzle_study.py."""
     txt = open(NOZZLE_LOG).read()
@@ -258,7 +302,7 @@ def main():
     if "--json" in sys.argv:
         print(json.dumps({"head_to_head": h2h, "nozzle": noz, "derived": der,
                           "package": pkg, "classic": classic,
-                          "performance": perf}, indent=2))
+                          "performance": perf, "panel": panel()}, indent=2))
         return
     print("HEAD TO HEAD, TimesFM3 vs laplace (source: canonical_summary_vs_laplace.csv)\n")
     print(f"{'stratum':22s} {'n':>6s}  {'w/d/l':>18s}  {'med dLL':>8s}  {'loss%':>6s}")
@@ -273,6 +317,16 @@ def main():
         wdl = f"{r['wrapped_win']}/{r['wrapped_draw']}/{r['wrapped_loss']}"
         print(f"{r['label']:22s} {r['wrapped_n_series']:6d}  {wdl:>18s}  "
               f"{r['wrapped_med_dLL']:+8.4f}  {r['wrapped_loss_rate']:6.1%}")
+    pan = panel()
+    print("\nTHE PRETRAINED PANEL, median dLL (loss% / win%) per stratum\n")
+    cols = [PRETTY[s] for s in STRATA]
+    print(f"{'model':32s}" + "".join(f"{c[:20]:>22s}" for c in cols))
+    for key, rec in pan.items():
+        cells = []
+        for s in STRATA:
+            c = rec[s]
+            cells.append("   ." if c is None else f"{c['med_dLL']:+.3f} ({c['loss_rate']:.0%}/{c['win_rate']:.0%})")
+        print(f"{rec['label']:32s}" + "".join(f"{c:>22s}" for c in cells))
     print(f"\nRECONSTRUCTION SPREAD ({noz['n_points']} points, {noz['n_series']} series, TimesFM3 fixed)\n")
     for m, v in noz["methods"].items():
         print(f"  {m:8s} mean logpdf {v:+.4f}")

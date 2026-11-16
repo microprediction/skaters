@@ -42,7 +42,7 @@ classical arms are per-window refits of ETS, ARIMA and Theta; no online
 forecaster appears, and no suite scores a full predictive density by log score. We supply the
 missing reference, \code{laplace}, an online distributional forecaster with no
 pretraining and no tunable parameters, and score it against TimesFM 3.0 one
-step ahead on held-out log density over an 18{,}815-series panel of
+step ahead on held-out log density over an 19{,}940-series panel of
 \proglang{FRED} and M4-hourly series. The comparison is decided by a step the
 suites leave unstated: how the model's nine quantiles become a density. Under
 a tight reconstruction the reference leads by half a nat on the median series
@@ -50,7 +50,7 @@ of every stratum; under a generous one the two are level at the median, and
 the reference keeps the better coverage. The reference is a \code{pip install},
 with a \proglang{Rust} core and bit-exact parity.
 }
-\date{October 8, 2026}
+\date{November 16, 2026}
 
 \begin{document}
 
@@ -216,8 +216,8 @@ needs to judge the comparison.
 Two properties matter for a reference arm, and neither is accuracy. The first is
 cost. Adding \code{laplace} to a leaderboard is a \code{pip install} and one
 function call, with no weights to download, no device to allocate, and no
-context length to choose. The pure-\proglang{Python} implementation, $288$\,KB of source across $28$
-files, is the reference; a \proglang{Rust} core runs the same arithmetic about
+context length to choose. The pure-\proglang{Python} implementation, $476$\,KB of source across $54$
+files including the differentiable port and the trained \code{granger}, is the reference; a \proglang{Rust} core runs the same arithmetic about
 twenty times faster.
 
 Table~\ref{tab:perf} gives the runtime, and the two regimes disagree. Cold is
@@ -234,14 +234,14 @@ a deployment asks for.
 \cmidrule(lr){2-3}\cmidrule(lr){4-4}
 Model & batch 1 & batch 64 & \\
 \midrule
-\code{laplace} (\proglang{Rust})   & $3.39$   & ---     & $0.012$ \\
-\code{laplace} (\proglang{Python}) & $67.08$  & ---     & $0.251$ \\
-AutoETS (refit)                     & $1.93$   & ---     & $1.93$ \\
-Prophet (refit)                     & $29.97$  & ---     & $29.97$ \\
-AutoARIMA (refit)                   & $62.13$  & ---     & $62.13$ \\
-Chronos-Bolt-small                  & $7.44$   & $0.72$  & $7.44$ \\
-TiRex                               & $96.47$  & $76.34$ & $95.68$ \\
-TimesFM-2.5-200M                    & $323.44$ & $5.10$  & $329.83$ \\
+\code{laplace} (\proglang{Rust})   & $3.40$ & --- & $0.012$ \\
+\code{laplace} (\proglang{Python}) & $74.48$ & --- & $0.286$ \\
+AutoETS (refit)                     & $2.02$ & --- & $2.02$ \\
+Prophet (refit)                     & $30.69$ & --- & $30.69$ \\
+AutoARIMA (refit)                   & $62.29$ & --- & $62.29$ \\
+Chronos-Bolt-small                  & $7.26$ & $0.74$ & $7.34$ \\
+TiRex                               & $95.18$ & $74.83$ & $94.09$ \\
+TimesFM-2.5-200M                    & $322.46$ & $4.96$ & $317.05$ \\
 \bottomrule
 \end{tabular}
 \caption{Milliseconds per forecast, context $256$, horizon $12$, $64$ series,
@@ -256,12 +256,12 @@ re-estimates from scratch, so for those the warm cost equals the cold cost.}
 \end{table}
 
 Warm is the regime that separates the arms. One online update costs $0.012$
-milliseconds, against $7.44$ for the cheapest foundation model here and $329.83$
+milliseconds, against $7.34$ for the cheapest foundation model here and $317.05$
 for the largest.
 
 That per-forecast figure compounds, because a benchmark asks for a forecast at
 every step of every series. Table~\ref{tab:panel} multiplies it out over the
-$1{,}204{,}288$ one-step forecasts this panel contains.
+$1{,}276{,}160$ one-step forecasts this panel contains.
 
 \begin{table}[t!]
 \centering
@@ -270,14 +270,14 @@ $1{,}204{,}288$ one-step forecasts this panel contains.
 \toprule
 Model & ms/step & batch 1 & batch 64 \\
 \midrule
-\code{laplace} (\proglang{Rust})   & $0.012$   & $15$ s    & ---        \\
-\code{laplace} (\proglang{Python}) & $0.251$   & $5$ min   & ---        \\
-AutoETS (refit)                     & $1.93$    & $39$ min  & ---        \\
-Chronos-Bolt-small                  & $7.44$    & $2.5$ h   & $14$ min   \\
-Prophet (refit)                     & $29.97$   & $10.0$ h  & ---        \\
-AutoARIMA (refit)                   & $62.13$   & $20.8$ h  & ---        \\
-TiRex                               & $95.68$   & $32.0$ h  & $25.5$ h   \\
-TimesFM-2.5-200M                    & $329.83$  & $4.6$ d   & $1.7$ h    \\
+\code{laplace} (\proglang{Rust})   & $0.012$ & $16$ s & --- \\
+\code{laplace} (\proglang{Python}) & $0.286$ & $6$ min & --- \\
+AutoETS (refit)                     & $2.02$ & $43$ min & --- \\
+Chronos-Bolt-small                  & $7.34$ & $2.6$ h & $16$ min \\
+Prophet (refit)                     & $30.69$ & $10.9$ h & --- \\
+AutoARIMA (refit)                   & $62.29$ & $22.1$ h & --- \\
+TiRex                               & $94.09$ & $1.4$ d & $1.1$ d \\
+TimesFM-2.5-200M                    & $317.05$ & $4.7$ d & $1.8$ h \\
 \bottomrule
 \end{tabular}
 \caption{Wall clock to score the whole panel one step at a time, single
@@ -287,7 +287,7 @@ an offline sweep that can run many series in lockstep.}
 \label{tab:panel}
 \end{table}
 
-The spread runs from fifteen seconds to four and a half days. It also accounts
+The spread runs from 16 seconds to 4.7 days. It also accounts
 for the shape of the suites in Table~\ref{tab:arms}: scoring a stateless model
 at every step of a large panel is expensive enough that one forecast origin per
 series is the affordable design, and four of the eleven use exactly that.
@@ -322,6 +322,11 @@ comparison (Table~\ref{tab:classic}) is the companion paper's protocol: each
 arm conditions on all data up to the forecast point, with coefficients
 re-estimated every 25 steps. The two tables are not differenced against each
 other.
+
+The panel is the November 2026 state of the store: the daily corpus was
+de-duplicated and extended after the first draft, and every arm was re-scored
+against the current reference, so the counts differ slightly from the SSRN
+version of this paper while every conclusion is unchanged.
 
 We report the median of that difference and the per-series win, draw and loss
 counts from a Diebold--Mariano test with HAC standard errors and a draw band,
@@ -407,7 +412,7 @@ online method clears by a wide margin on the same data.
 \section{Against TimesFM 3.0}\label{sec:results}
 
 Table~\ref{tab:raw} scores TimesFM 3.0 \citep{das2024timesfm} zero-shot against
-the reference on an 18{,}815-series panel: four \proglang{FRED} strata and the
+the reference on an 19{,}940-series panel: four \proglang{FRED} strata and the
 414 M4-hourly series. The model's nine deciles are turned into a density by the
 local-bandwidth mixture (\code{quantile\_dist}, the \code{local} method of
 Section~\ref{sec:nozzle}). Negative favours the reference.
@@ -418,11 +423,11 @@ Section~\ref{sec:nozzle}). Negative favours the reference.
 \toprule
 Stratum & $N$ & Win / draw / loss & Median $\Delta$LL & Loss rate \\
 \midrule
-Daily, economic       & $2{,}179$ & $66 / 923 / 1{,}190$      & $-0.854$ & $54.6\,\%$ \\
-Daily, price/returns  & $7{,}633$ & $15 / 4{,}593 / 3{,}025$  & $-0.616$ & $39.6\,\%$ \\
-Weekly, economic      & $3{,}013$ & $517 / 1{,}481 / 1{,}015$ & $-0.520$ & $33.7\,\%$ \\
-Monthly, economic     & $5{,}576$ & $193 / 3{,}592 / 1{,}791$ & $-0.647$ & $32.1\,\%$ \\
-M4-hourly, seasonal   & $414$     & $8 / 241 / 165$           & $-0.543$ & $39.9\,\%$ \\
+Daily, economic       & $2{,}210$ & $65 / 935 / 1{,}210$ & $-0.852$ & $54.8\,\%$ \\
+Daily, price/returns  & $8{,}703$ & $20 / 5{,}308 / 3{,}375$ & $-0.601$ & $38.8\,\%$ \\
+Weekly, economic      & $3{,}013$ & $521 / 1{,}475 / 1{,}017$ & $-0.517$ & $33.8\,\%$ \\
+Monthly, economic     & $5{,}600$ & $195 / 3{,}593 / 1{,}812$ & $-0.645$ & $32.4\,\%$ \\
+M4-hourly, seasonal   & $414$ & $8 / 241 / 165$ & $-0.543$ & $39.9\,\%$ \\
 \bottomrule
 \end{tabular}
 \caption{TimesFM 3.0 against \code{laplace}, one step ahead on held-out log
@@ -441,7 +446,7 @@ reconstruction of Section~\ref{sec:nozzle}, three times the local bandwidth.
 The median gap closes to between $-0.08$ and $+0.05$ nats; the model wins more
 series than it loses on the daily price, weekly and monthly strata; and its
 central 90\%
-coverage rises from the $0.81$ to $0.85$ of Table~\ref{tab:raw} to $0.86$ to
+coverage rises from the $0.80$ to $0.85$ of Table~\ref{tab:raw} to $0.86$ to
 $0.89$, against the reference's $0.89$ to $0.92$. The half-nat lead belongs to
 the reconstruction, not to the reference. What survives the choice is that the
 reference is never behind at the median by more than $0.05$ nats and is better
@@ -453,11 +458,11 @@ calibrated in every stratum.
 \toprule
 Stratum & $N$ & Win / draw / loss & Median $\Delta$LL & Loss rate \\
 \midrule
-Daily, economic       & $2{,}179$ & $178 / 1{,}382 / 619$     & $-0.082$ & $28.4\,\%$ \\
-Daily, price/returns  & $7{,}633$ & $506 / 6{,}925 / 202$     & $-0.008$ & $2.6\,\%$ \\
-Weekly, economic      & $3{,}013$ & $969 / 1{,}418 / 626$     & $+0.001$ & $20.8\,\%$ \\
-Monthly, economic     & $5{,}576$ & $1{,}429 / 3{,}537 / 610$ & $+0.046$ & $10.9\,\%$ \\
-M4-hourly, seasonal   & $414$     & $70 / 214 / 130$          & $-0.014$ & $31.4\,\%$ \\
+Daily, economic       & $2{,}210$ & $178 / 1{,}410 / 622$ & $-0.081$ & $28.1\,\%$ \\
+Daily, price/returns  & $8{,}703$ & $508 / 7{,}991 / 204$ & $-0.008$ & $2.3\,\%$ \\
+Weekly, economic      & $3{,}013$ & $980 / 1{,}405 / 628$ & $+0.001$ & $20.8\,\%$ \\
+Monthly, economic     & $5{,}600$ & $1{,}449 / 3{,}539 / 612$ & $+0.048$ & $10.9\,\%$ \\
+M4-hourly, seasonal   & $414$ & $68 / 215 / 131$ & $-0.015$ & $31.6\,\%$ \\
 \bottomrule
 \end{tabular}
 \caption{The forecasts of Table~\ref{tab:raw} rescored under the widest
@@ -482,11 +487,11 @@ supply them are dropped.
 \toprule
 Stratum & $N$ & Win / draw / loss & Median $\Delta$LL & Loss rate \\
 \midrule
-Daily, economic       & $2{,}179$ & $76 / 1{,}383 / 720$     & $-0.094$ & $33.0\,\%$ \\
-Daily, price/returns  & $7{,}633$ & $152 / 7{,}136 / 345$    & $-0.008$ & $4.5\,\%$ \\
-Weekly, economic      & $3{,}011$ & $467 / 2{,}045 / 499$    & $-0.049$ & $16.6\,\%$ \\
-Monthly, economic     & $5{,}195$ & $350 / 4{,}480 / 365$    & $-0.056$ & $7.0\,\%$ \\
-M4-hourly, seasonal   & $414$     & $58 / 352 / 4$           & $-0.007$ & $1.0\,\%$ \\
+Daily, economic       & $2{,}210$ & $76 / 1{,}410 / 724$ & $-0.094$ & $32.8\,\%$ \\
+Daily, price/returns  & $8{,}703$ & $140 / 8{,}203 / 360$ & $-0.008$ & $4.1\,\%$ \\
+Weekly, economic      & $3{,}011$ & $477 / 2{,}058 / 476$ & $-0.043$ & $15.8\,\%$ \\
+Monthly, economic     & $5{,}219$ & $346 / 4{,}543 / 330$ & $-0.052$ & $6.3\,\%$ \\
+M4-hourly, seasonal   & $414$ & $55 / 355 / 4$ & $-0.007$ & $1.0\,\%$ \\
 \bottomrule
 \end{tabular}
 \caption{The same model wrapped in a never-worse portfolio with the reference.
@@ -502,6 +507,67 @@ Because the portfolio contains the reference, the narrowing of the gap mostly
 measures the reference. What the wrap shows is narrower: the model's density can
 be combined with the reference without retraining, and the combination loses on
 fewer series than the raw model.
+
+%% -------------------------------------------------------------------------
+\section{The pretrained panel}\label{sec:panel}
+
+TimesFM 3.0 is the worked case; the store holds the same comparison for every
+pretrained model the project has run through the same protocol.
+Table~\ref{tab:fmpanel} gives it for the November 2026 roster, each nine-decile
+model under the generous reconstruction of Section~\ref{sec:nozzle} and the
+two models that emit 21 native levels scored on those levels. The last row is
+a conformal baseline, Conformal Seasonal Pools \citep{manokhin2026csp}, a
+training-free same-phase pool around a seasonal-naive forecast. Positive
+favours the model.
+
+\begin{table}[t!]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrr}
+\toprule
+Model & Daily econ. & Daily price & Weekly & Monthly & M4 hourly \\
+\midrule
+TimeH2O v1 (109M) & $-0.050$ ($26\,\%$) & $-0.010$ ($2\,\%$) & $+0.109$ ($10\,\%$) & $+0.097$ ($6\,\%$) & $+0.177$ ($0\,\%$) \\
+Toto 2.0 (2.5B) & $-0.030$ ($25\,\%$) & $-0.000$ ($1\,\%$) & $+0.050$ ($19\,\%$) & $+0.078$ ($7\,\%$) & $+0.089$ ($2\,\%$) \\
+Toto 2.0 (313M) & $-0.047$ ($26\,\%$) & $-0.003$ ($1\,\%$) & $+0.044$ ($22\,\%$) & $+0.071$ ($8\,\%$) & $+0.040$ ($5\,\%$) \\
+Simons (297M) & $-0.071$ ($27\,\%$) & $-0.010$ ($1\,\%$) & $+0.028$ ($25\,\%$) & $+0.067$ ($9\,\%$) & $+0.063$ ($3\,\%$) \\
+Simons (60M) & $-0.084$ ($28\,\%$) & $-0.002$ ($1\,\%$) & $+0.007$ ($27\,\%$) & $+0.064$ ($10\,\%$) & $+0.064$ ($2\,\%$) \\
+Chronos-2 (120M, 21 levels) & $-0.083$ ($33\,\%$) & $-0.014$ ($4\,\%$) & $-0.001$ ($30\,\%$) & $+0.059$ ($11\,\%$) & $+0.079$ ($3\,\%$) \\
+iAmTime-base (302M, 21 levels) & $-0.089$ ($32\,\%$) & $+0.003$ ($1\,\%$) & $+0.007$ ($30\,\%$) & $+0.055$ ($11\,\%$) & $+0.065$ ($5\,\%$) \\
+TimesFM 3.0 & $-0.081$ ($28\,\%$) & $-0.008$ ($2\,\%$) & $+0.001$ ($21\,\%$) & $+0.048$ ($11\,\%$) & $-0.015$ ($32\,\%$) \\
+ci-proto (167M) & $-0.113$ ($31\,\%$) & $-0.008$ ($3\,\%$) & $-0.018$ ($30\,\%$) & $+0.036$ ($11\,\%$) & $+0.042$ ($12\,\%$) \\
+Hirondel-7M & $-0.100$ ($31\,\%$) & $-0.004$ ($2\,\%$) & $-0.040$ ($30\,\%$) & $+0.035$ ($11\,\%$) & $+0.046$ ($10\,\%$) \\
+Moirai 2.0 small & $-0.134$ ($33\,\%$) & $-0.005$ ($1\,\%$) & $-0.179$ ($35\,\%$) & $+0.003$ ($13\,\%$) & $-0.083$ ($31\,\%$) \\
+TiRex-2 & $-0.159$ ($34\,\%$) & $-0.042$ ($6\,\%$) & $-0.194$ ($35\,\%$) & $-0.018$ ($14\,\%$) & $-0.067$ ($23\,\%$) \\
+TinyCast & $-0.250$ ($49\,\%$) & $-0.041$ ($14\,\%$) & $-0.146$ ($40\,\%$) & $-0.040$ ($20\,\%$) & $-0.214$ ($49\,\%$) \\
+TTM-R3 & $-0.156$ ($48\,\%$) & $-0.049$ ($14\,\%$) & $-0.184$ ($39\,\%$) & $-0.046$ ($20\,\%$) & $-0.198$ ($43\,\%$) \\
+TimeSSM (2.5M) & $-1.048$ ($90\,\%$) & $-1.127$ ($98\,\%$) & $-0.636$ ($58\,\%$) & $-0.387$ ($45\,\%$) & $-0.453$ ($57\,\%$) \\
+Conformal Seasonal Pools & $-0.432$ ($79\,\%$) & $-0.129$ ($64\,\%$) & $-0.288$ ($45\,\%$) & $-0.177$ ($38\,\%$) & $+0.057$ ($5\,\%$) \\
+\bottomrule
+\end{tabular}
+\caption{Median per-series $\Delta$LL, model minus reference, one step ahead,
+with the share of series on which the model loses in parentheses. Nine-decile
+models are scored under the generous reconstruction; Chronos-2 and iAmTime on
+their 21 native levels. Strata as in Table~\ref{tab:raw}.}
+\label{tab:fmpanel}
+\end{table}
+
+Three regularities hold across the roster. Daily economic series stay with the
+reference: every model loses there, the best of them on a quarter of the
+series. Monthly and hourly series go to the larger pretrained models by a few
+hundredths of a nat, with TimeH2O, Toto 2.0, Simons, Chronos-2 and iAmTime
+within $0.05$ nats of each other; weekly splits between them. Size buys
+little: Toto 2.0 improves by $0.03$ nats from 313M to 2.5B parameters and
+Simons by nothing from 60M to 297M, while the smallest models (TinyCast,
+TTM-R3, TimeSSM) lose everywhere. The conformal baseline reverses the picture
+of the pretrained models: it is the one arm that beats the reference on the
+strongly seasonal M4 hourly series, by $0.06$ nats on 144 of 414, and it loses
+the four \proglang{FRED} strata by $0.13$ to $0.43$ nats. A phase-conditional
+pool is the right tool for a series that repeats itself and nothing else; a
+likelihood-weighted portfolio of that pool and the reference keeps its hourly
+gain and loses nowhere else by more than $0.07$ nats, which is the sense in
+which the reference is a component rather than a competitor.
 
 %% -------------------------------------------------------------------------
 \section{The reconstruction moves the answer more than the model does}\label{sec:nozzle}
