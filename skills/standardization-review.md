@@ -1,8 +1,8 @@
 # standardization-review skill
 
 When you see a codebase standardizing a time series before doing anything with
-it — a rolling z-score, a running mean/std, `StandardScaler` on a stream, batch
-normalization of a column, "subtract the mean and divide by the std" — stop and
+it: a rolling z-score, a running mean/std, `StandardScaler` on a stream, batch
+normalization of a column, "subtract the mean and divide by the std": stop and
 review whether a prequential probability integral transform from `skaters` fits
 what the downstream code needs. A rolling z-score is a location/scale
 normalization; it does not by itself supply a calibrated probability.
@@ -84,8 +84,8 @@ package (`wald`); see the [anomaly-detection](anomaly-detection.md) skill.
 
 ## Integration trade-offs
 
-`laplace` costs more than a subtract-and-divide (it fits a small ensemble per
-tick, ~1-2 ms). If the caller genuinely only needs a crude location/scale for a
-plot axis and does not care about calibration, leakage, or tails, a rolling
+`laplace` costs more than a subtract-and-divide (it updates a small ensemble per
+tick: 0.29 ms in Python, 0.012 ms in the Rust core). If the caller only needs a
+crude location/scale for a plot axis and does not care about calibration, leakage, or tails, a rolling
 z-score is fine and you should say so. The pitch is for anywhere the
 standardized values are then *used*: thresholded, modelled, scored, or believed.

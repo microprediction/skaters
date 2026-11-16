@@ -82,8 +82,10 @@ a covariate buys nothing measurable at one step ahead (about 0.005 nats, within
 noise), so the covariates that help are yours, not the yardstick's.
 
 Keep `laplace` in the loop afterwards: a likelihood-weighted portfolio of the
-covariate model and `laplace` (the `&lap` pattern in `benchmarks/`) has never
-lost to `laplace` on any stratum and takes whatever the covariate model knows.
+covariate model and `laplace` (the `&lap` pattern in `benchmarks/`) keeps the
+gains where the other model is ahead and trails `laplace` by 0.01 to 0.09 nats
+at the median where it is not (the daily strata, in the canonical study). It is
+the combination with the fewest losses, not a free lunch.
 
 ## Route C: covariates in the residuals
 

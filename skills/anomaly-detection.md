@@ -31,7 +31,7 @@ clamped to ≈7.03 so thresholds never race an infinity. A calibrated online
 forecaster is the best null model there is: under it, each arriving point's
 surprise is a standard normal.
 
-For everything downstream of that signal — choosing thresholds, converting an
+For everything downstream of that signal: choosing thresholds, converting an
 alarm budget, distinguishing regime breaks from spikes, waveform caveats, and
-the measured false-alarm rates — use **timemachines**, where the detection
+the measured false-alarm rates: use **timemachines**, where the detection
 logic and its benchmarks live.
