@@ -1,0 +1,144 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[round]{natbib}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Cov}{\mathrm{Cov}}
+\newcommand{\F}{\mathcal{F}}
+
+\title{The decision horizon of a trader in a liquid security,\\ and what it implies for scoring multi-step forecasts}
+\author{Peter Cotton}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A trader who can revise a position at every tick needs, absent frictions, the conditional law of the next return and nothing further ahead. The log investor is exactly myopic; other investors add Merton's intertemporal hedging term, which is zero without return predictability and second order at short horizons. Every channel through which longer horizons enter the decision is a reason the position is carried rather than re-chosen: transaction costs, imposed holding periods, horizon risk limits, derivatives and inattention. In each, the multi-step law is either the iterated one-step law or a mean path weighted by a friction-set decay. None of this is new. It matters for the evaluation of foundation time-series models, whose benchmarks pool quantile losses over long horizons with equal weight, an aggregate no decision problem produces. The economically primary score is one step ahead at the decision frequency; multi-step fans should be scored against the iterated one-step predictive on cumulative returns at friction-weighted horizons.
+\end{abstract}
+
+\section{The question}
+
+Fix a liquid security with price $P_t$ and simple return $r_{t+1} = P_{t+1}/P_t - 1$. At each time $t$ a trader observes $\F_t$ and chooses a position $x_t$ (a fraction of wealth) that is held until $t+1$, when it may be revised. Nothing stops revision at every step. Does a forecast of $r_{t+2}, r_{t+3}, \dots$ change the choice of $x_t$?
+
+The claim examined here is that it does not, except through frictions. The argument is standard portfolio theory; the point of writing it down is Section~\ref{sec:fm}.
+
+\section{Without frictions}
+
+\subsection{Log utility: exact myopia}
+
+Wealth evolves as $W_{t+1} = W_t(1 + x_t r_{t+1})$ and the trader maximises $\E[\log W_T]$. The dynamic programme is
+\begin{equation}
+V_t(W_t, s_t) = \max_{x_t} \E\big[\,V_{t+1}(W_{t+1}, s_{t+1}) \,\big|\, \F_t\big],
+\label{eq:dp}
+\end{equation}
+with $s_t$ any state carrying the conditional law of returns.
+
+\begin{proposition}[Mossin 1968; Samuelson 1969; Merton 1969]
+Under log utility, $V_t(W, s) = \log W + g_t(s)$ for some $g_t$, and the optimal position satisfies
+\[
+x_t^\ast = \arg\max_x \E\big[\log(1 + x r_{t+1}) \,\big|\, \F_t\big].
+\]
+\end{proposition}
+\begin{proof}
+Backward induction. $V_T = \log W$. If $V_{t+1} = \log W + g_{t+1}(s)$ then
+$\E[V_{t+1}(W_{t+1}, s_{t+1}) \mid \F_t] = \log W_t + \E[\log(1 + x_t r_{t+1}) \mid \F_t] + \E[g_{t+1}(s_{t+1}) \mid \F_t]$,
+and only the middle term depends on $x_t$. The last term defines $g_t$.
+\end{proof}
+
+The optimal position is a functional of the one-step conditional law of $r_{t+1}$ alone. A perfect forecast of the law of $r_{t+h}$ for $h \ge 2$ does not enter. Kelly sizing \citep{kelly1956} is the same statement with $r$ a bet.
+
+\subsection{Other utilities: myopia plus a hedging term}
+
+For $u(W) = W^{1-\gamma}/(1-\gamma)$ with $\gamma \ne 1$ the value function factorises, $V_t(W, s) = W^{1-\gamma} H_t(s)$, and the first-order condition for $x_t$ involves $\E[(1 + x r_{t+1})^{-\gamma} r_{t+1} H_{t+1}(s_{t+1}) \mid \F_t]$. When returns are independent across time, $H_{t+1}$ is a constant and the problem is again one-step \citep{samuelson1969}. When returns are predictable, $H_{t+1}(s_{t+1})$ covaries with $r_{t+1}$ and the position acquires Merton's intertemporal hedging demand \citep{merton1971,merton1973}: in continuous time with one state variable,
+\[
+x_t^\ast = \frac{\mu_t - r^f}{\gamma \sigma_t^2} \;+\; \underbrace{\frac{\rho\, \sigma_{s}}{\sigma_t}\,\frac{-J_{Ws}}{W J_{WW}}}_{\text{hedging}},
+\]
+where $\rho$ is the correlation between the return and the state innovation and $J$ is the value function. The second term is zero for $\gamma = 1$ and for $\rho = 0$, and it is a genuine multi-step object: it depends on how the opportunity set moves, through $J_{Ws}$, not on tomorrow's return alone.
+
+\begin{remark}
+The hedging term is the only frictionless channel through which the future law enters today's position, and it scales with the predictability of the opportunity set, with $|\gamma - 1|$, and with the remaining horizon. For a daily or intraday trader with moderate risk aversion it is small against the myopic term \citep{campbell1999}. The statement ``one step is enough'' is exact for the log investor and a first-order approximation otherwise.
+\end{remark}
+
+\section{Where the horizon enters}
+
+Each channel below is a reason the position is carried rather than re-chosen at the next step.
+
+\subsection{Transaction costs}
+
+With quadratic trading costs $\tfrac{\lambda}{2}\,\Delta x_t^2$, mean-variance preferences and mean-reverting expected returns, \citet{garleanu2013} obtain in closed form that the optimal trade moves the position a fixed fraction of the way toward an \emph{aim} portfolio,
+\begin{equation}
+x_t = x_{t-1} + \frac{a}{\lambda}\,(\mathrm{aim}_t - x_{t-1}), \qquad
+\mathrm{aim}_t = \sum_{h \ge 0} z (1 - z)^h\, \E_t\!\big[\mathrm{Markowitz}_{t+h}\big],
+\label{eq:gp}
+\end{equation}
+where $\mathrm{Markowitz}_{t+h} = (\gamma \Sigma)^{-1} \E_{t+h}[r_{t+h+1}]$ and $z \in (0,1)$ is set by $\gamma$, $\lambda$ and the discount rate. Two things follow. Expected returns at every horizon $h$ enter the decision, weighted geometrically by how long the position will be carried; an alpha that decays faster than the trading speed $a/\lambda$ is barely worth trading. And what enters is the \emph{mean} path $\E_t[r_{t+h+1}]$; the distribution beyond the mean acts only through $\Sigma$, which is constant in that model and in practice enters through the variance of the carried position. Costs make multi-step \emph{mean} forecasts valuable, with a decay set by the cost.
+
+\subsection{A holding period imposed from outside}
+
+A term contract, a futures expiry, a lock-up, a monthly rebalancing mandate, or a position too large to unwind in one step: the payoff then depends on the cumulative return over the holding period, $R_{t,k} = \prod_{h=1}^{k}(1 + r_{t+h}) - 1$, and the object the decision needs is the conditional law of $R_{t,k}$. That law is implied by the one-step conditional law and the law of motion of the state, through the Chapman--Kolmogorov recursion
+\[
+p(r_{t+1}, \dots, r_{t+k} \mid \F_t) = \prod_{h=1}^{k} p(r_{t+h} \mid \F_{t+h-1}),
+\]
+so a one-step model that is right about the dynamics of its own state (volatility clustering, mean reversion of the level) produces the $k$-step law by iteration. A dedicated multi-step predictive adds value only where the iterated one-step law is wrong, which is a statement about misspecification of the one-step dynamics and is measurable series by series.
+
+\subsection{Horizon risk limits}
+
+A ten-day value at risk, a drawdown constraint, a margin that settles over days: constraints on the multi-step distribution that bind today's position. The same remark applies: the constraint is evaluated on the iterated law unless a multi-step model demonstrably beats it.
+
+\subsection{Derivatives}
+
+An option price is a functional of the distribution of the terminal price, and a path-dependent contract of the whole path. A market maker in options is a multi-step forecaster by construction. The one-step model enters only through what it implies about the path, and the quantity of interest is a risk-neutral law, which the physical one-step model informs but does not determine.
+
+\subsection{Inattention and latency}
+
+If the trader acts once a day, the decision interval is a day and ``one step'' is a day. The cost of attention plays the same role as the cost of trading. At the other extreme, a trader who can act at every tick with no cost has a decision interval of one tick, and the step collapses to the data's native frequency.
+
+\section{Two models, two horizons}\label{sec:two}
+
+The practical form of the question is this. Model $A$ is the better forecaster one step ahead and model $B$ the better one twelve steps ahead. Which does the trader use? Twelve-step returns are as predictable as the data make them; nothing above says otherwise. The question is what the twelve-step skill is worth to today's decision.
+
+For the frictionless trader of Section 2 the answer follows from the value of information. The position is a functional of the one-step conditional law, so $B$'s twelve-step forecast is worth exactly the improvement it brings to that law when it is treated as information at time $t$: the trader conditions $A$ on $B$'s output (a covariate, or a component in a mixture) and keeps whatever one-step gain results. If the best one-step predictive that uses $B$'s forecasts is no better than $A$ alone, $B$'s twelve-step edge has no value to this trader, however large it is. A model that is consistent in the probabilistic sense, whose $k$-step law is the iterate of its one-step law, cannot be better at twelve steps and worse at one; a model that is both is a direct multi-horizon regression whose horizons are not tied together, and its long-horizon skill does not transfer back.
+
+For the trader with costs, equation~\eqref{eq:gp} gives the weights: $B$'s mean path enters the aim portfolio with weight $z(1-z)^h$ at horizon $h$. The two models are combined horizon by horizon, $A$ where it is better and $B$ where it is better, and the trading speed decides how much the far horizons count. Under a holding period of exactly twelve steps the roles reverse and $B$ decides, with $A$ entering only through the first step of the cumulative return.
+
+\section{A better one-step model as a control variate}\label{sec:cv}
+
+The converse question is whether a strong one-step model improves a multi-step one. Three constructions do this without retraining either model.
+
+\emph{A portfolio per horizon.} At each $h$, mix the two predictive densities with weights that follow realised log score at that horizon. This is the combination the trader with costs uses, and the weights report where each model is better.
+
+\emph{Reweighting the multi-step model's paths.} A model that emits sample paths (several foundation models do) emits a joint law over horizons. Conditioning that joint law on better first-step information is importance weighting: give each path the weight $p_A(r_{t+1}) / p_B(r_{t+1})$ of its own first step under $A$ relative to $B$. The result keeps $B$'s dependence across horizons and $A$'s first-step law. It is the Monte Carlo control variate in its distributional form, and it is the only one of the three that uses the multi-step model's path structure rather than its marginals.
+
+\emph{Revision by the one-step innovation.} Once $r_{t+1}$ is observed, a stale $h$-step forecast made at $t$ is revised by the regression of its error on the one-step surprise $r_{t+1} - \E^A_t[r_{t+1}]$. This matters when the multi-step model is not rerun at every step; when it is, the rerun absorbs the observation and the revision is redundant.
+
+Each is a measurable experiment: the multi-step model alone, the one-step model's iterated law alone, and the construction, scored per horizon on the same series.
+
+\section{Implications for the assessment of foundation models}\label{sec:fm}
+
+Benchmark suites for pretrained time-series models score forecasts at horizons running to hundreds of steps and aggregate them with equal weight: GIFT-Eval's weighted quantile loss averages the pinball loss over nine quantile levels and over every step of a horizon that is several seasonal periods long, and the headline is the mean over datasets of that average \citep{aksu2024gifteval}. The suites surveyed in \citet{cotton2026stronger} share the pattern: one forecast origin per series, long horizons, horizons pooled.
+
+Measured against the decision problem above:
+\begin{enumerate}
+\item \textbf{The primary score is one step ahead at the decision frequency.} For a liquid security that is the native frequency of the data. A model that is strong at $h = 24$ and weak at $h = 1$ is weak for the frictionless trader, and the pooled score hides it. Scoring $h = 1$ in isolation is not a parochial choice; it is the frictionless decision problem.
+\item \textbf{Equal weight over horizons corresponds to no objective.} Transaction costs weight horizons geometrically with a decay set by the cost; holding periods pick out one cumulative horizon; risk limits pick out another. An unweighted mean over $h = 1, \dots, 96$ is none of these. A benchmark that wants an economic reading should either report horizons separately or state the friction that fixes the weights.
+\item \textbf{Beyond the mean, long horizons carry little decision weight.} In the cost model, what the future contributes to today's trade is the expected return path; the shape of the far-horizon predictive matters mainly for carried risk. A multi-horizon quantile loss averaged over levels and horizons therefore measures something that no trader in a liquid security pays for. The horizons are as predictable as they are; the aggregate is unattached to a decision.
+\item \textbf{The right baseline for a multi-step fan is the iterated one-step predictive.} The $k$-step law of a one-step model is a derived quantity. A pretrained model that emits a direct $k$-step forecast should be compared with the iterated law of a competent online one-step model on the cumulative return at the horizons a friction model says are carried. That is a smaller and sharper comparison than a pooled quantile loss, and it separates what the model knows about the path from what any one-step model already implies.
+\end{enumerate}
+
+For the \texttt{skaters} package this is the reason \texttt{laplace(k=1)} is the object the maintainer scores, why the stated upper limit is twelve steps with decimation beyond, and why its multi-step fans are built by iteration and mixing of decimated clocks rather than by direct multi-horizon regression. It is also the reason the comparison with foundation models on \url{https://foundationalprediction.com} is made at one step ahead, horizon by horizon where more than one is shown, and never pooled.
+
+\section*{Acknowledgement of priority}
+
+Nothing in Sections 2 and 3 is new: the myopia of the log investor is Mossin, Samuelson and Merton; the hedging demand is Merton; the cost-weighted aim portfolio is Gârleanu and Pedersen. The note only lines them up against how multi-step forecasts are currently scored.
+
+\bibliographystyle{plainnat}
+\bibliography{horizon-note}
+\end{document}

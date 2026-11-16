@@ -32,22 +32,24 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/skills.html">Skills</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
+          </span>
+        </span>
         <a href="/guide.html">Methodology</a>
-        <a href="/examples.html">Examples</a>
         <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
             <a href="/benchmarks.html">Accuracy</a>
             <a href="/metrics.html">Metrics</a>
             <a href="/performance.html">Performance</a>
             <a href="/footprint.html">Footprint</a>
-          </span>
-        </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
-          <span class="drop">
-            <a href="/challengers.html">Standalone</a>
-            <a href="/sandwich.html">Sandwich pattern</a>
-            <a href="/sidecar.html">Sidecar pattern</a>
-            <a href="/homogenization.html">Homogenization</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
@@ -74,8 +76,6 @@
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
             <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -1113,6 +1113,258 @@ the lazy path is also open: skip the filling entirely and just use `laplace`.
 The sandwich is for when the filling exists for reasons — covariates,
 regulation, sunk cost, a colleague's feelings — and you want the calibration
 and the leftovers anyway.
+</code></pre>
+      </details>
+    </div>
+    <div class="skill-copy">
+      <div class="skill-copy-head">
+        <h2 id="exogenous-variables"><code>exogenous-variables</code></h2>
+        <button class="btn copy-btn" data-target="src-exogenous-variables">Copy skill</button>
+      </div>
+      <p class="skill-label">Have covariates? Two routes that keep the calibrated univariate forecast in the loop: <code>laplace</code> as features in a <a href="https://ice-skaters.microprediction.org">river</a> pipeline (ice-skaters), or a foundation model that takes covariates, each scored against the <code>laplace</code> yardstick.</p>
+      <details>
+        <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/skills/exogenous-variables.md">view on GitHub</a></summary>
+        <pre id="src-exogenous-variables"><code># exogenous-variables skill
+
+Use this when the series to forecast comes with other series or features that
+might help: weather with demand, a calendar, a leading indicator, a sibling
+series, a promotion flag. `laplace` is univariate by design; it forecasts the
+stream it is given and nothing else. This skill is the graduation path: how to
+bring covariates in without throwing away the calibrated univariate forecast,
+and how to tell whether the covariates earned their place.
+
+## The order of operations
+
+1. **Run `laplace` on the target alone first.** It is the yardstick. Any
+   covariate model has to beat it per series, one step ahead, on log score,
+   or the covariate added nothing. Keep its `state[&quot;pit&quot;]` and `state[&quot;z&quot;]`;
+   they are the calibration check for everything below.
+2. **Ask whether the covariate is known ahead.** A calendar or a planned
+   promotion is known at forecast time (a future covariate). Weather or a
+   sibling series is only known up to now (a past covariate). Most leakage in
+   covariate forecasting is a past covariate treated as a future one.
+3. **Pick one of the two routes below, or both, and score against the
+   yardstick** with the per-series Diebold-Mariano test the canonical study
+   uses (the `benchmark-against-laplace` skill has the harness).
+
+## Route A: streaming ML with laplace as features (ice-skaters)
+
+For a model that learns online from covariates, put `laplace`&#x27;s calibrated
+forecast features into a `river` pipeline. `ice-skaters` wraps `laplace` as
+river-compatible transformers: `LaplaceFeatures` emits the forecast mean,
+spread, quantiles and calibration state as features; `LaplaceTarget` lets a
+regressor model the target&#x27;s deviation from laplace&#x27;s forecast rather than the
+raw target.
+
+```
+pip install ice-skaters
+```
+
+```python
+from river import linear_model, metrics, preprocessing
+from ice_skaters import LaplaceFeatures, LaplaceTarget
+
+model = LaplaceTarget(
+    regressor=preprocessing.TargetStandardScaler(
+        regressor=LaplaceFeatures()
+        | preprocessing.StandardScaler()
+        | linear_model.LinearRegression()))
+
+mae = metrics.MAE()
+for x, y in stream:                 # x: dict of covariates, y: the target
+    pred = model.predict_one(x)
+    mae.update(y, pred if pred is not None else 0.0)
+    model.learn_one(x, y)
+```
+
+The structure is the point: laplace carries the univariate dynamics (level,
+trend, scale, seasonality, tails) and the river model only has to learn what
+the covariates add on top. Swap `LinearRegression` for any river regressor.
+Documentation and more pipelines: https://ice-skaters.microprediction.org
+
+When the residual model learns nothing, the covariates were not informative at
+one step ahead, and that is a result worth having before building anything
+larger.
+
+## Route B: a foundation model that takes covariates
+
+Several pretrained models accept covariates directly, so a forecast that needs
+them can come from the model that was built for it:
+
+- **Chronos-2** (Amazon, Apache-2.0): past and future covariates and
+  multivariate targets in context; 21 native quantile levels.
+- **TimesFM 2.5 and 3.0** (Google): covariates through an in-context
+  regression layer; nine deciles.
+- **Moirai 2.0** (Salesforce) and **Toto 2.0** (Datadog): dynamic covariates
+  and multivariate input; check the licence (Moirai 2.0 is non-commercial).
+
+Run the foundation model with and without the covariates, and `laplace`
+without, and score all three per series. Two findings from the canonical study
+to keep in mind. Without covariates, `laplace` is ahead of every one of these
+models on daily economic series and behind the larger ones by a few hundredths
+of a nat on monthly and weekly series (foundationalprediction.com has the
+paired tables). And feeding `laplace`&#x27;s own forecast into a foundation model as
+a covariate buys nothing measurable at one step ahead (about 0.005 nats, within
+noise), so the covariates that help are yours, not the yardstick&#x27;s.
+
+Keep `laplace` in the loop afterwards: a likelihood-weighted portfolio of the
+covariate model and `laplace` (the `&amp;lap` pattern in `benchmarks/`) has never
+lost to `laplace` on any stratum and takes whatever the covariate model knows.
+
+## Route C: covariates in the residuals
+
+The cheapest test of all. Forecast the target with `laplace`, regress its
+one-step residuals (or its `state[&quot;z&quot;]`) on the covariates, online or in
+batch, and look at the fit. If nothing is explained, stop. If something is,
+Route A is that regression done properly, with calibration.
+
+## What to report
+
+- Per series: `laplace` alone, the covariate model, and the portfolio;
+  wins, ties and losses by Diebold-Mariano on log score; the median gap.
+- Coverage of the central 90% interval for each, from the PIT.
+- Which covariates were future-known and which were past-only, stated
+  explicitly, because that is where the leakage lives.
+</code></pre>
+      </details>
+    </div>
+    <div class="skill-copy">
+      <div class="skill-copy-head">
+        <h2 id="unwind-hater-post"><code>unwind-hater-post</code></h2>
+        <button class="btn copy-btn" data-target="src-unwind-hater-post">Copy skill</button>
+      </div>
+      <p class="skill-label">Someone posted that <code>laplace</code> fails, is slow, or loses? The checklist for finding what was actually run (version, horizon, units, missing transform), the metric games, and the pages that already hold the answer, starting with the <a href="/refunds.html">refunds page</a>.</p>
+      <details>
+        <summary>Show the skill (markdown) · or <a href="https://github.com/microprediction/skaters/blob/main/skills/unwind-hater-post.md">view on GitHub</a></summary>
+        <pre id="src-unwind-hater-post"><code># unwind-hater-post skill
+
+A skill for taking apart a social media post, thread or article that claims
+`laplace` (the `skaters` forecaster) fails, is slow, or loses to some other
+method. Use it when someone forwards such a post and asks &quot;is this true?&quot;, or
+when drafting a reply. The goal is a short, checkable answer that points to
+the pages where the measurement already lives, not an argument in the
+comments.
+
+Most hostile posts about `laplace` so far have been correct about what they
+ran and wrong about what it means. The skill is a checklist for finding which.
+
+## Step 1: find out what was actually run
+
+Before anything else, extract from the post:
+
+- **Version.** `skaters` version and date. Numbers before 2026-08-04 are a
+  different model (residual cap); the current canonical run is November 2026.
+- **Horizon.** One step ahead, or multi-step? The documented upper limit is
+  `k=12` (scope page). Results at 96 or 336 steps are outside scope; the
+  package will run there and the docs say not to.
+- **Units.** Were the series fed in natural units? A series near 10^20
+  (hash rate in hashes per second) or 10^-12 breaks every statistical
+  package with absolute constants; the working range is about 10^-3 to 10^6
+  (scope page, &quot;Units and scale&quot;). Dividing by 10^18 is the whole fix.
+- **Prior knowledge left out.** Was a non-negative series (demand, a price,
+  a count) forecast on the real line with no transform? The model does not
+  know the series is positive; `flesaker` or `log_transform` says so (examples
+  page, recipe three; scope page, &quot;Prior knowledge&quot;). Negative forecasts of
+  demand are the signature of this omission.
+- **Which implementation was timed.** The 12 microseconds per observation is
+  the Rust port, one step ahead, on a warm model. The Python package is about
+  24 times slower, and a cold multi-step run is slower again. All of it is on
+  the performance page; a post that compares one of these against a different
+  one of someone else&#x27;s numbers is comparing regimes, not methods.
+
+If any of these is off, the post is describing a misuse. Say so plainly, link
+the page, and stop. The refunds page does this with the standard examples:
+https://skaters.microprediction.org/refunds.html
+
+## Step 2: check the metric and the unit of counting
+
+- **One interval versus the whole distribution.** A 95% Winkler (interval)
+  score is proper but judges only the central interval, the one a conformal
+  method is built to calibrate. CRPS integrates every quantile level; the log
+  score checks every level and the tails hardest. A post that reports only the
+  interval score has chosen the one metric its method is built for
+  (metrics page, &quot;Interval scores judge one interval&quot;).
+- **Datasets won versus series.** Counting datasets gives a 30-series
+  collection the same vote as a 3,000-series one. The canonical study tests
+  every series with Diebold-Mariano and reports wins, ties, losses and the
+  median gap. Ask what the per-series numbers are.
+- **Reconstruction.** For nine-decile models, the step from quantiles to a
+  density moves the answer by half a nat. Any log-score gap quoted without
+  saying which reconstruction is not a number
+  (https://skaters.microprediction.org/papers.html).
+- **Pooled horizons.** A loss averaged over horizons 1 to 96 with equal
+  weight corresponds to no decision problem; report horizons separately.
+
+## Step 3: check the claim against the store
+
+The current paired results are public:
+
+- https://foundationalprediction.com (leaderboards and the explorer; pick any
+  reference model)
+- `benchmarks/canonical_summary_vs_laplace.csv` in the repository
+- https://conformalprediction.net/csp.html for the conformal baseline
+
+Where the post is right, say so with the same numbers. On the strongly
+seasonal M4 hourly series Conformal Seasonal Pools beats `laplace` on 144 of
+414 series and loses on 19 (+0.06 nats), and that sits in the first table of
+the review. On every FRED stratum `laplace` is ahead by 0.13 to 0.43 nats. The
+larger foundation models are ahead on monthly and weekly series by a few
+hundredths of a nat under the generous reconstruction; `laplace` is ahead on
+daily economic series against every one of them. Quote these as they are.
+
+## Step 4: the tactics to name
+
+A running list. Name the tactic, not the person.
+
+1. **The unrerunnable number.** A headline (&quot;60% of datasets&quot;, &quot;7,700 times
+   slower&quot;) with no script, no version pin and no series list. Ask for the
+   script that produces it; offer to rerun it through the canonical harness.
+2. **Metric chosen after the fact.** The interval score appears when the
+   density scores do not cooperate. Point to the metrics page.
+3. **Dataset-weighted counting.** Equal votes for collections of very
+   different size, so a few small seasonal collections decide the result.
+4. **Out of scope, reported as failure.** Running at horizons the docs exclude,
+   or in units the docs warn about, and presenting the result as a property of
+   the model.
+5. **The missing transform.** Negative demand, negative prices: the series was
+   positive and nobody said so to the model.
+6. **Regime-crossing speed comparisons.** Python cold multi-step against
+   someone else&#x27;s one-step figure; or the Rust warm figure disputed with the
+   Python number, which the performance page already lists next to it.
+7. **The tight reconstruction only.** Quoting the half-nat gap without the
+   generous reconstruction that erases it, or the other way round.
+8. **The amendment as concealment.** A page corrected the same day on a
+   public repository is presented as evidence of bad faith. The history is
+   public; say so and move on.
+9. **Priority claims for old ideas.** Same-phase forecasting is Holt-Winters
+   (1960), periodic AR (1967) and STL (1990); nobody owns it. When a credit
+   question is raised, answer it in the docstring or the benchmark notes with
+   dates, not on the thread.
+10. **Guarantee rhetoric.** &quot;No coverage guarantee&quot; against a method whose
+    measured coverage is on the page, next to the conformal method&#x27;s. Point to
+    the coverage column.
+11. **Engagement as evidence.** Reaction counts and emoji are not a
+    benchmark.
+
+## Step 5: how to reply
+
+- Two or three sentences. Which step above the post failed, the page that
+  shows it, the one number that matters.
+- Concede what is true, with the number. The hourly loss to CSP is real and is
+  on our own page.
+- Invite an issue with a reproducible example. A failing test is worth more
+  than a thread.
+- Do not argue the metric in the comments, do not name-call, do not quote any
+  number you cannot rerun, and never quote a pooled GIFT-Eval figure.
+- Tone: the refunds page. Dry, specific, and done.
+
+## What not to do
+
+- Do not reply to a post that contains no checkable claim.
+- Do not re-run a benchmark to a critic&#x27;s specification outside the
+  package&#x27;s stated scope and present the result as if it were in scope.
+- Do not edit the docs in response to a post without dating the change; the
+  repository history is public and that is a strength.
 </code></pre>
       </details>
     </div>
