@@ -1,6 +1,6 @@
 # skaters
 
-Home of **Laplace**, a light, fast, automatic **distributional** univariate time-series prediction algorithm that also improves the performance of other time-series models, including Prophet. Recommended for non-price economic time series and available in Python, JavaScript, R, Julia and Rust.
+Home of **Laplace**, a light, fast, automatic **distributional** univariate time-series prediction algorithm. It also improves other time-series models, including Prophet. Recommended for non-price economic time series.
 
 One call, zero dependencies, every prediction a full probability *distribution* computed online in O(1).
 
@@ -11,7 +11,9 @@ One call, zero dependencies, every prediction a full probability *distribution* 
 
 ## Quick start
 
-`pip install skaters` gives the latest release (0.16.0). `granger`, `flesaker` and `log_transform` are on `main` and arrive in the next release; until then use `pip install git+https://github.com/microprediction/skaters`. Every prediction is a `Dist`: a weighted Gaussian mixture carrying the mean, the spread, quantiles and a density at once. You build models by composition: transforms chain, ensembles nest, and a distributional leaf sits at the bottom (see the [guide](https://skaters.microprediction.org/guide.html)).
+```bash
+pip install skaters
+```
 
 ```python
 from skaters import laplace
@@ -29,11 +31,22 @@ for y in observations:
     forecast[0].quantile(0.975)        # upper edge of the central 95% band
 ```
 
-Score a forecast only against observations that arrive after it was issued. Every skater returns a list of predictive distributions, one per horizon h = 1, ..., k, and `state["pit"]` and `state["z"]` give a calibrated surprise for every arriving point.
+- Each call takes one observation and returns a predictive distribution (`Dist`) per horizon, `h = 1, ..., k`.
+- A `Dist` carries the mean, spread, quantiles and density at once.
+- Score a forecast only against values that arrive after it was issued.
+- `state["pit"]` and `state["z"]` give a calibrated surprise for every point.
+
+The release on PyPI is 0.16.0. `granger`, `flesaker` and `log_transform` arrive in the next release; until then, `pip install git+https://github.com/microprediction/skaters`.
 
 ## Demonstrations
 
-Each demo runs live in your browser: the [playground](https://skaters.microprediction.org/demos/playground.html), a [race](https://skaters.microprediction.org/demos/race.html) against classical baselines on FRED series, [whitening](https://skaters.microprediction.org/demos/normalization.html) against a rolling z-score, the [Rosenblatt bijection](https://skaters.microprediction.org/demos/rosenblatt.html), and the Python package itself in [Pyodide](https://skaters.microprediction.org/demos/pyodide.html).
+Live in your browser:
+
+- [Playground](https://skaters.microprediction.org/demos/playground.html): pick a regime and watch the forecast adapt
+- [Race](https://skaters.microprediction.org/demos/race.html): against classical baselines on FRED series
+- [Whitening](https://skaters.microprediction.org/demos/normalization.html): against a rolling z-score
+- [Rosenblatt bijection](https://skaters.microprediction.org/demos/rosenblatt.html): the series and its N(0,1) image
+- [Pyodide](https://skaters.microprediction.org/demos/pyodide.html): the Python package itself, in the browser
 
 ## Have a conversation about skaters
 
@@ -41,13 +54,15 @@ Paste the [primer](https://skaters.microprediction.org/#conversation) into ChatG
 
 ## How Laplace complements foundational models
 
-Laplace was written for monitoring hundreds of thousands of private and public economic series because we couldn't find anything better. We think some foundational models are slightly better, but far less usable at present. Your mileage may vary. [The leaderboards →](https://foundationalprediction.com/)
+Laplace was written to monitor hundreds of thousands of private and public economic series, because we couldn't find anything better. Some foundational models are slightly better, but far less usable at present. Your mileage may vary.
 
-`laplace` is tiny, fast and dependency-free, and it runs in five languages: Python, JavaScript, R, Julia and Rust. A forecast update takes microseconds on one CPU thread, where a pretrained model takes milliseconds or more ([speed](https://foundationalprediction.com/speed.html), [performance](https://skaters.microprediction.org/performance.html)). Its secondary use is as a reference point that marks the advances in foundational time-series models.
+- **Tiny and dependency-free**, in five languages ([ports](https://skaters.microprediction.org/languages.html)).
+- **Fast:** microseconds per update on one CPU thread, against milliseconds or more for a pretrained model ([speed](https://foundationalprediction.com/speed.html), [performance](https://skaters.microprediction.org/performance.html)).
+- **A reference point:** its secondary use is to mark the advances in foundational time-series models ([leaderboards](https://foundationalprediction.com/)).
 
 ## Where foundational models are better
 
-On monthly, weekly and hourly series. Paired per series on log score, with each model's stronger density reconstruction, the best foundational model on each of these strata wins far more series than it loses:
+On monthly, weekly and hourly series. The best foundational model on each wins far more series than it loses (paired per series on log score):
 
 | Series | Best model | Wins / draws / losses | Median gain (nats) | CRPS ratio |
 |---|---|--:|--:|--:|
@@ -55,7 +70,10 @@ On monthly, weekly and hourly series. Paired per series on log score, with each 
 | Weekly | TimeH2O | 1,383 / 1,324 / 306 | +0.11 | 0.82 |
 | Hourly (M4) | TimeH2O | 186 / 228 / 0 | +0.18 | 0.83 |
 
-On daily economic series every foundational and classical model loses more series than it wins. On daily prices the foundational models are level with `laplace`, and a fitted GARCH-t is ahead (743 wins, 216 losses). Wins and losses are Diebold–Mariano verdicts at each series; a CRPS ratio below 1 favours the compared model.
+- **Daily economic series:** every foundational and classical model loses more series than it wins.
+- **Daily prices:** the foundational models are level with `laplace`; a fitted GARCH-t is ahead (743 wins, 216 losses).
+
+Wins and losses are per-series Diebold–Mariano verdicts. A CRPS ratio below 1 favours the compared model.
 
 <p align="center">
   <img src="https://skaters.microprediction.org/assets/radar-canonical.png" alt="Radar chart of strength against laplace on log score, by stratum, for Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma and GARCH-t; laplace is the dashed ring." width="520">
@@ -76,7 +94,9 @@ skaters exposes one general forecaster, `laplace`, and one trained one, `granger
 | `granger(frequency=...)` | `laplace` with hyperparameters trained per frequency (monthly, weekly, hourly), mixed with `laplace` so its total log score is never more than log 4 behind |
 | `flesaker(lower=0)` | experimental: `laplace` on `log(y - lower)`, mapped back exactly, for series with a known bound |
 
-`laplace` performs solidly across domains and is fully autonomous: no training, no tuning. Being autonomous, it cannot beat a tuned model, a tuned version of itself (`granger`), or a custom construction built for a series you know something about, such as a non-negative one. It is not a substitute for a model that uses covariates or exogenous regressors (see [ice-skaters](https://ice-skaters.microprediction.org) and the [exogenous-variables skill](https://skaters.microprediction.org/skills.html#exogenous-variables)).
+`laplace` is fully autonomous: no training, no tuning. So it will not beat a tuned model, a tuned version of itself (`granger`), or a construction built for what you know about a series, such as a positive one.
+
+It does not use covariates; for those see [ice-skaters](https://ice-skaters.microprediction.org) and the [exogenous-variables skill](https://skaters.microprediction.org/skills.html#exogenous-variables).
 
 ## The toolkit
 
@@ -89,11 +109,13 @@ spread = conjugate(leaf(k=10), ou_transform(kappa=0.1), k=10)     # mean reversi
 positive = conjugate(laplace(), log_transform(lower=0.0))          # a positive series
 ```
 
-The transforms (differencing, EMA level, drift, Holt, AR, fractional differencing, seasonal difference and anchor, standardisation, GARCH, Yeo-Johnson, power, log, OU) and ensembles are documented in the [methodology guide](https://skaters.microprediction.org/guide.html), with runnable recipes on the [examples page](https://skaters.microprediction.org/examples.html).
+The transforms and ensembles are in the [methodology guide](https://skaters.microprediction.org/guide.html); runnable recipes are on the [examples page](https://skaters.microprediction.org/examples.html).
 
 ## A bijection, not just a forecaster
 
-`laplace`'s calibration state maps each arriving point through its own predictive cdf, z_t = Φ⁻¹(F_t(y_t)), a causal bijection on paths (Rosenblatt 1952) whose image is, under calibration, iid N(0,1). Run any forecaster in those coordinates and score it back in the original ones by exact change of variables. [See it live →](https://skaters.microprediction.org/demos/rosenblatt.html)
+Each arriving point maps through its own predictive cdf, z_t = Φ⁻¹(F_t(y_t)). This is a causal bijection on paths (Rosenblatt 1952), and under calibration its image is iid N(0,1).
+
+Run any forecaster in those coordinates, then score it back in the original ones by an exact change of variables. [See it live →](https://skaters.microprediction.org/demos/rosenblatt.html)
 
 ## Documentation
 
@@ -103,8 +125,8 @@ The transforms (differencing, EMA level, drift, Holt, AR, fractional differencin
 - [Scope](https://skaters.microprediction.org/scope.html): prior knowledge, horizons, units
 - [Metrics](https://skaters.microprediction.org/metrics.html): why log likelihood is the default score
 - [Claude skills](https://skaters.microprediction.org/skills.html): copyable instructions for common tasks
-- [Languages](https://skaters.microprediction.org/languages.html): the JavaScript, R, Julia and Rust ports, parity-checked to 1e-6
-- [REFERENCE.md](REFERENCE.md): the detailed reference (architecture, `Dist`, transforms, ensembles, `dantzig`, spec system, `skaters.torch`, theory)
+- Ports, parity-checked to 1e-6: [Python](https://skaters.microprediction.org/ports/python.html), [torch](https://skaters.microprediction.org/ports/torch.html), [Rust](https://skaters.microprediction.org/ports/rust.html), [JavaScript](https://skaters.microprediction.org/ports/javascript.html), [R](https://skaters.microprediction.org/ports/r.html), [Julia](https://skaters.microprediction.org/ports/julia.html)
+- [REFERENCE.md](REFERENCE.md): the detailed reference (architecture, `Dist`, transforms, ensembles, spec system, `skaters.torch`, theory)
 
 ## Papers
 
