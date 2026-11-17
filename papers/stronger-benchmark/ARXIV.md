@@ -35,12 +35,16 @@ Reported progress for foundation time-series models rests on comparisons that
 leave out a strong classical reference. Across eleven benchmark papers the
 classical arms are per-window refits of ETS, ARIMA and Theta; no online
 forecaster appears, and no suite scores a full predictive density by log score. We supply the
-missing reference: laplace, an online distributional forecaster with no
-pretraining and no tunable parameters. Scored one step ahead on held-out log
-density over an 18,815-series FRED panel, it beats TimesFM 3.0 on the median
-series of every stratum by about half a nat, and a post-hoc portfolio that sees
-only the model's own issued density recovers most of the gap. It is a pip
-install, with a Rust core and bit-exact parity.
+missing reference, laplace, an online distributional forecaster with no
+pretraining and no tunable parameters, and score it against TimesFM 3.0 one
+step ahead on held-out log density over an 19,940-series panel of
+FRED and M4-hourly series. The comparison is decided by a step the
+suites leave unstated: how the model's nine quantiles become a density. Under
+a tight reconstruction the reference leads by half a nat on the median series
+of every stratum; under a generous one the two are level at the median, and
+the reference keeps the better coverage. The reference is a pip install,
+with a Rust core and bit-exact parity.
+
 
 **Primary category.** stat.ML (Machine Learning, statistics)
 
