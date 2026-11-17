@@ -58,3 +58,22 @@ small components while preserving historical rounding for irrelevant residue.
 `visible_narrow_mass_at_crossing` and the two `meaningful_*` cases assert the
 intentional upper-endpoint policy for visible unresolved mass; they are accuracy
 expectations, not historical-main provenance goldens.
+
+## Other ports
+
+The torch port does not carry a second copy of the search.
+`TorchDist.quantile` converts its detached components to the reference `Dist`
+and calls `Dist.quantile`, so every case above holds for it by construction;
+`tests/test_torch_quantile_contract.py` runs the shared cases through it and
+checks exact agreement. `TorchSplicedDist.quantile` forwards with the same
+2100-step default.
+
+The R port at `microprediction/skaters-r` and the Julia port at
+`microprediction/Skaters.jl` mirror `Dist.quantile` line for line and run
+`quantile_contract.json` in their own test suites.
+
+The `granger` mixture of predictives has its own bisection between its members'
+quantiles, with a tolerance relative to location rather than to component
+scale. It is unchanged here in every port. Its members' quantiles are the ones
+this contract covers.
+

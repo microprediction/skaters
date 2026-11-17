@@ -31,7 +31,14 @@
   Float-resolution handling preserves historical rounding for resolved components
   where the old absolute tolerance could not stop, and handles collapsed components
   and atom jumps explicitly. Nonfinite search brackets fail explicitly. The optional
-  Torch implementation is unchanged. See `parity/QUANTILE_CONTRACT.md`.
+  torch port follows: `TorchDist.quantile` now delegates to the reference search,
+  and `TorchSplicedDist.quantile` carries the same default budget. The R and Julia
+  ports take the same change in their own repositories. The `granger` mixture
+  quantile keeps its own bisection and tolerance. On the frozen k=1 signature
+  streams the issued quantiles of ordinary series move by less than 5e-10 and
+  log density and CDF are unchanged; the reference digests in
+  `parity/laplace_k1_signatures.txt` are regenerated. Contributed by
+  verityengine in #328. See `parity/QUANTILE_CONTRACT.md`.
 - New forecaster `granger` (horizon 1), after Clive Granger: laplace with
   trained values for its continuous hyperparameters plus a small gate on the
   ensemble's combining weights, mixed with laplace by the Aggregating
