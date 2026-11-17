@@ -78,7 +78,7 @@ The transforms (differencing, EMA level, drift, Holt, AR, fractional differencin
 
 ## Cite
 
-Please cite *Transforms all the way down* ([SSRN 7220478](https://papers.ssrn.com/abstract=7220478)).
+Please cite the first paper listed, *Transforms all the way down* ([SSRN 7220478](https://papers.ssrn.com/abstract=7220478)), as it explains the methodology.
 
 ```bibtex
 @misc{cotton2026skaters,
