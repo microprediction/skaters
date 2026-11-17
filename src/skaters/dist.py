@@ -169,30 +169,41 @@ class Dist:
                 t2 += wi * wj * _abs_expectation(mi - mj, math.sqrt(si * si + sj * sj))
         return t1 - 0.5 * t2
 
-    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> float:
-        """Inverse CDF via bisection."""
+    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 2100) -> float:
+        """Inverse CDF with a scale-relative x tolerance below unit scale.
+
+        Ordinary tolerance exits retain the historical midpoint. At float
+        resolution retain historical midpoint rounding when the absolute
+        tolerance is at most twice float spacing and unresolved components
+        have no effect on the endpoint CDFs; otherwise use hi. An atom in
+        the final tolerance bracket is returned exactly. The default budget
+        spans binary64's exponent range; a smaller explicit max_iter can
+        still return an unconverged midpoint. The bracket must be finite.
+        """
         if not 0 < p < 1:
             raise ValueError(f"quantile needs 0 < p < 1, got {p}")
-        # Initial bracket. mu +- 8 sigma covers every ordinary mixture, but a
-        # small component far from the bulk can put the quantile outside it,
-        # and bisection against a bracket that excludes the answer converges
-        # to the endpoint with no signal. Expand geometrically until the
-        # bracket genuinely contains p; the expansion never fires for a
-        # bracket that was already sufficient, so existing results are
-        # bit-identical.
         mu = self.mean
         sigma = math.sqrt(self.var)
+        if not math.isfinite(sigma):
+            raise ArithmeticError("quantile needs a finite mixture variance")
+        scale = min((s for w, _, s in self.components if w > 0 and s > 0),
+                    default=1.0)
+        x_tol = tol * min(1.0, scale)
         lo = mu - 8 * sigma
         hi = mu + 8 * sigma
-        width = max(16 * sigma, 1e-12)
+        # Preserve main's geometric expansion. A location-scaled seed also
+        # moves a collapsed bracket at large-magnitude atoms. Strictly below
+        # p avoids excluding an earlier solution on a CDF plateau.
+        seed = max(16 * sigma, 1e-12 * max(1.0, abs(mu)))
+        width = seed
         for _ in range(120):
-            if self.cdf(lo) <= p:
+            if self.cdf(lo) < p:
                 break
             lo -= width
             width *= 2.0
         else:
             raise ArithmeticError(f"could not bracket quantile p={p} from below")
-        width = max(16 * sigma, 1e-12)
+        width = seed
         for _ in range(120):
             if self.cdf(hi) >= p:
                 break
@@ -200,15 +211,49 @@ class Dist:
             width *= 2.0
         else:
             raise ArithmeticError(f"could not bracket quantile p={p} from above")
+        if not (math.isfinite(lo) and math.isfinite(hi)):
+            raise ArithmeticError("quantile needs a finite search bracket")
         for _ in range(max_iter):
             mid = 0.5 * (lo + hi)
+            if not math.isfinite(mid):
+                mid = 0.5 * lo + 0.5 * hi
+            if not lo < mid < hi:
+                # Main may have stopped on this adjacent pair when its
+                # width first fell below tol. Preserve that rounded midpoint
+                # only if unresolved components do not change either endpoint
+                # CDF when moved across the pair. No weight cutoff is used.
+                gap = hi - lo
+                if 0 < tol <= 2 * gap:
+                    lower = upper = swapped_lower = swapped_upper = 0.0
+                    for w, m, s in self.components:
+                        cl = w * _gaussian_cdf(lo, m, s)
+                        cu = w * _gaussian_cdf(hi, m, s)
+                        lower += cl
+                        upper += cu
+                        unresolved = w > 0 and s <= gap
+                        swapped_lower += cu if unresolved else cl
+                        swapped_upper += cl if unresolved else cu
+                    if swapped_lower == lower and swapped_upper == upper:
+                        return mid
+                return hi
             if self.cdf(mid) < p:
                 lo = mid
             else:
                 hi = mid
-            if hi - lo < tol:
+            if hi - lo < x_tol:
+                # A midpoint just below an atom has the wrong CDF even if
+                # its x error is tiny. Snap only when p is inside its jump.
+                for w, m, s in self.components:
+                    if w > 0 and s == 0 and lo <= m <= hi:
+                        left = 0.0
+                        for wi, mi, si in self.components:
+                            left += wi * (float(mi < m) if si == 0
+                                          else _gaussian_cdf(m, mi, si))
+                        if left < p <= self.cdf(m):
+                            return m
                 break
-        return 0.5 * (lo + hi)
+        mid = 0.5 * (lo + hi)
+        return mid if math.isfinite(mid) else 0.5 * lo + 0.5 * hi
 
     @property
     def mean(self) -> float:

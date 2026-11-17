@@ -1,0 +1,134 @@
+{
+  "daily:econ": {
+    "series": 149,
+    "steps": 9536,
+    "median_dLL": 0.0,
+    "max_absolute_series_dLL": 0.0,
+    "coverage_baseline": [
+      8321,
+      4908
+    ],
+    "coverage_candidate": [
+      8321,
+      4908
+    ],
+    "logpdf_step_changes": 0,
+    "boundary_flips": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "max_absolute_movements": {
+      "y": 0.0,
+      "mean": 3.5266407247392437e-10,
+      "std": 1.1246205551020128e-10,
+      "q05": 4.989252941301289e-10,
+      "q50": 4.929415057565445e-10,
+      "q95": 4.980153442413204e-10,
+      "logpdf": 0.0,
+      "crps": 2.6592235735269077e-10
+    },
+    "raw_logpdf_changes": 0,
+    "raw_nonfinite_count": 0
+  },
+  "daily:price": {
+    "series": 51,
+    "steps": 3264,
+    "median_dLL": 0.0,
+    "max_absolute_series_dLL": 0.0,
+    "coverage_baseline": [
+      2958,
+      1767
+    ],
+    "coverage_candidate": [
+      2958,
+      1767
+    ],
+    "logpdf_step_changes": 0,
+    "boundary_flips": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "max_absolute_movements": {
+      "y": 0.0,
+      "mean": 1.1444815803613242e-10,
+      "std": 1.1621631434977076e-10,
+      "q05": 4.961779598300353e-10,
+      "q50": 4.92061813170408e-10,
+      "q95": 4.929331057917929e-10,
+      "logpdf": 0.0,
+      "crps": 1.2886227718696898e-10
+    },
+    "raw_logpdf_changes": 0,
+    "raw_nonfinite_count": 0
+  },
+  "monthly:econ": {
+    "series": 200,
+    "steps": 12800,
+    "median_dLL": 0.0,
+    "max_absolute_series_dLL": 0.0,
+    "coverage_baseline": [
+      11938,
+      6473
+    ],
+    "coverage_candidate": [
+      11938,
+      6473
+    ],
+    "logpdf_step_changes": 0,
+    "boundary_flips": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "max_absolute_movements": {
+      "y": 0.0,
+      "mean": 1.1784786579753515e-10,
+      "std": 1.194004478621835e-10,
+      "q05": 4.941197173646827e-10,
+      "q50": 4.985727007026514e-10,
+      "q95": 4.985264024509606e-10,
+      "logpdf": 0.0,
+      "crps": 1.2523619641324757e-10
+    },
+    "raw_logpdf_changes": 0,
+    "raw_nonfinite_count": 0
+  },
+  "weekly:econ": {
+    "series": 200,
+    "steps": 12800,
+    "median_dLL": 0.0,
+    "max_absolute_series_dLL": 0.0,
+    "coverage_baseline": [
+      11405,
+      5958
+    ],
+    "coverage_candidate": [
+      11405,
+      5958
+    ],
+    "logpdf_step_changes": 0,
+    "boundary_flips": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "max_absolute_movements": {
+      "y": 0.0,
+      "mean": 1.1602612620675856e-10,
+      "std": 1.1575864832663596e-10,
+      "q05": 4.977443305610729e-10,
+      "q50": 4.973560835093774e-10,
+      "q95": 4.870934332962262e-10,
+      "logpdf": 0.0,
+      "crps": 9.82933790784346e-11
+    },
+    "raw_logpdf_changes": 0,
+    "raw_nonfinite_count": 0
+  }
+}

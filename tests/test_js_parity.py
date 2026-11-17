@@ -72,3 +72,8 @@ def test_rust_parity():
     subprocess.run(
         ["cargo", "test", "--release", "--test", "parity"],
         check=True, cwd=os.path.join(ROOT, "rust"))
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_quantile_contract():
+    subprocess.run(["node", os.path.join(ROOT, "parity", "quantile_contract.mjs")], check=True, cwd=ROOT)

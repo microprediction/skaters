@@ -163,7 +163,7 @@ class TorchSplicedDist:
             return torch.exp(lp)
         return torch.as_tensor(math.inf, dtype=DTYPE)
 
-    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100):
+    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 2100):
         assert 0 < p < 1
         if p < self.zeta_lo:
             z = self.t_lo - ref._gpd_isf(p / self.zeta_lo, self.g_lo, self.s_lo)
