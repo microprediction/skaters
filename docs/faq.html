@@ -180,6 +180,14 @@
       <code>laplace</code> ties it. On strongly seasonal hourly waveforms some foundation models and Conformal
       Seasonal Pools are ahead.</p>
 
+    <h3>What is it not best for?</h3>
+    <p>This can be answered in part by looking at the metrics and the breakdowns by type of series on
+      <a href="https://foundationalprediction.com">foundationalprediction.com</a>. Intuitively, a model built for
+      economic time series needs to spread probability over a lot of the space, and it seldom has strong anchors.
+      So, for example, you would probably not want to use it out of the box to predict hourly Citi Bike
+      availability. You can try, of course. If you do, please
+      <a href="https://github.com/microprediction/skaters/issues">file a GitHub issue</a> with the results.</p>
+
     <h3>Is it a replacement for foundational time-series models?</h3>
     <p>No. Several pretrained models beat <code>laplace</code> on monthly, weekly and hourly series by a few
       hundredths of a nat per step; <code>laplace</code> is ahead on daily economic series and is far cheaper
