@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — FAQ</title>
-  <meta name="description" content="Frequently asked questions about skaters: why likelihood is the default score, whether the benchmark win holds up, and what univariate distributional forecasting is for." />
+  <meta name="description" content="What skaters is for, how to use it, why it focuses on economic series one step ahead, what it does not do (covariates, replacing foundation models), misuse, and the technical questions that come up most." />
   <link rel="stylesheet" href="./academic.css" />
 </head>
 <body>
@@ -67,50 +67,104 @@
 
   <main>
     <h1>FAQ</h1>
-    <p class="subtitle">A short list, growing as questions recur.</p>
+    <p class="lead">What skaters is for, how to use it, where it stops, and the technical questions that come up most.
+      The <a href="/#conversation">conversation primer</a> on the home page gives a chat assistant the same starting point.</p>
 
-    <h2>Why is likelihood the default, not CRPS?</h2>
-    <p>
-      A skater's target is a reusable predictive <em>density</em>, and densities
-      are meant to be chained: each stage refines the residual of the last.
-      Held-out log-likelihood is the score under which those refinements compose,
-      the log-likelihood of a chained forecast being the base score plus the
-      contribution of each stage. CRPS is a good score for a different target,
-      coverage or threshold behaviour, and it is reported alongside as a
-      diagnostic. It is a different contract, not a worse one. The full argument,
-      with the worked example and where CRPS is the right choice, is in
-      <a href="/metrics.html">why skaters ranks by likelihood, by default</a>.
-    </p>
+    <h2 id="about">About skaters</h2>
 
-    <h2>Isn't the benchmark win just p-hacked?</h2>
-    <p>
-      Reasonable thing to ask of any leaderboard. Rather than take one slice on
-      faith, the <a href="/robustness.html">robustness explorer</a> lets you cut
-      the non-price benchmark any way you like (at random, by category,
-      frequency, stickiness, martingality) and watch the per-series win-rate
-      recompute live with a bootstrap band. A cherry-picked edge falls apart under
-      reslicing; a real one stays high and tight. The price caveat is stated
-      plainly too: on equity/fx/commodity returns GARCH-t wins, and we say so.
-    </p>
+    <h3>Why was it written?</h3>
+    <p>To monitor hundreds of thousands of public and private economic series, each with a full predictive
+      distribution, updated online as each observation arrives, with no training job to run and nothing to tune.
+      Nothing available did that at that scale, so <code>laplace</code> was built for it.</p>
 
-    <h2>Do I need exogenous data or features for this to be useful?</h2>
-    <p>
-      Not to use it. Univariate distributional prediction is a composable
-      <em>component</em>, not a whole pipeline: it runs on the series you have and
-      plugs in before, during, or after the rest of a model. Exogenous structure
-      enters as another stage. See <a href="/scope.html">Scope</a>.
-    </p>
+    <h3>What does it produce?</h3>
+    <p>A predictive distribution for the next value of one series: a mean, a spread, quantiles and a density.
+      Every call takes one observation and the previous state and returns the forecast and the new state, in
+      O(1) time per observation. The state also carries a calibrated surprise, <code>state["z"]</code> and
+      <code>state["pit"]</code>, for each arriving point.</p>
 
-    <h2>Why not just build a bespoke model?</h2>
+    <h3>What are laplace and granger?</h3>
+    <p><code>laplace</code> is the general forecaster: a likelihood-weighted ensemble of transform chains with a
+      distributional leaf. <code>granger</code> is <code>laplace</code> with its continuous hyperparameters
+      trained per frequency (monthly, weekly, hourly), mixed with <code>laplace</code> so that its total log score
+      is never more than log 4 behind. The <a href="/guide.html">methodology guide</a> describes both.</p>
+
+    <h2 id="using">Using it</h2>
+
+    <h3>How do I start?</h3>
+    <p><code>pip install skaters</code>, then feed observations one at a time to <code>laplace()</code>. The
+      <a href="/examples.html">examples page</a> has runnable recipes: a first forecast, several steps ahead,
+      positive series, calibration checks, anomalies, mean reversion, your own transform and the browser.</p>
+
+    <h3>Which languages?</h3>
+    <p>Python, with a Rust core for speed, and parity-locked ports in JavaScript, R and Julia that agree with
+      the Python to 1e-6. See <a href="/languages.html">languages</a>.</p>
+
+    <h3>Can an AI assistant help me use it?</h3>
+    <p>Yes. The <a href="/skills.html">Claude skills</a> are copyable instructions for common jobs: basic use,
+      benchmarking a method against <code>laplace</code>, reviewing a paper's benchmark, exogenous variables,
+      residual review and others. For a general conversation, paste the
+      <a href="/#conversation">primer</a> into any chat assistant.</p>
+
+    <h2 id="scope">Scope</h2>
+
+    <h3>Why economic series?</h3>
+    <p>Because that is what it was built for and where it has been tested hardest: daily, weekly and monthly
+      economic series, mostly from FRED. On price and return series a fitted GARCH-t is the recommendation, and
+      <code>laplace</code> ties it. On strongly seasonal hourly waveforms some foundation models and Conformal
+      Seasonal Pools are ahead.</p>
+
+    <h3>Why one step ahead, and short horizons?</h3>
+    <p>An investor who can trade every interval in a liquid market chooses today's position from the
+      distribution of the next return; under log utility nothing further ahead enters the decision. So one step
+      ahead is the score that matters for that use, and the comparisons here report it on its own rather than
+      pooled over long horizons. The argument, with its limits, is in <a href="https://foundationalprediction.com/horizon-note.pdf">On the importance of evaluating foundational time-series models one step ahead in an investment context</a>. Multi-step forecasts are supported
+      to twelve steps, which is the stated upper limit.</p>
+
+    <h3>Is it a replacement for foundational time-series models?</h3>
+    <p>No. Several pretrained models beat <code>laplace</code> on monthly, weekly and hourly series by a few
+      hundredths of a nat per step; <code>laplace</code> is ahead on daily economic series and is far cheaper
+      and easier to run online. The paired results for each model, against <code>laplace</code> or any other
+      reference, are on <a href="https://foundationalprediction.com">foundationalprediction.com</a>, and the
+      protocol is in <a href="/papers.html">A stronger univariate benchmark for foundational time-series model evaluation</a>.</p>
+
+    <h3>Does it handle covariates or exogenous regressors?</h3>
+    <p>No. <code>laplace</code> is univariate: it forecasts the stream it is given and nothing else. It has no
+      way to use known future covariates, calendar regressors or other series. For those, use a foundation model
+      that takes covariates, or put <code>laplace</code>'s forecast features into a streaming regression with
+      <a href="https://ice-skaters.microprediction.org">ice-skaters</a>; the
+      <a href="/skills.html#exogenous-variables">exogenous-variables skill</a> sets out both routes and how to
+      check that the covariates helped.</p>
+
+    <h3>Is there a multivariate version?</h3>
+    <p>Not in skaters itself: one stream, one forecaster, one distribution. Cross-stream work happens one layer
+      up, where each stream is reduced to its forecaster's expectation and surprise. The first packaged version
+      is <a href="https://ice-skaters.microprediction.org">ice-skaters</a>, which is preliminary.</p>
+
+    <h3>What counts as misuse?</h3>
+    <p>Forecasting a positive series on the real line without a transform, feeding values near 10<sup>20</sup>
+      or 10<sup>-12</sup> instead of natural units, asking for horizons far beyond twelve steps, and reading a
+      univariate forecast as if it knew about covariates. The <a href="/scope.html">scope page</a> covers each
+      and the <a href="/refunds.html">misuse page</a> has worked examples.</p>
+
+    <h2 id="evaluation">Evaluation</h2>
+
+    <h3>Why is likelihood the default score, not CRPS?</h3>
+    <p>A skater's target is a reusable predictive density, and densities are chained: each stage refines the
+      residual of the last. Held-out log-likelihood is the score under which those refinements add up. CRPS
+      suits a different target, coverage or threshold behaviour, and it is reported alongside. The full argument,
+      with a worked example and the cases where CRPS is right, is on the <a href="/metrics.html">metrics page</a>.</p>
+
+    <h3>Isn't the benchmark win just p-hacked?</h3>
+    <p>Every comparison is paired per series with a Diebold&ndash;Mariano test, on identical windows, and the
+      results include the strata where <code>laplace</code> loses. The <a href="https://foundationalprediction.com">leaderboards</a>
+      let you choose the reference model and slice the series by type.</p>
+
+    <h2 id="technical">Technical questions</h2>
+<h3>Doesn't the transform leave the hard part, the time-dependence,
+      exactly as hard? (the copula objection)</h3>
     <p>
-      For a single important series, do. The value here is autonomy and scale:
-      thousands of streams, online, unattended, each returning a full
-      distribution rather than a point. See <a href="/scope.html">Scope</a>.
-    </p>
-    <h2>Doesn't the transform leave the hard part, the time-dependence,
-      exactly as hard? (the copula objection)</h2>
-    <p>
-      No, and the distinction is worth being precise about. The copula
+      No. The copula
       instinct is right for the static transform: push a series through a
       fixed marginal F and all the serial dependence is still sitting in the
       uniforms, exactly as hard as before. This transform is the conditional
@@ -129,8 +183,8 @@
       (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
       log</a>); hand it to the streaming anomaly detectors in
       <a href="https://timemachines.microprediction.org/">timemachines</a> and they run
-      several times better than on raw data. The dependence problem is not relocated, it is
-      mostly finished by the time z exists.
+      several times better than on raw data. Most of the dependence problem is finished by the
+      time z exists.
     </p>
     <p>
       What does remain as hard as before is cross-stream dependence, which
@@ -141,9 +195,9 @@
       the bookkeeping is about twenty lines.
     </p>
 
-    <h2>"A nonlinear transform of an optimal estimate is usually not the
+    <h3>"A nonlinear transform of an optimal estimate is usually not the
       optimal estimate of the nonlinear transform." Isn't this exactly
-      that mistake?</h2>
+      that mistake?</h3>
     <p>
       The rule is E[g(X)] &ne; g(E[X]), and it bites when a point goes
       through a nonlinearity. Distributions do not have this problem: if Y
@@ -212,8 +266,8 @@
     })();
     </script>
 
-    <h2>Online methods struggle to adjust parameters without a restart. How
-      is that handled?</h2>
+    <h3>Online methods struggle to adjust parameters without a restart. How
+      is that handled?</h3>
     <p>
       There is no fit-then-freeze stage, so there is nothing to restart.
       Every estimator is recursive with forgetting, the ensemble reweights
@@ -233,20 +287,8 @@
       switch regimes mid-stream and watch.
     </p>
 
-    <h2>Is there a multivariate version?</h2>
-    <p>
-      Not in skaters itself: one stream, one forecaster, one distribution.
-      Cross-stream work happens one layer up, where each stream is reduced
-      to its forecaster's expectation and surprise and downstream models
-      consume those instead of raw values.
-    </p>
-    <p>
-      The first packaged version is
-      <a href="https://ice-skaters.microprediction.org">ice-skaters</a>,
-      which feeds streaming regressions in <a href="https://riverml.xyz">river</a>. It is highly preliminary:
-      the benchmarks there report the losing configurations next to the
-      winning ones, so read the boundaries first.
-    </p>
+    
+
   </main>
 
   <footer>

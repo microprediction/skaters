@@ -18,6 +18,13 @@
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"
     onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
   <link rel="stylesheet" href="./academic.css" />
+  <style>
+    .conversation { margin: 18px 0 26px; padding: 14px 18px 6px; border: 1px solid #ddd; border-radius: 6px; background: #fafaff; }
+    .conv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .conv-head h2 { margin: 0; font-size: 1.15rem; }
+    .conversation pre { white-space: pre-wrap; font-size: .85rem; max-height: 320px; overflow: auto; background: #fff; border: 1px solid #e3e3e3; padding: 10px 12px; }
+    .copy-btn { white-space: nowrap; cursor: pointer; border: none; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -81,8 +88,7 @@
     <h1>skaters</h1>
     <p class="subtitle">Home of <strong>Laplace</strong>, a light, fast, automatic
       <strong>distributional</strong> univariate time-series prediction algorithm that also
-      reliably <a href="/sandwich.html">improves the performance of other time-series
-      models</a> (<a href="https://prophet.microprediction.org">including Prophet</a>).
+      improves the performance of other time-series models, including Prophet.
       Recommended for non-price economic time-series and available in Python, JavaScript,
       R, Julia and Rust.</p>
 
@@ -97,6 +103,32 @@
       <span class="tag">Python · JS · R · Julia · Rust</span>
     </div>
 
+
+    <section id="conversation" class="conversation">
+      <div class="conv-head">
+        <h2>Have a conversation about skaters</h2>
+        <button class="btn copy-btn" data-target="chat-prime">Copy</button>
+      </div>
+      <p>Paste this into ChatGPT, Claude or any chat assistant, then describe your series and what you need.</p>
+      <pre id="chat-prime">I would like to discuss skaters (https://skaters.microprediction.org), an open-source package for online, distributional, univariate time-series forecasting in Python (with a Rust core), JavaScript, R and Julia. Please read these pages before answering:
+
+- FAQ: https://skaters.microprediction.org/faq.html
+- Examples: https://skaters.microprediction.org/examples.html
+- Methodology: https://skaters.microprediction.org/guide.html
+- Scope and misuse: https://skaters.microprediction.org/scope.html
+- Claude skills: https://skaters.microprediction.org/skills.html
+- Results against foundational models: https://foundationalprediction.com
+- Why one step ahead: https://foundationalprediction.com/horizon-note.pdf
+
+Key points:
+- laplace is the general forecaster; granger is laplace with trained hyperparameters (monthly, weekly, hourly).
+- Each call takes one observation and returns a full predictive distribution for the next value, in O(1) time.
+- It was built for large numbers of economic series and is scored one step ahead on held-out log likelihood.
+- It is univariate: it does not use covariates or exogenous regressors, and it does not replace foundational time-series models.
+- Supply prior knowledge as a transform (for example, a log transform for a positive series) and use natural units.
+
+My series and goal: </pre>
+    </section>
 
     <figure class="hero-figure">
       <img src="./assets/laplace-foundational-models.gif" alt="A cyclist pops a wheelie on a mountain bike alongside a professional peloton; the peloton is labelled Foundational Models and the wheelie rider Laplace." style="width:100%;height:auto;">
@@ -279,5 +311,16 @@ g = granger(frequency="monthly")   # or "weekly", "hourly"</code></pre>
     (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
     <a href="http://schur.microprediction.org">schur</a>).
   </footer>
+  <script>
+    document.querySelectorAll('.copy-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var pre = document.getElementById(btn.dataset.target);
+        navigator.clipboard.writeText(pre.innerText).then(function () {
+          var old = btn.textContent; btn.textContent = 'Copied \u2713';
+          setTimeout(function () { btn.textContent = old; }, 1600);
+        });
+      });
+    });
+  </script>
 </body>
 </html>
