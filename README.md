@@ -70,7 +70,7 @@ Everything else is a building block you can compose: transforms, leaves and ense
 | [Metrics](https://skaters.microprediction.org/metrics.html) | why log likelihood is the default score |
 | [Skills](https://skaters.microprediction.org/skills.html) | copyable instructions for AI assistants |
 | [Primer](https://skaters.microprediction.org/#conversation) | paste into any chat assistant to discuss your series |
-| [Ports](https://skaters.microprediction.org/languages.html) | [Python](https://skaters.microprediction.org/ports/python.html), [torch](https://skaters.microprediction.org/ports/torch.html), [Rust](https://skaters.microprediction.org/ports/rust.html), [JavaScript](https://skaters.microprediction.org/ports/javascript.html), [R](https://skaters.microprediction.org/ports/r.html), [Julia](https://skaters.microprediction.org/ports/julia.html), parity-checked to 1e-6 |
+| [Implementations](https://skaters.microprediction.org/languages.html) | [Python](https://skaters.microprediction.org/ports/python.html), [torch](https://skaters.microprediction.org/ports/torch.html), [Rust](https://skaters.microprediction.org/ports/rust.html), [JavaScript](https://skaters.microprediction.org/ports/javascript.html), [R](https://skaters.microprediction.org/ports/r.html), [Julia](https://skaters.microprediction.org/ports/julia.html), parity-checked to 1e-6 |
 | [Papers](https://skaters.microprediction.org/papers.html) | the methods paper, the benchmark paper and technical notes |
 | [Leaderboards](https://foundationalprediction.com/) | paired results against foundational models |
 | [REFERENCE.md](REFERENCE.md) | the detailed reference: architecture, `Dist`, transforms, ensembles, specs, `skaters.torch` |
