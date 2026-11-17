@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — FAQ</title>
-  <meta name="description" content="What skaters is for, how to use it, why it focuses on economic series one step ahead, what it does not do (covariates, replacing foundation models), misuse, and the technical questions that come up most." />
+  <meta name="description" content="What skaters is for, how to use it, why it focuses on economic series one step ahead, what it does not do (covariates, replacing foundation models), how not to use it, whitening, and the technical questions that come up most." />
   <link rel="stylesheet" href="./academic.css" />
 </head>
 <body>
@@ -77,6 +77,13 @@
       distribution, updated online as each observation arrives, with no training job to run and nothing to tune.
       Nothing small, fast and light did that at that scale, so <code>laplace</code> was built for it.</p>
 
+    <h3>Why is it called skaters?</h3>
+    <p>The project is older than this package. It began as
+      <a href="https://github.com/microprediction/timemachines">timemachines</a>, where every forecaster had the
+      signature <code>f(y, s, k, a, t, e, r)</code>: the observation <code>y</code>, then state, steps ahead,
+      variables known in advance, time, expiry and hyper-parameters. The letters after <code>y</code> spell
+      skater. The signature has since shrunk to <code>f(y, state)</code>, and the name stayed.</p>
+
     <h3>What does it produce?</h3>
     <p>A predictive distribution for the next value of one series: a mean, a spread, quantiles and a density.
       Every call takes one observation and the previous state and returns the forecast and the new state, in
@@ -115,8 +122,9 @@
     <h3>How fast is it?</h3>
     <p>One update costs about 12 microseconds in the Rust core and about 0.3 milliseconds in pure Python, one
       step ahead on one CPU thread. A pretrained model reruns its forward pass for each new observation, which
-      costs milliseconds to hundreds of milliseconds per forecast. The measurements are on the
-      <a href="/performance.html">performance page</a>.</p>
+      costs milliseconds to hundreds of milliseconds per forecast. The skaters measurements are on the
+      <a href="/performance.html">performance page</a>. The cost of each foundational model per forecast is on the
+      <a href="https://foundationalprediction.com/speed.html">speed page</a> of foundationalprediction.com.</p>
 
     <h3>How do I get intervals and quantiles?</h3>
     <p>From the distribution: <code>d.quantile(0.05)</code> and <code>d.quantile(0.95)</code> give a 90% interval,
@@ -133,6 +141,31 @@
       pattern</a>), run it alongside your model as a calibration check (the <a href="/sidecar.html">sidecar
       pattern</a>), or combine the two predictive densities with weights that follow realised log score. The
       combination keeps most of the other model's gains and costs little where the other model is worse.</p>
+
+    <h3>Can I use it to whiten a series?</h3>
+    <p>Yes, and this is one of its main uses. After each observation the state holds
+      <code>state["z"]</code>, the normal quantile of the observation's probability under the forecast issued
+      one step earlier. If the forecast is calibrated, that stream is approximately independent N(0,1). It is
+      causal, because each value uses only the past. The
+      <a href="/skills.html#standardization-review">standardization-review skill</a> has a ten-line
+      <code>whiten</code> generator, and the <a href="/demos/rosenblatt.html">Rosenblatt demo</a> shows the
+      transform running.</p>
+
+    <h3>How does that differ from a rolling z-score?</h3>
+    <p>A rolling z-score subtracts a trailing mean and divides by a trailing standard deviation. It changes
+      location and scale only, so skew, heavy tails and serial dependence pass through. Labelling |z| &gt; 3 as
+      a three-sigma event then assumes a normality the data may not have. The probability-integral version maps
+      each point through the whole predictive distribution, so shape is handled as well. Neither guarantees
+      calibration. Check the z stream before you attach nominal probabilities to thresholds.</p>
+
+    <h3>Is the whitened stream really white?</h3>
+    <p>Only as far as the forecaster is right. What it fails to model stays in z as remaining autocorrelation,
+      a scale that drifts or a lopsided histogram. Testing z for those is the calibration check. ARIMA, ETS,
+      GARCH and Prophet fitted to z find only a few hundredths of a nat
+      (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results log</a>).
+      On FRED change series the implied sd of z is about 0.88 one step ahead, so the intervals run slightly
+      wide; the <a href="/homogenization.html">homogenization page</a> measures this by horizon and corrects it
+      online.</p>
 
     <h3>Can I use it for anomaly detection?</h3>
     <p>The state carries a calibrated surprise for every arriving point, <code>state["z"]</code>, which is the
@@ -172,7 +205,7 @@
       that sit on a grid. It has no model for a point mass at zero. For a positive series with zeros, set the
       floor of <code>flesaker</code> a little below zero, or treat the zeros separately.</p>
 
-    <h3>What counts as misuse?</h3>
+    <h3>How not to use</h3>
     <p>Forecasting a positive series on the real line without a transform, feeding values near 10<sup>20</sup>
       or 10<sup>-12</sup> instead of natural units, asking for horizons far beyond twelve steps, and reading a
       univariate forecast as if it knew about covariates. The <a href="/scope.html">scope page</a> covers each
@@ -341,9 +374,8 @@
 
 
     <h3>How do I cite it, and what is the licence?</h3>
-    <p>MIT licence. Cite the methods paper, <a href="https://papers.ssrn.com/abstract=7220478">Transforms all the
-      way down</a>, or the benchmark paper on the <a href="/papers.html">papers page</a>; a software paper is under
-      review at the Journal of Open Source Software.</p>
+    <p>MIT licence. Please cite <a href="https://papers.ssrn.com/abstract=7220478">Transforms all the way down</a>
+      (SSRN 7220478). The BibTeX entry is on the <a href="/papers.html#citation">papers page</a>.</p>
   </main>
 
   <footer>

@@ -76,6 +76,20 @@ The transforms (differencing, EMA level, drift, Holt, AR, fractional differencin
 - On the importance of evaluating foundational time-series models one step ahead in an investment context: [PDF](https://foundationalprediction.com/horizon-note.pdf)
 - Transforms all the way down, the methods paper: [PDF](papers/skaters-jss.pdf), [SSRN](https://papers.ssrn.com/abstract=7220478)
 
+## Cite
+
+Please cite *Transforms all the way down* ([SSRN 7220478](https://papers.ssrn.com/abstract=7220478)).
+
+```bibtex
+@misc{cotton2026skaters,
+  title  = {Transforms All the Way Down --- Automatic Online Distributional
+            Forecasting by Conjugation},
+  author = {Cotton, Peter},
+  year   = {2026},
+  note   = {SSRN 7220478, https://skaters.microprediction.org}
+}
+```
+
 ## Lineage
 
 skaters distils ideas from [timemachines](https://github.com/microprediction/timemachines), which gave dozens of time-series packages a common interface. It is a from-scratch rewrite for speed, distributional prediction and the browser.
