@@ -99,32 +99,39 @@
       every time. This is the regime a live deployment runs in.</p>
     <table class="perf">
       <tr><th>model</th><th>ms per observation</th><th>vs laplace (Rust) k=1</th></tr>
+      <tr><td>CSP</td><td class=num>0.0616</td><td class=num>5&times;</td></tr>
       <tr><td>laplace (Rust) k=12</td><td class=num>0.1504</td><td class=num>12&times;</td></tr>
       <tr><td>laplace (Python) k=1</td><td class=num>0.2858</td><td class=num>23&times;</td></tr>
       <tr><td>AutoETS (refit)</td><td class=num>2.0162</td><td class=num>165&times;</td></tr>
+      <tr><td>TTM-R3</td><td class=num>3.6356</td><td class=num>297&times;</td></tr>
+      <tr><td>Moirai 2.0 small</td><td class=num>4.9126</td><td class=num>401&times;</td></tr>
       <tr><td>Timestral-28M</td><td class=num>5.5466</td><td class=num>453&times;</td></tr>
+      <tr><td>ARIMA (order fixed, refit)</td><td class=num>7.2501</td><td class=num>592&times;</td></tr>
+      <tr><td>AutoTheta (refit)</td><td class=num>7.2653</td><td class=num>593&times;</td></tr>
       <tr><td>Chronos-Bolt-small</td><td class=num>7.3395</td><td class=num>599&times;</td></tr>
+      <tr><td>TinyCast</td><td class=num>11.5098</td><td class=num>939&times;</td></tr>
+      <tr><td>laplace++ (torch) k=1</td><td class=num>12.5795</td><td class=num>1,026&times;</td></tr>
+      <tr><td>Simons-60M</td><td class=num>12.7007</td><td class=num>1,036&times;</td></tr>
+      <tr><td>Chronos-2</td><td class=num>25.4695</td><td class=num>2,078&times;</td></tr>
+      <tr><td>GARCH-t (refit)</td><td class=num>29.6317</td><td class=num>2,418&times;</td></tr>
       <tr><td>Timestral-209M</td><td class=num>30.4898</td><td class=num>2,488&times;</td></tr>
       <tr><td>Prophet (refit)</td><td class=num>30.6941</td><td class=num>2,504&times;</td></tr>
+      <tr><td>Simons-297M</td><td class=num>33.4139</td><td class=num>2,726&times;</td></tr>
       <tr><td>t0-gamma</td><td class=num>40.0977</td><td class=num>3,272&times;</td></tr>
+      <tr><td>Hirondel-7M</td><td class=num>58.9203</td><td class=num>4,808&times;</td></tr>
       <tr><td>AutoARIMA (refit)</td><td class=num>62.2923</td><td class=num>5,083&times;</td></tr>
+      <tr><td>TiRex-2</td><td class=num>63.1508</td><td class=num>5,153&times;</td></tr>
       <tr><td>TimesFM-3.0</td><td class=num>66.9425</td><td class=num>5,462&times;</td></tr>
+      <tr><td>Toto 2.0 313M</td><td class=num>79.1804</td><td class=num>6,461&times;</td></tr>
       <tr><td>TiRex</td><td class=num>94.0870</td><td class=num>7,677&times;</td></tr>
+      <tr><td>iAmTime-base</td><td class=num>94.3603</td><td class=num>7,699&times;</td></tr>
       <tr><td>Sundial-base-128m</td><td class=num>108.4277</td><td class=num>8,847&times;</td></tr>
+      <tr><td>TimeSSM-2.5M</td><td class=num>159.2914</td><td class=num>12,997&times;</td></tr>
+      <tr><td>TimeH2O-v1</td><td class=num>215.7587</td><td class=num>17,605&times;</td></tr>
       <tr><td>TimesFM-2.5-200M</td><td class=num>317.0508</td><td class=num>25,869&times;</td></tr>
+      <tr><td>Toto 2.0 2.5B</td><td class=num>411.1566</td><td class=num>33,548&times;</td></tr>
+      <tr><td>ci-proto</td><td class=num>481.2025</td><td class=num>39,263&times;</td></tr>
     </table>
-
-    <figure class="heater">
-      <img src="./assets/nbeats-heater.jpg" alt="A tall space heater glowing orange in a living room, the word NBEATS lit up on its side and its control panel set to NBEATS Mode." loading="lazy">
-      <figcaption>Re-running a forward pass for every new observation does have one use in winter.</figcaption>
-    </figure>
-    <style>
-      figure.heater { margin: 28px auto 34px; max-width: 620px; }
-      figure.heater img { width: 100%; height: auto; display: block; border-radius: 10px;
-        box-shadow: 0 10px 30px rgba(120, 60, 10, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08); }
-      figure.heater figcaption { margin-top: 10px; text-align: center; font-style: italic;
-        font-size: 0.92rem; color: var(--muted, #777); }
-    </style>
 
     <h2>Batch: one forecast for a series never seen before</h2>
     <p>This is the benchmark protocol, and it is <em>laplace at its worst</em>: it must
@@ -132,20 +139,39 @@
       forward pass across many series. Best batch size shown per model.</p>
     <table class="perf">
       <tr><th>model</th><th>ms per series</th><th>regime</th></tr>
+      <tr><td>CSP</td><td class=num>0.0587</td><td class=note>cold b=16</td></tr>
+      <tr><td>Moirai 2.0 small</td><td class=num>0.6774</td><td class=note>cold b=64</td></tr>
       <tr><td>Timestral-28M</td><td class=num>0.7080</td><td class=note>cold b=64</td></tr>
       <tr><td>Chronos-Bolt-small</td><td class=num>0.7392</td><td class=note>cold b=64</td></tr>
+      <tr><td>TTM-R3</td><td class=num>0.7858</td><td class=note>cold b=64</td></tr>
       <tr><td>AutoETS (refit)</td><td class=num>2.0162</td><td class=note>cold</td></tr>
+      <tr><td>Simons-60M</td><td class=num>2.0423</td><td class=note>cold b=64</td></tr>
+      <tr><td>Chronos-2</td><td class=num>2.7960</td><td class=note>cold b=64</td></tr>
       <tr><td>Timestral-209M</td><td class=num>2.9965</td><td class=note>cold b=64</td></tr>
       <tr><td>laplace (Rust) k=1</td><td class=num>3.3989</td><td class=note>cold</td></tr>
       <tr><td>t0-gamma</td><td class=num>3.5279</td><td class=note>cold b=64</td></tr>
       <tr><td>TimesFM-3.0</td><td class=num>4.9556</td><td class=note>cold b=64</td></tr>
       <tr><td>TimesFM-2.5-200M</td><td class=num>4.9561</td><td class=note>cold b=64</td></tr>
+      <tr><td>Toto 2.0 313M</td><td class=num>5.1889</td><td class=note>cold b=64</td></tr>
+      <tr><td>Simons-297M</td><td class=num>6.2218</td><td class=note>cold b=64</td></tr>
+      <tr><td>ARIMA (order fixed, refit)</td><td class=num>7.2501</td><td class=note>cold</td></tr>
+      <tr><td>AutoTheta (refit)</td><td class=num>7.2653</td><td class=note>cold</td></tr>
+      <tr><td>TinyCast</td><td class=num>11.8785</td><td class=note>cold b=64</td></tr>
+      <tr><td>TiRex-2</td><td class=num>14.1551</td><td class=note>cold b=64</td></tr>
+      <tr><td>iAmTime-base</td><td class=num>14.5196</td><td class=note>cold b=64</td></tr>
+      <tr><td>Toto 2.0 2.5B</td><td class=num>25.7406</td><td class=note>cold b=64</td></tr>
+      <tr><td>TimeSSM-2.5M</td><td class=num>26.0017</td><td class=note>cold b=64</td></tr>
       <tr><td>Sundial-base-128m</td><td class=num>28.0490</td><td class=note>cold b=64</td></tr>
+      <tr><td>GARCH-t (refit)</td><td class=num>29.6317</td><td class=note>cold</td></tr>
       <tr><td>Prophet (refit)</td><td class=num>30.6941</td><td class=note>cold</td></tr>
       <tr><td>laplace (Rust) k=12</td><td class=num>42.5444</td><td class=note>cold</td></tr>
+      <tr><td>Hirondel-7M</td><td class=num>52.0751</td><td class=note>cold b=64</td></tr>
       <tr><td>AutoARIMA (refit)</td><td class=num>62.2923</td><td class=note>cold</td></tr>
       <tr><td>TiRex</td><td class=num>74.4202</td><td class=note>cold b=16</td></tr>
       <tr><td>laplace (Python) k=1</td><td class=num>74.4759</td><td class=note>cold</td></tr>
+      <tr><td>TimeH2O-v1</td><td class=num>128.6047</td><td class=note>cold b=64</td></tr>
+      <tr><td>ci-proto</td><td class=num>448.3012</td><td class=note>cold b=16</td></tr>
+      <tr><td>laplace++ (torch) k=1</td><td class=num>3244.2139</td><td class=note>cold</td></tr>
     </table>
 
     <h2>Every measurement</h2>
@@ -195,6 +221,74 @@
       <tr><td>Sundial-base-128m</td><td>cold b=16</td><td class=num>33.0453</td><td class=note>128M params, 30 sample paths, batched</td></tr>
       <tr><td>Sundial-base-128m</td><td>cold b=64</td><td class=num>28.0490</td><td class=note>128M params, 30 sample paths, batched</td></tr>
       <tr><td>Sundial-base-128m</td><td>warm</td><td class=num>108.4277</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>laplace++ (torch) k=1</td><td>cold</td><td class=num>3244.2139</td><td class=note>replays 256 points</td></tr>
+      <tr><td>laplace++ (torch) k=1</td><td>warm</td><td class=num>12.5795</td><td class=note>one online update</td></tr>
+      <tr><td>TimeH2O-v1</td><td>cold b=1</td><td class=num>255.3649</td><td class=note>108.8M params, batched</td></tr>
+      <tr><td>TimeH2O-v1</td><td>cold b=16</td><td class=num>155.3164</td><td class=note>108.8M params, batched</td></tr>
+      <tr><td>TimeH2O-v1</td><td>cold b=64</td><td class=num>128.6047</td><td class=note>108.8M params, batched</td></tr>
+      <tr><td>TimeH2O-v1</td><td>warm</td><td class=num>215.7587</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>AutoTheta (refit)</td><td>cold</td><td class=num>7.2653</td><td class=note>fit on 256 points</td></tr>
+      <tr><td>AutoTheta (refit)</td><td>warm</td><td class=num>7.2653</td><td class=note>refits from scratch every step</td></tr>
+      <tr><td>ARIMA (order fixed, refit)</td><td>cold</td><td class=num>7.2501</td><td class=note>a typical order, (1,1,1); the leaderboard arm searches the order once per series and refits coefficients every step</td></tr>
+      <tr><td>ARIMA (order fixed, refit)</td><td>warm</td><td class=num>7.2501</td><td class=note>coefficients refit every step</td></tr>
+      <tr><td>GARCH-t (refit)</td><td>cold</td><td class=num>29.6317</td><td class=note>fit on 256 points</td></tr>
+      <tr><td>GARCH-t (refit)</td><td>warm</td><td class=num>29.6317</td><td class=note>refits from scratch every step</td></tr>
+      <tr><td>Chronos-2</td><td>cold b=1</td><td class=num>23.6219</td><td class=note>120M params, batched</td></tr>
+      <tr><td>Chronos-2</td><td>cold b=16</td><td class=num>3.9020</td><td class=note>120M params, batched</td></tr>
+      <tr><td>Chronos-2</td><td>cold b=64</td><td class=num>2.7960</td><td class=note>120M params, batched</td></tr>
+      <tr><td>Chronos-2</td><td>warm</td><td class=num>25.4695</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>TTM-R3</td><td>cold b=1</td><td class=num>3.7956</td><td class=note>1.48M params, batched</td></tr>
+      <tr><td>TTM-R3</td><td>cold b=16</td><td class=num>0.9998</td><td class=note>1.48M params, batched</td></tr>
+      <tr><td>TTM-R3</td><td>cold b=64</td><td class=num>0.7858</td><td class=note>1.48M params, batched</td></tr>
+      <tr><td>TTM-R3</td><td>warm</td><td class=num>3.6356</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>Moirai 2.0 small</td><td>cold b=1</td><td class=num>4.7107</td><td class=note>11.4M params, batched</td></tr>
+      <tr><td>Moirai 2.0 small</td><td>cold b=16</td><td class=num>0.9798</td><td class=note>11.4M params, batched</td></tr>
+      <tr><td>Moirai 2.0 small</td><td>cold b=64</td><td class=num>0.6774</td><td class=note>11.4M params, batched</td></tr>
+      <tr><td>Moirai 2.0 small</td><td>warm</td><td class=num>4.9126</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>TinyCast</td><td>cold b=1</td><td class=num>13.1019</td><td class=note>146.5K params, batched</td></tr>
+      <tr><td>TinyCast</td><td>cold b=16</td><td class=num>12.5684</td><td class=note>146.5K params, batched</td></tr>
+      <tr><td>TinyCast</td><td>cold b=64</td><td class=num>11.8785</td><td class=note>146.5K params, batched</td></tr>
+      <tr><td>TinyCast</td><td>warm</td><td class=num>11.5098</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>Toto 2.0 313M</td><td>cold b=1</td><td class=num>78.4567</td><td class=note>313M params, batched</td></tr>
+      <tr><td>Toto 2.0 313M</td><td>cold b=16</td><td class=num>8.3377</td><td class=note>313M params, batched</td></tr>
+      <tr><td>Toto 2.0 313M</td><td>cold b=64</td><td class=num>5.1889</td><td class=note>313M params, batched</td></tr>
+      <tr><td>Toto 2.0 313M</td><td>warm</td><td class=num>79.1804</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>Toto 2.0 2.5B</td><td>cold b=1</td><td class=num>397.8920</td><td class=note>2.45B params, batched</td></tr>
+      <tr><td>Toto 2.0 2.5B</td><td>cold b=16</td><td class=num>40.7634</td><td class=note>2.45B params, batched</td></tr>
+      <tr><td>Toto 2.0 2.5B</td><td>cold b=64</td><td class=num>25.7406</td><td class=note>2.45B params, batched</td></tr>
+      <tr><td>Toto 2.0 2.5B</td><td>warm</td><td class=num>411.1566</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>TiRex-2</td><td>cold b=1</td><td class=num>62.7732</td><td class=note>38.4M params (univariate), batched</td></tr>
+      <tr><td>TiRex-2</td><td>cold b=16</td><td class=num>17.0985</td><td class=note>38.4M params (univariate), batched</td></tr>
+      <tr><td>TiRex-2</td><td>cold b=64</td><td class=num>14.1551</td><td class=note>38.4M params (univariate), batched</td></tr>
+      <tr><td>TiRex-2</td><td>warm</td><td class=num>63.1508</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>Simons-60M</td><td>cold b=1</td><td class=num>12.0416</td><td class=note>60.3M params, batched</td></tr>
+      <tr><td>Simons-60M</td><td>cold b=16</td><td class=num>2.4895</td><td class=note>60.3M params, batched</td></tr>
+      <tr><td>Simons-60M</td><td>cold b=64</td><td class=num>2.0423</td><td class=note>60.3M params, batched</td></tr>
+      <tr><td>Simons-60M</td><td>warm</td><td class=num>12.7007</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>Simons-297M</td><td>cold b=1</td><td class=num>32.7353</td><td class=note>297.2M params, batched</td></tr>
+      <tr><td>Simons-297M</td><td>cold b=16</td><td class=num>7.3045</td><td class=note>297.2M params, batched</td></tr>
+      <tr><td>Simons-297M</td><td>cold b=64</td><td class=num>6.2218</td><td class=note>297.2M params, batched</td></tr>
+      <tr><td>Simons-297M</td><td>warm</td><td class=num>33.4139</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>ci-proto</td><td>cold b=1</td><td class=num>476.3839</td><td class=note>167.2M params, batched</td></tr>
+      <tr><td>ci-proto</td><td>cold b=16</td><td class=num>448.3012</td><td class=note>167.2M params, batched</td></tr>
+      <tr><td>ci-proto</td><td>cold b=64</td><td class=num>451.6704</td><td class=note>167.2M params, batched</td></tr>
+      <tr><td>ci-proto</td><td>warm</td><td class=num>481.2025</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>Hirondel-7M</td><td>cold b=1</td><td class=num>60.0153</td><td class=note>7.5M params, batched</td></tr>
+      <tr><td>Hirondel-7M</td><td>cold b=16</td><td class=num>58.5840</td><td class=note>7.5M params, batched</td></tr>
+      <tr><td>Hirondel-7M</td><td>cold b=64</td><td class=num>52.0751</td><td class=note>7.5M params, batched</td></tr>
+      <tr><td>Hirondel-7M</td><td>warm</td><td class=num>58.9203</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>iAmTime-base</td><td>cold b=1</td><td class=num>94.8823</td><td class=note>302.1M params (21 levels), batched</td></tr>
+      <tr><td>iAmTime-base</td><td>cold b=16</td><td class=num>18.6450</td><td class=note>302.1M params (21 levels), batched</td></tr>
+      <tr><td>iAmTime-base</td><td>cold b=64</td><td class=num>14.5196</td><td class=note>302.1M params (21 levels), batched</td></tr>
+      <tr><td>iAmTime-base</td><td>warm</td><td class=num>94.3603</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>CSP</td><td>cold b=1</td><td class=num>0.0615</td><td class=note>csp-forecaster 0.2.0, refit per forecast, batched</td></tr>
+      <tr><td>CSP</td><td>cold b=16</td><td class=num>0.0587</td><td class=note>csp-forecaster 0.2.0, refit per forecast, batched</td></tr>
+      <tr><td>CSP</td><td>cold b=64</td><td class=num>0.0593</td><td class=note>csp-forecaster 0.2.0, refit per forecast, batched</td></tr>
+      <tr><td>CSP</td><td>warm</td><td class=num>0.0616</td><td class=note>stateless: full re-forward</td></tr>
+      <tr><td>TimeSSM-2.5M</td><td>cold b=1</td><td class=num>155.9781</td><td class=note>2.5M params, batched</td></tr>
+      <tr><td>TimeSSM-2.5M</td><td>cold b=16</td><td class=num>31.8613</td><td class=note>2.5M params, batched</td></tr>
+      <tr><td>TimeSSM-2.5M</td><td>cold b=64</td><td class=num>26.0017</td><td class=note>2.5M params, batched</td></tr>
+      <tr><td>TimeSSM-2.5M</td><td>warm</td><td class=num>159.2914</td><td class=note>stateless: full re-forward</td></tr>
     </table>
 
     <h2>Caveats</h2>
