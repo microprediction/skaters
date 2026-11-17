@@ -142,8 +142,38 @@
       an AI assistant do it, give it the <a href="/skills.html#basic-use">basic-use skill</a>.</p>
 
     <h3>Which languages?</h3>
-    <p>Python, with a Rust core for speed, and parity-locked ports in JavaScript, R and Julia that agree with
-      the Python to 1e-6. See <a href="/languages.html">languages</a>.</p>
+    <p>Python is the reference. There are parity-locked ports in torch, Rust, JavaScript, R and Julia, each
+      agreeing with the Python to 1e-6. See <a href="/languages.html">languages</a>, or the page for each port
+      under Ports in the menu.</p>
+
+    <h3>Is it available in JavaScript?</h3>
+    <p>Yes: <code>npm install skaters</code>. It is zero-dependency ES modules that run in the browser and in
+      Node, and every live demo on this site uses it. See the <a href="/ports/javascript.html">JavaScript
+      port</a>.</p>
+
+    <h3>Is there an R version?</h3>
+    <p>Yes, in pure R, covering the whole library: <code>pak::pak("microprediction/skaters-r")</code>. See the
+      <a href="/ports/r.html">R port</a>.</p>
+
+    <h3>Is there a Julia version?</h3>
+    <p>Yes, Skaters.jl, covering the whole library. See the <a href="/ports/julia.html">Julia port</a>.</p>
+
+    <h3>Is there a Rust version, or a faster Python?</h3>
+    <p>Yes. The Rust crate (<code>cargo add skaters</code>) steps <code>laplace</code> at about 14 microseconds
+      per observation. The same core powers <code>skaters-fast</code>, a Python backend at roughly 20 times the
+      pure-Python rate; it is not on PyPI yet, so build it from the repository. See the
+      <a href="/ports/rust.html">Rust port</a>.</p>
+
+    <h3>Can you train Laplace?</h3>
+    <p>Yes. The torch port (<code>pip install "skaters[torch]"</code>) exposes <code>laplace</code>'s continuous
+      hyperparameters as <code>nn.Parameter</code>s, and gradients flow from a log score through every stage.
+      <code>granger</code> is the result of training them per frequency, mixed with <code>laplace</code> so that
+      it is never more than log 4 behind. See the <a href="/ports/torch.html">torch port</a> and
+      <a href="/learned.html">granger</a>.</p>
+
+    <h3>Can I run it in the browser?</h3>
+    <p>Yes, two ways: the JavaScript port, or the unmodified Python package in
+      <a href="/demos/pyodide.html">Pyodide</a>. The <a href="/demos/">demos</a> show both.</p>
 
     <h3>Can an AI assistant help me use it?</h3>
     <p>Yes. The <a href="/skills.html">Claude skills</a> are copyable instructions for common jobs: basic use,
