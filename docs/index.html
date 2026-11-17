@@ -104,6 +104,36 @@
     </div>
 
 
+    <h2>Quick start</h2>
+    <p>
+      <code>pip install skaters</code>. Every prediction is a <code>Dist</code>: a weighted
+      Gaussian mixture carrying the mean, the spread, quantiles, and a density at once. You build
+      models by <em>composition</em>: transforms chain, ensembles nest, and a distributional leaf
+      sits at the bottom (see the <a href="/guide.html">Guide</a>).
+    </p>
+
+<pre><code>from skaters import laplace
+
+f = laplace(k=3)
+state = None
+forecast = None            # the fan issued LAST tick, aimed at this y
+for y in observations:
+    if forecast is not None:
+        forecast[0].logpdf(y)          # one-step-ahead log score
+        forecast[0].cdf(y)             # one-step-ahead PIT
+    forecast, state = f(y, state)
+    forecast[0].mean                   # point forecast for the NEXT tick
+    forecast[0].std                    # uncertainty
+    forecast[0].quantile(0.975)        # upper edge of the central 95% band</code></pre>
+    <p>
+      Score a forecast only against observations that arrive after it was issued; the
+      predictive returned alongside $y$ aims at the next tick, and the parade in
+      <code>state["pit"]</code>/<code>state["z"]</code> does this bookkeeping for you. Every
+      skater returns a list of predictive distributions, one per horizon
+      $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all
+      facets of the same object.
+    </p>
+
     <section id="conversation" class="conversation">
       <div class="conv-head">
         <h2>Have a conversation about skaters</h2>
@@ -167,6 +197,27 @@ My series and goal: </pre>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
     <script src="./assets/frontier3d.js"></script>
 
+    <h2 id="where-fms-are-better">Where foundational models are better</h2>
+    <p>
+      On monthly, weekly and hourly series. Paired per series on log score, with each model's
+      stronger density reconstruction, the best foundational model on each of these strata wins
+      far more series than it loses:
+    </p>
+    <table>
+      <tr><th>Series</th><th>Best model</th><th>Wins / draws / losses</th><th>Median gain (nats)</th><th>CRPS ratio</th></tr>
+        <tr><td>Monthly</td><td>Timestral-209M</td><td class="num">2,037 / 3,182 / 381</td><td class="num">+0.11</td><td class="num">0.88</td></tr>
+        <tr><td>Weekly</td><td>TimeH2O</td><td class="num">1,383 / 1,324 / 306</td><td class="num">+0.11</td><td class="num">0.82</td></tr>
+        <tr><td>Hourly (M4)</td><td>TimeH2O</td><td class="num">186 / 228 / 0</td><td class="num">+0.18</td><td class="num">0.83</td></tr>
+    </table>
+    <p>
+      On daily economic series every foundational and classical model loses more series than it wins. On daily
+      prices the foundational models are level with <code>laplace</code>, and a fitted GARCH-t
+      is ahead (743 wins, 216 losses). Wins and losses are
+      Diebold&ndash;Mariano verdicts at each series; a CRPS ratio below 1 favours the compared
+      model. <a href="https://foundationalprediction.com/">The leaderboards &rarr;</a>
+    </p>
+
+
     <figure class="hero-figure">
       <img src="./assets/radar-canonical.svg" alt="Radar chart of strength against laplace on
         log score, by stratum, for Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma and GARCH-t. On
@@ -179,36 +230,6 @@ My series and goal: </pre>
         stronger density reconstruction.
         <a href="https://foundationalprediction.com/">The leaderboards →</a></figcaption>
     </figure>
-
-    <p>
-      <code>pip install skaters</code>. Every prediction is a <code>Dist</code>: a weighted
-      Gaussian mixture carrying the mean, the spread, quantiles, and a density at once. You build
-      models by <em>composition</em>: transforms chain, ensembles nest, and a distributional leaf
-      sits at the bottom (see the <a href="/guide.html">Guide</a>).
-    </p>
-
-    <h2>Quick start</h2>
-<pre><code>from skaters import laplace
-
-f = laplace(k=3)
-state = None
-forecast = None            # the fan issued LAST tick, aimed at this y
-for y in observations:
-    if forecast is not None:
-        forecast[0].logpdf(y)          # one-step-ahead log score
-        forecast[0].cdf(y)             # one-step-ahead PIT
-    forecast, state = f(y, state)
-    forecast[0].mean                   # point forecast for the NEXT tick
-    forecast[0].std                    # uncertainty
-    forecast[0].quantile(0.975)        # upper edge of the central 95% band</code></pre>
-    <p>
-      Score a forecast only against observations that arrive after it was issued; the
-      predictive returned alongside $y$ aims at the next tick, and the parade in
-      <code>state["pit"]</code>/<code>state["z"]</code> does this bookkeeping for you. Every
-      skater returns a list of predictive distributions, one per horizon
-      $h = 1, \ldots, k$. Point forecasts, uncertainty, density evaluation, and quantiles are all
-      facets of the same object.
-    </p>
 
     <h2>One general forecaster</h2>
     <figure style="float:right;max-width:150px;margin:4px 0 12px 22px;text-align:center;">
