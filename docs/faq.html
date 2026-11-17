@@ -84,6 +84,11 @@
       variables known in advance, time, expiry and hyper-parameters. The signature has since shrunk to
       <code>f(y, state)</code>, and the name stayed.</p>
 
+    <h3>Why is it called laplace?</h3>
+    <p>He had weaker priors than&hellip; Bayes. You can use the same toolkit to make more opinionated models, and
+      <code>granger</code> is an example of exactly that. <code>granger</code> will <em>probably</em> outperform
+      <code>laplace</code> on economic time series in the future, though we can't say for sure.</p>
+
     <h3>What does it produce?</h3>
     <p>A predictive distribution for the next value of one series: a mean, a spread, quantiles and a density.
       Every call takes one observation and the previous state and returns the forecast and the new state, in
