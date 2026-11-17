@@ -511,7 +511,7 @@ def render(rows, meta):
   <meta property="og:description" content="Measured cost of laplace against foundation models, batch and streaming." />
   <meta property="og:url" content="https://skaters.microprediction.org/performance.html" />
   <meta name="twitter:card" content="summary" />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     .lede {{ color: #555; margin: 0 0 28px; font-size: 1.05em; }}
     table.perf {{ border-collapse: collapse; margin: 0 0 26px; width: 100%; }}

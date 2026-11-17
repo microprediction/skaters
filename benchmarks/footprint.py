@@ -142,7 +142,7 @@ def render(r):
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters &mdash; footprint</title>
   <meta name="description" content="What it costs to carry skaters: source size per port, dependencies, import time, checkpoint bytes and resident memory of a live laplace, all measured." />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     table.fp {{ border-collapse: collapse; margin: 0 0 26px; width: 100%; }}
     table.fp th, table.fp td {{ border-bottom: 1px solid #e3e3e3; padding: 6px 10px; text-align: left; font-size: 0.94em; }}
