@@ -103,15 +103,9 @@
     </figure>
 
     <p>
-      On FRED change-series scored one step ahead, <code>laplace</code> beats AutoARIMA,
-      AutoETS, AutoTheta, GARCH-t and NPTS on held-out log score at every FRED frequency, and on
-      2,210 daily economic series it beats every zero-shot foundation model tested. On 5,600
-      monthly series the larger foundation models (TimeH2O, Toto 2.0, Simons, Chronos-2, iAmTime,
-      TimesFM 3.0) are ahead by 0.05 to 0.10 nats per step at the median under the generous
-      density reconstruction, and on 3,013 weekly series TimeH2O and Toto 2.0 are. On the 414
-      strongly seasonal M4 hourly series AutoARIMA and Conformal Seasonal Pools are ahead. On
-      price and return series <code>laplace</code>, GARCH-t and the foundation models are level.
-      (Run of 16 November 2026, 19,940 series.)
+      Laplace was written for monitoring hundreds of thousands of private and public economic
+      series because we couldn't find anything better. We think some foundational models are
+      slightly better, but far less usable at present. Your mileage may vary.
       <a href="https://foundationalprediction.com/">The leaderboards →</a>
     </p>
 
@@ -135,9 +129,8 @@
 
     <figure class="hero-figure">
       <div id="frontier3d" style="width:100%;min-height:520px;"></div>
-      <figcaption><span id="frontier3d-caption">Accuracy, speed and footprint, one point per model;
-        every coordinate is measured. Drag to rotate.</span>
-        <a href="/benchmarks.html">The benchmarks &rarr;</a></figcaption>
+      <figcaption>Accuracy, speed and footprint, one point per model. Drag to rotate.
+        <a href="https://foundationalprediction.com/">The leaderboards &rarr;</a></figcaption>
     </figure>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
     <script src="./assets/frontier3d.js"></script>
@@ -194,16 +187,8 @@ for y in observations:
     </figure>
     <p>
       <code>skaters</code> exposes <strong>one general forecaster</strong>, <code>laplace</code>,
-      and <strong>one trained one</strong>, <code>granger</code>: laplace's pipeline with its
-      continuous hyperparameters trained per frequency and a small gate on the ensemble weights,
-      mixed with laplace by the Aggregating Algorithm so that its total log score is never more
-      than log&nbsp;4 behind laplace's on any series (see the
-      <a href="/guide.html#granger">guide</a>). At multi-step horizons (<code>k&gt;1</code>)
-      <code>laplace</code> is <strong>multi-scale by default</strong>, mixing instances on
-      decimated clocks by likelihood (opt out with <code>scales=[1]</code>). Everything else is a
-      building block you can compose, including the experimental <code>flesaker</code> for series
-      with a known bound. ("skater" is the <em>concept</em>, any
-      <code>(y, state) → ([Dist], state)</code> function, not a function name.)
+      and <strong>one trained one</strong>, <code>granger</code>. Everything else is a building
+      block you can compose. <a href="/guide.html">The guide →</a>
     </p>
 <pre><code>from skaters import laplace, granger
 

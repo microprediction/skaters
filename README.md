@@ -26,7 +26,7 @@ One step ahead on economic series it beats the classical arms at every FRED freq
 <p align="center"><sub>Strength against <code>laplace</code> by stratum: per-series Diebold–Mariano verdicts on log score, draws split, <code>laplace</code> = the dashed ring. Outside the ring the challenger is ahead on that stratum; inside, <code>laplace</code> is. Each foundation model is shown with its stronger density reconstruction. <a href="https://foundationalprediction.com/">The leaderboards →</a></sub></p>
 
 
-Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust** (all matched to the reference within 1e-6; JavaScript and Pyodide run it in the [browser](https://skaters.microprediction.org/demos/pyodide.html)). It's a **general-purpose forecaster for non-price economic series**. On FRED change-series scored one step ahead, it beats AutoARIMA, AutoETS, AutoTheta, GARCH-t and NPTS on held-out **log score** at every frequency, and on 2,179 daily series it beats every zero-shot foundation model tested. On 5,576 monthly series the newest foundation models (Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma) are ahead, by 0.05 to 0.10 nats per step at the median, and on 3,013 weekly series three of the four are. On price and return series laplace, GARCH-t and the foundation models are level. Every foundation-model figure depends on how its quantiles are turned into a density (see the [benchmark paper](https://skaters.microprediction.org/papers.html)).
+Laplace is fast, dependency-free, **online** univariate *distributional* forecasting with parity-locked ports in **Python, JavaScript, R, Julia and Rust**. It was written for monitoring hundreds of thousands of private and public economic series because we couldn't find anything better. We think some foundational models are slightly better, but far less usable at present. Your mileage may vary. [The leaderboards →](https://foundationalprediction.com/)
 
 **Not for price/return series:** 
 We recommend GARCH-t there instead. 
@@ -68,16 +68,8 @@ Score a forecast only against observations that arrive after it was issued; the 
 ## `laplace`: the general forecaster
 
 `skaters` exposes **one general forecaster**, `laplace`, and **one trained one**,
-`granger`: laplace's pipeline with its continuous hyperparameters trained per
-frequency and a small gate on the ensemble weights, mixed with laplace by the
-Aggregating Algorithm so that its total log score is never more than `log 4`
-behind laplace's on any series (`granger(frequency="monthly")`; parameters ship
-for monthly, weekly and hourly). Everything else is a building block
-(transforms, leaves, ensembles) you can compose; `flesaker` (experimental) is
-one such composition for series with a known bound. ("skater" is the *concept*,
-any `(y, state) -> ([Dist], state)` function, borrowed from the old timemachines
-package.) At multi-step horizons (`k>1`) `laplace` is **multi-scale by default**
-(below).
+`granger`. Everything else is a building block you can compose.
+[The guide →](https://skaters.microprediction.org/guide.html)
 
 ```python
 from skaters import laplace
