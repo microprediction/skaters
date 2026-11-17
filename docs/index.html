@@ -134,6 +134,21 @@ for y in observations:
       facets of the same object.
     </p>
 
+    <h2 id="playground">Watch it forecast</h2>
+    <p>
+      Live in your browser: pick a data regime, change the horizon, and watch the predictive
+      distribution, the transform paths and the clocks adapt.
+      <a href="/demos/playground.html">Full page &rarr;</a>
+    </p>
+    <iframe id="playground-embed" src="./demos/playground.html?embed" title="laplace forecasting playground"
+      loading="lazy" style="width:100%;height:900px;border:0;display:block;margin-bottom:28px;"></iframe>
+    <script>
+      addEventListener("message", (e) => {
+        const h = e.data && e.data.playgroundHeight;
+        if (h) document.getElementById("playground-embed").style.height = (h + 8) + "px";
+      });
+    </script>
+
     <section id="conversation" class="conversation">
       <div class="conv-head">
         <h2>Have a conversation about skaters</h2>

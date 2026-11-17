@@ -25,7 +25,26 @@
     .wtrack { flex: 1 1 auto; height: 11px; background: #f0f0f3; border-radius: 3px; overflow: hidden; }
     .wbar { display: block; height: 100%; background: #4a3aff; border-radius: 3px; transition: width 0.12s linear; }
     .wval { flex: 0 0 34px; text-align: right; color: #666; font-variant-numeric: tabular-nums; }
+    /* ?embed: just the live panel, for the landing page iframe */
+    html.embed .site-header, html.embed footer, html.embed main > h1,
+    html.embed main > .subtitle, html.embed main > p { display: none; }
+    html.embed main { margin: 0; padding: 0; max-width: none; }
+    html.embed .panel { margin: 0; }
+    /* fixed room (up to 4 clocks, 8 paths) so the embedded panel never changes height */
+    html.embed #scalesPanel { display: block !important; }
+    html.embed #scales { min-height: 72px; }
+    html.embed #weights { min-height: 144px; }
   </style>
+  <script>
+    if (new URLSearchParams(location.search).has("embed")) {
+      document.documentElement.classList.add("embed");
+      addEventListener("DOMContentLoaded", () => {
+        const panel = document.querySelector(".panel");
+        const post = () => parent.postMessage({ playgroundHeight: Math.ceil(panel.getBoundingClientRect().bottom) }, "*");
+        new ResizeObserver(post).observe(panel); post(); setInterval(post, 500);
+      });
+    }
+  </script>
 </head>
 <body>
   <header class="site-header">
