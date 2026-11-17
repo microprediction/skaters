@@ -32,6 +32,7 @@
   .topbar a{color:var(--accent);text-decoration:none}
   footer{grid-column:1/-1;max-width:none;margin:40px 0 24px;padding:16px 24px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
   footer a{color:var(--accent);text-decoration:none}
+  .sub a{color:var(--accent)}
   .topbar a:hover{text-decoration:underline}
   .topbar .crumb{color:var(--faint);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
   header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px}
@@ -104,12 +105,27 @@
   select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
     font-family:var(--mono);font-size:12px;border-radius:6px;padding:3px 7px;cursor:pointer}
   select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  /* site header, as in academic.css */
+  header.site-header{background:#1f1d3d;color:#fff;padding:14px 24px;margin:0;border-bottom:1px solid #15132a;
+    position:sticky;top:0;z-index:100;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  header.site-header .nav-inner{max-width:980px;margin:0 auto;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  header.site-header a{text-decoration:none}
+  header.site-header .brand{font-weight:600;font-size:1.1rem;color:#fff}
+  header.site-header nav{display:flex;flex-wrap:wrap;gap:0 18px;margin-left:auto}
+  header.site-header nav a{color:#fff;opacity:.85;font-size:.95rem}
+  header.site-header nav a:hover{opacity:1}
+  header.site-header nav .menu{position:relative}
+  header.site-header nav .menu>.menu-label{color:#fff;opacity:.85;font-size:.95rem;cursor:default}
+  header.site-header nav .menu:hover>.menu-label,header.site-header nav .menu:focus-within>.menu-label{opacity:1}
+  header.site-header nav .menu .drop{display:none;position:absolute;left:0;top:100%;z-index:50;min-width:10em;padding:6px 0;
+    background:#1f1d3d;border:1px solid #15132a;border-radius:0 0 6px 6px;box-shadow:0 4px 10px rgba(0,0,0,.25)}
+  header.site-header nav .menu:hover .drop,header.site-header nav .menu:focus-within .drop{display:block}
+  header.site-header nav .menu .drop a{display:block;padding:4px 14px;white-space:nowrap}
 </style>
 </head>
 <body>
 
 
-<div class="wrap">
   <header class="site-header">
     <div class="nav-inner">
       <a class="brand" href="/">skaters</a>
@@ -166,6 +182,8 @@
       </nav>
     </div>
   </header>
+
+<div class="wrap">
   <header>
     <p class="eyebrow">skaters · non-price benchmark</p>
     <h1>How robust is the win? Slice it and see.</h1>
