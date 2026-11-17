@@ -195,6 +195,15 @@
       reference, are on <a href="https://foundationalprediction.com">foundationalprediction.com</a>, and the
       protocol is in <a href="/papers.html">A stronger univariate benchmark for foundational time-series model evaluation</a>.</p>
 
+    <h3>What about the classics, like AutoARIMA and GARCH?</h3>
+    <p>Originally skaters was built to be much lighter, and dependency-free for the browser. It turned out to be
+      statistically more suitable too, and much faster, than alternatives such as refitting ARIMA, at least for
+      the intended purpose. If you <em>know</em> the series is very close to a martingale (say, a liquidly traded
+      security), then a GARCH-t is a better bet than <code>laplace</code>. To date, attempts to get
+      <code>laplace</code> to recognise this and switch over have failed, because they cost too much regret on
+      other series. If you have a clever idea for this,
+      <a href="https://github.com/microprediction/skaters/issues">file an issue</a>.</p>
+
     <h3>Does it handle covariates or exogenous regressors?</h3>
     <p>No. <code>laplace</code> is univariate: it forecasts the stream it is given and nothing else. It has no
       way to use known future covariates, calendar regressors or other series. For those, use a foundation model
