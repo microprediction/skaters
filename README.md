@@ -11,7 +11,7 @@ One call, zero dependencies, every prediction a full probability *distribution* 
 
 ## Quick start
 
-`pip install skaters`. Every prediction is a `Dist`: a weighted Gaussian mixture carrying the mean, the spread, quantiles and a density at once. You build models by composition: transforms chain, ensembles nest, and a distributional leaf sits at the bottom (see the [guide](https://skaters.microprediction.org/guide.html)).
+`pip install skaters` gives the latest release (0.16.0). `granger`, `flesaker` and `log_transform` are on `main` and arrive in the next release; until then use `pip install git+https://github.com/microprediction/skaters`. Every prediction is a `Dist`: a weighted Gaussian mixture carrying the mean, the spread, quantiles and a density at once. You build models by composition: transforms chain, ensembles nest, and a distributional leaf sits at the bottom (see the [guide](https://skaters.microprediction.org/guide.html)).
 
 ```python
 from skaters import laplace
