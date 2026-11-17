@@ -77,6 +77,27 @@
       distribution, updated online as each observation arrives, with no training job to run and nothing to tune.
       Nothing small, fast and light did that at that scale, so <code>laplace</code> was built for it.</p>
 
+    <h3>How can I quickly grasp the algorithm?</h3>
+    <p>Open the <a href="/demos/playground.html">playground</a>. Pick a data regime, switch it mid-stream, and
+      watch the predictive distribution, the transform paths and the scale mixture adapt, live in the browser.
+      The <a href="/guide.html">methodology guide</a> has the details once the picture is clear.</p>
+
+    <h3>Can I watch it race other models?</h3>
+    <p>Yes. The <a href="/demos/race.html">live race</a> runs <code>laplace</code> against classical baselines on
+      real FRED series in your browser, with no key and no server.</p>
+
+    <h3>Can I see what whitening does to an ugly series?</h3>
+    <p>The <a href="/demos/normalization.html">normalization demo</a> feeds the same stream to two normalizers.
+      The rolling z-score stays ugly, and <code>laplace</code>'s z turns it into the same N(0,1) bell each time.</p>
+
+    <h3>What does it mean that <code>laplace</code> is a bijection?</h3>
+    <p>The <a href="/demos/rosenblatt.html">Rosenblatt demo</a> shows it. Upstairs the raw series trends, cycles
+      and bursts; downstairs its image is N(0,1) noise, and each side can be recovered from the other.</p>
+
+    <h3>Does the Python package really run in a browser?</h3>
+    <p>Yes, unmodified, in <a href="/demos/pyodide.html">Pyodide</a>. The other demos use the JavaScript port,
+      which agrees with the Python to 1e-6. All the demos are listed on the <a href="/demos/">demos page</a>.</p>
+
     <h3>Why is it called skaters?</h3>
     <p>The project is older than this package. It began as
       <a href="https://github.com/microprediction/timemachines">timemachines</a>, where every forecaster had the
