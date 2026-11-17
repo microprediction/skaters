@@ -19,9 +19,9 @@
     onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
   <link rel="stylesheet" href="./academic.css" />
   <style>
-    .conversation { margin: 18px 0 26px; padding: 14px 18px 6px; border: 1px solid #ddd; border-radius: 6px; background: #fafaff; }
+    .conversation { margin: 12px 0 26px; padding: 14px 18px 6px; border: 1px solid #ddd; border-radius: 6px; background: #fafaff; }
     .conv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .conv-head h2 { margin: 0; font-size: 1.15rem; }
+    .conv-head p { margin: 0; }
     .conversation pre { white-space: pre-wrap; font-size: .85rem; max-height: 320px; overflow: auto; background: #fff; border: 1px solid #e3e3e3; padding: 10px 12px; }
     .copy-btn { white-space: nowrap; cursor: pointer; border: none; }
   </style>
@@ -149,12 +149,12 @@ for y in observations:
       });
     </script>
 
-    <section id="conversation" class="conversation">
+    <h2 id="conversation">Have a conversation about skaters</h2>
+    <section class="conversation">
       <div class="conv-head">
-        <h2>Have a conversation about skaters</h2>
+        <p>Paste this into ChatGPT, Claude or any chat assistant, then describe your series and what you need.</p>
         <button class="btn copy-btn" data-target="chat-prime">Copy</button>
       </div>
-      <p>Paste this into ChatGPT, Claude or any chat assistant, then describe your series and what you need.</p>
       <pre id="chat-prime">I would like to discuss skaters (https://skaters.microprediction.org), an open-source package for online, distributional, univariate time-series forecasting in Python (with a Rust core), JavaScript, R and Julia. Please read these pages before answering:
 
 - FAQ: https://skaters.microprediction.org/faq.html
