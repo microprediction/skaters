@@ -131,3 +131,25 @@ This PR implements the correction in Python, JavaScript and Rust. The [R port](h
 ## Integration with later upstream changes
 
 The contribution branch incorporates upstream `ead4a03b80f47d49860476455c97f5100e808204`. Conflict resolution retains both the quantile and Granger changelog entries and both native Rust test commands, including upstream Granger vector generation. The numerical quantile implementation is unchanged. The recorded FRED/M4 evidence and `source-identity.json` retain their original source identities; they are not relabeled as measurements of this combined tree. Use the archived-checkout instructions above for historical replay. Current integration checks are recorded in the PR.
+
+## Scope of this record after #365
+
+Everything in this directory records #328 at its pinned candidate, against
+baseline `8baee06362f82504fe47e25f7b91fe6d8b55eb84`. The JSON files are kept
+as the contributor wrote them. Three things changed when the work landed
+through #365, and none of them is covered by this record:
+
+- The torch port. `verification-summary.json` lists it as unchanged and out of
+  scope, which was true of #328. In #365 `TorchDist.quantile` delegates to
+  `Dist.quantile` and `TorchSplicedDist.quantile` takes the 2100-step default.
+  Those files, `tests/test_torch_quantile_contract.py` and the regenerated
+  `parity/laplace_k1_signatures.txt` are not in `candidate_changes`.
+- The test counts. The 1,588 passed and 24 skipped in `full_suite` are the
+  contributor's local run on the pinned candidate. The run on the merge of
+  #328 onto main of 16 November 2026 was 2,033 passed, 14 skipped and 18
+  expected failures, with one test deselected that fails the same way on main.
+- The jobs listed under `not_run`. The wasm, MSRV and remote CI jobs ran on
+  #365 and passed.
+
+The R and Julia ports listed as owed are microprediction/skaters-r#10 and
+microprediction/Skaters.jl#4.
