@@ -2503,6 +2503,364 @@ def laplace_extra_periods_dists(ch, h=1, periods=(52,), fourier=(), shash_grid=(
     return out
 
 
+
+# ---- seasonal heteroskedasticity (CSP on M4 hourly, 2026-11-16) ----
+# CSP's edge on M4 hourly sits on series whose change-volatility varies with
+# the hour of day (phase-scale ratio > 3: +0.127 nats, 76% of 312 series;
+# flat ratio: laplace wins 93%). laplace's leaf keeps one phase-averaged
+# scale. seasonal_scale(period) conditions the scale on the phase; measured
+# two ways, everything else identical to laplace:
+#   laplace(ss24): the transform OUTSIDE laplace, conjugate(laplace, ss24):
+#                  the user says the period, no pool change, granger untouched
+#   laplace(+ss24): ss24 as pool candidates (over seasonal_difference(24) and
+#                  over seasonal_anchor(24)), via the extra= hook
+def _ss_extras(kk, period):
+    from skaters.conjugate import conjugate as C
+    from skaters.leaf import leaf as L
+    from skaters.transform import seasonal_anchor, seasonal_difference, seasonal_scale
+    def c(*ts):                       # leaf <- ts[0] <- ts[1] ...: innermost first
+        f = L(k=kk)
+        for t in ts:
+            f = C(f, t, k=kk)
+        return f
+    return [(c(seasonal_difference(period), seasonal_scale(period, center=False)), 2),
+            (c(seasonal_anchor(period), seasonal_scale(period, center=False)), 2)]
+
+
+def laplace_seasonal_scale_dists(ch, h=1, period=24, inside=False, center=False):
+    if inside:
+        return laplace_extra_periods_dists(ch, h, (), extra=lambda kk: _ss_extras(kk, period))
+    from skaters.conjugate import conjugate
+    from skaters.transform import seasonal_scale
+    f = conjugate(laplace(h), seasonal_scale(period, center=center), k=h); st = None; queue = []; out = []
+    start = len(ch) - TEST
+    for i, yv in enumerate(ch):
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
+
+# ---- phase dispersion (the repeating-dispersion question, 2026-11-16) ----
+# From the preds: CSP's hourly edge is dispersion, not location (its median is
+# less accurate on 69% of series), and laplace's z^2 rises with the hour-of-day
+# variance (slope 0.63; 0.70 on strongly patterned series) where CSP's rises
+# 0.26. This wrapper learns a multiplicative factor on laplace's issued scale
+# per phase of a candidate period, from laplace's own parade z, shrunk toward 1
+# by visit count, and picks the period (or none) by cumulative Gaussian
+# log-likelihood gain. Nothing upstream of the predictive changes. k=1.
+def phase_dispersion(base, periods=(7, 12, 24), alpha=0.05, prior=3.0):
+    """see laplace(pd); alpha is the per-phase EWMA rate of z^2, prior the shrink count"""
+    def f(y, state):
+        if state is None:
+            state = {"base": None, "t": 0,
+                     "raw": {m: [1.0] * m for m in periods}, "n": {m: [0] * m for m in periods},
+                     "gain": {m: 0.0 for m in periods}, "used": {m: 1.0 for m in periods}}
+        dists, bst = base(y, state["base"])
+        state["base"] = bst
+        t = state["t"]
+        z = bst["z"][0] if isinstance(bst, dict) and bst.get("z") else None
+        if z is not None and math.isfinite(z):
+            z2 = z * z
+            for m in periods:
+                p = t % m
+                v = state["used"][m]                       # the factor this tick's forecast would have used
+                state["gain"][m] += -0.5 * math.log(v) - z2 / (2.0 * v) + z2 / 2.0
+                state["n"][m][p] += 1
+                state["raw"][m][p] += alpha * (z2 - state["raw"][m][p])
+        # factor for the NEXT tick, per period, shrunk toward 1 by visits
+        for m in periods:
+            p = (t + 1) % m
+            n = state["n"][m][p]
+            state["used"][m] = (n * state["raw"][m][p] + prior * 1.0) / (n + prior)
+        best = max(periods, key=lambda m: state["gain"][m])
+        fac = state["used"][best] if state["gain"][best] > 0.0 else 1.0
+        state["t"] = t + 1
+        if fac == 1.0:
+            return dists, state
+        a = math.sqrt(fac)
+        out = []
+        for d in dists:
+            med = d.quantile(0.5)
+            out.append(d.affine(a, med * (1.0 - a)))
+        return out, state
+    return f
+
+
+def laplace_phase_dispersion_dists(ch, h=1, periods=(7, 12, 24), alpha=0.05, prior=3.0):
+    f = phase_dispersion(laplace(h), periods=periods, alpha=alpha, prior=prior); st = None; queue = []; out = []
+    start = len(ch) - TEST
+    for i, yv in enumerate(ch):
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
+
+# ---- same-phase pool candidate (the attraction-points question, 2026-11-16) ----
+# Per test point, CSP's gain over laplace is +0.50 nats when the outcome lands
+# within 0.1 laplace-std of a value seen at the same phase in the last eight
+# cycles (half of all hourly test points) and negative when it does not: the
+# series returns to where it has been at that hour, and CSP's pool has mass
+# there. This candidate is that pool as a skater: a mixture with one Gaussian
+# on each of the last M same-phase values, recency-weighted, bandwidth from an
+# EWMA of the nearest-neighbour residual, so it can enter laplace's pool and be
+# weighted by likelihood like every other candidate. k=1; level coordinates.
+def seasonal_pool_skater(period, m=8, lam=0.8, alpha=0.05, k=1):
+    assert k == 1
+    def f(y, state):
+        if state is None:
+            state = {"buf": [], "h": None}
+        buf = state["buf"]
+        # score the incoming y against the pool to update the bandwidth
+        past = [buf[-period * j] for j in range(1, m + 1) if len(buf) >= period * j]
+        if past and math.isfinite(y):
+            r = min(abs(y - v) for v in past)
+            state["h"] = r if state["h"] is None else state["h"] + alpha * (r - state["h"])
+        buf.append(y if math.isfinite(y) else (buf[-1] if buf else 0.0))
+        if len(buf) > period * m + 1:
+            del buf[0]
+        # predictive for the next tick: same phase as t+1 = positions -period+1, -2*period+1, ...
+        comps = []
+        for j in range(1, m + 1):
+            idx = len(buf) - period * j
+            if idx < 0:
+                break
+            comps.append((lam ** (j - 1), buf[idx]))
+        if not comps:
+            return [Dist([(1.0, buf[-1], 1.0)])], state
+        spread = max(st_dev_floor(state["h"], buf), 1e-9)
+        tot = sum(w for w, _ in comps)
+        return [Dist([(w / tot, mu, spread) for w, mu in comps])], state
+    return f
+
+
+def st_dev_floor(h, buf):
+    """bandwidth: the nearest-neighbour EWMA, floored by a small fraction of the
+    recent range so a long run of exact repeats cannot collapse the mixture."""
+    recent = buf[-64:]
+    rng = (max(recent) - min(recent)) if len(recent) > 1 else 0.0
+    base = h if h is not None else (rng / 4.0 if rng > 0 else 1.0)
+    return max(base, 0.02 * rng, 1e-9)
+
+
+def _spool_extras(kk, periods):
+    return [(seasonal_pool_skater(p, k=kk), 1) for p in periods]
+
+
+def laplace_spool_dists(ch, h=1, periods=(24,)):
+    return laplace_extra_periods_dists(ch, h, (), extra=lambda kk: _spool_extras(kk, periods))
+
+
+# ---- phase-pool TERMINAL LEAF (the attraction-points question, take two) ----
+# The trunk combines candidate MEANS and the terminal leaf models the residual
+# (terminal.py: pred = leaf_pred.shift(mu)), so a multimodal candidate in the
+# pool contributes only its mean: laplace(+spool) was a wash (64/328/22). The
+# shape has to come from the leaf. This leaf keeps the default CRPS leaf and
+# adds, per candidate period, a mixture with one Gaussian on each of the last
+# M same-phase RESIDUALS (recency weights, bandwidth c * running sigma), and
+# mixes the lot by the Aggregating Algorithm on realised log score with a
+# prior on the CRPS leaf, so it is never far behind the default leaf and the
+# pool only takes weight where the residual returns to where it has been at
+# that phase.
+def phase_pool_leaf(k=1, periods=(24,), m=8, lam=0.8, c=0.5, scale_alpha=0.03,
+                    forget=0.99, eta=1.0, prior=2.0):
+    from skaters.leaf import crps_leaf
+    base = crps_leaf(k=k, scale_alpha=scale_alpha)
+    n_arms = 1 + len(periods)
+    def _leaf(r, state):
+        if state is None:
+            state = {"base": None, "buf": [], "lw": [prior] + [0.0] * len(periods), "pending": None}
+        if state["pending"] is not None and math.isfinite(r):
+            for i, d in enumerate(state["pending"]):
+                lp = d.logpdf(r)
+                lp = 20.0 if lp > 20.0 else (-20.0 if not (lp >= -20.0) else lp)
+                state["lw"][i] = forget * state["lw"][i] + eta * lp
+        bd, state["base"] = base(r, state["base"])
+        base_pred = bd[0]
+        v = state["base"].get("v", 0.0)
+        sig = math.sqrt(v) if (math.isfinite(v) and v > 0) else (abs(r) if math.isfinite(r) and r != 0 else 1e-6)
+        buf = state["buf"]
+        buf.append(r if math.isfinite(r) else 0.0)
+        if len(buf) > max(periods) * m + 1:
+            del buf[0]
+        preds = [base_pred]
+        for P in periods:
+            comps = []
+            for j in range(1, m + 1):
+                idx = len(buf) - P * j                    # residual at the phase of the NEXT tick: tick t+1-P*j
+                if idx < 0 or idx >= len(buf):
+                    continue
+                comps.append((lam ** (j - 1), buf[idx]))
+            if not comps:
+                preds.append(base_pred); continue
+            tot = sum(w for w, _ in comps)
+            preds.append(Dist([(w / tot, mu, max(c * sig, 1e-9)) for w, mu in comps]))
+        state["pending"] = preds
+        mx = max(state["lw"]); w = [math.exp(x - mx) for x in state["lw"]]; tw = sum(w)
+        out = Dist.combine(preds, [x / tw for x in w])
+        if len(out) > 20:
+            out = out.prune(20)
+        return [out], state
+    return _leaf
+
+
+def laplace_leaf_dists(ch, h=1, leaf=None):
+    f = laplace(h, leaf=leaf); st = None; queue = []; out = []
+    start = len(ch) - TEST
+    for i, yv in enumerate(ch):
+        if len(queue) >= h and i >= start:
+            out.append(queue[-h][h - 1])
+        d, st = f(yv, st)
+        queue.append(d)
+        if len(queue) > h:
+            queue.pop(0)
+    return out
+
+
+# ---- phase-SCALE terminal leaf (dispersion by phase, inside the leaf) ----
+# The CRPS leaf with its running sigma multiplied by a per-phase factor f_p
+# learned from the residuals' squared standardised errors at that phase (EWMA,
+# shrunk toward 1 by visits), one factor track per candidate period, and the
+# plain leaf kept alongside: the issued residual law is the Aggregating-
+# Algorithm mixture of the plain and the phase-scaled predictives on realised
+# log score with a prior on the plain leaf. The scale mixture's CRPS weights
+# are shared (one base leaf), only the scale changes, so where phases look
+# alike the factors sit at 1 and the leaf is the default leaf.
+def phase_scale_leaf(k=1, periods=(24,), alpha=0.1, prior_n=3.0, forget=0.99, eta=1.0, prior=2.0):
+    from skaters.leaf import crps_leaf
+    base = crps_leaf(k=k, scale_alpha=0.03)
+    def _leaf(r, state):
+        if state is None:
+            state = {"base": None, "t": 0, "raw": {P: [1.0] * P for P in periods}, "n": {P: [0] * P for P in periods},
+                     "lw": [prior] + [0.0] * len(periods), "pending": None, "used": {P: 1.0 for P in periods}}
+        t = state["t"]
+        if state["pending"] is not None and math.isfinite(r):
+            for i, d in enumerate(state["pending"]):
+                lp = d.logpdf(r)
+                lp = 20.0 if lp > 20.0 else (-20.0 if not (lp >= -20.0) else lp)
+                state["lw"][i] = forget * state["lw"][i] + eta * lp
+        bd, state["base"] = base(r, state["base"])
+        base_pred = bd[0]
+        v = state["base"].get("v", 0.0)
+        if math.isfinite(r) and v > 0:
+            z2 = r * r / v
+            for P in periods:
+                p = t % P
+                state["n"][P][p] += 1
+                state["raw"][P][p] += alpha * (z2 - state["raw"][P][p])
+        preds = [base_pred]
+        for P in periods:
+            p = (t + 1) % P
+            n = state["n"][P][p]
+            f = (n * state["raw"][P][p] + prior_n * 1.0) / (n + prior_n)
+            a = math.sqrt(max(f, 1e-6))
+            preds.append(base_pred.affine(a, 0.0))
+        state["pending"] = preds
+        state["t"] = t + 1
+        mx = max(state["lw"]); w = [math.exp(x - mx) for x in state["lw"]]; tw = sum(w)
+        out = Dist.combine(preds, [x / tw for x in w])
+        if len(out) > 20:
+            out = out.prune(20)
+        return [out], state
+    return _leaf
+
+
+# ---- periodic-variance terminal leaf (smooth phase factor, Fourier) ----
+# Per-phase cells learn too slowly or too noisily (psleaf: wash; pd with a
+# 20-cycle memory: +0.021; with a 5-cycle memory: wash). The factor should be a
+# smooth periodic function: log f(phase) = sum_j a_j cos + b_j sin over J
+# harmonics of each candidate period, coefficients learned online by gradient
+# ascent on the Gaussian log score of the standardised residual, -0.5 log f -
+# z^2 / (2 f), whose gradient in each coefficient is 0.5 (z^2 / f - 1) times
+# the basis value. 2J numbers per period instead of P cells. Same AA gate
+# against the plain leaf as phase_scale_leaf.
+def phase_fourier_leaf(k=1, periods=(24,), J=3, lr=0.02, forget=0.99, eta=1.0, prior=2.0, cap=2.5,
+                       pit_z=False, hard=False, tgate=0.0, dm_forget=None):
+    dmf = forget if dm_forget is None else dm_forget
+    """pit_z: standardise through the base predictive's own PIT (Phi^-1 of
+    base_pred.cdf(r)), which is bounded and tail-robust, instead of r^2 / v;
+    hard: pick plain or the best period by cumulative gain (as the wrapper
+    laplace(pd) does) instead of the AA mixture."""
+    from skaters.leaf import crps_leaf
+    from skaters.tails import _phi_inv as _pinv
+    base = crps_leaf(k=k, scale_alpha=0.03)
+    def basis(P, t):
+        ang = 2.0 * math.pi * (t % P) / P
+        return [math.cos(j * ang) for j in range(1, J + 1)] + [math.sin(j * ang) for j in range(1, J + 1)]
+    def logf(coef, b):
+        v = sum(c * x for c, x in zip(coef, b))
+        return max(-cap, min(cap, v))
+    def _leaf(r, state):
+        if state is None:
+            state = {"base": None, "t": 0, "coef": {P: [0.0] * (2 * J) for P in periods},
+                     "lw": [prior] + [0.0] * len(periods), "pending": None,
+                     # tgate: discounted mean, mean square and count of the per-step score
+                     # difference (scaled minus plain), one track per period
+                     "dm": [0.0] * len(periods), "dv": [0.0] * len(periods), "dn": [0.0] * len(periods)}
+        t = state["t"]
+        if state["pending"] is not None and math.isfinite(r):
+            lps = []
+            for i, d in enumerate(state["pending"]):
+                lp = d.logpdf(r)
+                lp = 20.0 if lp > 20.0 else (-20.0 if not (lp >= -20.0) else lp)
+                state["lw"][i] = forget * state["lw"][i] + eta * lp
+                lps.append(lp)
+            for i in range(len(periods)):
+                dlt = lps[i + 1] - lps[0]
+                state["dm"][i] = dmf * state["dm"][i] + (1 - dmf) * dlt
+                state["dv"][i] = dmf * state["dv"][i] + (1 - dmf) * dlt * dlt
+                state["dn"][i] = dmf * state["dn"][i] + 1.0
+        bd, state["base"] = base(r, state["base"])
+        base_pred = bd[0]
+        v = state["base"].get("v", 0.0)
+        if math.isfinite(r) and v > 0:
+            if pit_z and state.get("prev_base") is not None:
+                u = min(max(state["prev_base"].cdf(r), 1e-9), 1.0 - 1e-9)
+                z2 = _pinv(u) ** 2
+            else:
+                z2 = r * r / v
+            for P in periods:
+                b = basis(P, t)                       # this tick's phase
+                f = math.exp(logf(state["coef"][P], b))
+                g = 0.5 * (min(z2 / f, 25.0) - 1.0)   # d/dlogf of the Gaussian log score, clipped
+                state["coef"][P] = [c + lr * g * x for c, x in zip(state["coef"][P], b)]
+        state["prev_base"] = base_pred
+        preds = [base_pred]
+        for P in periods:
+            a = math.exp(0.5 * logf(state["coef"][P], basis(P, t + 1)))   # next tick's phase
+            preds.append(base_pred.affine(a, 0.0))
+        state["pending"] = preds
+        state["t"] = t + 1
+        if tgate > 0.0:
+            # switch to a period's scaled predictive only when its discounted mean
+            # gain over the plain leaf exceeds tgate standard errors
+            best, best_t = 0, 0.0
+            for i in range(len(periods)):
+                n = state["dn"][i]
+                if n < 30:
+                    continue
+                var = max(state["dv"][i] - state["dm"][i] ** 2, 1e-12)
+                tstat = state["dm"][i] / math.sqrt(var / n)
+                if tstat > tgate and tstat > best_t:
+                    best, best_t = i + 1, tstat
+            return [preds[best]], state
+        if hard:
+            best = max(range(len(preds)), key=lambda i: state["lw"][i])
+            return [preds[best]], state
+        mx = max(state["lw"]); w = [math.exp(x - mx) for x in state["lw"]]; tw = sum(w)
+        out = Dist.combine(preds, [x / tw for x in w])
+        if len(out) > 20:
+            out = out.prune(20)
+        return [out], state
+    return _leaf
+
 # ---- untested pool transforms (queue from the transform audit) ----
 # Each entry adds candidate chains to laplace's pool, everything else
 # identical, so laplace(+x) against laplace isolates the transform. Ranked by
@@ -2565,6 +2923,31 @@ def make_registry(h=1):
         "laplace":     lambda ch: laplace_dists(ch, h),
         "laplace(s52)": lambda ch: laplace_extra_periods_dists(ch, h, (52,)),   # + annual cycle on weekly data
         "laplace(s168)": lambda ch: laplace_extra_periods_dists(ch, h, (168,)),  # + weekly cycle on hourly data
+        "laplace(ss24)":  lambda ch: laplace_seasonal_scale_dists(ch, h, 24),               # seasonal_scale outside laplace
+        "laplace(+ss24)": lambda ch: laplace_seasonal_scale_dists(ch, h, 24, inside=True),  # seasonal_scale candidates in the pool
+        "laplace(ss24c)": lambda ch: laplace_seasonal_scale_dists(ch, h, 24, center=True),  # phase mean removed too
+        "laplace(pd24)": lambda ch: laplace_phase_dispersion_dists(ch, h, (24,)),        # phase dispersion factor, period 24
+        "laplace(pd)":   lambda ch: laplace_phase_dispersion_dists(ch, h, (7, 12, 24)),  # period chosen online by likelihood gain
+        "laplace(+spool24)": lambda ch: laplace_spool_dists(ch, h, (24,)),      # same-phase pool candidate, period 24
+        "laplace(+spool)":   lambda ch: laplace_spool_dists(ch, h, (7, 12, 24)),  # one pool candidate per common period
+        "laplace(poolleaf24)": lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_pool_leaf(k=k, periods=(24,))),
+        "laplace(poolleaf)":   lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_pool_leaf(k=k, periods=(7, 12, 24))),
+        "laplace(psleaf24)":   lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_scale_leaf(k=k, periods=(24,))),
+        "laplace(psleaf)":     lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_scale_leaf(k=k, periods=(7, 12, 24))),
+        "laplace(pdfast24)":   lambda ch: laplace_phase_dispersion_dists(ch, h, (24,), alpha=0.2, prior=1.0),
+        "laplace(pdslow24)":   lambda ch: laplace_phase_dispersion_dists(ch, h, (24,), alpha=0.02, prior=3.0),
+        "laplace(pfleaf24)":   lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,))),
+        "laplace(pfleaf)":     lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(7, 12, 24))),
+        "laplace(pfz24)":      lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.01)),
+        "laplace(pfz24h)":     lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.01, hard=True)),
+        "laplace(pfz24t)":     lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.01, tgate=2.0)),
+        "laplace(pfzt)":       lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(7, 12, 24), pit_z=True, lr=0.01, tgate=2.0)),
+        "laplace(pfz24t400)":  lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.01, tgate=2.0, dm_forget=0.9975)),
+        "laplace(pfz24t15)":   lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.01, tgate=1.5, dm_forget=0.995)),
+        "laplace(pfz24t15m400)": lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.01, tgate=1.5, dm_forget=0.9975)),
+        "laplace(pfz24t2m800)":  lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.01, tgate=2.0, dm_forget=0.99875)),
+        "laplace(pfz24t400lr2)": lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(24,), pit_z=True, lr=0.02, tgate=2.0, dm_forget=0.9975)),
+        "laplace(pfzh)":       lambda ch: laplace_leaf_dists(ch, h, leaf=lambda k: phase_fourier_leaf(k=k, periods=(7, 12, 24), pit_z=True, lr=0.01, hard=True)),
         "laplace(octave)": lambda ch: laplace_extra_periods_dists(ch, h, (), octave=True),
         "laplace(shash)": lambda ch: laplace_extra_periods_dists(ch, h, (), shash_grid=__import__("shash").SHASH_GRID),
         "laplace(f52)": lambda ch: laplace_extra_periods_dists(ch, h, (), fourier=(365.25 / 7,)),   # Fourier annual, weekly data

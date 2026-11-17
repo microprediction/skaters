@@ -86,6 +86,138 @@
     "horizon": 12,
     "series": 64,
     "date": "2026-11-09"
+   },
+   "chronos2": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.11.15",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-11"
+   },
+   "tirex2": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-11"
+   },
+   "ttm3": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-11"
+   },
+   "moirai2": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-11"
+   },
+   "tinycast": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-11"
+   },
+   "toto2": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-11"
+   },
+   "simons": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-16"
+   },
+   "ciproto": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-16"
+   },
+   "hirondel": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-16"
+   },
+   "iamtime": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-16"
+   },
+   "timessm": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-16"
+   },
+   "csp": {
+    "version": "0.16.0",
+    "commit": "6ae5e2a",
+    "python": "3.12.13",
+    "machine": "Darwin arm64",
+    "torch_threads": 1,
+    "context": 256,
+    "horizon": 12,
+    "series": 64,
+    "date": "2026-11-16"
    }
   }
  },
@@ -425,6 +557,342 @@
    "regime": "warm",
    "ms": 29.631665907800198,
    "note": "refits from scratch every step"
+  },
+  {
+   "model": "Chronos-2",
+   "regime": "cold b=1",
+   "ms": 23.62194140732754,
+   "note": "120M params, batched"
+  },
+  {
+   "model": "Chronos-2",
+   "regime": "cold b=16",
+   "ms": 3.9020345138851553,
+   "note": "120M params, batched"
+  },
+  {
+   "model": "Chronos-2",
+   "regime": "cold b=64",
+   "ms": 2.7960384031757712,
+   "note": "120M params, batched"
+  },
+  {
+   "model": "Chronos-2",
+   "regime": "warm",
+   "ms": 25.469500105828047,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "TTM-R3",
+   "regime": "cold b=1",
+   "ms": 3.7956067608320154,
+   "note": "1.48M params, batched"
+  },
+  {
+   "model": "TTM-R3",
+   "regime": "cold b=16",
+   "ms": 0.9997591114370152,
+   "note": "1.48M params, batched"
+  },
+  {
+   "model": "TTM-R3",
+   "regime": "cold b=64",
+   "ms": 0.785845702921506,
+   "note": "1.48M params, batched"
+  },
+  {
+   "model": "TTM-R3",
+   "regime": "warm",
+   "ms": 3.6356253549456596,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "Moirai 2.0 small",
+   "regime": "cold b=1",
+   "ms": 4.710665358288679,
+   "note": "11.4M params, batched"
+  },
+  {
+   "model": "Moirai 2.0 small",
+   "regime": "cold b=16",
+   "ms": 0.9797747334232554,
+   "note": "11.4M params, batched"
+  },
+  {
+   "model": "Moirai 2.0 small",
+   "regime": "cold b=64",
+   "ms": 0.6774082066840492,
+   "note": "11.4M params, batched"
+  },
+  {
+   "model": "Moirai 2.0 small",
+   "regime": "warm",
+   "ms": 4.912625066936016,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "TinyCast",
+   "regime": "cold b=1",
+   "ms": 13.10192707751412,
+   "note": "146.5K params, batched"
+  },
+  {
+   "model": "TinyCast",
+   "regime": "cold b=16",
+   "ms": 12.568402344186325,
+   "note": "146.5K params, batched"
+  },
+  {
+   "model": "TinyCast",
+   "regime": "cold b=64",
+   "ms": 11.878507168148644,
+   "note": "146.5K params, batched"
+  },
+  {
+   "model": "TinyCast",
+   "regime": "warm",
+   "ms": 11.509791016578674,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "Toto 2.0 313M",
+   "regime": "cold b=1",
+   "ms": 78.45666274806717,
+   "note": "313M params, batched"
+  },
+  {
+   "model": "Toto 2.0 313M",
+   "regime": "cold b=16",
+   "ms": 8.337707033206243,
+   "note": "313M params, batched"
+  },
+  {
+   "model": "Toto 2.0 313M",
+   "regime": "cold b=64",
+   "ms": 5.1889427049900405,
+   "note": "313M params, batched"
+  },
+  {
+   "model": "Toto 2.0 313M",
+   "regime": "warm",
+   "ms": 79.18041665107012,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "Toto 2.0 2.5B",
+   "regime": "cold b=1",
+   "ms": 397.89196811034344,
+   "note": "2.45B params, batched"
+  },
+  {
+   "model": "Toto 2.0 2.5B",
+   "regime": "cold b=16",
+   "ms": 40.76339192397427,
+   "note": "2.45B params, batched"
+  },
+  {
+   "model": "Toto 2.0 2.5B",
+   "regime": "cold b=64",
+   "ms": 25.74062239000341,
+   "note": "2.45B params, batched"
+  },
+  {
+   "model": "Toto 2.0 2.5B",
+   "regime": "warm",
+   "ms": 411.15662502124906,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "TiRex-2",
+   "regime": "cold b=1",
+   "ms": 62.77323763788445,
+   "note": "38.4M params (univariate), batched"
+  },
+  {
+   "model": "TiRex-2",
+   "regime": "cold b=16",
+   "ms": 17.098479816922918,
+   "note": "38.4M params (univariate), batched"
+  },
+  {
+   "model": "TiRex-2",
+   "regime": "cold b=64",
+   "ms": 14.155102871882264,
+   "note": "38.4M params (univariate), batched"
+  },
+  {
+   "model": "TiRex-2",
+   "regime": "warm",
+   "ms": 63.150832895189524,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "Simons-60M",
+   "regime": "cold b=1",
+   "ms": 12.041561858495697,
+   "note": "60.3M params, batched"
+  },
+  {
+   "model": "Simons-60M",
+   "regime": "cold b=16",
+   "ms": 2.489529302692972,
+   "note": "60.3M params, batched"
+  },
+  {
+   "model": "Simons-60M",
+   "regime": "cold b=64",
+   "ms": 2.042286461801268,
+   "note": "60.3M params, batched"
+  },
+  {
+   "model": "Simons-60M",
+   "regime": "warm",
+   "ms": 12.700749561190605,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "Simons-297M",
+   "regime": "cold b=1",
+   "ms": 32.73530534352176,
+   "note": "297.2M params, batched"
+  },
+  {
+   "model": "Simons-297M",
+   "regime": "cold b=16",
+   "ms": 7.304497397853993,
+   "note": "297.2M params, batched"
+  },
+  {
+   "model": "Simons-297M",
+   "regime": "cold b=64",
+   "ms": 6.221755204023793,
+   "note": "297.2M params, batched"
+  },
+  {
+   "model": "Simons-297M",
+   "regime": "warm",
+   "ms": 33.41387491673231,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "ci-proto",
+   "regime": "cold b=1",
+   "ms": 476.38391601503827,
+   "note": "167.2M params, batched"
+  },
+  {
+   "model": "ci-proto",
+   "regime": "cold b=16",
+   "ms": 448.3012207056163,
+   "note": "167.2M params, batched"
+  },
+  {
+   "model": "ci-proto",
+   "regime": "cold b=64",
+   "ms": 451.67043813853525,
+   "note": "167.2M params, batched"
+  },
+  {
+   "model": "ci-proto",
+   "regime": "warm",
+   "ms": 481.20254185050726,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "Hirondel-7M",
+   "regime": "cold b=1",
+   "ms": 60.01534308597911,
+   "note": "7.5M params, batched"
+  },
+  {
+   "model": "Hirondel-7M",
+   "regime": "cold b=16",
+   "ms": 58.58398828422651,
+   "note": "7.5M params, batched"
+  },
+  {
+   "model": "Hirondel-7M",
+   "regime": "cold b=64",
+   "ms": 52.07507160957903,
+   "note": "7.5M params, batched"
+  },
+  {
+   "model": "Hirondel-7M",
+   "regime": "warm",
+   "ms": 58.92033316195011,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "iAmTime-base",
+   "regime": "cold b=1",
+   "ms": 94.88232422154397,
+   "note": "302.1M params (21 levels), batched"
+  },
+  {
+   "model": "iAmTime-base",
+   "regime": "cold b=16",
+   "ms": 18.645011077751406,
+   "note": "302.1M params (21 levels), batched"
+  },
+  {
+   "model": "iAmTime-base",
+   "regime": "cold b=64",
+   "ms": 14.519610020215623,
+   "note": "302.1M params (21 levels), batched"
+  },
+  {
+   "model": "iAmTime-base",
+   "regime": "warm",
+   "ms": 94.36025004833937,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "CSP",
+   "regime": "cold b=1",
+   "ms": 0.06145118095446378,
+   "note": "csp-forecaster 0.2.0, refit per forecast, batched"
+  },
+  {
+   "model": "CSP",
+   "regime": "cold b=16",
+   "ms": 0.058684905525296926,
+   "note": "csp-forecaster 0.2.0, refit per forecast, batched"
+  },
+  {
+   "model": "CSP",
+   "regime": "cold b=64",
+   "ms": 0.05933594366069883,
+   "note": "csp-forecaster 0.2.0, refit per forecast, batched"
+  },
+  {
+   "model": "CSP",
+   "regime": "warm",
+   "ms": 0.06162561476230621,
+   "note": "stateless: full re-forward"
+  },
+  {
+   "model": "TimeSSM-2.5M",
+   "regime": "cold b=1",
+   "ms": 155.9780930983834,
+   "note": "2.5M params, batched"
+  },
+  {
+   "model": "TimeSSM-2.5M",
+   "regime": "cold b=16",
+   "ms": 31.861287119681947,
+   "note": "2.5M params, batched"
+  },
+  {
+   "model": "TimeSSM-2.5M",
+   "regime": "cold b=64",
+   "ms": 26.001703125075437,
+   "note": "2.5M params, batched"
+  },
+  {
+   "model": "TimeSSM-2.5M",
+   "regime": "warm",
+   "ms": 159.29141640663147,
+   "note": "stateless: full re-forward"
   }
  ]
 }
