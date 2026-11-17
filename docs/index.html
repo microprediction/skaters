@@ -17,7 +17,17 @@
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" crossorigin="anonymous"
     onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
+  <style>
+    .conversation { margin: 12px 0 26px; padding: 14px 18px 6px; border: 1px solid #ddd; border-radius: 6px; background: #fafaff; }
+    .conv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .conv-head p { margin: 0; }
+    .hero-figure { margin: 24px 0; }
+    .hero-figure img { display: block; margin: 0 auto; max-width: 100%; }
+    .hero-figure figcaption { max-width: 760px; margin: 8px auto 0; text-align: center; }
+    .conversation pre { white-space: pre-wrap; font-size: .85rem; max-height: 320px; overflow: auto; background: #fff; border: 1px solid #e3e3e3; padding: 10px 12px; }
+    .copy-btn { white-space: nowrap; cursor: pointer; border: none; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -25,10 +35,22 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/skills.html">Skills</a>
             <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
@@ -36,42 +58,39 @@
             <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <a href="/guide.html">Methodology</a>
         <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
             <a href="/benchmarks.html">Accuracy</a>
             <a href="/metrics.html">Metrics</a>
             <a href="/performance.html">Performance</a>
             <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+              </span>
+            </span>
           </span>
-        </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
-          <span class="drop">
-            <a href="https://foundationalprediction.com/">All</a>
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
-          </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
@@ -81,8 +100,7 @@
     <h1>skaters</h1>
     <p class="subtitle">Home of <strong>Laplace</strong>, a light, fast, automatic
       <strong>distributional</strong> univariate time-series prediction algorithm that also
-      reliably <a href="/sandwich.html">improves the performance of other time-series
-      models</a> (<a href="https://prophet.microprediction.org">including Prophet</a>).
+      improves the performance of other time-series models, including Prophet.
       Recommended for non-price economic time-series and available in Python, JavaScript,
       R, Julia and Rust.</p>
 
@@ -98,63 +116,7 @@
     </div>
 
 
-    <figure class="hero-figure">
-      <img src="./assets/laplace-foundational-models.gif" alt="A cyclist pops a wheelie on a mountain bike alongside a professional peloton; the peloton is labelled Foundational Models and the wheelie rider Laplace." style="width:100%;height:auto;">
-    </figure>
-
-    <p>
-      On FRED change-series scored one step ahead, <code>laplace</code> beats AutoARIMA,
-      AutoETS, AutoTheta, GARCH-t and NPTS on held-out log score at every FRED frequency, and on
-      2,210 daily economic series it beats every zero-shot foundation model tested. On 5,600
-      monthly series the larger foundation models (TimeH2O, Toto 2.0, Simons, Chronos-2, iAmTime,
-      TimesFM 3.0) are ahead by 0.05 to 0.10 nats per step at the median under the generous
-      density reconstruction, and on 3,013 weekly series TimeH2O and Toto 2.0 are. On the 414
-      strongly seasonal M4 hourly series AutoARIMA and Conformal Seasonal Pools are ahead. On
-      price and return series <code>laplace</code>, GARCH-t and the foundation models are level.
-      (Run of 16 November 2026, 19,940 series.)
-      <a href="https://foundationalprediction.com/">The leaderboards →</a>
-    </p>
-
-
-    <p>
-      Each language is an independent, parity-locked port, checked against the reference to
-      1e-6 (Python also has a Rust backend for speed). Model specifications serialise to
-      JSON, and fitted state checkpoints and resumes within a language.
-      <a href="/languages.html">The languages →</a>
-    </p>
-
-    <p>
-      A calibrated surprise signal comes with the state: each point is scored against the
-      forecast issued for it, so <code>state["z"]</code> is a normalized residual and
-      <code>state["pit"]</code> its probability integral transform.
-      <a href="/demos/normalization.html">See it live →</a>
-      Turning that signal into streaming anomaly detection with measured false-alarm rates is
-      its own project, <a href="https://timemachines.microprediction.org/">timemachines</a>,
-      built on skaters.
-    </p>
-
-    <figure class="hero-figure">
-      <div id="frontier3d" style="width:100%;min-height:520px;"></div>
-      <figcaption><span id="frontier3d-caption">Accuracy, speed and footprint, one point per model;
-        every coordinate is measured. Drag to rotate.</span>
-        <a href="/benchmarks.html">The benchmarks &rarr;</a></figcaption>
-    </figure>
-    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
-    <script src="./assets/frontier3d.js"></script>
-
-    <figure class="hero-figure">
-      <img src="./assets/radar-canonical.svg" alt="Radar chart of strength against laplace on
-        log score, by stratum, for Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma and GARCH-t. On
-        daily economic series every challenger sits inside the dashed laplace ring; on weekly,
-        monthly and hourly series most foundation models sit outside it; on price and returns all
-        are on the ring. The full November 2026 panel is on the leaderboards." />
-      <figcaption>Strength against <code>laplace</code> by stratum: per-series Diebold–Mariano
-        verdicts on log score, draws split; <code>laplace</code> is the dashed ring. Outside the
-        ring the challenger is ahead on that stratum. Each foundation model is shown with its
-        stronger density reconstruction.
-        <a href="https://foundationalprediction.com/">The leaderboards →</a></figcaption>
-    </figure>
-
+    <h2>Quick start</h2>
     <p>
       <code>pip install skaters</code>. Every prediction is a <code>Dist</code>: a weighted
       Gaussian mixture carrying the mean, the spread, quantiles, and a density at once. You build
@@ -162,7 +124,6 @@
       sits at the bottom (see the <a href="/guide.html">Guide</a>).
     </p>
 
-    <h2>Quick start</h2>
 <pre><code>from skaters import laplace
 
 f = laplace(k=3)
@@ -185,7 +146,141 @@ for y in observations:
       facets of the same object.
     </p>
 
-    <h2>One general forecaster</h2>
+    <h2 id="demonstrations">Demonstrations</h2>
+    <p>
+      Each demo runs live in your browser:
+      the <a href="/demos/playground.html">playground</a>,
+      a <a href="/demos/race.html">race</a> against classical baselines on FRED series,
+      <a href="/demos/normalization.html">whitening</a> against a rolling z-score,
+      the <a href="/demos/rosenblatt.html">Rosenblatt bijection</a>,
+      and the Python package itself in <a href="/demos/pyodide.html">Pyodide</a>.
+      <a href="/demos/">All demos &rarr;</a>
+    </p>
+
+    <h3 id="playground">Watch it forecast</h3>
+    <p>
+      Live in your browser: pick a data regime, change the horizon, and watch the predictive
+      distribution, the transform paths and the clocks adapt.
+      <a href="/demos/playground.html">Full page &rarr;</a>
+    </p>
+    <iframe id="playground-embed" src="./demos/playground.html?embed" title="laplace forecasting playground"
+      loading="lazy" style="width:100%;height:900px;border:0;display:block;margin-bottom:28px;"></iframe>
+    <script>
+      addEventListener("message", (e) => {
+        const h = e.data && e.data.playgroundHeight;
+        if (h) document.getElementById("playground-embed").style.height = (h + 8) + "px";
+      });
+    </script>
+
+    <h2 id="conversation">Have a conversation about skaters</h2>
+    <section class="conversation">
+      <div class="conv-head">
+        <p>Paste this into ChatGPT, Claude or any chat assistant, then describe your series and what you need.</p>
+        <button class="btn copy-btn" data-target="chat-prime">Copy</button>
+      </div>
+      <pre id="chat-prime">I would like to discuss skaters (https://skaters.microprediction.org), an open-source package for online, distributional, univariate time-series forecasting in Python (with a Rust core), JavaScript, R and Julia. Please read these pages before answering:
+
+- FAQ: https://skaters.microprediction.org/faq.html
+- Examples: https://skaters.microprediction.org/examples.html
+- Methodology: https://skaters.microprediction.org/guide.html
+- Scope and misuse: https://skaters.microprediction.org/scope.html
+- Claude skills: https://skaters.microprediction.org/skills.html
+- Results against foundational models: https://foundationalprediction.com
+- Why one step ahead: https://foundationalprediction.com/horizon-note.pdf
+
+Key points:
+- laplace is the general forecaster; granger is laplace with trained hyperparameters (monthly, weekly, hourly).
+- Each call takes one observation and returns a full predictive distribution for the next value, in O(1) time.
+- It was built for large numbers of economic series and is scored one step ahead on held-out log likelihood.
+- It is univariate: it does not use covariates or exogenous regressors, and it does not replace foundational time-series models.
+- Supply prior knowledge as a transform (for example, a log transform for a positive series) and use natural units.
+
+My series and goal: </pre>
+    </section>
+
+    <p>
+      Laplace was written for monitoring hundreds of thousands of private and public economic
+      series because we couldn't find anything better. We think some foundational models are
+      slightly better, but far less usable at present. Your mileage may vary.
+      <a href="https://foundationalprediction.com/">The leaderboards →</a>
+    </p>
+
+    <p>
+      Each language is an independent, parity-locked port, checked against the reference to
+      1e-6 (Python also has a Rust backend for speed). Model specifications serialise to
+      JSON, and fitted state checkpoints and resumes within a language.
+      <a href="/languages.html">The languages →</a>
+    </p>
+
+    <p>
+      A calibrated surprise signal comes with the state: each point is scored against the
+      forecast issued for it, so <code>state["z"]</code> is a normalized residual and
+      <code>state["pit"]</code> its probability integral transform.
+      <a href="/demos/normalization.html">See it live →</a>
+      Turning that signal into streaming anomaly detection with measured false-alarm rates is
+      its own project, <a href="https://timemachines.microprediction.org/">timemachines</a>,
+      built on skaters.
+    </p>
+
+    <h2 id="complements">How Laplace complements foundational models</h2>
+    <p>
+      <code>laplace</code> is tiny, fast and dependency-free, and it runs in five languages:
+      Python, JavaScript, R, Julia and Rust. A forecast update takes microseconds on one CPU
+      thread, where a pretrained model takes milliseconds or more
+      (<a href="https://foundationalprediction.com/speed.html">speed</a>,
+      <a href="/performance.html">performance</a>). Its secondary use is as a reference point
+      that marks the advances in foundational time-series models.
+    </p>
+
+    <figure class="hero-figure">
+      <div id="frontier3d" style="width:100%;min-height:520px;"></div>
+      <figcaption>Accuracy, speed and footprint, one point per model. Drag to rotate.
+        <a href="https://foundationalprediction.com/">The leaderboards &rarr;</a></figcaption>
+    </figure>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+    <script src="./assets/frontier3d.js"></script>
+
+    <h2 id="where-fms-are-better">Where foundational models are better</h2>
+    <p>
+      On monthly, weekly and hourly series. Paired per series on log score, with each model's
+      stronger density reconstruction, the best foundational model on each of these strata wins
+      far more series than it loses:
+    </p>
+    <table>
+      <tr><th>Series</th><th>Best model</th><th>Wins / draws / losses</th><th>Median gain (nats)</th><th>CRPS ratio</th></tr>
+        <tr><td>Monthly</td><td>Timestral-209M</td><td class="num">2,037 / 3,182 / 381</td><td class="num">+0.11</td><td class="num">0.88</td></tr>
+        <tr><td>Weekly</td><td>TimeH2O</td><td class="num">1,383 / 1,324 / 306</td><td class="num">+0.11</td><td class="num">0.82</td></tr>
+        <tr><td>Hourly (M4)</td><td>TimeH2O</td><td class="num">186 / 228 / 0</td><td class="num">+0.18</td><td class="num">0.83</td></tr>
+    </table>
+    <p>
+      On daily economic series every foundational and classical model loses more series than it wins. On daily
+      prices the foundational models are level with <code>laplace</code>, and a fitted GARCH-t
+      is ahead (743 wins, 216 losses). Wins and losses are
+      Diebold&ndash;Mariano verdicts at each series; a CRPS ratio below 1 favours the compared
+      model. <a href="https://foundationalprediction.com/">The leaderboards &rarr;</a>
+    </p>
+
+
+    <figure class="hero-figure">
+      <img src="./assets/radar-canonical.svg" alt="Radar chart of strength against laplace on
+        log score, by stratum, for Timestral-209M, TimeH2O, TimesFM 3.0, t0-gamma and GARCH-t. On
+        daily economic series every compared model sits inside the dashed laplace ring; on weekly,
+        monthly and hourly series most foundation models sit outside it; on price and returns all
+        are on the ring. The full November 2026 panel is on the leaderboards." />
+      <figcaption>Strength against <code>laplace</code> by stratum: per-series Diebold–Mariano
+        verdicts on log score, draws split; <code>laplace</code> is the dashed ring. Outside the
+        ring the compared model is ahead on that stratum. Each foundation model is shown with its
+        stronger density reconstruction.
+        <a href="https://foundationalprediction.com/">The leaderboards →</a></figcaption>
+    </figure>
+
+    <figure class="hero-figure">
+      <img src="./assets/laplace-foundational-models.gif" alt="A cyclist pops a wheelie on a mountain bike alongside a professional peloton; the peloton is labelled Foundational Models and the wheelie rider Laplace." style="width:100%;max-width:480px;height:auto;">
+      <figcaption>How each foundational model compares, series by series:
+        <a href="https://foundationalprediction.com/">foundationalprediction.com &rarr;</a></figcaption>
+    </figure>
+
+    <h2>One general forecaster?</h2>
     <figure style="float:right;max-width:150px;margin:4px 0 12px 22px;text-align:center;">
       <img src="./assets/laplace.jpg" alt="Portrait of Pierre-Simon Laplace"
         style="max-width:100%;height:auto;border-radius:6px;" />
@@ -194,16 +289,8 @@ for y in observations:
     </figure>
     <p>
       <code>skaters</code> exposes <strong>one general forecaster</strong>, <code>laplace</code>,
-      and <strong>one trained one</strong>, <code>granger</code>: laplace's pipeline with its
-      continuous hyperparameters trained per frequency and a small gate on the ensemble weights,
-      mixed with laplace by the Aggregating Algorithm so that its total log score is never more
-      than log&nbsp;4 behind laplace's on any series (see the
-      <a href="/guide.html#granger">guide</a>). At multi-step horizons (<code>k&gt;1</code>)
-      <code>laplace</code> is <strong>multi-scale by default</strong>, mixing instances on
-      decimated clocks by likelihood (opt out with <code>scales=[1]</code>). Everything else is a
-      building block you can compose, including the experimental <code>flesaker</code> for series
-      with a known bound. ("skater" is the <em>concept</em>, any
-      <code>(y, state) → ([Dist], state)</code> function, not a function name.)
+      and <strong>one trained one</strong>, <code>granger</code>. Everything else is a building
+      block you can compose. <a href="/guide.html">The guide →</a>
     </p>
 <pre><code>from skaters import laplace, granger
 
@@ -265,6 +352,14 @@ g = granger(frequency="monthly")   # or "weekly", "hourly"</code></pre>
       or the anomaly-detection consequences at
       <a href="https://timemachines.microprediction.org/">timemachines</a> (DSPOT 5.2&times;,
       RRCF 1.8&times; in the same coordinates).</p>
+    <iframe id="rosenblatt-embed" src="./demos/rosenblatt.html?embed" title="The Rosenblatt bijection, live"
+      loading="lazy" style="width:100%;height:760px;border:0;display:block;margin:8px 0 28px;"></iframe>
+    <script>
+      addEventListener("message", (e) => {
+        const h = e.data && e.data.rosenblattHeight;
+        if (h) document.getElementById("rosenblatt-embed").style.height = (h + 8) + "px";
+      });
+    </script>
 
     <h2 id="heritage">Heritage</h2>
     <p>
@@ -273,9 +368,7 @@ g = granger(frequency="monthly")   # or "weekly", "hourly"</code></pre>
       competition-winning forecasting package by Peter Cotton, and builds on years of experience
       running live <strong>distributional prediction contests</strong> at
       <a href="https://www.microprediction.org/">microprediction</a>, where forecasts are scored,
-      continuously, as full distributions rather than points. Sibling packages: <a
-      href="https://github.com/microprediction/precise">precise</a> (online covariance) and
-      <a href="https://github.com/microprediction/humpday">humpday</a> (global optimizers).
+      continuously, as full distributions rather than points.
     </p>
 
     <h2>Get the source</h2>
@@ -290,9 +383,19 @@ g = granger(frequency="monthly")   # or "weekly", "hourly"</code></pre>
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
+  <script>
+    document.querySelectorAll('.copy-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var pre = document.getElementById(btn.dataset.target);
+        navigator.clipboard.writeText(pre.innerText).then(function () {
+          var old = btn.textContent; btn.textContent = 'Copied \u2713';
+          setTimeout(function () { btn.textContent = old; }, 1600);
+        });
+      });
+    });
+  </script>
 </body>
 </html>

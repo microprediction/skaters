@@ -7,7 +7,7 @@
   <meta name="description" content="A per-stratum workup of t0-gamma against the
     Laplace online ensemble: standalone head-to-head, a star plot of not-worse rates, and
     the collaborative sidecar arms." />
-  <link rel="stylesheet" href="../academic.css" />
+  <link rel="stylesheet" href="../academic.css?v=20261117" />
   <style>
     .wdl { display:flex; height:15px; width:180px; border-radius:3px; overflow:hidden;
            border:1px solid var(--border); }
@@ -30,10 +30,22 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/skills.html">Skills</a>
             <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
@@ -41,42 +53,39 @@
             <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <a href="/guide.html">Methodology</a>
         <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
             <a href="/benchmarks.html">Accuracy</a>
             <a href="/metrics.html">Metrics</a>
             <a href="/performance.html">Performance</a>
             <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+              </span>
+            </span>
           </span>
-        </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
-          <span class="drop">
-            <a href="https://foundationalprediction.com/">All</a>
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
-          </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
@@ -177,7 +186,7 @@
       with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
       less. Here a series counts as a win when the model's mean per-series log score exceeds
       Laplace's by any amount, and as a tie only at exact equality: the same rule the
-      challengers radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
+      compared models radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
       loss above, which fold statistically unresolved differences into draws. The two
       agree on direction and differ in how they treat small gaps. The solid polygon is the headline arm and
       the dashed grey one, where present, is the tight nine-decile reconstruction. The
@@ -237,7 +246,8 @@
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://github.com/microprediction">microprediction</a> family.
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

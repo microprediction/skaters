@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — R port</title>
+  <meta name="description" content="Pure R, covering the whole library, parity-locked to the reference." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — R port" />
+  <meta property="og:description" content="Pure R, covering the whole library, parity-locked to the reference." />
+  <meta property="og:url" content="https://skaters.microprediction.org/ports/r.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="../academic.css?v=20261117" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+              </span>
+            </span>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>R</h1>
+    <p class="subtitle">Pure R, covering the whole library, parity-locked to the reference.</p>
+
+<pre><code>pak::pak("microprediction/skaters-r")</code></pre>
+
+    <p>Pure R, covering the whole library including <code>laplace</code>, the adaptive search engine
+      and the covariance estimators, at 105,798 parity values, with the adversarial gates, exact
+      checkpoint-resume contracts and a clean <code>R CMD check</code>. The current version is 0.16.0.</p>
+    <p>It matches <code>laplace</code>'s reference and receives <code>granger</code> with 0.17.0. A CRAN
+      submission is planned once the surface and documentation settle.</p>
+
+    <h2>Links</h2>
+    <table>
+        <tr><th>Source</th><td><a href="https://github.com/microprediction/skaters-r">microprediction/skaters-r</a></td></tr>
+        <tr><th>R-universe</th><td><a href="https://microprediction.r-universe.dev/skaters">microprediction.r-universe.dev</a></td></tr>
+        <tr><th>Issues</th><td><a href="https://github.com/microprediction/skaters-r/issues">skaters-r issues</a></td></tr>
+        <tr><th>Overview</th><td><a href="/languages.html">All ports</a></td></tr>
+    </table>
+
+    <p>Every port is checked against the Python reference by the same parity vectors, to 1e-6.
+      <a href="/languages.html">How the ports are kept identical &rarr;</a></p>
+    <p class="muted small">Other implementations: <a href="/ports/python.html">Python</a> &middot; <a href="/ports/torch.html">torch</a> &middot; <a href="/ports/rust.html">Rust</a> &middot; <a href="/ports/javascript.html">JavaScript</a> &middot; <a href="/ports/julia.html">Julia</a></p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
+  </footer>
+</body>
+</html>

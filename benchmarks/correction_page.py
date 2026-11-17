@@ -117,7 +117,7 @@ def render(d, hom, conf):
   <meta property="og:description" content="Why homogenization gains where conformal correction costs." />
   <meta property="og:url" content="https://skaters.microprediction.org/corrections.html" />
   <meta name="twitter:card" content="summary" />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     .lede {{ color: #555; margin: 0 0 26px; font-size: 1.05em; }}
     .abstract {{ background: #fafafa; border-left: 3px solid #ccc; padding: 12px 16px;
@@ -286,9 +286,8 @@ def render(d, hom, conf):
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

@@ -80,7 +80,7 @@ def main():
         ax.scatter([p[0] for p in pres], [p[1] for p in pres], s=26, color=color,
                    edgecolor="white", linewidth=1.0, zorder=6)
 
-    ax.set_title("Challenger strength vs. laplace, by stratum (log score)",
+    ax.set_title("Strength against laplace, by stratum (log score)",
                  fontsize=12.5, pad=24)
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.20), ncol=3,
               frameon=False, fontsize=10, handlelength=1.2, columnspacing=1.6)

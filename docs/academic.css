@@ -145,3 +145,15 @@ header.site-header nav .menu .drop {
 header.site-header nav .menu:hover .drop,
 header.site-header nav .menu:focus-within .drop { display: block; }
 header.site-header nav .menu .drop a { display: block; padding: 4px 14px; white-space: nowrap; }
+
+/* nested flyout inside a dropdown (Assessment > Foundational) */
+header.site-header nav .menu .drop .sub { position: relative; display: block; }
+header.site-header nav .menu .drop .sub > .menu-label { display: block; padding: 4px 14px; white-space: nowrap; }
+header.site-header nav .menu .drop .subdrop {
+  display: none; position: absolute; left: 100%; top: -7px; z-index: 60;
+  min-width: 9em; padding: 6px 0;
+  background: var(--header-bg); border: 1px solid var(--header-bg-dark);
+  border-radius: 0 6px 6px 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+}
+header.site-header nav .menu .drop .sub:hover > .subdrop,
+header.site-header nav .menu .drop .sub:focus-within > .subdrop { display: block; }

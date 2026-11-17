@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — FAQ</title>
-  <meta name="description" content="Frequently asked questions about skaters: why likelihood is the default score, whether the benchmark win holds up, and what univariate distributional forecasting is for." />
-  <link rel="stylesheet" href="./academic.css" />
+  <meta name="description" content="What skaters is for, how to use it, why it focuses on economic series one step ahead, what it does not do (covariates, replacing foundation models), how not to use it, whitening, and the technical questions that come up most." />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
 </head>
 <body>
   <header class="site-header">
@@ -13,10 +13,22 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/skills.html">Skills</a>
             <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
@@ -24,42 +36,39 @@
             <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <a href="/guide.html">Methodology</a>
         <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
             <a href="/benchmarks.html">Accuracy</a>
             <a href="/metrics.html">Metrics</a>
             <a href="/performance.html">Performance</a>
             <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+              </span>
+            </span>
           </span>
-        </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
-          <span class="drop">
-            <a href="https://foundationalprediction.com/">All</a>
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
-          </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
@@ -67,50 +76,318 @@
 
   <main>
     <h1>FAQ</h1>
-    <p class="subtitle">A short list, growing as questions recur.</p>
+    <p class="lead">What skaters is for, how to use it, where it stops, and the technical questions that come up most.
+      The <a href="/#conversation">conversation primer</a> on the home page gives a chat assistant the same starting point.</p>
 
-    <h2>Why is likelihood the default, not CRPS?</h2>
-    <p>
-      A skater's target is a reusable predictive <em>density</em>, and densities
-      are meant to be chained: each stage refines the residual of the last.
-      Held-out log-likelihood is the score under which those refinements compose,
-      the log-likelihood of a chained forecast being the base score plus the
-      contribution of each stage. CRPS is a good score for a different target,
-      coverage or threshold behaviour, and it is reported alongside as a
-      diagnostic. It is a different contract, not a worse one. The full argument,
-      with the worked example and where CRPS is the right choice, is in
-      <a href="/metrics.html">why skaters ranks by likelihood, by default</a>.
-    </p>
+    <h2 id="about">About skaters</h2>
 
-    <h2>Isn't the benchmark win just p-hacked?</h2>
-    <p>
-      Reasonable thing to ask of any leaderboard. Rather than take one slice on
-      faith, the <a href="/robustness.html">robustness explorer</a> lets you cut
-      the non-price benchmark any way you like (at random, by category,
-      frequency, stickiness, martingality) and watch the per-series win-rate
-      recompute live with a bootstrap band. A cherry-picked edge falls apart under
-      reslicing; a real one stays high and tight. The price caveat is stated
-      plainly too: on equity/fx/commodity returns GARCH-t wins, and we say so.
-    </p>
+    <h3>Why was it written?</h3>
+    <p>To monitor hundreds of thousands of public and private economic series, each with a full predictive
+      distribution, updated online as each observation arrives, with no training job to run and nothing to tune.
+      Nothing small, fast and light did that at that scale, so <code>laplace</code> was built for it.</p>
 
-    <h2>Do I need exogenous data or features for this to be useful?</h2>
-    <p>
-      Not to use it. Univariate distributional prediction is a composable
-      <em>component</em>, not a whole pipeline: it runs on the series you have and
-      plugs in before, during, or after the rest of a model. Exogenous structure
-      enters as another stage. See <a href="/scope.html">Scope</a>.
-    </p>
+    <h3>How can I quickly grasp the algorithm?</h3>
+    <p>Open the <a href="/demos/playground.html">playground</a>. Pick a data regime, switch it mid-stream, and
+      watch the predictive distribution, the transform paths and the scale mixture adapt, live in the browser.
+      The <a href="/guide.html">methodology guide</a> has the details once the picture is clear.</p>
 
-    <h2>Why not just build a bespoke model?</h2>
+    <h3>Can I watch it race other models?</h3>
+    <p>Yes. The <a href="/demos/race.html">live race</a> runs <code>laplace</code> against classical baselines on
+      real FRED series in your browser, with no key and no server.</p>
+
+    <h3>Can I see what whitening does to an ugly series?</h3>
+    <p>The <a href="/demos/normalization.html">normalization demo</a> feeds the same stream to two normalizers.
+      The rolling z-score stays ugly, and <code>laplace</code>'s z turns it into the same N(0,1) bell each time.</p>
+
+    <h3>What does it mean that <code>laplace</code> is a bijection?</h3>
+    <p>The <a href="/demos/rosenblatt.html">Rosenblatt demo</a> shows it. Upstairs the raw series trends, cycles
+      and bursts; downstairs its image is N(0,1) noise, and each side can be recovered from the other.</p>
+
+    <h3>Does the Python package really run in a browser?</h3>
+    <p>Yes, unmodified, in <a href="/demos/pyodide.html">Pyodide</a>. The other demos use the JavaScript port,
+      which agrees with the Python to 1e-6. All the demos are listed on the <a href="/demos/">demos page</a>.</p>
+
+    <h3>Why is it called skaters?</h3>
+    <p>The project is older than this package. It began as
+      <a href="https://github.com/microprediction/timemachines">timemachines</a>, where every forecaster had the
+      signature <code>f(y, s, k, a, t, e, r)</code>: the observation <code>y</code>, then state, steps ahead,
+      variables known in advance, time, expiry and hyper-parameters. The signature has since shrunk to
+      <code>f(y, state)</code>, and the name stayed.</p>
+
+    <h3>Why is it called laplace?</h3>
+    <p>He had weaker priors than&hellip; Bayes. You can use the same toolkit to make more opinionated models, and
+      <code>granger</code> is an example of exactly that. <code>granger</code> will <em>probably</em> outperform
+      <code>laplace</code> on economic time series in the future, though we can't say for sure.</p>
+
+    <h3>What does it produce?</h3>
+    <p>A predictive distribution for the next value of one series: a mean, a spread, quantiles and a density.
+      Every call takes one observation and the previous state and returns the forecast and the new state, in
+      O(1) time per observation. The state also carries a calibrated surprise, <code>state["z"]</code> and
+      <code>state["pit"]</code>, for each arriving point.</p>
+
+    <h3>What are laplace and granger?</h3>
+    <p><code>laplace</code> is the general forecaster: a likelihood-weighted ensemble of transform chains with a
+      distributional leaf. <code>granger</code> is <code>laplace</code> with its continuous hyperparameters
+      trained per frequency (monthly, weekly, hourly), mixed with <code>laplace</code> so that its total log score
+      is never more than log 4 behind. The <a href="/guide.html">methodology guide</a> describes both.</p>
+
+    <h2 id="using">Using it</h2>
+
+    <h3>How do I start?</h3>
+    <p><code>pip install skaters</code>, then feed observations one at a time to <code>laplace()</code>. The
+      <a href="/examples.html">examples page</a> has runnable recipes: a first forecast, several steps ahead,
+      positive series, calibration checks, anomalies, mean reversion, your own transform and the browser. To have
+      an AI assistant do it, give it the <a href="/skills.html#basic-use">basic-use skill</a>.</p>
+
+    <h3>Which languages?</h3>
+    <p>Python is the reference. There are parity-locked ports in torch, Rust, JavaScript, R and Julia, each
+      agreeing with the Python to 1e-6. See <a href="/languages.html">languages</a>, or the page for each port
+      under Implementations in the menu.</p>
+
+    <h3>Is it available in JavaScript?</h3>
+    <p>Yes: <code>npm install skaters</code>. It is zero-dependency ES modules that run in the browser and in
+      Node, and every live demo on this site uses it. See the <a href="/ports/javascript.html">JavaScript
+      port</a>.</p>
+
+    <h3>Is there an R version?</h3>
+    <p>Yes, in pure R, covering the whole library: <code>pak::pak("microprediction/skaters-r")</code>. See the
+      <a href="/ports/r.html">R port</a>.</p>
+
+    <h3>Is there a Julia version?</h3>
+    <p>Yes, Skaters.jl, covering the whole library. See the <a href="/ports/julia.html">Julia port</a>.</p>
+
+    <h3>Is there a Rust version, or a faster Python?</h3>
+    <p>Yes. The Rust crate (<code>cargo add skaters</code>) steps <code>laplace</code> at about 14 microseconds
+      per observation. The same core powers <code>skaters-fast</code>, a Python backend at roughly 20 times the
+      pure-Python rate; it is not on PyPI yet, so build it from the repository. See the
+      <a href="/ports/rust.html">Rust port</a>.</p>
+
+    <h3>Can you train Laplace?</h3>
+    <p>Yes. The torch port (<code>pip install "skaters[torch]"</code>) exposes <code>laplace</code>'s continuous
+      hyperparameters as <code>nn.Parameter</code>s, and gradients flow from a log score through every stage.
+      <code>granger</code> is the result of training them per frequency, mixed with <code>laplace</code> so that
+      it is never more than log 4 behind. See the <a href="/ports/torch.html">torch port</a> and
+      <a href="/learned.html">granger</a>.</p>
+
+    <h3>Can I run it in the browser?</h3>
+    <p>Yes, two ways: the JavaScript port, or the unmodified Python package in
+      <a href="/demos/pyodide.html">Pyodide</a>. The <a href="/demos/">demos</a> show both.</p>
+
+    <h3>Can an AI assistant help me use it?</h3>
+    <p>Yes. The <a href="/skills.html">Claude skills</a> are copyable instructions for common jobs: basic use,
+      benchmarking a method against <code>laplace</code>, reviewing a paper's benchmark, exogenous variables,
+      residual review and others. For a general conversation, paste the
+      <a href="/#conversation">primer</a> into any chat assistant.</p>
+
+    <h3>What is a skater?</h3>
+    <p>Any function <code>f(y, state) -&gt; (distributions, state)</code>. It takes one observation and the
+      state it returned last time, and gives back a predictive distribution for each horizon and a new state.
+      <code>laplace</code>, <code>granger</code> and every building block in the package share that signature,
+      so they compose.</p>
+
+    <h3>How fast is it?</h3>
+    <p>One update costs about 12 microseconds in the Rust core and about 0.3 milliseconds in pure Python, one
+      step ahead on one CPU thread. A pretrained model reruns its forward pass for each new observation, which
+      costs milliseconds to hundreds of milliseconds per forecast. The skaters measurements are on the
+      <a href="/performance.html">performance page</a>. The cost of each foundational model per forecast is on the
+      <a href="https://foundationalprediction.com/speed.html">speed page</a> of foundationalprediction.com.</p>
+
+    <h3>How do I get intervals and quantiles?</h3>
+    <p>From the distribution: <code>d.quantile(0.05)</code> and <code>d.quantile(0.95)</code> give a 90% interval,
+      <code>d.cdf(x)</code> a probability, <code>d.logpdf(y)</code> a log score. On the canonical panel the
+      central 90% interval contains between 89% and 92% of outcomes, depending on the stratum.</p>
+
+    <h3>What about missing values?</h3>
+    <p>Pass <code>NaN</code> for a missing observation. The forecaster carries its state forward without
+      updating on it, and the calibration diagnostics skip it. Irregularly spaced observations are not modelled
+      as such: the forecaster sees a sequence, and the step is whatever interval separates the values you feed it.</p>
+
+    <h3>Can I use it with a model I already have?</h3>
+    <p>Yes. Forecast your model's residuals with <code>laplace</code> (the <a href="/sandwich.html">sandwich
+      pattern</a>), run it alongside your model as a calibration check (the <a href="/sidecar.html">sidecar
+      pattern</a>; there is a <a href="/skills.html#laplace-sandwich">laplace-sandwich skill</a>), or combine the two predictive densities with weights that follow realised log score. The
+      combination keeps most of the other model's gains and costs little where the other model is worse.</p>
+
+    <h3>Can I use it to whiten a series?</h3>
+    <p>Yes, and this is one of its main uses. After each observation the state holds
+      <code>state["z"]</code>, the normal quantile of the observation's probability under the forecast issued
+      one step earlier. If the forecast is calibrated, that stream is approximately independent N(0,1). It is
+      causal, because each value uses only the past. The
+      <a href="/skills.html#standardization-review">standardization-review skill</a> has a ten-line
+      <code>whiten</code> generator, and the <a href="/demos/rosenblatt.html">Rosenblatt demo</a> shows the
+      transform running.</p>
+
+    <h3>How does that differ from a rolling z-score?</h3>
+    <p>A rolling z-score subtracts a trailing mean and divides by a trailing standard deviation. It changes
+      location and scale only, so skew, heavy tails and serial dependence pass through. Labelling |z| &gt; 3 as
+      a three-sigma event then assumes a normality the data may not have. The probability-integral version maps
+      each point through the whole predictive distribution, so shape is handled as well. Neither guarantees
+      calibration. Check the z stream before you attach nominal probabilities to thresholds.</p>
+
+    <h3>Is the whitened stream really white?</h3>
+    <p>Only as far as the forecaster is right. What it fails to model stays in z as remaining autocorrelation,
+      a scale that drifts or a lopsided histogram. Testing z for those is the calibration check. ARIMA, ETS,
+      GARCH and Prophet fitted to z find only a few hundredths of a nat
+      (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results log</a>).
+      On FRED change series the implied sd of z is about 0.88 one step ahead, so the intervals run slightly
+      wide; the <a href="/homogenization.html">homogenization page</a> measures this by horizon and corrects it
+      online.</p>
+
+    <h3>Can I use it for anomaly detection?</h3>
+    <p>The state carries a calibrated surprise for every arriving point, <code>state["z"]</code>, which is the
+      raw material. Turning it into an alarm with a measured false-alarm rate is the job of
+      <a href="https://timemachines.microprediction.org/">timemachines</a>, which is built on skaters. The
+      <a href="/skills.html#anomaly-detection">anomaly-detection skill</a> points an assistant there.</p>
+
+    <h2 id="scope">Scope</h2>
+
+    <h3>Why economic series?</h3>
+    <p>Because that is what it was built for and where it has been tested hardest: daily, weekly and monthly
+      economic series, mostly from FRED. On price and return series a fitted GARCH-t is the recommendation. On strongly seasonal hourly waveforms some foundation models and Conformal
+      Seasonal Pools are ahead.</p>
+
+    <h3>What is it not best for?</h3>
+    <p>This can be answered in part by looking at the metrics and the breakdowns by type of series on
+      <a href="https://foundationalprediction.com">foundationalprediction.com</a>. Intuitively, a model built for
+      economic time series needs to spread probability over a lot of the space, and it seldom has strong anchors.
+      So, for example, you would probably not want to use it out of the box to predict hourly Citi Bike
+      availability. You can try, of course. If you do, please
+      <a href="https://github.com/microprediction/skaters/issues">file a GitHub issue</a> with the results.</p>
+
+    <h3>Is it a replacement for foundational time-series models?</h3>
+    <p>No. Several pretrained models beat <code>laplace</code> on monthly, weekly and hourly series by a few
+      hundredths of a nat per step; <code>laplace</code> is ahead on daily economic series and is far cheaper
+      and easier to run online. The paired results for each model, against <code>laplace</code> or any other
+      reference, are on <a href="https://foundationalprediction.com">foundationalprediction.com</a>, and the
+      protocol is in <a href="/papers.html">A stronger univariate benchmark for foundational time-series model evaluation</a>.</p>
+
+    <h3>What about the classics, like AutoARIMA and GARCH?</h3>
+    <p>Originally skaters was built to be much lighter, and dependency-free for the browser. It turned out to be
+      statistically more suitable too, and much faster, than alternatives such as refitting ARIMA, at least for
+      the intended purpose. If you <em>know</em> the series is very close to a martingale (say, a liquidly traded
+      security), then a GARCH-t is a better bet than <code>laplace</code>. To date, attempts to get
+      <code>laplace</code> to recognise this and switch over have failed, because they cost too much regret on
+      other series. If you have a clever idea for this,
+      <a href="https://github.com/microprediction/skaters/issues">file an issue</a>.</p>
+
+    <h3>Does it handle covariates or exogenous regressors?</h3>
+    <p>No. <code>laplace</code> is univariate: it forecasts the stream it is given and nothing else. It has no
+      way to use known future covariates, calendar regressors or other series. For those, use a foundation model
+      that takes covariates, or put <code>laplace</code>'s forecast features into a streaming regression with
+      <a href="https://ice-skaters.microprediction.org">ice-skaters</a>; the
+      <a href="/skills.html#exogenous-variables">exogenous-variables skill</a> sets out both routes and how to
+      check that the covariates helped.</p>
+
+    <h3>Is there a multivariate version?</h3>
+    <p>Not in skaters itself: one stream, one forecaster, one distribution. Cross-stream work happens one layer
+      up, where each stream is reduced to its forecaster's expectation and surprise. The first packaged version
+      is <a href="https://ice-skaters.microprediction.org">ice-skaters</a>, which is preliminary.</p>
+
+    <h3>Does it work on counts and series with many zeros?</h3>
+    <p>It runs, and the lattice projection gives exact repeated values their own mass, which helps on series
+      that sit on a grid. It has no model for a point mass at zero. For a positive series with zeros, set the
+      floor of <code>flesaker</code> a little below zero, or treat the zeros separately.</p>
+
+    <h3>How not to use</h3>
+    <p>Forecasting a positive series on the real line without a transform, feeding values near 10<sup>20</sup>
+      or 10<sup>-12</sup> instead of natural units, asking for horizons far beyond twelve steps, and reading a
+      univariate forecast as if it knew about covariates. The <a href="/scope.html">scope page</a> covers each
+      and the <a href="/refunds.html">misuse page</a> has worked examples.</p>
+
+    <h2 id="jobs">Common jobs</h2>
+    <p>Each answer below has a matching <a href="/skills.html">skill</a>: copyable instructions you can give an
+      AI assistant so that it does the job the way it is done here.</p>
+
+    <h3>How should I interpret public criticism of <code>laplace</code>?</h3>
+    <p>First find out what was run: the version, the horizon, the units of the series, whether a positive
+      series was forecast without a transform, and which implementation was timed. Most hostile posts so far
+      were right about what they ran and wrong about what it means: a horizon of 96 steps, values near
+      10<sup>20</sup>, or a demand series allowed to go negative. If none of that applies, the criticism may be
+      right, and the measurement pages will say so. The <a href="/refunds.html">misuse page</a> works through
+      the standard cases, and the <a href="/skills.html#unwind-hater-post">unwind-hater-post skill</a> is the
+      checklist.</p>
+
+    <h3>I have a new forecaster. How should I benchmark it against <code>laplace</code>?</h3>
+    <p>Turn both into the same predictive object, score them with the same code on the same held-out points,
+      report log-likelihood and CRPS, and test per series with Diebold&ndash;Mariano. See the
+      <a href="/skills.html#benchmark-against-laplace">benchmark-against-laplace skill</a>, and
+      <a href="/challengers.html#propose">propose a model</a> if you want it on the site.</p>
+
+    <h3>How do I compare <code>laplace</code> with TimesFM on my own series?</h3>
+    <p>Forecast the one-step change, give TimesFM a fixed context, score the identical steps, and state how
+      you turned its quantiles into a density, because that choice moves the log score by about half a nat.
+      The <a href="/skills.html#timesfm-study">timesfm-study skill</a> sets out the protocol, and the
+      <a href="/timesfm.html">TimesFM page</a> has the reference results.</p>
+
+    <h3>How do I check the benchmark in a paper I am reviewing?</h3>
+    <p>Classify what each method emits (density, samples, quantiles or a CDF), since that decides what can be
+      scored on log-likelihood. Then run every method through one scoring harness against strong opponents.
+      The <a href="/skills.html#benchmark-review">benchmark-review skill</a> lists the steps and the traps that
+      make published comparisons misleading.</p>
+
+    <h3>How do I tell whether my model has left something on the table?</h3>
+    <p>Feed its residuals to <code>laplace</code>. If <code>laplace</code> beats a frozen Gaussian on them by
+      more than about 0.02 nats, structure remains. If it beats a GARCH-t, the leftover is in the mean. See the
+      <a href="/skills.html#residual-review">residual-review skill</a>.</p>
+
+    <h3>Can an assistant review my forecasting code?</h3>
+    <p>Yes. The <a href="/skills.html#skaters-code-review">skaters-code-review skill</a> flags refit-every-window
+      ARIMA, Prophet intervals, conformal-only outputs and similar patterns, names the shortcoming and gives
+      the one-line swap where <code>skaters</code> applies. For rolling z-scores specifically, use the
+      <a href="/skills.html#standardization-review">standardization-review skill</a>.</p>
+
+    <h3>Can I use it for a mean-reversion strategy?</h3>
+    <p>Yes. Reduce the pair or basket to one spread, feed its levels to <code>laplace(k)</code> with
+      <code>k</code> at your holding horizon, and read entry probabilities from the predictive CDF instead of a
+      z-score threshold. See the <a href="/skills.html#mean-reversion">mean-reversion skill</a>.</p>
+
+    <h3>How do I make a good-looking time-series page?</h3>
+    <p>Use three colours with fixed roles, draw intervals as one filled band that widens with horizon, and
+      anchor the forecast fan at the last observation. The
+      <a href="/skills.html#pretty-timeseries-page">pretty-timeseries-page skill</a> has the rules, and the
+      <a href="/demos/playground.html">playground</a> is the worked example.</p>
+
+    <h3>How do I bring in other series or features?</h3>
+    <p>See "Does it handle covariates or exogenous regressors?" above and the
+      <a href="/skills.html#exogenous-variables">exogenous-variables skill</a>.</p>
+
+    <h2 id="evaluation">Evaluation</h2>
+
+    <h3>Why is likelihood the default score, not CRPS?</h3>
+    <p>A skater's target is a reusable predictive density, and densities are chained: each stage refines the
+      residual of the last. Held-out log-likelihood is the score under which those refinements add up. CRPS
+      suits a different target, coverage or threshold behaviour, and it is reported alongside. The full argument,
+      with a worked example and the cases where CRPS is right, is on the <a href="/metrics.html">metrics page</a>.</p>
+
+    <h3>Isn't the benchmark win just p-hacked?</h3>
+    <p>Every comparison is paired per series with a Diebold&ndash;Mariano test, on identical windows, and the
+      results include the strata where <code>laplace</code> loses. Against foundational models it is currently a
+      win only on daily economic series. On the others, models such as Timestral and TimeH2O are slightly
+      better, and more will probably have joined them by the time you read this. They also have quite
+      different deployment properties. The <a href="https://foundationalprediction.com">leaderboards</a>
+      let you choose the reference model and slice the series by type.</p>
+
+
+    <h3>Where can I see how it compares with a particular model?</h3>
+    <p>Each model has its own page on <a href="https://foundationalprediction.com">foundationalprediction.com</a>,
+      with how it was run, its references and its paired results on every panel. The interactive leaderboard
+      there lets you make any model the reference.</p>
+
+    <h3>Why the emphasis on one step ahead and short horizons?</h3>
+    <p>Your criteria may differ, and you can use the components as you wish. The author's uses are largely
+      financial, and there is often a strong reason to focus on <code>k=1</code>. A very brief version of the
+      argument runs as follows. An investor who can trade every interval in a liquid market chooses today's
+      position from the distribution of the next return; under log utility nothing further ahead enters the
+      decision. So one step
+      ahead is the score that matters for that use, and the comparisons here report it on its own rather than
+      pooled over long horizons. The argument, with its limits, is in <a href="https://foundationalprediction.com/horizon-note.pdf">On the importance of evaluating foundational time-series models one step ahead in an investment context</a>. Multi-step forecasts are supported
+      to twelve steps, which is the stated upper limit.</p>
+
+
+<h3>Doesn't the transform leave the hard part, the time-dependence,
+      exactly as hard? (the copula objection)</h3>
     <p>
-      For a single important series, do. The value here is autonomy and scale:
-      thousands of streams, online, unattended, each returning a full
-      distribution rather than a point. See <a href="/scope.html">Scope</a>.
-    </p>
-    <h2>Doesn't the transform leave the hard part, the time-dependence,
-      exactly as hard? (the copula objection)</h2>
-    <p>
-      No, and the distinction is worth being precise about. The copula
+      No. The copula
       instinct is right for the static transform: push a series through a
       fixed marginal F and all the serial dependence is still sitting in the
       uniforms, exactly as hard as before. This transform is the conditional
@@ -129,8 +406,8 @@
       (<a href="https://github.com/microprediction/timemachines/blob/main/benchmarks/RESULTS.md">results
       log</a>); hand it to the streaming anomaly detectors in
       <a href="https://timemachines.microprediction.org/">timemachines</a> and they run
-      several times better than on raw data. The dependence problem is not relocated, it is
-      mostly finished by the time z exists.
+      several times better than on raw data. Most of the dependence problem is finished by the
+      time z exists.
     </p>
     <p>
       What does remain as hard as before is cross-stream dependence, which
@@ -141,9 +418,9 @@
       the bookkeeping is about twenty lines.
     </p>
 
-    <h2>"A nonlinear transform of an optimal estimate is usually not the
+    <h3>"A nonlinear transform of an optimal estimate is usually not the
       optimal estimate of the nonlinear transform." Isn't this exactly
-      that mistake?</h2>
+      that mistake?</h3>
     <p>
       The rule is E[g(X)] &ne; g(E[X]), and it bites when a point goes
       through a nonlinearity. Distributions do not have this problem: if Y
@@ -212,8 +489,8 @@
     })();
     </script>
 
-    <h2>Online methods struggle to adjust parameters without a restart. How
-      is that handled?</h2>
+    <h3>Online methods struggle to adjust parameters without a restart. How
+      is that handled?</h3>
     <p>
       There is no fit-then-freeze stage, so there is nothing to restart.
       Every estimator is recursive with forgetting, the ensemble reweights
@@ -233,28 +510,25 @@
       switch regimes mid-stream and watch.
     </p>
 
-    <h2>Is there a multivariate version?</h2>
-    <p>
-      Not in skaters itself: one stream, one forecaster, one distribution.
-      Cross-stream work happens one layer up, where each stream is reduced
-      to its forecaster's expectation and surprise and downstream models
-      consume those instead of raw values.
-    </p>
-    <p>
-      The first packaged version is
-      <a href="https://ice-skaters.microprediction.org">ice-skaters</a>,
-      which feeds streaming regressions in <a href="https://riverml.xyz">river</a>. It is highly preliminary:
-      the benchmarks there report the losing configurations next to the
-      winning ones, so read the boundaries first.
-    </p>
+    
+
+
+    <h3>How do I cite it, and what is the licence?</h3>
+    <p>MIT licence. Please cite <a href="https://papers.ssrn.com/abstract=7220478">Transforms all the way down</a>
+      (SSRN 7220478). The BibTeX entry is on the <a href="/papers.html#citation">papers page</a>.</p>
+
+    <h3>How do I contribute?</h3>
+    <p>Read <a href="https://github.com/microprediction/skaters/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
+      first. The package has strict invariants: parity with the JavaScript port to 1e-6, adversarial gates,
+      and a frozen <code>laplace</code> contract, and that page says how to pass them. Bug reports, failure
+      cases and results go in <a href="https://github.com/microprediction/skaters/issues">GitHub issues</a>. To
+      put a forecaster on the comparison pages, see <a href="/challengers.html#propose">propose a model</a>.</p>
   </main>
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="https://github.com/microprediction/precise">precise</a>,
-    <a href="https://github.com/microprediction/allocation">allocation</a>,
-    <a href="https://github.com/microprediction/humpday">humpday</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

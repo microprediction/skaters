@@ -4,17 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters — benchmarks</title>
-  <meta name="description" content="The benchmark studies: twelve distributional baselines, foundation models, and the challengers." />
+  <meta name="description" content="The benchmark studies: twelve distributional baselines, foundation models, and the compared models." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="skaters" />
   <meta property="og:title" content="skaters — benchmarks" />
-  <meta property="og:description" content="The benchmark studies: twelve distributional baselines, foundation models, and the challengers." />
+  <meta property="og:description" content="The benchmark studies: twelve distributional baselines, foundation models, and the compared models." />
   <meta property="og:url" content="https://skaters.microprediction.org/benchmarks.html" />
   <meta property="og:image" content="https://skaters.microprediction.org/assets/frontier.png" />
   <meta property="og:image:alt" content="Accuracy vs speed: laplace has the best held-out likelihood at a fraction of the baselines' runtime." />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
 </head>
 <body>
   <header class="site-header">
@@ -22,10 +22,22 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/skills.html">Skills</a>
             <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/challengers.html">Standalone</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
@@ -33,42 +45,39 @@
             <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <a href="/guide.html">Methodology</a>
         <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
             <a href="/benchmarks.html">Accuracy</a>
             <a href="/metrics.html">Metrics</a>
             <a href="/performance.html">Performance</a>
             <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+              </span>
+            </span>
           </span>
-        </span>
         </span>
         <a href="/demos/">Demos</a>
         <a href="/papers.html">Papers</a>
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
-          <span class="drop">
-            <a href="https://foundationalprediction.com/">All</a>
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
-          </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
@@ -81,8 +90,7 @@
 
     <figure class="hero-figure">
       <div id="frontier3d" style="width:100%;min-height:520px;"></div>
-      <figcaption><span id="frontier3d-caption">Accuracy, speed and footprint, one point per model;
-        every coordinate is measured. Drag to rotate.</span>
+      <figcaption>Accuracy, speed and footprint, one point per model. Drag to rotate.
         Runtime detail is on the <a href="/performance.html">performance page</a>, size and dependencies
         on the <a href="/footprint.html">footprint page</a>.</figcaption>
     </figure>
@@ -156,11 +164,11 @@
       for the half-nat margin over TimesFM3. Read the win rates above with that in mind.
     </p>
 
-    <h2>Challengers</h2>
+    <h2>Comparison models</h2>
     <p>
       Every method that has stepped up, one row each with its tape, lives on
       its own page now, built for the ones still coming:
-      <a href="/challengers.html">Challengers</a>.
+      <a href="/challengers.html">Comparison models</a>.
     </p>
 
     <h2>Reproducibility</h2>
@@ -175,9 +183,8 @@
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>
