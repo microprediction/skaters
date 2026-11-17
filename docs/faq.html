@@ -106,7 +106,8 @@
     <h3>How do I start?</h3>
     <p><code>pip install skaters</code>, then feed observations one at a time to <code>laplace()</code>. The
       <a href="/examples.html">examples page</a> has runnable recipes: a first forecast, several steps ahead,
-      positive series, calibration checks, anomalies, mean reversion, your own transform and the browser.</p>
+      positive series, calibration checks, anomalies, mean reversion, your own transform and the browser. To have
+      an AI assistant do it, give it the <a href="/skills.html#basic-use">basic-use skill</a>.</p>
 
     <h3>Which languages?</h3>
     <p>Python, with a Rust core for speed, and parity-locked ports in JavaScript, R and Julia that agree with
@@ -144,7 +145,7 @@
     <h3>Can I use it with a model I already have?</h3>
     <p>Yes. Forecast your model's residuals with <code>laplace</code> (the <a href="/sandwich.html">sandwich
       pattern</a>), run it alongside your model as a calibration check (the <a href="/sidecar.html">sidecar
-      pattern</a>), or combine the two predictive densities with weights that follow realised log score. The
+      pattern</a>; there is a <a href="/skills.html#laplace-sandwich">laplace-sandwich skill</a>), or combine the two predictive densities with weights that follow realised log score. The
       combination keeps most of the other model's gains and costs little where the other model is worse.</p>
 
     <h3>Can I use it to whiten a series?</h3>
@@ -175,7 +176,8 @@
     <h3>Can I use it for anomaly detection?</h3>
     <p>The state carries a calibrated surprise for every arriving point, <code>state["z"]</code>, which is the
       raw material. Turning it into an alarm with a measured false-alarm rate is the job of
-      <a href="https://timemachines.microprediction.org/">timemachines</a>, which is built on skaters.</p>
+      <a href="https://timemachines.microprediction.org/">timemachines</a>, which is built on skaters. The
+      <a href="/skills.html#anomaly-detection">anomaly-detection skill</a> points an assistant there.</p>
 
     <h2 id="scope">Scope</h2>
 
@@ -231,6 +233,63 @@
       or 10<sup>-12</sup> instead of natural units, asking for horizons far beyond twelve steps, and reading a
       univariate forecast as if it knew about covariates. The <a href="/scope.html">scope page</a> covers each
       and the <a href="/refunds.html">misuse page</a> has worked examples.</p>
+
+    <h2 id="jobs">Common jobs</h2>
+    <p>Each answer below has a matching <a href="/skills.html">skill</a>: copyable instructions you can give an
+      AI assistant so that it does the job the way it is done here.</p>
+
+    <h3>How should I interpret public criticism of <code>laplace</code>?</h3>
+    <p>First find out what was run: the version, the horizon, the units of the series, whether a positive
+      series was forecast without a transform, and which implementation was timed. Most hostile posts so far
+      were right about what they ran and wrong about what it means: a horizon of 96 steps, values near
+      10<sup>20</sup>, or a demand series allowed to go negative. If none of that applies, the criticism may be
+      right, and the measurement pages will say so. The <a href="/refunds.html">misuse page</a> works through
+      the standard cases, and the <a href="/skills.html#unwind-hater-post">unwind-hater-post skill</a> is the
+      checklist.</p>
+
+    <h3>I have a new forecaster. How should I benchmark it against <code>laplace</code>?</h3>
+    <p>Turn both into the same predictive object, score them with the same code on the same held-out points,
+      report log-likelihood and CRPS, and test per series with Diebold&ndash;Mariano. See the
+      <a href="/skills.html#benchmark-against-laplace">benchmark-against-laplace skill</a>, and
+      <a href="/challengers.html#propose">propose a model</a> if you want it on the site.</p>
+
+    <h3>How do I compare <code>laplace</code> with TimesFM on my own series?</h3>
+    <p>Forecast the one-step change, give TimesFM a fixed context, score the identical steps, and state how
+      you turned its quantiles into a density, because that choice moves the log score by about half a nat.
+      The <a href="/skills.html#timesfm-study">timesfm-study skill</a> sets out the protocol, and the
+      <a href="/timesfm.html">TimesFM page</a> has the reference results.</p>
+
+    <h3>How do I check the benchmark in a paper I am reviewing?</h3>
+    <p>Classify what each method emits (density, samples, quantiles or a CDF), since that decides what can be
+      scored on log-likelihood. Then run every method through one scoring harness against strong opponents.
+      The <a href="/skills.html#benchmark-review">benchmark-review skill</a> lists the steps and the traps that
+      make published comparisons misleading.</p>
+
+    <h3>How do I tell whether my model has left something on the table?</h3>
+    <p>Feed its residuals to <code>laplace</code>. If <code>laplace</code> beats a frozen Gaussian on them by
+      more than about 0.02 nats, structure remains. If it beats a GARCH-t, the leftover is in the mean. See the
+      <a href="/skills.html#residual-review">residual-review skill</a>.</p>
+
+    <h3>Can an assistant review my forecasting code?</h3>
+    <p>Yes. The <a href="/skills.html#skaters-code-review">skaters-code-review skill</a> flags refit-every-window
+      ARIMA, Prophet intervals, conformal-only outputs and similar patterns, names the shortcoming and gives
+      the one-line swap where <code>skaters</code> applies. For rolling z-scores specifically, use the
+      <a href="/skills.html#standardization-review">standardization-review skill</a>.</p>
+
+    <h3>Can I use it for a mean-reversion strategy?</h3>
+    <p>Yes. Reduce the pair or basket to one spread, feed its levels to <code>laplace(k)</code> with
+      <code>k</code> at your holding horizon, and read entry probabilities from the predictive CDF instead of a
+      z-score threshold. See the <a href="/skills.html#mean-reversion">mean-reversion skill</a>.</p>
+
+    <h3>How do I make a good-looking time-series page?</h3>
+    <p>Use three colours with fixed roles, draw intervals as one filled band that widens with horizon, and
+      anchor the forecast fan at the last observation. The
+      <a href="/skills.html#pretty-timeseries-page">pretty-timeseries-page skill</a> has the rules, and the
+      <a href="/demos/playground.html">playground</a> is the worked example.</p>
+
+    <h3>How do I bring in other series or features?</h3>
+    <p>See "Does it handle covariates or exogenous regressors?" above and the
+      <a href="/skills.html#exogenous-variables">exogenous-variables skill</a>.</p>
 
     <h2 id="evaluation">Evaluation</h2>
 
@@ -397,6 +456,13 @@
     <h3>How do I cite it, and what is the licence?</h3>
     <p>MIT licence. Please cite <a href="https://papers.ssrn.com/abstract=7220478">Transforms all the way down</a>
       (SSRN 7220478). The BibTeX entry is on the <a href="/papers.html#citation">papers page</a>.</p>
+
+    <h3>How do I contribute?</h3>
+    <p>Read <a href="https://github.com/microprediction/skaters/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
+      first. The package has strict invariants: parity with the JavaScript port to 1e-6, adversarial gates,
+      and a frozen <code>laplace</code> contract, and that page says how to pass them. Bug reports, failure
+      cases and results go in <a href="https://github.com/microprediction/skaters/issues">GitHub issues</a>. To
+      put a forecaster on the comparison pages, see <a href="/challengers.html#propose">propose a model</a>.</p>
   </main>
 
   <footer>
