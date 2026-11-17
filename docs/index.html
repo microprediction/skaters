@@ -318,6 +318,14 @@ g = granger(frequency="monthly")   # or "weekly", "hourly"</code></pre>
       or the anomaly-detection consequences at
       <a href="https://timemachines.microprediction.org/">timemachines</a> (DSPOT 5.2&times;,
       RRCF 1.8&times; in the same coordinates).</p>
+    <iframe id="rosenblatt-embed" src="./demos/rosenblatt.html?embed" title="The Rosenblatt bijection, live"
+      loading="lazy" style="width:100%;height:760px;border:0;display:block;margin:8px 0 28px;"></iframe>
+    <script>
+      addEventListener("message", (e) => {
+        const h = e.data && e.data.rosenblattHeight;
+        if (h) document.getElementById("rosenblatt-embed").style.height = (h + 8) + "px";
+      });
+    </script>
 
     <h2 id="heritage">Heritage</h2>
     <p>

@@ -23,7 +23,22 @@
     .diagram line, .diagram path { stroke: var(--muted); stroke-width: 1.4; fill: none; }
     .diagram .accent { stroke: var(--accent); }
     .diagram .hot { stroke: var(--warn); }
+    /* ?embed: just the diagram and the live panels, for the landing page iframe */
+    html.embed .site-header, html.embed footer, html.embed main > :not(.diagram):not(.demo-wrap) { display: none; }
+    html.embed main { margin: 0; padding: 0; max-width: none; }
+    html.embed .diagram { margin-top: 0; }
+    html.embed .demo-wrap { margin: 0; }
   </style>
+  <script>
+    if (new URLSearchParams(location.search).has("embed")) {
+      document.documentElement.classList.add("embed");
+      addEventListener("DOMContentLoaded", () => {
+        const wrap = document.querySelector(".demo-wrap");
+        const post = () => parent.postMessage({ rosenblattHeight: Math.ceil(wrap.getBoundingClientRect().bottom) }, "*");
+        new ResizeObserver(post).observe(wrap); post(); setInterval(post, 500);
+      });
+    }
+  </script>
 </head>
 <body>
   <header class="site-header">
