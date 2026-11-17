@@ -106,6 +106,39 @@
       residual review and others. For a general conversation, paste the
       <a href="/#conversation">primer</a> into any chat assistant.</p>
 
+    <h3>What is a skater?</h3>
+    <p>Any function <code>f(y, state) -&gt; (distributions, state)</code>. It takes one observation and the
+      state it returned last time, and gives back a predictive distribution for each horizon and a new state.
+      <code>laplace</code>, <code>granger</code> and every building block in the package share that signature,
+      so they compose.</p>
+
+    <h3>How fast is it?</h3>
+    <p>One update costs about 12 microseconds in the Rust core and about 0.3 milliseconds in pure Python, one
+      step ahead on one CPU thread. A pretrained model reruns its forward pass for each new observation, which
+      costs milliseconds to hundreds of milliseconds per forecast. The measurements are on the
+      <a href="/performance.html">performance page</a>.</p>
+
+    <h3>How do I get intervals and quantiles?</h3>
+    <p>From the distribution: <code>d.quantile(0.05)</code> and <code>d.quantile(0.95)</code> give a 90% interval,
+      <code>d.cdf(x)</code> a probability, <code>d.logpdf(y)</code> a log score. On the canonical panel the
+      central 90% interval contains between 89% and 92% of outcomes, depending on the stratum.</p>
+
+    <h3>What about missing values?</h3>
+    <p>Pass <code>NaN</code> for a missing observation. The forecaster carries its state forward without
+      updating on it, and the calibration diagnostics skip it. Irregularly spaced observations are not modelled
+      as such: the forecaster sees a sequence, and the step is whatever interval separates the values you feed it.</p>
+
+    <h3>Can I use it with a model I already have?</h3>
+    <p>Yes. Forecast your model's residuals with <code>laplace</code> (the <a href="/sandwich.html">sandwich
+      pattern</a>), run it alongside your model as a calibration check (the <a href="/sidecar.html">sidecar
+      pattern</a>), or combine the two predictive densities with weights that follow realised log score. The
+      combination keeps most of the other model's gains and costs little where the other model is worse.</p>
+
+    <h3>Can I use it for anomaly detection?</h3>
+    <p>The state carries a calibrated surprise for every arriving point, <code>state["z"]</code>, which is the
+      raw material. Turning it into an alarm with a measured false-alarm rate is the job of
+      <a href="https://timemachines.microprediction.org/">timemachines</a>, which is built on skaters.</p>
+
     <h2 id="scope">Scope</h2>
 
     <h3>Why economic series?</h3>
@@ -113,16 +146,6 @@
       economic series, mostly from FRED. On price and return series a fitted GARCH-t is the recommendation, and
       <code>laplace</code> ties it. On strongly seasonal hourly waveforms some foundation models and Conformal
       Seasonal Pools are ahead.</p>
-
-    <h3>Why one step ahead, and short horizons?</h3>
-    <p>Your criteria may differ, and you can use the components as you wish. The author's uses are largely
-      financial, and there is often a strong reason to focus on <code>k=1</code>. A very brief version of the
-      argument runs as follows. An investor who can trade every interval in a liquid market chooses today's
-      position from the distribution of the next return; under log utility nothing further ahead enters the
-      decision. So one step
-      ahead is the score that matters for that use, and the comparisons here report it on its own rather than
-      pooled over long horizons. The argument, with its limits, is in <a href="https://foundationalprediction.com/horizon-note.pdf">On the importance of evaluating foundational time-series models one step ahead in an investment context</a>. Multi-step forecasts are supported
-      to twelve steps, which is the stated upper limit.</p>
 
     <h3>Is it a replacement for foundational time-series models?</h3>
     <p>No. Several pretrained models beat <code>laplace</code> on monthly, weekly and hourly series by a few
@@ -143,6 +166,11 @@
     <p>Not in skaters itself: one stream, one forecaster, one distribution. Cross-stream work happens one layer
       up, where each stream is reduced to its forecaster's expectation and surprise. The first packaged version
       is <a href="https://ice-skaters.microprediction.org">ice-skaters</a>, which is preliminary.</p>
+
+    <h3>Does it work on counts and series with many zeros?</h3>
+    <p>It runs, and the lattice projection gives exact repeated values their own mass, which helps on series
+      that sit on a grid. It has no model for a point mass at zero. For a positive series with zeros, set the
+      floor of <code>flesaker</code> a little below zero, or treat the zeros separately.</p>
 
     <h3>What counts as misuse?</h3>
     <p>Forecasting a positive series on the real line without a transform, feeding values near 10<sup>20</sup>
@@ -166,7 +194,23 @@
       different deployment properties. The <a href="https://foundationalprediction.com">leaderboards</a>
       let you choose the reference model and slice the series by type.</p>
 
-    <h2 id="technical">Technical questions</h2>
+
+    <h3>Where can I see how it compares with a particular model?</h3>
+    <p>Each model has its own page on <a href="https://foundationalprediction.com">foundationalprediction.com</a>,
+      with how it was run, its references and its paired results on every panel. The interactive leaderboard
+      there lets you make any model the reference.</p>
+
+    <h3>Why the emphasis on one step ahead and short horizons?</h3>
+    <p>Your criteria may differ, and you can use the components as you wish. The author's uses are largely
+      financial, and there is often a strong reason to focus on <code>k=1</code>. A very brief version of the
+      argument runs as follows. An investor who can trade every interval in a liquid market chooses today's
+      position from the distribution of the next return; under log utility nothing further ahead enters the
+      decision. So one step
+      ahead is the score that matters for that use, and the comparisons here report it on its own rather than
+      pooled over long horizons. The argument, with its limits, is in <a href="https://foundationalprediction.com/horizon-note.pdf">On the importance of evaluating foundational time-series models one step ahead in an investment context</a>. Multi-step forecasts are supported
+      to twelve steps, which is the stated upper limit.</p>
+
+
 <h3>Doesn't the transform leave the hard part, the time-dependence,
       exactly as hard? (the copula objection)</h3>
     <p>
@@ -295,6 +339,11 @@
 
     
 
+
+    <h3>How do I cite it, and what is the licence?</h3>
+    <p>MIT licence. Cite the methods paper, <a href="https://papers.ssrn.com/abstract=7220478">Transforms all the
+      way down</a>, or the benchmark paper on the <a href="/papers.html">papers page</a>; a software paper is under
+      review at the Journal of Open Source Software.</p>
   </main>
 
   <footer>
