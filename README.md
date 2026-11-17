@@ -72,9 +72,9 @@ The transforms (differencing, EMA level, drift, Holt, AR, fractional differencin
 
 ## Papers
 
+- Transforms all the way down, the methods paper: [PDF](papers/skaters-jss.pdf), [SSRN](https://papers.ssrn.com/abstract=7220478)
 - A stronger univariate benchmark for foundational time-series model evaluation: [PDF](papers/stronger-benchmark/stronger-benchmark.pdf), [SSRN](https://papers.ssrn.com/abstract=7583618), [reproduce](papers/stronger-benchmark/REPRODUCE.md)
 - On the importance of evaluating foundational time-series models one step ahead in an investment context: [PDF](https://foundationalprediction.com/horizon-note.pdf)
-- Transforms all the way down, the methods paper: [PDF](papers/skaters-jss.pdf), [SSRN](https://papers.ssrn.com/abstract=7220478)
 
 ## Cite
 
