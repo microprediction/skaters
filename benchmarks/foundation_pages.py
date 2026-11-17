@@ -736,7 +736,7 @@ def build_page(slug, model, vs, cov, radar):
       with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
       less. Here a series counts as a win when the model's mean per-series log score exceeds
       Laplace's by any amount, and as a tie only at exact equality: the same rule the
-      challengers radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
+      comparison radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
       loss above, which fold statistically unresolved differences into draws. The two
       agree on direction and differ in how they treat small gaps. The solid polygon is the headline arm and
       the dashed grey one, where present, is the tight nine-decile reconstruction. The
@@ -841,7 +841,7 @@ def sidecar_fairbase_section(vs, cov):
     <p>The arms above were built on the tight reconstruction, and part of what they repaired was the
       reconstruction. The same four sandwiches have now been run on the fair bases: Timestral-209M and
       t0-gamma on their native 21 levels, and TimesFM 3.0, TimesFM 2.5, TiRex and Chronos through the
-      generous reconstruction, plus the PyMC-forecast challenger (a Student-t regression on lagged
+      generous reconstruction, plus the PyMC-forecast model (a Student-t regression on lagged
       changes, fit by ADVI) on the monthly stratum. Each arm is paired with its standalone run on
       identical series and windows; <code>~lap</code> and <code>@lap</code> need a longer warm-up
       window, so their series counts are smaller. Median per-series &Delta; log-likelihood against
