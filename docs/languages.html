@@ -108,9 +108,12 @@
     </p>
     <p>
       An opt-in accelerated backend, <code>skaters-fast</code> (a PyO3 skin
-      over the Rust core, <code>pip install skaters[fast]</code>), runs the
-      identical <code>laplace</code> model at about 20x the per-step rate with
-      the same bits on every platform.
+      over the Rust core), runs the identical <code>laplace</code> model at about
+      20x the per-step rate with the same bits on every platform. It is not on PyPI
+      yet, so <code>pip install skaters[fast]</code> does not install it; build it
+      from the repository with
+      <code>maturin develop --release -m rust/python/Cargo.toml</code>
+      (<a href="/ports/rust.html">Rust port</a>).
     </p>
 
     <h2>Python, differentiable (<code>skaters.torch</code>)</h2>
@@ -163,10 +166,10 @@
       a numerics change cannot merge without both mirrors. Its mathematics
       is portable (identical bits on x86, ARM, and WebAssembly, enforced by
       a cross-platform digest job in CI), and it steps laplace at about 14
-      microseconds per observation. For Python users it ships as the
-      opt-in <code>skaters[fast]</code> backend: same interface, roughly
-      20x the step rate, bit-exact checkpoint resume, with pure Python
-      remaining the reference and the default.
+      microseconds per observation. For Python users it is the opt-in
+      <code>skaters-fast</code> backend, built from source until it is published
+      on PyPI: same interface, roughly 20x the step rate, bit-exact checkpoint
+      resume, with pure Python remaining the reference and the default.
     </p>
 
     <h2>Julia</h2>
