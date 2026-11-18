@@ -153,11 +153,16 @@ state["z"], state["pit"]     # laplace's own, unchanged by the map</pre>
     </table>
 
     <h2 id="status">Status</h2>
-    <p>Experimental and Python only, from 0.17.0. It is an example composition and may change or move
-      to <code>examples/</code>; <code>laplace</code>, <code>log_transform</code> and
-      <code>conjugate</code> underneath are the stable surface. Named after Bjorn Flesaker, whose
-      positive-interest framework with Hughston builds the guarantee that rates stay positive into
-      the model.</p>
+    <p class="callout"><code>flesaker</code> is not part of the official API and is not cross-port: it is
+      experimental and Python only, from 0.17.0. There are many possible domains (positive, bounded
+      above, inside an interval, on a circle), and skaters provides a clean way to add your own:
+      write the transform and conjugate <code>laplace</code> by it, as
+      <code>conjugate(laplace(), log_transform(lower=0.0))</code> does here. We lean towards making
+      <code>flesaker</code> permanent if people keep making YouTube videos criticising the fact that an
+      inanimate library doesn't know ahead of time that a series will always be positive (but maybe
+      you do).</p>
+    <p>Named after Bjorn Flesaker, whose positive-interest framework with Hughston builds the
+      guarantee that rates stay positive into the model.</p>
   </main>
 
   <footer>
