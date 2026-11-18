@@ -36,6 +36,13 @@
             <a href="/ports/julia.html">Julia</a>
           </span>
         </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
+          </span>
+        </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
             <a href="/examples.html">Examples</a>
@@ -246,7 +253,7 @@ f = search(
     max_pool=30,
 )</code></pre>
 
-    <h2>The default: <code>laplace</code></h2>
+    <h2 id="laplace">The default: <code>laplace</code></h2>
     <p><code>laplace(k)</code> assembles these pieces into one fixed pipeline. Sixty transform
       chains of depth 0 to 2 (EMA, differencing, drift, Holt, theta, AR, seasonal difference and
       anchor at periods 7, 12 and 24, fractional differencing, GARCH, power and Yeo&ndash;Johnson
