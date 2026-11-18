@@ -1,5 +1,0 @@
-study,model,n_series,win,draw,loss,med_dLL,q25_dLL,q75_dLL,med_crps_ratio
-m4-hourly:econ,MHSeasonal-ema,414,30,226,158,-0.0933,-0.5499,0.0478,1.0123
-m4-hourly:econ,MHSeasonal-laplace,414,70,210,134,0.0022,-0.4706,0.1373,0.9833
-m4-hourly:econ,MHSeasonal-naive,414,7,113,294,-0.2888,-0.4908,-0.1644,1.1893
-m4-hourly:econ,laplace,414,20,250,144,-0.0572,-0.4052,0.0309,1.0229
