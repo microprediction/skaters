@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: USE MAIN PIPELINE.
+#   WEEK_MODELS="<arm>,<arm>" benchmarks/launch_week_study.sh
+# A new arm = REGISTRY entry in benchmarks/arm_adapters.py + a MODELS line in
+# benchmarks/week_study.py + its venv. Kept only as a record of how earlier
+# results were produced. It refuses to run.
+echo "DEPRECATED: use benchmarks/launch_week_study.sh (see header)" >&2; exit 1
 # Generous-reconstruction arms (#269, #261): the same zero-shot quantile
 # forecasts as the tight arms, reconstructed by nozzles.nozzle_wide. One
 # worker per model in its own venv, each walking the four corpora, bounded to

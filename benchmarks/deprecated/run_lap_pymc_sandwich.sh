@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: USE MAIN PIPELINE.
+#   WEEK_MODELS="<arm>,<arm>" benchmarks/launch_week_study.sh
+# A new arm = REGISTRY entry in benchmarks/arm_adapters.py + a MODELS line in
+# benchmarks/week_study.py + its venv. Kept only as a record of how earlier
+# results were produced. It refuses to run.
+echo "DEPRECATED: use benchmarks/launch_week_study.sh (see header)" >&2; exit 1
 # laplace@PyMC (laplace base, PyMC regression on laplace's normal scores,
 # inverted through laplace), the frontier figure's "PyMC-laplace sandwich"
 # through run_arm.py, on the three FRED economic strata, first 500 series of
