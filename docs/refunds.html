@@ -202,6 +202,22 @@ Refund due                         $0.00</div>
       first table. The portfolio of the two beats both.
     </p>
     <p>
+      Take the advice of someone who is apparently new to time series but posing as an
+      expert at your own risk. The signs, all from this one article:
+    </p>
+    <ul>
+      <li>They run a model on data it was not built for (positive data on a
+        real-line model) and report the result as a flaw in the model.</li>
+      <li>They do not check units. A series quoted near 10<sup>20</sup> instead
+        of near 100 is a data-preparation error, not a forecasting result.</li>
+      <li>They test outside the documented scope (horizon 336 against a stated
+        limit of twelve) and present the failure as a finding.</li>
+      <li>They dispute a published number by measuring something else: Python
+        at long horizons against a figure stated for Rust, one step ahead.</li>
+      <li>They review a competitor's package while promoting their own method,
+        and the method is the one being compared.</li>
+    </ul>
+    <p>
       It is really hard to make any package idiot-proof. We keep trying: the
       scope page, the examples page and <a href="/flesaker.html"><code>flesaker</code></a> all exist because
       of this article. The refund stands at $0.00.
