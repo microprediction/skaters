@@ -92,8 +92,8 @@
       ARM and WebAssembly, enforced by a cross-platform digest job in CI, and it steps
       <code>laplace</code> at about 14 microseconds per observation.</p>
     <p>For Python users the same core is the opt-in <code>skaters-fast</code> backend, a PyO3 skin with
-      the same interface at roughly 20 times the step rate. It is not on PyPI yet: build it from the
-      repository with <code>maturin develop --release -m rust/python/Cargo.toml</code>.</p>
+      the same interface at roughly 20 times the step rate. Install it with
+      <code>pip install "skaters[fast]"</code> and <code>import skaters_fast</code>.</p>
 
     <h2>Links</h2>
     <table>
