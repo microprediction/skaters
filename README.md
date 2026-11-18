@@ -38,7 +38,7 @@ for y in observations:
 - Score a forecast only against values that arrive after it was issued.
 - `state["pit"]` and `state["z"]` give a calibrated surprise for every point.
 
-The release on PyPI is 0.16.0. `granger`, `flesaker` and `log_transform` arrive in the next release; until then, `pip install git+https://github.com/microprediction/skaters`.
+For the Rust-backed version at about 20x the step rate, `pip install "skaters[fast]"` and `import skaters_fast`.
 
 ## Laplace and foundational models
 

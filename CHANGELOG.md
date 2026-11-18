@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.17.0
+
+- `skaters-fast` (the PyO3 backend) is published to PyPI for the first time, so
+  `pip install "skaters[fast]"` installs it. Before this release the extra named a
+  package that did not exist, and an unpinned install fell back to skaters 0.13.0
+  (#372).
 
 - Experimental forecaster `flesaker` (after Bjorn Flesaker): `laplace` on
   log(y - lower), mapped back by the exact pushforward, for series with a

@@ -107,10 +107,8 @@
     <p>
       An opt-in accelerated backend, <code>skaters-fast</code> (a PyO3 skin
       over the Rust core), runs the identical <code>laplace</code> model at about
-      20x the per-step rate with the same bits on every platform. It is not on PyPI
-      yet, so <code>pip install skaters[fast]</code> does not install it; build it
-      from the repository with
-      <code>maturin develop --release -m rust/python/Cargo.toml</code>
+      20x the per-step rate with the same bits on every platform. Install it with
+      <code>pip install "skaters[fast]"</code> and <code>import skaters_fast</code>
       (<a href="/ports/rust.html">Rust port</a>).
     </p>
 
@@ -165,8 +163,7 @@
       is portable (identical bits on x86, ARM, and WebAssembly, enforced by
       a cross-platform digest job in CI), and it steps laplace at about 14
       microseconds per observation. For Python users it is the opt-in
-      <code>skaters-fast</code> backend, built from source until it is published
-      on PyPI: same interface, roughly 20x the step rate, bit-exact checkpoint
+      <code>skaters-fast</code> backend (<code>pip install "skaters[fast]"</code>): same interface, roughly 20x the step rate, bit-exact checkpoint
       resume, with pure Python remaining the reference and the default.
     </p>
 
