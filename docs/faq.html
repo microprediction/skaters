@@ -103,6 +103,12 @@
     <p>The <a href="/demos/rosenblatt.html">Rosenblatt demo</a> shows it. Upstairs the raw series trends, cycles
       and bursts; downstairs its image is N(0,1) noise, and each side can be recovered from the other.</p>
 
+    <h3>What if my series must stay positive?</h3>
+    <p>Use <a href="/flesaker.html"><code>flesaker</code></a>. It forecasts log(<em>y</em>) with
+      <code>laplace</code> and maps the forecast back through exp, so no probability lands below zero.
+      The <a href="/demos/flesaker.html">flesaker demo</a> runs it next to plain <code>laplace</code>
+      on a rate that falls toward zero.</p>
+
     <h3>Does the Python package really run in a browser?</h3>
     <p>Yes, unmodified, in <a href="/demos/pyodide.html">Pyodide</a>. The other demos use the JavaScript port,
       which agrees with the Python to 1e-6. All the demos are listed on the <a href="/demos/">demos page</a>.</p>

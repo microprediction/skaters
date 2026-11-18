@@ -164,6 +164,15 @@ Refund due                         $0.00</div>
       heading <em>Prior knowledge</em>, for readers who need it spelled out.
     </p>
     <p>
+      <a href="/flesaker.html"><code>flesaker</code></a> now applies the log
+      transform for you. It is experimental, Python only and not part of the
+      official API. There are many possible domains, and skaters provides a clean
+      way to add your own custom conjugations. We lean towards making
+      <code>flesaker</code> permanent if people keep making YouTube videos
+      criticising the fact that an inanimate library doesn't know ahead of time
+      that a series will always be positive (but maybe you do).
+    </p>
+    <p>
       <strong>Intervals at 10<sup>35</sup>.</strong> The hash rate was fed in as
       hashes per second, a number near 10<sup>20</sup>. Nobody who works with
       that series writes it that way; it is quoted in exahashes, where it is a
@@ -193,8 +202,24 @@ Refund due                         $0.00</div>
       first table. The portfolio of the two beats both.
     </p>
     <p>
+      Take the advice of someone who is apparently new to time series but posing as an
+      expert at your own risk. The signs, all from this one article:
+    </p>
+    <ul>
+      <li>They run a model on data it was not built for (positive data on a
+        real-line model) and report the result as a flaw in the model.</li>
+      <li>They do not check units. A series quoted near 10<sup>20</sup> instead
+        of near 100 is a data-preparation error, not a forecasting result.</li>
+      <li>They test outside the documented scope (horizon 336 against a stated
+        limit of twelve) and present the failure as a finding.</li>
+      <li>They dispute a published number by measuring something else: Python
+        at long horizons against a figure stated for Rust, one step ahead.</li>
+      <li>They review a competitor's package while promoting their own method,
+        and the method is the one being compared.</li>
+    </ul>
+    <p>
       It is really hard to make any package idiot-proof. We keep trying: the
-      scope page, the examples page and <code>flesaker</code> all exist because
+      scope page, the examples page and <a href="/flesaker.html"><code>flesaker</code></a> all exist because
       of this article. The refund stands at $0.00.
     </p>
 
