@@ -26,6 +26,19 @@ single chosen lead by keeping its initial history and replaying the same
 reference updates. Returning marginals for several leads leaves their joint
 dependence unspecified.
 
+`AffineFrame` exposes `forward`, `inverse`, and `inverse_dist` explicitly.
+For two maps A followed by B, the inverse predictive passes through B's
+inverse and then A's inverse. Tests compose this layer and the existing
+exact logarithmic transform in both orders, checking CDFs, quantiles, and
+the density Jacobian. A general continuous predictive is retained through
+affine transport when its distribution class has no native affine method.
+
+If an existing outer transform mixes future times, its inverse needs their
+joint law. For example, inverting differencing sums all future increments.
+Their marginal distributions leave the distribution of that sum unspecified.
+Full path conjugation for such a node needs a joint forecast and replayable
+transform state. The fixed-lead scalar wrapper supplies marginal forecasts.
+
 `seasonal_reference(period, k, alpha=1)` uses the last observed value of each
 seasonal phase. `alpha=0.2` averages observations of each phase with an EWMA.
 Its forecast at every lead uses the current estimate for the target's phase,
@@ -127,6 +140,55 @@ PYTHONPATH=src python -m pytest -q research/multi_horizon
 Tests cover seasonal removal through seven 24-step cycles, noisy and changing
 seasonal estimates, frozen frames, nested affine frames, checkpoint replay,
 Gaussian random walks and signed AR(1), copula averaging, and sampled-path
-marginals. They establish these mechanics on controlled processes. Forecast
-skill on real series still needs evaluation through the canonical benchmark
-pipeline in `benchmarks/`. These prototypes currently have a Python implementation.
+marginals. These prototypes currently have a Python implementation.
+
+A canonical M4 Hourly run compares the affine conjugations with CSP on all
+414 series. Each method predicts the same final 64 rolling targets in each
+series, using at most the last 1,000 changes. The corpus supplies hourly
+changes, using log differences for positive series. At lead 48 the target is
+one hourly change 48 ticks ahead. A forecast of the load level or a complete
+48-hour load path would require its own evaluation.
+
+The configurations were fixed before the run. `MHSeasonal-naive` uses the
+last observed value of each phase and a scale-mixture residual leaf.
+`MHSeasonal-ema` smooths each phase with alpha 0.2 and uses that same leaf.
+`MHSeasonal-laplace` uses alpha 0.2 and Laplace as the inner skater.
+All three use period 24. The 48-step run evaluates the two residual-leaf
+variants. The forecast-revision model has its synthetic correctness tests.
+
+The table reports median per-series log-score difference and CRPS ratio
+against a fresh CSP run. Positive log-score differences and CRPS ratios
+below one favour the conjugated model. Win/draw/loss are the canonical
+per-series Diebold-Mariano verdicts on log score.
+
+| Lead | Model | Series | Median log-score gain | Median CRPS ratio | Win/draw/loss |
+| --- | --- | --- | --- | --- | --- |
+| 1 | MHSeasonal-naive | 414 | -0.2888 | 1.1893 | 7 / 113 / 294 |
+| 1 | MHSeasonal-ema | 414 | -0.0933 | 1.0123 | 30 / 226 / 158 |
+| 1 | MHSeasonal-laplace | 414 | +0.0022 | 0.9833 | 70 / 210 / 134 |
+| 1 | laplace | 414 | -0.0572 | 1.0229 | 20 / 250 / 144 |
+| 48 | MHSeasonal-naive | 414 | -0.2563 | 1.1984 | 8 / 148 / 258 |
+| 48 | MHSeasonal-ema | 414 | -0.0193 | 0.9581 | 67 / 206 / 141 |
+
+The smoothed seasonal conjugation with an inner Laplace is competitive on
+median one-step scores, with more significant log-score losses than wins.
+At lead 48 the smoothed seasonal leaf improves median CRPS while losing
+median log score. The simple seasonal-naive leaf trails CSP at both leads.
+
+The opponent is csp-forecaster 0.2.0 at commit
+`529d91865b2c8c6c0c08192c1a2ea35cfb94877c`, with 256 samples, a trailing
+750-change fitting window, and the canonical deterministic per-origin seeds.
+The run used Python 3.12.14 and NumPy 2.5.5. The raw Hourly-train.csv input
+has SHA-256 `ea59b7783573c49077a835ab6465c7d66f1474783360f310988a9a737fbca62f`.
+The small score and coverage tables are the `results_*_vs_CSP.csv` files here.
+Per-step rows remain regenerable under the ignored `benchmarks/preds/` tree.
+
+The adapters are registered in `benchmarks/arm_adapters.py` and the runner
+delegates scoring and summary calculations to the existing canonical pipeline.
+Install CSP at the pinned commit in `benchmarks/csp_requirements.lock`, then
+reproduce from the repository root with
+
+```sh
+PYTHONPATH=.:src:benchmarks python research/multi_horizon/run_m4.py
+PYTHONPATH=.:src:benchmarks python research/multi_horizon/run_m4.py --horizon 48 --methods MHSeasonal-naive,MHSeasonal-ema,CSP
+```

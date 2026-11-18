@@ -1,0 +1,4 @@
+study,method,n_steps,cov_central90,cal_median
+m4-hourly:econ,CSP,26496,0.9283,0.5065
+m4-hourly:econ,MHSeasonal-ema,26496,0.9195,0.4992
+m4-hourly:econ,MHSeasonal-naive,26496,0.9146,0.5205

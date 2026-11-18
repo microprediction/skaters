@@ -2,9 +2,9 @@ import math
 
 import pytest
 
-from skaters import Dist
+from skaters import Dist, conjugate, log_transform
 
-from .reference import horizon_conjugate
+from .reference import AffineFrame, horizon_conjugate
 
 
 def _reference(k):
@@ -78,3 +78,70 @@ def test_missing_tick_is_rejected_before_retiming_a_model():
     assert state["reference"]["levels"] == reference_before
     assert state["reference"]["n"] == 4
     assert state["inner"] == inner_before
+
+
+def test_inverse_maps_density_and_quantiles_through_the_same_frozen_frame():
+    inner_dist = Dist([(0.4, -1.0, 0.5), (0.6, 2.0, 1.1)])
+
+    def reference(y, state):
+        return [Dist.gaussian(10.0, 3.0)] * 3, {}
+
+    def inner(k):
+        return lambda y, state: ([inner_dist] * k, {})
+
+    model = horizon_conjugate(reference, inner, k=3)
+    state = None
+    for y in (7.0, 8.0, 9.0, 11.0):
+        fan, state = model(y, state)
+    for d in fan:
+        for z in (-1.0, 0.5, 2.0):
+            y = 10.0 + 3.0 * z
+            assert d.cdf(y) == pytest.approx(inner_dist.cdf(z))
+            assert d.pdf(y) == pytest.approx(inner_dist.pdf(z) / 3.0)
+        assert d.quantile(0.9) == pytest.approx(10.0 + 3.0 * inner_dist.quantile(0.9))
+
+
+@pytest.mark.parametrize("log_first", [False, True])
+def test_conjugation_with_the_existing_log_transform_in_both_orders(log_first):
+    def reference(y, state):
+        return [Dist.gaussian(5.0, 2.0)] * 3, {}
+
+    def unit(k):
+        return lambda y, state: ([Dist.gaussian()] * k, {})
+
+    if log_first:
+        model = conjugate(horizon_conjugate(reference, unit, k=3), log_transform(), k=3)
+    else:
+        def inner(k):
+            return conjugate(unit(k), log_transform(), k=k)
+        model = horizon_conjugate(reference, inner, k=3)
+    state = None
+    for y in (10.0, 11.0, 12.0, 13.0):
+        fan, state = model(y, state)
+    for d in fan:
+        for p in (0.1, 0.5, 0.9):
+            assert d.cdf(d.quantile(p)) == pytest.approx(p)
+        y = d.quantile(0.6)
+        delta = 1e-5 * y
+        assert d.pdf(y) == pytest.approx((d.cdf(y + delta) - d.cdf(y - delta)) / (2 * delta), rel=1e-6)
+
+
+@pytest.mark.parametrize("scale", [3.0, -3.0])
+def test_affine_frame_has_scalar_and_continuous_predictive_inverses(scale):
+    from skaters.pushforward import PushforwardDist
+
+    frame = AffineFrame(10.0, scale)
+    assert frame.inverse(frame.forward(1.5)) == pytest.approx(1.5)
+    # A table representation stores the exact identity as a general predictive.
+    inner = PushforwardDist(Dist.gaussian(), ys=[0.0, 1.0], zs=[0.0, 1.0])
+    outer = frame.inverse_dist(inner)
+    oracle = Dist.gaussian(10.0, abs(scale))
+    assert outer.mean == pytest.approx(oracle.mean)
+    assert outer.std == pytest.approx(oracle.std, rel=1e-3)
+    for p in (0.1, 0.5, 0.9):
+        assert outer.cdf(outer.quantile(p)) == pytest.approx(p)
+        assert outer.quantile(p) == pytest.approx(oracle.quantile(p))
+    assert outer.logpdf(12.0) == pytest.approx(oracle.logpdf(12.0))
+    reflected = outer.affine(-2.0, 7.0)
+    assert reflected.mean == pytest.approx(-13.0)
+    assert reflected.cdf(reflected.quantile(0.3)) == pytest.approx(0.3)

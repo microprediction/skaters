@@ -2908,6 +2908,12 @@ def _pool_extras(kk):
 POOL_EXTRAS = ("+lou", "+gar", "+ou", "+ma", "+huber", "+ptrend", "+setar", "markov")
 
 
+def horizon_seasonal_dists(ch, h=1, alpha=1.0, use_laplace=False):
+    from research.multi_horizon.benchmark import seasonal_dists
+
+    return seasonal_dists(ch, h, alpha=alpha, use_laplace=use_laplace)
+
+
 def make_registry(h=1):
     return {
         # forecastability decomposition (#250): unconditional, signed CPS, normalized CPS
@@ -2921,6 +2927,9 @@ def make_registry(h=1):
         "lap_conf":    lambda ch: _lap_rank_dists(ch, h, True),
         "lap_conf(250)": lambda ch: _lap_rank_dists(ch, h, True, 250),
         "laplace":     lambda ch: laplace_dists(ch, h),
+        "MHSeasonal-naive": lambda ch: horizon_seasonal_dists(ch, h),
+        "MHSeasonal-ema": lambda ch: horizon_seasonal_dists(ch, h, alpha=0.2),
+        "MHSeasonal-laplace": lambda ch: horizon_seasonal_dists(ch, h, alpha=0.2, use_laplace=True),
         "laplace(s52)": lambda ch: laplace_extra_periods_dists(ch, h, (52,)),   # + annual cycle on weekly data
         "laplace(s168)": lambda ch: laplace_extra_periods_dists(ch, h, (168,)),  # + weekly cycle on hourly data
         "laplace(ss24)":  lambda ch: laplace_seasonal_scale_dists(ch, h, 24),               # seasonal_scale outside laplace
