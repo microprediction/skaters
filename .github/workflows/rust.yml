@@ -1,5 +1,10 @@
 name: rust
-on: [push, pull_request]
+# push runs only on main: on a PR branch, push + pull_request ran every job twice,
+# and the duplicate macOS core job sat queued, was cancelled, and blocked merges.
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
   vectors:
     runs-on: ubuntu-latest
