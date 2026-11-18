@@ -1,8 +1,9 @@
 name: wheels
 
 # Build the skaters-fast (PyO3) abi3 wheel matrix. abi3-py39 means one wheel
-# per platform serves all of CPython >= 3.9. Artifacts only: no PyPI publish
-# (see the commented stanza at the end).
+# per platform serves all of CPython >= 3.9. On a v* tag the publish job uploads
+# them to PyPI as skaters-fast (trusted publisher: microprediction/skaters,
+# wheels.yml, no environment).
 
 on:
   push:
@@ -102,21 +103,17 @@ jobs:
           name: sdist
           path: dist
 
-  # ---------------------------------------------------------------------------
-  # PyPI publish is intentionally NOT enabled. To turn it on, add a trusted
-  # publisher on PyPI for this project and uncomment:
-  #
-  # publish:
-  #   name: publish to PyPI
-  #   needs: [linux, musllinux, macos, windows, sdist]
-  #   runs-on: ubuntu-latest
-  #   if: startsWith(github.ref, 'refs/tags/v')
-  #   permissions:
-  #     id-token: write        # trusted publishing (OIDC), no API token
-  #   steps:
-  #     - uses: actions/download-artifact@v4
-  #       with: { path: dist, merge-multiple: true }
-  #     - uses: PyO3/maturin-action@v1
-  #       with:
-  #         command: upload
-  #         args: --non-interactive --skip-existing dist/*
+  publish:
+    name: publish to PyPI
+    needs: [linux, musllinux, macos, windows, sdist]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      id-token: write        # trusted publishing (OIDC), no API token
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: upload
+          args: --non-interactive --skip-existing dist/*
