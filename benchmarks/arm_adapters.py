@@ -1732,6 +1732,68 @@ def tafsut_dists(ch, h=1, size="base", recon=None):
         print(f"  tafsut failed: {e}", flush=True); return None
 
 
+# Granite PatchTST-FM r2 (IBM, 2026-08), ~385M, OpenMDW-1.0. GIFT-Eval CRPS 0.467,
+# the best open-weight entry. Pretraining: GiftEvalPretrain subset, KernelSynth,
+# TSMixup outside GIFT's eval set, CauKer; FRED/M4 not stated.
+PATCHTSTFM_REVISIONS = {"r2": "b125275f9204d37cbb81fe47b9cf5e08a521e829"}
+_patchtstfm, _patchtstfm_memo = {}, {}
+
+
+def patchtstfm_quantiles_from_contexts(contexts, h=1, version="r2"):
+    """PatchTST-FM's native quantiles at horizon ``h``: ``(levels, array (n, q))``.
+
+    Called on the model directly (``past_values`` (batch, T, 1)); the output
+    ``quantile_outputs`` is (batch, q, horizon, 1) at ``config.quantile_levels``.
+    One forward pass per (series, horizon, window) is memoised.
+    """
+    import torch
+    from tsfm_public import PatchTSTFMForPrediction
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    key = (version, h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _patchtstfm_memo:
+        return _patchtstfm_memo[key]
+    if version not in _patchtstfm:
+        m = PatchTSTFMForPrediction.from_pretrained(
+            f"ibm-granite/granite-timeseries-patchtst-fm-{version}", revision=PATCHTSTFM_REVISIONS[version])
+        _patchtstfm[version] = m.to(DEVICE).eval()
+    model = _patchtstfm[version]
+    levels = [float(q) for q in model.config.quantile_levels]
+    with torch.no_grad():
+        out = model(past_values=torch.from_numpy(values).unsqueeze(-1).to(DEVICE),
+                    prediction_length=h, return_dict=True)
+    q = np.asarray(out.quantile_outputs.detach().cpu().numpy(), dtype=float)
+    if q.shape != (len(values), len(levels), h, 1):
+        raise ValueError(f"unexpected PatchTST-FM quantile shape {q.shape}")
+    q = q[:, :, h - 1, 0]
+    if not np.all(np.isfinite(q)):
+        raise ValueError("PatchTST-FM produced nonfinite quantiles")
+    if np.any(np.diff(q, axis=1) < 0.0):
+        raise ValueError("PatchTST-FM produced crossing quantiles")
+    _patchtstfm_memo.clear(); _patchtstfm_memo[key] = (levels, q)
+    return levels, q
+
+
+def patchtstfm_dists(ch, h=1, version="r2", arm="q9", recon=None):
+    """``arm="q99"``: every native level through the fixed-bandwidth
+    reconstruction (the fair arm, as Kumo q99); ``"q9"``: the nine deciles with
+    ``quantile_dist`` (tight) or ``recon`` (generous)."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = patchtstfm_quantiles_from_contexts(fs._ctx_batch(source), h=h, version=version)
+        if arm == "q99":
+            spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+            return [fixed_bandwidth_quantile_dist(levels, row, spacing_multiplier=spacing) for row in quantiles]
+        idx = [min(range(len(levels)), key=lambda i: abs(levels[i] - p)) for p in LEVELS9]
+        if any(abs(levels[i] - p) > 1e-6 for i, p in zip(idx, LEVELS9)):
+            raise ValueError("PatchTST-FM levels do not include the nine deciles")
+        rec = recon or fs.quantile_dist
+        return [rec(LEVELS9, row[idx]) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  patchtstfm failed: {e}", flush=True); return None
+
+
 _Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
 
 
@@ -3045,6 +3107,10 @@ def make_registry(h=1):
         # Tafsut (Huawei GTS + EURECOM, 2026-08), univariate base, tight and wide
         "Tafsut-base":       lambda ch: tafsut_dists(ch, h, "base"),
         "Tafsut-base(wide)": lambda ch: tafsut_dists(ch, h, "base", recon=_wide_recon()),
+        # Granite PatchTST-FM r2 (IBM): native 99 levels (fair arm) and nine deciles tight/wide
+        "PatchTST-FM-r2(q99)": lambda ch: patchtstfm_dists(ch, h, "r2", "q99"),
+        "PatchTST-FM-r2":      lambda ch: patchtstfm_dists(ch, h, "r2", "q9"),
+        "PatchTST-FM-r2(wide)": lambda ch: patchtstfm_dists(ch, h, "r2", "q9", recon=_wide_recon()),
         # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
         "CSP":         lambda ch: csp_dists(ch, h),
         "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),
