@@ -1989,6 +1989,99 @@ def tsicl_dists(ch, h=1, arm="q9", recon=None):
         print(f"  tsicl failed: {e}", flush=True); return None
 
 
+# Kairos (2025-09, Apache-2.0): 10M/23M/50M, nine deciles, trained on PreSTS.
+# Vendor defaults kept (average_with_flipped_input=True) except the post-processing
+# that would truncate a signed change series (preserve_positivity=False).
+KAIROS_REVISIONS = {"50m": "b788434dd95f9893be002e6858bfb2afb0e3f360"}
+_kairos, _kairos_memo = {}, {}
+
+
+def kairos_quantiles_from_contexts(contexts, h=1, size="50m"):
+    """Kairos's nine deciles at horizon ``h``: ``(levels, array (n, 9))``."""
+    import torch
+    from tsfm.model.kairos import AutoModel
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    key = (size, h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _kairos_memo:
+        return _kairos_memo[key]
+    if size not in _kairos:
+        _kairos[size] = AutoModel.from_pretrained(
+            f"mldi-lab/Kairos_{size}", trust_remote_code=True, revision=KAIROS_REVISIONS[size]).to(DEVICE).eval()
+    model = _kairos[size]
+    levels = [float(q) for q in model.config.quantiles]
+    with torch.no_grad():
+        out = model(past_target=torch.from_numpy(values).to(DEVICE), prediction_length=h, generation=True,
+                    preserve_positivity=False, average_with_flipped_input=True)
+    q = np.asarray(out["prediction_outputs"].detach().cpu().numpy(), dtype=float)
+    if q.shape != (len(values), len(levels), h):
+        raise ValueError(f"unexpected Kairos forecast shape {q.shape}")
+    q = q[:, :, h - 1]
+    if not np.all(np.isfinite(q)):
+        raise ValueError("Kairos produced nonfinite quantiles")
+    q = np.sort(q, axis=1)          # monotone rearrangement if the flip average crosses
+    _kairos_memo.clear(); _kairos_memo[key] = (levels, q)
+    return levels, q
+
+
+def kairos_dists(ch, h=1, size="50m", recon=None):
+    """Kairos's nine deciles: ``quantile_dist`` (tight) or ``recon`` (generous)."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = kairos_quantiles_from_contexts(fs._ctx_batch(source), h=h, size=size)
+        rec = recon or fs.quantile_dist
+        return [rec(levels, row) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  kairos failed: {e}", flush=True); return None
+
+
+# Timer-S1 (Tsinghua / ByteDance, 2026-04, Apache-2.0): MoE, 8.3B total / 0.75B
+# active, nine deciles. Loaded in bfloat16 on CPU (float32 needs ~33 GB per worker);
+# outputs are cast to float64 before reconstruction. GIFT-Eval CRPS 0.485.
+TIMERS1_REVISION = "8911430cc7f32add5c8913afe12e3b05742f5bb2"
+_timers1, _timers1_memo = {}, {}
+
+
+def timers1_quantiles_from_contexts(contexts, h=1):
+    """Timer-S1's nine deciles at horizon ``h``: ``(levels, array (n, 9))``."""
+    import torch
+    from transformers import AutoModelForCausalLM
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    key = (h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _timers1_memo:
+        return _timers1_memo[key]
+    if "m" not in _timers1:
+        _timers1["m"] = AutoModelForCausalLM.from_pretrained(
+            "bytedance-research/Timer-S1", trust_remote_code=True, revision=TIMERS1_REVISION,
+            torch_dtype=torch.bfloat16).to(DEVICE).eval()
+    model = _timers1["m"]
+    with torch.no_grad():
+        out = model.generate(torch.from_numpy(values).to(model.dtype).to(DEVICE), max_new_tokens=h, revin=True)
+    q = np.asarray(out.float().cpu().numpy(), dtype=float)
+    if q.shape != (len(values), len(LEVELS9), h):
+        raise ValueError(f"unexpected Timer-S1 forecast shape {q.shape}")
+    q = q[:, :, h - 1]
+    if not np.all(np.isfinite(q)):
+        raise ValueError("Timer-S1 produced nonfinite quantiles")
+    q = np.sort(q, axis=1)          # monotone rearrangement (none seen in the smoke test)
+    _timers1_memo.clear(); _timers1_memo[key] = (list(LEVELS9), q)
+    return list(LEVELS9), q
+
+
+def timers1_dists(ch, h=1, recon=None):
+    """Timer-S1's nine deciles: ``quantile_dist`` (tight) or ``recon`` (generous)."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = timers1_quantiles_from_contexts(fs._ctx_batch(source), h=h)
+        rec = recon or fs.quantile_dist
+        return [rec(levels, row) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  timers1 failed: {e}", flush=True); return None
+
+
 def tabby_dists(ch, h=1, variant="Pretrain", arm="q9", recon=None):
     """Tabby: ``arm="q99"`` native levels (fair), ``"q9"`` nine deciles."""
     try:
@@ -3330,6 +3423,12 @@ def make_registry(h=1):
         "TS-ICL(q99)":  lambda ch: tsicl_dists(ch, h, "q99"),
         "TS-ICL":       lambda ch: tsicl_dists(ch, h, "q9"),
         "TS-ICL(wide)": lambda ch: tsicl_dists(ch, h, "q9", recon=_wide_recon()),
+        # Kairos 50M, nine deciles, tight and wide
+        "Kairos-50m":       lambda ch: kairos_dists(ch, h, "50m"),
+        "Kairos-50m(wide)": lambda ch: kairos_dists(ch, h, "50m", recon=_wide_recon()),
+        # Timer-S1 (MoE, bf16 on CPU), nine deciles, tight and wide
+        "Timer-S1":       lambda ch: timers1_dists(ch, h),
+        "Timer-S1(wide)": lambda ch: timers1_dists(ch, h, recon=_wide_recon()),
         # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
         "CSP":         lambda ch: csp_dists(ch, h),
         "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),
