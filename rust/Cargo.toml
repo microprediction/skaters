@@ -6,7 +6,7 @@ default-members = ["."]
 
 [package]
 name = "skaters"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 # MSRV. Conservative: the deps (pyo3 0.22 -> 1.63, serde_json 1 -> 1.56, edition
 # 2021 -> 1.56) all admit older toolchains, but only stable 1.96 is available in

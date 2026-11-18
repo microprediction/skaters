@@ -1,6 +1,6 @@
 [project]
 name = "skaters"
-version = "0.16.0"
+version = "0.17.0"
 description = "Fast univariate time series models that run in Pyodide"
 readme = "README.md"
 license = "MIT"
@@ -24,7 +24,7 @@ Issues = "https://github.com/microprediction/skaters/issues"
 dev = ["pytest"]
 # Opt-in accelerated backend (PyO3 skin over the Rust core). Same numerics as
 # the pure Python reference; see rust/python/.
-fast = ["skaters-fast"]
+fast = ["skaters-fast>=0.17.0"]
 # The differentiable port (skaters.torch): same transforms as nn.Modules,
 # held to the reference by the parity suite. See src/skaters/torch/.
 torch = ["torch>=2.1"]

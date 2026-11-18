@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "skaters-fast"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Opt-in accelerated backend for skaters: a PyO3 skin over the parity-gated Rust core."
 readme = "README.md"
 license = { text = "MIT" }
