@@ -1775,23 +1775,75 @@ def patchtstfm_quantiles_from_contexts(contexts, h=1, version="r2"):
     return levels, q
 
 
+def _native_or_decile_dists(levels, quantiles, arm="q9", recon=None):
+    """Dists for a model with a dense native quantile grid. ``arm="native"``:
+    every level through the fixed-bandwidth reconstruction (the fair arm, as
+    Kumo q99 / Timestral q21); ``"q9"``: the nine deciles with ``quantile_dist``
+    (tight) or ``recon`` (generous), comparable with the nine-decile models."""
+    if arm == "native":
+        spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
+        return [fixed_bandwidth_quantile_dist(levels, row, spacing_multiplier=spacing) for row in quantiles]
+    idx = [min(range(len(levels)), key=lambda i: abs(levels[i] - p)) for p in LEVELS9]
+    if any(abs(levels[i] - p) > 1e-6 for i, p in zip(idx, LEVELS9)):
+        raise ValueError("native levels do not include the nine deciles")
+    rec = recon or fs.quantile_dist
+    return [rec(LEVELS9, np.asarray(row)[idx]) for row in quantiles]
+
+
 def patchtstfm_dists(ch, h=1, version="r2", arm="q9", recon=None):
-    """``arm="q99"``: every native level through the fixed-bandwidth
-    reconstruction (the fair arm, as Kumo q99); ``"q9"``: the nine deciles with
-    ``quantile_dist`` (tight) or ``recon`` (generous)."""
+    """PatchTST-FM: ``arm="q99"`` native levels, ``"q9"`` nine deciles."""
     try:
         source = ch if h == 1 else ch[:len(ch) - (h - 1)]
         levels, quantiles = patchtstfm_quantiles_from_contexts(fs._ctx_batch(source), h=h, version=version)
-        if arm == "q99":
-            spacing = float(os.environ.get("FM_Q_SPACING", "0.5"))
-            return [fixed_bandwidth_quantile_dist(levels, row, spacing_multiplier=spacing) for row in quantiles]
-        idx = [min(range(len(levels)), key=lambda i: abs(levels[i] - p)) for p in LEVELS9]
-        if any(abs(levels[i] - p) > 1e-6 for i, p in zip(idx, LEVELS9)):
-            raise ValueError("PatchTST-FM levels do not include the nine deciles")
-        rec = recon or fs.quantile_dist
-        return [rec(LEVELS9, row[idx]) for row in quantiles]
+        return _native_or_decile_dists(levels, quantiles, "native" if arm == "q99" else "q9", recon)
     except Exception as e:                                 # noqa: BLE001
         print(f"  patchtstfm failed: {e}", flush=True); return None
+
+
+# Tabby-Pretrain (Huawei Paris Noah's Ark, 2026-09), ~146M, CC BY-NC 4.0: encoder-only
+# patch transformer, 99 monotone quantiles. The prompt-tuned "Tabby" is a separate
+# model (foundationalprediction #4) and is not this arm.
+TABBY_REVISIONS = {"Pretrain": "b26c277bf96087712ea3ae65740947ffe276ae61"}
+_tabby, _tabby_memo = {}, {}
+
+
+def tabby_quantiles_from_contexts(contexts, h=1, variant="Pretrain"):
+    """Tabby's 99 native quantiles at horizon ``h``: ``(levels, array (n, 99))``,
+    via the official ``PatchTSTFMPredictor`` (fp32 on CPU). Memoised per window."""
+    from huggingface_hub import snapshot_download
+    from tabby.predictor import PatchTSTFMPredictor
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    key = (variant, h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _tabby_memo:
+        return _tabby_memo[key]
+    if (variant, h) not in _tabby:
+        path = snapshot_download(f"paris-noah/Tabby-{variant}", revision=TABBY_REVISIONS[variant])
+        _tabby[(variant, h)] = PatchTSTFMPredictor(
+            checkpoint=path, prediction_length=h, device=DEVICE, precision="fp32",
+            quantile_levels=LEVELS99)
+    pred = _tabby[(variant, h)]
+    q = np.asarray(pred._forecast_flat([row for row in values]), dtype=float)
+    if q.shape != (len(values), h, len(LEVELS99)):
+        raise ValueError(f"unexpected Tabby forecast shape {q.shape}")
+    q = q[:, h - 1, :]
+    if not np.all(np.isfinite(q)):
+        raise ValueError("Tabby produced nonfinite quantiles")
+    if np.any(np.diff(q, axis=1) < 0.0):
+        raise ValueError("Tabby produced crossing quantiles")
+    _tabby_memo.clear(); _tabby_memo[key] = (list(LEVELS99), q)
+    return list(LEVELS99), q
+
+
+def tabby_dists(ch, h=1, variant="Pretrain", arm="q9", recon=None):
+    """Tabby: ``arm="q99"`` native levels (fair), ``"q9"`` nine deciles."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = tabby_quantiles_from_contexts(fs._ctx_batch(source), h=h, variant=variant)
+        return _native_or_decile_dists(levels, quantiles, "native" if arm == "q99" else "q9", recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  tabby failed: {e}", flush=True); return None
 
 
 _Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
@@ -3111,6 +3163,10 @@ def make_registry(h=1):
         "PatchTST-FM-r2(q99)": lambda ch: patchtstfm_dists(ch, h, "r2", "q99"),
         "PatchTST-FM-r2":      lambda ch: patchtstfm_dists(ch, h, "r2", "q9"),
         "PatchTST-FM-r2(wide)": lambda ch: patchtstfm_dists(ch, h, "r2", "q9", recon=_wide_recon()),
+        # Tabby-Pretrain (Huawei Paris): native 99 levels (fair) and nine deciles tight/wide
+        "Tabby-Pretrain(q99)":  lambda ch: tabby_dists(ch, h, "Pretrain", "q99"),
+        "Tabby-Pretrain":       lambda ch: tabby_dists(ch, h, "Pretrain", "q9"),
+        "Tabby-Pretrain(wide)": lambda ch: tabby_dists(ch, h, "Pretrain", "q9", recon=_wide_recon()),
         # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
         "CSP":         lambda ch: csp_dists(ch, h),
         "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),
