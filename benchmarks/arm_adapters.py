@@ -1836,6 +1836,58 @@ def tabby_quantiles_from_contexts(contexts, h=1, variant="Pretrain"):
     return list(LEVELS99), q
 
 
+# Yug (Birla AI Labs, 2026-10), 271.8M, code Apache-2.0, weights CC BY-NC 4.0.
+# Nine quantiles estimated from sampled trajectories: num_samples=100 (the package
+# default) and seed=0, recorded here because both change the band. ``freq`` selects
+# a learned embedding, so it is set from the corpus.
+YUG_REVISION = "ec5375888b672e334e8a258ce03d7e57fcfbb610"
+YUG_SAMPLES, YUG_SEED = 100, 0
+_yug, _yug_memo = {}, {}
+
+
+def _corpus_freq():
+    c = os.environ.get("ARM_CORPUS", "")
+    return {"monthly": "ME", "weekly": "W", "m4-hourly": "h"}.get(c, "D")
+
+
+def yug_quantiles_from_contexts(contexts, h=1):
+    """Yug's nine quantiles at horizon ``h``: ``(levels, array (n, 9))``."""
+    from yug import YugPipeline
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    freq = _corpus_freq()
+    key = (h, freq, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _yug_memo:
+        return _yug_memo[key]
+    if "pipe" not in _yug:
+        _yug["pipe"] = YugPipeline.from_pretrained("birlaailabs/yug", revision=YUG_REVISION, device_map=DEVICE)
+    fc = _yug["pipe"].predict(values, prediction_length=h, freq=freq,
+                              num_samples=YUG_SAMPLES, seed=YUG_SEED)
+    levels = [float(q) for q in fc.quantile_levels]
+    q = np.asarray(fc.values, dtype=float)                 # (n, q, h)
+    if q.shape != (len(values), len(levels), h):
+        raise ValueError(f"unexpected Yug forecast shape {q.shape}")
+    q = q[:, :, h - 1]
+    if not np.all(np.isfinite(q)):
+        raise ValueError("Yug produced nonfinite quantiles")
+    if np.any(np.diff(q, axis=1) < 0.0):
+        raise ValueError("Yug produced crossing quantiles")
+    _yug_memo.clear(); _yug_memo[key] = (levels, q)
+    return levels, q
+
+
+def yug_dists(ch, h=1, recon=None):
+    """Yug's nine quantiles: ``quantile_dist`` (tight) or ``recon`` (generous)."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = yug_quantiles_from_contexts(fs._ctx_batch(source), h=h)
+        rec = recon or fs.quantile_dist
+        return [rec(levels, row) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  yug failed: {e}", flush=True); return None
+
+
 def tabby_dists(ch, h=1, variant="Pretrain", arm="q9", recon=None):
     """Tabby: ``arm="q99"`` native levels (fair), ``"q9"`` nine deciles."""
     try:
@@ -3167,6 +3219,9 @@ def make_registry(h=1):
         "Tabby-Pretrain(q99)":  lambda ch: tabby_dists(ch, h, "Pretrain", "q99"),
         "Tabby-Pretrain":       lambda ch: tabby_dists(ch, h, "Pretrain", "q9"),
         "Tabby-Pretrain(wide)": lambda ch: tabby_dists(ch, h, "Pretrain", "q9", recon=_wide_recon()),
+        # Yug (Birla AI Labs): nine sampled quantiles, tight and wide
+        "Yug":       lambda ch: yug_dists(ch, h),
+        "Yug(wide)": lambda ch: yug_dists(ch, h, recon=_wide_recon()),
         # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
         "CSP":         lambda ch: csp_dists(ch, h),
         "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),

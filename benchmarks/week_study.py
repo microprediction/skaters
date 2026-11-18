@@ -105,6 +105,8 @@ MODELS = {
     "Tabby-Pretrain(q99)":  (".venv-tabby", "C", {}),
     "Tabby-Pretrain":       (".venv-tabby", "C", {}),
     "Tabby-Pretrain(wide)": (".venv-tabby", "C", {}),
+    "Yug":       (".venv-yug", "C", {}),
+    "Yug(wide)": (".venv-yug", "C", {}),
     "AutoARIMA":   (".venv-sota",      "C", {}),
     "AutoETS":     (".venv-sota",      "C", {}),
     "AutoTheta":   (".venv-sota",      "C", {}),
