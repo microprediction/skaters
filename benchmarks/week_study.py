@@ -97,6 +97,8 @@ MODELS = {
     "ci-proto":       (".venv-ciproto", "C", {}),
     "ci-proto(wide)": (".venv-ciproto", "C", {}),
     "CSP":         (".venv-csp",       "C", {}),
+    "Tafsut-base":       (".venv-tafsut", "C", {}),
+    "Tafsut-base(wide)": (".venv-tafsut", "C", {}),
     "AutoARIMA":   (".venv-sota",      "C", {}),
     "AutoETS":     (".venv-sota",      "C", {}),
     "AutoTheta":   (".venv-sota",      "C", {}),

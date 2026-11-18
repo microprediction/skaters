@@ -1681,6 +1681,57 @@ def timeh2o_dists(ch, h=1, size="v1", recon=None):
         print(f"  timeh2o failed: {e}", flush=True); return None
 
 
+# Tafsut (Huawei GTS + EURECOM, 2026-08): univariate base, 105M, MIT. GIFT-Eval
+# CRPS 0.481 (non-leaking). Trained on synthetic series then GiftEvalPretrain and
+# Chronos data, eval-benchmark overlap excluded per the card; FRED/M4 not stated.
+TAFSUT_REVISIONS = {"base": "a17c92cbab2cccecbf033406644af88586f6731c"}
+_tafsut, _tafsut_memo = {}, {}
+
+
+def tafsut_quantiles_from_contexts(contexts, h=1, size="base"):
+    """Tafsut's native quantiles at horizon ``h``: ``(levels, array (n, q))``.
+
+    ``tafsut.forecast`` returns ``(batch, horizon, q)`` at the checkpoint's own
+    ``cfg.quantiles``. One forward pass per (series, horizon, window) is memoised
+    so the tight and generous reconstructions share it.
+    """
+    from tafsut import TafsutModel, forecast
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    key = (size, h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _tafsut_memo:
+        return _tafsut_memo[key]
+    if size not in _tafsut:
+        _tafsut[size] = TafsutModel.from_pretrained(
+            f"Tafsut-FM/tafsut-univariate-{size}", device=DEVICE, revision=TAFSUT_REVISIONS[size])
+    model = _tafsut[size]
+    levels = [float(q) for q in model.cfg.quantiles]
+    out = forecast(model, values, horizon=h)
+    q = np.asarray(out.detach().cpu().numpy(), dtype=float)
+    if q.shape != (len(values), h, len(levels)):
+        raise ValueError(f"unexpected Tafsut forecast shape {q.shape}")
+    q = q[:, h - 1, :]
+    if not np.all(np.isfinite(q)):
+        raise ValueError("Tafsut produced nonfinite quantiles")
+    if np.any(np.diff(q, axis=1) < 0.0):
+        raise ValueError("Tafsut produced crossing quantiles")
+    _tafsut_memo.clear(); _tafsut_memo[key] = (levels, q)
+    return levels, q
+
+
+def tafsut_dists(ch, h=1, size="base", recon=None):
+    """Tafsut quantiles as benchmark ``Dist`` objects: tight ``quantile_dist`` by
+    default, or ``recon`` (``_wide_recon()``) for the generous reconstruction."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = tafsut_quantiles_from_contexts(fs._ctx_batch(source), h=h, size=size)
+        rec = recon or fs.quantile_dist
+        return [rec(levels, row) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  tafsut failed: {e}", flush=True); return None
+
+
 _Q9_IN_21 = [LEVELS21.index(p) for p in LEVELS9]
 
 
@@ -2991,6 +3042,9 @@ def make_registry(h=1):
         "TimeSSM-2.5M(wide)": lambda ch: timessm_dists(ch, h, recon=_wide_recon()),
         "Hirondel-7M":    lambda ch: hirondel_dists(ch, h),
         "Hirondel-7M(wide)": lambda ch: hirondel_dists(ch, h, recon=_wide_recon()),
+        # Tafsut (Huawei GTS + EURECOM, 2026-08), univariate base, tight and wide
+        "Tafsut-base":       lambda ch: tafsut_dists(ch, h, "base"),
+        "Tafsut-base(wide)": lambda ch: tafsut_dists(ch, h, "base", recon=_wide_recon()),
         # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
         "CSP":         lambda ch: csp_dists(ch, h),
         "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),
