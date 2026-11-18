@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: USE MAIN PIPELINE.
+#   WEEK_MODELS="<arm>,<arm>" benchmarks/launch_week_study.sh
+# A new arm = REGISTRY entry in benchmarks/arm_adapters.py + a MODELS line in
+# benchmarks/week_study.py + its venv. Kept only as a record of how earlier
+# results were produced. It refuses to run.
+echo "DEPRECATED: use benchmarks/launch_week_study.sh (see header)" >&2; exit 1
 # The four sandwich arms (+lap, ~lap, @lap, &lap) on every fair base: the
 # native-21-level Timestral-209M and t0-gamma arms and the generous (wide)
 # reconstructions of TimesFM3, TimesFM 2.5, TiRex and Chronos. One worker per

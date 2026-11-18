@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: USE MAIN PIPELINE.
+#   WEEK_MODELS="<arm>,<arm>" benchmarks/launch_week_study.sh
+# A new arm = REGISTRY entry in benchmarks/arm_adapters.py + a MODELS line in
+# benchmarks/week_study.py + its venv. Kept only as a record of how earlier
+# results were produced. It refuses to run.
+echo "DEPRECATED: use benchmarks/launch_week_study.sh (see header)" >&2; exit 1
 # PyMC-Forecast (solo) on the seasonal/waveform arms, thread-capped CPU pool.
 # 12 workers x 1 BLAS thread = 12 cores, under half of this 28-core box.
 # Each worker: disjoint residue shard, own output file, own pytensor compiledir.

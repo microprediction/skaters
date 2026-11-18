@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: USE MAIN PIPELINE.
+#   WEEK_MODELS="<arm>,<arm>" benchmarks/launch_week_study.sh
+# A new arm = REGISTRY entry in benchmarks/arm_adapters.py + a MODELS line in
+# benchmarks/week_study.py + its venv. Kept only as a record of how earlier
+# results were produced. It refuses to run.
+echo "DEPRECATED: use benchmarks/launch_week_study.sh (see header)" >&2; exit 1
 # Foundation-model arms from #329 through the canonical runner: one worker per
 # model group, each in its own venv (benchmarks/<slug>_requirements.lock), all
 # four corpora, monthly capped at 5,600 like the Timestral, t0-gamma and

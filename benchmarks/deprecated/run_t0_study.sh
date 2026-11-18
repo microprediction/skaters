@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: USE MAIN PIPELINE.
+#   WEEK_MODELS="<arm>,<arm>" benchmarks/launch_week_study.sh
+# A new arm = REGISTRY entry in benchmarks/arm_adapters.py + a MODELS line in
+# benchmarks/week_study.py + its venv. Kept only as a record of how earlier
+# results were produced. It refuses to run.
+echo "DEPRECATED: use benchmarks/launch_week_study.sh (see header)" >&2; exit 1
 # t0-gamma arms (#287) through the canonical runner: one worker per arm, each
 # walking the four corpora, writing benchmarks/preds/<arm>__<corpus>.csv.
 # Resumable (run_arm.py skips written (series, method) rows). Monthly is capped

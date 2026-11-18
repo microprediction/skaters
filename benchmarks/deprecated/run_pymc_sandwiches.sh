@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: USE MAIN PIPELINE.
+#   WEEK_MODELS="<arm>,<arm>" benchmarks/launch_week_study.sh
+# A new arm = REGISTRY entry in benchmarks/arm_adapters.py + a MODELS line in
+# benchmarks/week_study.py + its venv. Kept only as a record of how earlier
+# results were produced. It refuses to run.
+echo "DEPRECATED: use benchmarks/launch_week_study.sh (see header)" >&2; exit 1
 # The four sandwich arms (+lap, ~lap, @lap, &lap) on the PyMC-forecast base,
 # through run_arm.py, on the same series as the stored raw PyMC run
 # (monthly, ARM_MAX=500: 471 of the first 500 series are long enough for the
