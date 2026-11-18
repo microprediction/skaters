@@ -1888,6 +1888,107 @@ def yug_dists(ch, h=1, recon=None):
         print(f"  yug failed: {e}", flush=True); return None
 
 
+# CITRAS-FM (Hitachi, EUSIPCO 2026), 7M, weights CC BY-NC-SA 4.0; package from
+# github.com/hitachi-ais/citras-fm (not on PyPI). ``forecast`` takes one target
+# array and treats a 2-D input as several target variables, so each context
+# window is a separate call.
+CITRAS_REVISION = "8633940936e1a401aa9d97d92cc0784fd6129ca6"
+_citras, _citras_memo = {}, {}
+
+
+def citras_quantiles_from_contexts(contexts, h=1):
+    """CITRAS-FM's nine quantiles at horizon ``h``: ``(levels, array (n, 9))``."""
+    import torch
+    from citras_fm import CitrasFM
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    key = (h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _citras_memo:
+        return _citras_memo[key]
+    if "m" not in _citras:
+        _citras["m"] = CitrasFM.from_pretrained("hitachi-nlp/citras-fm", revision=CITRAS_REVISION).eval()
+    model = _citras["m"]
+    levels = [float(q) for q in model.quantiles]
+    rows = []
+    with torch.no_grad():
+        for row in values:
+            _, q = model.forecast(row, horizon=h)
+            q = np.asarray(q.detach().cpu().numpy() if hasattr(q, "detach") else q, dtype=float)
+            if q.shape != (h, len(levels)):
+                raise ValueError(f"unexpected CITRAS-FM quantile shape {q.shape}")
+            rows.append(q[h - 1])
+    q = np.stack(rows)
+    if not np.all(np.isfinite(q)):
+        raise ValueError("CITRAS-FM produced nonfinite quantiles")
+    if np.any(np.diff(q, axis=1) < 0.0):
+        raise ValueError("CITRAS-FM produced crossing quantiles")
+    _citras_memo.clear(); _citras_memo[key] = (levels, q)
+    return levels, q
+
+
+def citras_dists(ch, h=1, recon=None):
+    """CITRAS-FM's nine quantiles: ``quantile_dist`` (tight) or ``recon`` (generous)."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = citras_quantiles_from_contexts(fs._ctx_batch(source), h=h)
+        rec = recon or fs.quantile_dist
+        return [rec(levels, row) for row in quantiles]
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  citras failed: {e}", flush=True); return None
+
+
+# TS-ICL (EDF, 2026-06), checkpoint tsicl-v1.ckpt, licence "other" (non-commercial
+# per the card). 99 trained levels 0.01..0.99. Its public ``quantile_levels`` check
+# multiplies by 100 and tests exact float membership, so some levels (0.07) can
+# never be requested; the index lookup is replaced by "all trained levels".
+TSICL_REVISION = "19c94031439fb31f36ce395088ee50a6762d3774"
+_tsicl, _tsicl_memo = {}, {}
+
+
+def tsicl_quantiles_from_contexts(contexts, h=1):
+    """TS-ICL's 99 native quantiles at horizon ``h``: ``(levels, array (n, 99))``."""
+    import torch
+    from huggingface_hub import hf_hub_download
+    from tsicl import TSICL
+    values = np.ascontiguousarray(contexts, dtype=np.float32)
+    if values.ndim != 2 or not np.all(np.isfinite(values)):
+        raise ValueError("contexts must be a finite two-dimensional array")
+    key = (h, fs.TEST, hashlib.sha1(values.tobytes()).hexdigest())
+    if key in _tsicl_memo:
+        return _tsicl_memo[key]
+    if "m" not in _tsicl:
+        path = hf_hub_download("taharnbl/TS-ICL", "tsicl-v1.ckpt", revision=TSICL_REVISION)
+        m = TSICL(model_path=path)
+        t = m.forecaster.tf_icl
+        n = int(t.nb_quantiles)
+        m._get_quantile_indices = lambda _levels, n=n: list(range(n))
+        _tsicl["m"] = m
+        _tsicl["levels"] = [round(float(x), 6) for x in np.linspace(t.start_quantile, t.end_quantile, n)]
+    m, levels = _tsicl["m"], _tsicl["levels"]
+    _, q = m.forecast(torch.from_numpy(values), prediction_length=h, quantile_levels=[0.5] * len(levels),
+                      device=torch.device(DEVICE), squeeze_output=False)
+    q = np.asarray(q.detach().cpu().numpy() if hasattr(q, "detach") else q, dtype=float)
+    q = q.reshape(len(values), -1, len(levels))[:, h - 1, :]
+    if not np.all(np.isfinite(q)):
+        raise ValueError("TS-ICL produced nonfinite quantiles")
+    # TS-ICL's 99 levels can cross (1 of 3 smoke series); monotone rearrangement
+    # (sorting, Chernozhukov et al. 2010) keeps the series scored rather than dropped.
+    q = np.sort(q, axis=1)
+    _tsicl_memo.clear(); _tsicl_memo[key] = (levels, q)
+    return levels, q
+
+
+def tsicl_dists(ch, h=1, arm="q9", recon=None):
+    """TS-ICL: ``arm="q99"`` native levels (fair), ``"q9"`` nine deciles."""
+    try:
+        source = ch if h == 1 else ch[:len(ch) - (h - 1)]
+        levels, quantiles = tsicl_quantiles_from_contexts(fs._ctx_batch(source), h=h)
+        return _native_or_decile_dists(levels, quantiles, "native" if arm == "q99" else "q9", recon)
+    except Exception as e:                                 # noqa: BLE001
+        print(f"  tsicl failed: {e}", flush=True); return None
+
+
 def tabby_dists(ch, h=1, variant="Pretrain", arm="q9", recon=None):
     """Tabby: ``arm="q99"`` native levels (fair), ``"q9"`` nine deciles."""
     try:
@@ -3222,6 +3323,13 @@ def make_registry(h=1):
         # Yug (Birla AI Labs): nine sampled quantiles, tight and wide
         "Yug":       lambda ch: yug_dists(ch, h),
         "Yug(wide)": lambda ch: yug_dists(ch, h, recon=_wide_recon()),
+        # CITRAS-FM (Hitachi), nine quantiles, tight and wide
+        "CITRAS-FM":       lambda ch: citras_dists(ch, h),
+        "CITRAS-FM(wide)": lambda ch: citras_dists(ch, h, recon=_wide_recon()),
+        # TS-ICL (EDF): native 99 levels (fair) and nine deciles tight/wide
+        "TS-ICL(q99)":  lambda ch: tsicl_dists(ch, h, "q99"),
+        "TS-ICL":       lambda ch: tsicl_dists(ch, h, "q9"),
+        "TS-ICL(wide)": lambda ch: tsicl_dists(ch, h, "q9", recon=_wide_recon()),
         # Conformal Seasonal Pools (Manokhin 2026), the author's package, refit every step
         "CSP":         lambda ch: csp_dists(ch, h),
         "CSP(paper)":  lambda ch: csp_dists(ch, h, "paper"),
