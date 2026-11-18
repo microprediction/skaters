@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flesaker: forecasting under a bound</title>
+  <meta name="description" content="flesaker forecasts log(y) with laplace and maps the forecast back through exp, so a positive series gets a positive, skewed predictive. Live in your browser, next to plain laplace." />
+  <link rel="stylesheet" href="../academic.css?v=20261117" />
+  <style>
+    .demo-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 18px 10px; margin: 24px 0; }
+    .panel-label { color: var(--muted); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; margin: 6px 0 2px; }
+    .demo-controls { display: flex; gap: 10px; align-items: center; margin: 10px 0 2px; flex-wrap: wrap; }
+    .demo-controls button { background: var(--accent); color: #fff; border: 0; border-radius: 7px; padding: 7px 14px; font-size: 15px; cursor: pointer; }
+    .demo-controls button:hover { background: var(--accent-dark); }
+    .demo-controls button.on { background: var(--accent-dark); box-shadow: inset 0 0 0 2px #fff3; }
+    .demo-controls button.secondary { background: var(--code-bg); color: var(--text); border: 1px solid var(--border); }
+    .demo-note { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+    canvas { width: 100%; display: block; }
+    .diagram { display: block; margin: 18px auto 6px; max-width: 560px; width: 100%; }
+    .diagram text { font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: var(--text); }
+    .diagram .lbl { font-size: 13px; fill: var(--muted); }
+    .diagram .node { font-weight: 600; }
+    .diagram line, .diagram path { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+    .diagram .accent { stroke: var(--accent); }
+    .diagram .hot { stroke: var(--warn); }
+    .readout { font-variant-numeric: tabular-nums; font-size: 14px; margin: 4px 0 0; }
+    .readout b { font-weight: 600; }
+    /* ?embed: just the diagram and the live panels, for the landing page iframe */
+    html.embed .site-header, html.embed footer, html.embed main > :not(.diagram):not(.demo-wrap) { display: none; }
+    html.embed main { margin: 0; padding: 0; max-width: none; }
+    html.embed .diagram { margin-top: 0; }
+    html.embed .demo-wrap { margin: 0; }
+  </style>
+  <script>
+    if (new URLSearchParams(location.search).has("embed")) {
+      document.documentElement.classList.add("embed");
+      addEventListener("DOMContentLoaded", () => {
+        const wrap = document.querySelector(".demo-wrap");
+        const post = () => parent.postMessage({ flesakerHeight: Math.ceil(wrap.getBoundingClientRect().bottom) }, "*");
+        new ResizeObserver(post).observe(wrap); post(); setInterval(post, 500);
+      });
+    }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+            <a href="/challengers.html">Standalone</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+              </span>
+            </span>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Flesaker: forecasting under a bound</h1>
+    <p class="subtitle">One diagram, computed live: forecast log(<em>y</em>) with <code>laplace</code>,
+      map the forecast back through exp, and no probability ever lands below zero.</p>
+
+    <p class="lead">Plain <code>laplace</code> forecasts in the series' own units. On a positive
+      series that drifts toward zero, its band can cross zero. <code>flesaker</code> moves the
+      problem to <em>x<sub>t</sub></em> = log(<em>y<sub>t</sub></em> &minus; <em>b</em>), where the
+      bound is gone and noise proportional to the level becomes constant. <code>laplace</code>
+      forecasts there, and the exact change of variables carries the forecast back up: every
+      quantile is <em>b</em> + exp of a quantile downstairs, so it stays above the bound and keeps
+      the skew. The diagram commutes:</p>
+
+    <svg class="diagram" viewBox="0 0 560 190" role="img" aria-label="Commutative diagram: y maps to x = log(y - b); laplace forecasts x; the forecast maps back to y by b + exp.">
+      <text class="node" x="40" y="40">y<tspan baseline-shift="sub" font-size="11">t</tspan> &gt; b (bounded)</text>
+      <text class="node" x="370" y="40">x<tspan baseline-shift="sub" font-size="11">t</tspan> (unbounded)</text>
+      <text class="node" x="20" y="160">skewed band above b</text>
+      <text class="node" x="360" y="160">laplace's band in x</text>
+      <path class="accent" d="M 200 35 L 360 35" marker-end="url(#a)"/>
+      <text class="lbl" x="238" y="26">x = log(y &minus; b)</text>
+      <path d="M 430 55 L 430 140" marker-end="url(#a)"/>
+      <text class="lbl" x="440" y="102">forecast (laplace)</text>
+      <path class="hot" d="M 350 155 L 190 155" marker-end="url(#a)"/>
+      <text class="lbl" x="228" y="147">y&#770; = b + exp(x&#770;)</text>
+      <path d="M 90 55 L 90 140" marker-end="url(#a)"/>
+      <text class="lbl" x="100" y="102">forecast (bounded)</text>
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#5a5a5a" stroke="none"/></marker></defs>
+    </svg>
+
+    <div class="demo-wrap">
+      <p class="panel-label">upstairs: positive series y, with flesaker's band and 8-step fan (grey: plain laplace)</p>
+      <canvas id="ypanel" data-h="260"></canvas>
+      <p class="readout" id="readout">&nbsp;</p>
+      <p class="panel-label">downstairs: the same points as x = log(y), where laplace forecasts</p>
+      <canvas id="xpanel" data-h="150"></canvas>
+      <div class="demo-controls">
+        <button id="drift" class="on">Cycle toward zero</button>
+        <button id="burst" class="secondary">Volatility burst</button>
+        <button id="spike" class="secondary">Outlier</button>
+        <button id="compare" class="on">Plain laplace</button>
+      </div>
+      <p class="demo-note">Every hundred steps the level falls toward zero, then recovers; switch the cycle off to hold it at 0.2. Plain
+        <code>laplace</code> (grey) keeps a roughly symmetric band and puts probability below
+        zero, shaded red. <code>flesaker</code>'s band narrows as the level falls and never
+        crosses the line. Downstairs the same points look ordinary, because a falling level is
+        just a shift in log units. The orange fan upstairs is the <em>image</em> of the fan
+        downstairs under b&nbsp;+&nbsp;exp. This is the JavaScript port of <code>laplace</code>
+        running live, with the log map applied in the page.</p>
+    </div>
+
+    <h2>Use it</h2>
+<pre>from skaters import flesaker
+
+f = flesaker(k=8)            # lower=0 by default
+state = None
+for y in observations:
+    dists, state = f(y, state)
+
+dists[7].quantile(0.01)      # always &gt; 0
+flesaker(lower=-3.0)         # any floor
+flesaker(upper=1.0)          # a ceiling</pre>
+    <p>The state is <code>laplace</code>'s own, so <code>state["pit"]</code> and
+      <code>state["z"]</code> read as they do for <code>laplace</code>; PIT values are unchanged by
+      the log map. Every observation must lie strictly inside the bound, so a series with exact
+      zeros needs the floor set a little below zero. <code>flesaker</code> is experimental and
+      Python only: an example composition of <code>laplace</code>, <code>log_transform</code> and
+      <code>conjugate</code>, which are the stable surface.</p>
+
+    <h2>Measured on a synthetic rate</h2>
+    <p>600 points of a mean-reverting rate that dips from about 0.5 to about 0.05 and back.
+      The series is generated on the log scale, so the comparison favours <code>flesaker</code>
+      by construction; it shows the mechanics, not a benchmark. Source:
+      <a href="https://github.com/microprediction/skaters/blob/main/examples/positive_series.py"><code>examples/positive_series.py</code></a>.</p>
+    <table>
+      <thead><tr><th>skater</th><th>mean log score</th><th>80% coverage</th><th>max P(Y&lt;0)</th></tr></thead>
+      <tbody>
+        <tr><td><code>laplace()</code></td><td>1.289</td><td>79.4%</td><td>0.329</td></tr>
+        <tr><td><code>flesaker()</code></td><td><strong>1.665</strong></td><td>84.4%</td><td><strong>0.000</strong></td></tr>
+        <tr><td><code>laplace</code> on Yeo&ndash;Johnson</td><td>1.449</td><td>78.2%</td><td>0.223</td></tr>
+      </tbody>
+    </table>
+    <p>Named after Bjorn Flesaker, whose positive-interest framework with Hughston builds the
+      guarantee that rates stay positive into the model. More recipes:
+      <a href="/examples.html#positive">Examples</a>.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
+  </footer>
+
+  <script type="module">
+    import { laplace } from "../js/skaters/api.mjs";
+
+    const INK = "#1a1a1a", ACCENT = "#4a3aff", BAND = "rgba(74,58,255,0.16)",
+          HOT = "#ff8a3a", HOTBAND = "rgba(255,138,58,0.18)", BASE = "#e2e2e2",
+          GREY = "#9a9a9a", RED = "rgba(214,48,49,0.16)", REDLINE = "#d63031";
+    const K = 8, N = 220, LO_P = 0.025, HI_P = 0.975;
+
+    let seed = 11;
+    const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const gauss = () => {
+      const u = Math.max(rand(), 1e-12), v = rand();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    };
+
+    // a mean-reverting rate built on the log scale: always positive
+    let driftOn = true, burstLeft = 0, pendingSpike = false, compareOn = true;
+    let x = Math.log(0.2), cyc = 0;
+    function nextY() {
+      // with the cycle on, the level falls from about 0.2 to 0.03 for 100 steps, then recovers
+      const low = driftOn && Math.floor(cyc++ / 100) % 2 === 1;
+      const target = low ? Math.log(0.03) : Math.log(0.2);
+      const vol = burstLeft > 0 ? (burstLeft--, 0.45) : 0.2;
+      x += 0.15 * (target - x) + vol * gauss();
+      if (pendingSpike) { pendingSpike = false; x += 1.1; }
+      return Math.exp(x);
+    }
+
+    // flesaker = laplace on log(y - b), quantiles mapped back by b + exp
+    const B = 0.0;
+    const fl = laplace(K), plain = laplace(K);
+    let sFl = null, sPl = null, lastX = null, lastP = null, t = 0;
+    const ys = [], xs = [];
+    const fLo = [], fHi = [], fMed = [], xLo = [], xHi = [], xMed = [], pLo = [], pHi = [];
+    const q = (d, p) => d.quantile(p);
+    const up = (v) => B + Math.exp(v);
+
+    function step() {
+      const y = nextY(), lx = Math.log(y - B);
+      let dx, dp;
+      [dx, sFl] = fl(lx, sFl);
+      [dp, sPl] = plain(y, sPl);
+      ys.push(y); xs.push(lx);
+      const a = q(dx[0], LO_P), b = q(dx[0], HI_P), m = q(dx[0], 0.5);
+      xLo.push(a); xHi.push(b); xMed.push(m);
+      fLo.push(up(a)); fHi.push(up(b)); fMed.push(up(m));
+      pLo.push(q(dp[0], LO_P)); pHi.push(q(dp[0], HI_P));
+      lastX = dx; lastP = dp;
+      for (const arr of [ys, xs, fLo, fHi, fMed, xLo, xHi, xMed, pLo, pHi]) if (arr.length > N) arr.shift();
+      t += 1;
+    }
+
+    function fit(cv) {
+      const dpr = window.devicePixelRatio || 1;
+      const w = cv.clientWidth || 900, h = +cv.dataset.h;
+      const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+      if (cv.width !== bw || cv.height !== bh) {
+        cv.width = bw; cv.height = bh; cv.style.height = h + "px";
+      }
+      const ctx = cv.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return [ctx, w, h];
+    }
+
+    const PAD = 36;
+    const xOf = (W) => (i) => PAD + (W - 2 * PAD) * i / (N - 1 + K);
+
+    function band(ctx, x, yy, lo, hi, n, fill) {
+      ctx.fillStyle = fill; ctx.beginPath();
+      ctx.moveTo(x(1), yy(hi[0]));
+      for (let i = 1; i < n; i++) ctx.lineTo(x(i), yy(hi[i - 1]));
+      for (let i = n - 1; i >= 1; i--) ctx.lineTo(x(i), yy(lo[i - 1]));
+      ctx.closePath(); ctx.fill();
+    }
+    function line(ctx, x, yy, v, n, color, width, dash) {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+      ctx.beginPath(); ctx.moveTo(x(1), yy(v[0]));
+      for (let i = 1; i < n; i++) ctx.lineTo(x(i), yy(v[i - 1]));
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    function fan(ctx, x, yy, n, x0v, dists, map, fill, color) {
+      const x0 = x(n - 1), y0 = yy(x0v);
+      ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(x0, y0);
+      for (let h = 0; h < K; h++) ctx.lineTo(x(n + h), yy(map(q(dists[h], HI_P))));
+      for (let h = K - 1; h >= 0; h--) ctx.lineTo(x(n + h), yy(map(q(dists[h], LO_P))));
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(x0, y0);
+      for (let h = 0; h < K; h++) ctx.lineTo(x(n + h), yy(map(q(dists[h], 0.5))));
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    function dots(ctx, x, yy, v, n) {
+      ctx.fillStyle = INK;
+      for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x(i), yy(v[i]), 1.7, 0, 2 * Math.PI); ctx.fill(); }
+    }
+
+    let yLoS = null, yHiS = null;
+    function drawY() {
+      const cv = document.getElementById("ypanel");
+      const [ctx, W, H] = fit(cv);
+      ctx.clearRect(0, 0, W, H);
+      const n = ys.length; if (n < 3 || !lastX) return;
+      let lo = 0, hi = -Infinity;
+      for (let i = 0; i < n; i++) {
+        hi = Math.max(hi, ys[i], fHi[i]);
+        if (compareOn) { lo = Math.min(lo, pLo[i]); hi = Math.max(hi, pHi[i]); }
+      }
+      const span = (hi - lo) || 1; lo -= 0.06 * span; hi += 0.06 * span;
+      if (yLoS === null) { yLoS = lo; yHiS = hi; }
+      yLoS += 0.15 * (lo - yLoS); yHiS += 0.15 * (hi - yHiS);
+      yLoS = Math.min(yLoS, lo); yHiS = Math.max(yHiS, hi);
+      lo = yLoS; hi = yHiS;
+      const x = xOf(W), yy = (v) => H - PAD + 10 - (H - 2 * PAD) * (v - lo) / (hi - lo);
+      // below the bound: plain laplace's probability there is shaded red
+      ctx.fillStyle = "rgba(214,48,49,0.05)";
+      ctx.fillRect(PAD, yy(B), W - 2 * PAD, yy(lo) - yy(B));
+      if (compareOn) {
+        ctx.save(); ctx.beginPath(); ctx.rect(PAD, yy(B), W - 2 * PAD, yy(lo) - yy(B)); ctx.clip();
+        band(ctx, x, yy, pLo, pHi, n, RED); ctx.restore();
+        line(ctx, x, yy, pLo, n, GREY, 1.2, [3, 3]);
+        line(ctx, x, yy, pHi, n, GREY, 1.2, [3, 3]);
+      }
+      ctx.strokeStyle = REDLINE; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(PAD, yy(B)); ctx.lineTo(W - PAD, yy(B)); ctx.stroke();
+      ctx.fillStyle = REDLINE; ctx.font = "11px sans-serif";
+      ctx.fillText("bound b = 0", PAD + 4, yy(B) + 13);
+      band(ctx, x, yy, fLo, fHi, n, BAND);
+      line(ctx, x, yy, fMed, n, ACCENT, 1.8);
+      // the fan is not in the y-scale (exp of a wide log fan can be very tall); clip it to the panel
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+      fan(ctx, x, yy, n, ys[n - 1], lastX, up, HOTBAND, HOT);
+      ctx.restore();
+      dots(ctx, x, yy, ys, n);
+    }
+
+    function drawX() {
+      const cv = document.getElementById("xpanel");
+      const [ctx, W, H] = fit(cv);
+      ctx.clearRect(0, 0, W, H);
+      const n = xs.length; if (n < 3 || !lastX) return;
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < n; i++) { lo = Math.min(lo, xs[i], xLo[i]); hi = Math.max(hi, xs[i], xHi[i]); }
+      for (let h = 0; h < K; h++) { lo = Math.min(lo, q(lastX[h], LO_P)); hi = Math.max(hi, q(lastX[h], HI_P)); }
+      const span = (hi - lo) || 1; lo -= 0.06 * span; hi += 0.06 * span;
+      const x = xOf(W), yy = (v) => H - 18 - (H - 34) * (v - lo) / (hi - lo);
+      band(ctx, x, yy, xLo, xHi, n, BAND);
+      line(ctx, x, yy, xMed, n, ACCENT, 1.8);
+      fan(ctx, x, yy, n, xs[n - 1], lastX, (v) => v, HOTBAND, HOT);
+      dots(ctx, x, yy, xs, n);
+    }
+
+    function readout() {
+      if (!lastP) return;
+      const pBelow = Math.max(0, Math.min(1, lastP[0].cdf(B)));
+      document.getElementById("readout").innerHTML =
+        `Next step, probability below zero: plain laplace <b>${(100 * pBelow).toFixed(1)}%</b>, flesaker <b>0%</b>.`;
+    }
+
+    const toggle = (id, fn) => {
+      const b = document.getElementById(id);
+      b.onclick = () => { fn(); b.classList.toggle("on"); };
+    };
+    toggle("drift", () => { driftOn = !driftOn; cyc = 0; });
+    toggle("compare", () => { compareOn = !compareOn; });
+    document.getElementById("burst").onclick = () => { burstLeft = 40; };
+    document.getElementById("spike").onclick = () => { pendingSpike = true; };
+
+    for (let i = 0; i < 160; i++) step();
+    setInterval(() => { step(); drawY(); drawX(); readout(); }, 90);
+    addEventListener("resize", () => { drawY(); drawX(); });
+  </script>
+</body>
+</html>
