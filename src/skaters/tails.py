@@ -86,6 +86,61 @@ def _phi_inv(p: float) -> float:
     return x - u / (1.0 + 0.5 * x * u)
 
 
+# Below this tail mass the body quantile is solved on erfc sums. Dist.cdf is
+# 0.5 * (1 + erf), whose resolution (about 5.5e-17) is a sizable fraction of
+# a 1e-12 tail: bisection on it stops on a plateau whose position turns on the
+# last bit of erf, which differs between libm builds and between the ports
+# (about 1.8e-6 in x at the 1e-12 PIT clamp). The erfc sum keeps relative
+# precision, so the answer is fixed by tol alone. Above 1e-8 the plateau is
+# already below tol and the plain Dist quantile is kept.
+_TAIL_U = 1e-8
+_SQRT2 = math.sqrt(2.0)
+
+
+def _body_tail_quantile(body, t: float, upper: bool, tol: float, max_iter: int) -> float:
+    """x with body mass t beyond it (below x, or above x when ``upper``)."""
+    sign = -1.0 if upper else 1.0       # mirror the upper tail onto the lower
+    comps = [(w, sign * m, s) for w, m, s in body.components]
+
+    def mass(x):
+        total = 0.0
+        for w, m, s in comps:
+            if s > 0.0:
+                total += w * 0.5 * math.erfc((m - x) / (s * _SQRT2))
+            elif x >= m:
+                total += w
+        return total
+
+    mu = sign * body.mean
+    sigma = math.sqrt(body.var)
+    scale = min((s for w, _, s in comps if w > 0 and s > 0), default=1.0)
+    x_tol = tol * min(1.0, scale)
+    seed = max(8.0 * sigma, 1e-12 * max(1.0, abs(mu)))
+    lo, hi, width = mu - seed, mu, seed
+    for _ in range(120):
+        if mass(hi) >= t:
+            break
+        hi += width
+        width *= 2.0
+    width = seed
+    for _ in range(120):
+        if mass(lo) < t:
+            break
+        lo -= width
+        width *= 2.0
+    for _ in range(max_iter):
+        if hi - lo < x_tol:
+            break
+        mid = 0.5 * (lo + hi)
+        if not lo < mid < hi:
+            break
+        if mass(mid) < t:
+            lo = mid
+        else:
+            hi = mid
+    return sign * (0.5 * (lo + hi))
+
+
 # ---------------------------------------------------------------------------
 # GPD helpers
 # ---------------------------------------------------------------------------
@@ -237,6 +292,9 @@ class SplicedDist:
         else:
             u = self._plo + (p - self.zeta_lo) / self._c
             z = _phi_inv(min(max(u, _EPS), 1.0 - _EPS))
+        t = max(_phi(-abs(z)), _EPS)    # body tail mass beyond the target
+        if t < _TAIL_U and getattr(self.body, "components", None) is not None:
+            return _body_tail_quantile(self.body, t, z > 0.0, tol, max_iter)
         ub = min(max(_phi(z), _EPS), 1.0 - _EPS)
         return self.body.quantile(ub, tol=tol, max_iter=max_iter)
 

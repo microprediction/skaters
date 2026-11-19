@@ -58,6 +58,16 @@ function bisectLeft(xs, x) {
   return lo;
 }
 
+export function bisectRight(xs, x) {
+  let lo = 0, hi = xs.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (x < xs[mid]) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
 // Piecewise-linear with linear extrapolation from the end segments.
 export function interpTable(x, xs, fs) {
   let i = bisectLeft(xs, x);
