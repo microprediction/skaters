@@ -85,6 +85,8 @@ CANONICAL = """  <header class="site-header">
                 <a href="/foundation/hirondel.html">Hirondel</a>
                 <a href="/foundation/iamtime.html">iAmTime</a>
                 <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
               </span>
             </span>
           </span>
