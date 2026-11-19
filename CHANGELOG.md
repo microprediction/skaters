@@ -7,10 +7,13 @@
   `laplace` no longer raise `AttributeError` once the tail splice is live. The
   0.17.0 entry said `ema_transform` was covered by the `affine` fix; it was not.
   The JavaScript `SplicedDist` gains `affine`, `shift` and `scale` (it had none).
-  Julia and R take the same fix in their own repositories. Still open: transforms
-  that read `.components` directly (`power_transform` and `yeo_johnson` without
-  `exact=True`, `gaussianize`, and the k > 1 horizons of `ema_transform`,
-  `seasonal_difference` and `seasonal_anchor`) fail on a spliced predictive.
+  Julia and R take the same fix in their own repositories.
+- Fix: transforms that read mixture components no longer fail on a spliced
+  predictive. `power_transform`, `yeo_johnson` and `gaussianize` emit the exact
+  pushforward of the spliced law. At k > 1, `ema_transform`, `seasonal_difference`
+  and `seasonal_anchor` widen the body and the GPD splice follows it. Outputs on
+  Gaussian-mixture predictives are unchanged, and laplace's k=1 signatures are
+  identical.
 
 ## 0.17.0
 
