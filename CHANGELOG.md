@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `PushforwardDist` gains `affine`, `shift` and `scale`, so an exact pushforward
+  predictive can be wrapped by `standardize`, `seasonal_scale` and the other affine
+  transforms. A negative multiplier reflects the inner law so the map stays
+  increasing.
 - Fix: `SplicedDist` gains `shift` and `scale`, so `ema_transform`, `seasonal_difference`,
   `seasonal_anchor` and `ou_transform` conjugated around
   `laplace` no longer raise `AttributeError` once the tail splice is live. The
