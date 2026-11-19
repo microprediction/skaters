@@ -79,8 +79,9 @@ walkers throw, naming the path, if a state holds anything JSON would damage.
 
 ## What's exported
 
-`laplace` and `buildCandidates`; the `Dist` object; transforms (`difference`,
-`standardize`, `garch`, `ar`, `holtLinear`, `powerTransform`, …); ensembles
+`laplace`, `flesaker` and `buildCandidates`; the `Dist` object; transforms (`difference`,
+`standardize`, `garch`, `ar`, `holtLinear`, `powerTransform`, `yeoJohnson`,
+`logTransform`, …, with `gaussianize` and `seasonalScale` in `transform.mjs`); ensembles
 (`precisionWeightedEnsemble`, `bayesianEnsemble`, `terminalLeafEnsemble`); leaves
 (`scaleMixtureLeaf`, `crpsLeaf`, `garchLeaf`); `multiscale`, `sticky`, periodicity
 and covariance helpers; and spec (de)serialisers. See `index.mjs` for the full

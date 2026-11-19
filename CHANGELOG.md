@@ -18,10 +18,32 @@
   `laplace` no longer raise `AttributeError` once the tail splice is live. The
   0.17.0 entry said `ema_transform` was covered by the `affine` fix; it was not.
   The JavaScript `SplicedDist` gains `affine`, `shift` and `scale` (it had none).
-  Julia and R take the same fix in their own repositories. Still open: transforms
-  that read `.components` directly (`power_transform` and `yeo_johnson` without
-  `exact=True`, `gaussianize`, and the k > 1 horizons of `ema_transform`,
-  `seasonal_difference` and `seasonal_anchor`) fail on a spliced predictive.
+  Julia and R take the same fix in their own repositories.
+- Fix: transforms that read mixture components no longer fail on a spliced
+  predictive. `power_transform`, `yeo_johnson` and `gaussianize` emit the exact
+  pushforward of the spliced law. At k > 1, `ema_transform`, `seasonal_difference`
+  and `seasonal_anchor` widen the body and the GPD splice follows it. Outputs on
+  Gaussian-mixture predictives are unchanged. The JavaScript port takes the same
+  fix, with a new `PushforwardDist` in `pushforward.mjs`.
+- Fix: `SplicedDist` quantiles deep in a tail are solved on erfc sums. Once the
+  body's tail mass beyond the target falls below 1e-8, the body quantile came
+  from bisection on `0.5 * (1 + erf)`, which cannot resolve a 1e-12 tail: the
+  answer sat on a plateau set by the last bit of `erf`, so it differed between
+  libm builds and between ports by about 1.8e-6 in x at the PIT clamp. On the
+  spike stream of the signature check, a q0.999 was off by 4e4 against an
+  exact value. Python, Torch, JavaScript
+  and Rust share the new solve. Of laplace's k=1 signatures only `regimes_spike`
+  moves, at q0.001 and q0.999, to the correct values.
+- The JavaScript transform surface matches Python's: `gaussianize`,
+  `seasonalScale`, `logTransform` and `flesaker` are ported, and
+  `powerTransform` and `yeoJohnson` take the `exact` flag. `index.mjs` exports
+  `yeoJohnson`, `logTransform` and `flesaker`, as `skaters/__init__.py` does.
+  The JavaScript `erf` is now fdlibm's, with `erfc`, and the tail splice's
+  normal CDF uses `erfc` as `tails.py` does. Parity vectors cover every new
+  transform. The Rust crate does not have these transforms yet; its parity
+  gate lists them in `NOT_IN_RUST`. `skaters.torch` has `seasonal_scale`,
+  now in its parity check, and lacks the exact pushforward and `gaussianize`,
+  listed in `NOT_IN_TORCH`.
 
 ## 0.17.0
 

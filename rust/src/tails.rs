@@ -8,6 +8,76 @@ use crate::skater::Sk;
 use serde::{Deserialize, Serialize};
 
 pub const EPS: f64 = 1e-12;
+
+// Below this tail mass the body quantile is solved on erfc sums (tails.py):
+// 0.5 * (1 + erf) cannot resolve a 1e-12 tail, so bisection on it stops on a
+// plateau set by the last bit of erf, which differs between libm builds.
+const TAIL_U: f64 = 1e-8;
+
+/// x with body mass t beyond it (below x, or above x when `upper`).
+fn body_tail_quantile(body: &Dist, t: f64, upper: bool, tol: f64, max_iter: usize) -> f64 {
+    let sign = if upper { -1.0 } else { 1.0 }; // mirror the upper tail onto the lower
+    let comps: Vec<(f64, f64, f64)> = body
+        .components
+        .iter()
+        .map(|&(w, m, s)| (w, sign * m, s))
+        .collect();
+    let mass = |x: f64| -> f64 {
+        let mut total = 0.0;
+        for &(w, m, s) in &comps {
+            if s > 0.0 {
+                total += w * 0.5 * libm::erfc((m - x) / (s * SQRT2));
+            } else if x >= m {
+                total += w;
+            }
+        }
+        total
+    };
+    let mu = sign * body.mean();
+    let sigma = body.var().sqrt();
+    let mut scale = f64::INFINITY;
+    for &(w, _, s) in &comps {
+        if w > 0.0 && s > 0.0 {
+            scale = scale.min(s);
+        }
+    }
+    if scale == f64::INFINITY {
+        scale = 1.0;
+    }
+    let x_tol = tol * scale.min(1.0);
+    let seed = (8.0 * sigma).max(1e-12 * mu.abs().max(1.0));
+    let (mut lo, mut hi, mut width) = (mu - seed, mu, seed);
+    for _ in 0..120 {
+        if mass(hi) >= t {
+            break;
+        }
+        hi += width;
+        width *= 2.0;
+    }
+    width = seed;
+    for _ in 0..120 {
+        if mass(lo) < t {
+            break;
+        }
+        lo -= width;
+        width *= 2.0;
+    }
+    for _ in 0..max_iter {
+        if hi - lo < x_tol {
+            break;
+        }
+        let mid = 0.5 * (lo + hi);
+        if !(lo < mid && mid < hi) {
+            break;
+        }
+        if mass(mid) < t {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    sign * (0.5 * (lo + hi))
+}
 const REFIT_EVERY: u64 = 25;
 
 // ---------------------------------------------------------------------------
@@ -269,6 +339,10 @@ impl SplicedDist {
         } else {
             let u = self.plo + (p - self.zeta_lo) / self.c;
             z = phi_inv(u.max(EPS).min(1.0 - EPS));
+        }
+        let t = phi(-z.abs()).max(EPS); // body tail mass beyond the target
+        if t < TAIL_U {
+            return body_tail_quantile(&self.body, t, z > 0.0, tol, max_iter);
         }
         let ub = phi(z).max(EPS).min(1.0 - EPS);
         self.body.quantile_tol(ub, tol, max_iter)
