@@ -32,7 +32,7 @@ def test_single_scale_opt_out():
 def test_default_scales_from_k():
     f = laplace(20)
     _, state = f(0.1, None)
-    assert sorted(state["base"]["base"]["score"]) == [1, 5, 20]
+    assert sorted(state["base"]["base"]["score"], key=int) == ["1", "5", "20"]   # stride keys are strings (docs/STATE.md)
 
 
 def test_shapes_and_finiteness():
@@ -80,7 +80,7 @@ def test_coarse_weight_rises_on_fine_noise():
         state = None
         for y in ys:
             _, state = f(y, state)
-        return state["base"]["base"]["score"][1] - state["base"]["base"]["score"][5]
+        return state["base"]["base"]["score"]["1"] - state["base"]["base"]["score"]["5"]
 
     assert gap(smooth) > gap(noisy)
 

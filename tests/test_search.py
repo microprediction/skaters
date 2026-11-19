@@ -7,7 +7,6 @@ from skaters.search import (
 )
 from skaters.leaf import leaf
 from skaters.dist import Dist
-from collections import deque
 
 
 # --- Basic mechanics ---
@@ -65,9 +64,9 @@ def test_buffer_bounded():
 
 def test_warmup_builds_state():
     """After warmup, a candidate should have non-None state."""
-    entry = _make_entry(leaf(k=1), depth=0, recipe=[], k=1)
-    buf = deque([1.0, 2.0, 3.0, 4.0, 5.0])
-    _warmup(entry, buf, k=1)
+    entry = _make_entry(depth=0, recipe=[], k=1)
+    buf = list([1.0, 2.0, 3.0, 4.0, 5.0])
+    _warmup(entry, leaf(k=1), buf, k=1)
     assert entry["s"] is not None
     assert entry["dists"] is not None
     assert entry["warmed"] is True
@@ -76,9 +75,9 @@ def test_warmup_builds_state():
 
 def test_warmup_produces_valid_predictions():
     """After warmup, the queued prediction should be a proper Dist."""
-    entry = _make_entry(leaf(k=1), depth=0, recipe=[], k=1)
-    buf = deque([1.0, 2.0, 3.0])
-    _warmup(entry, buf, k=1)
+    entry = _make_entry(depth=0, recipe=[], k=1)
+    buf = list([1.0, 2.0, 3.0])
+    _warmup(entry, leaf(k=1), buf, k=1)
     assert len(entry["queues"][0]) == 1
     assert isinstance(entry["queues"][0][0], Dist)
 
@@ -237,15 +236,15 @@ def test_child_of_a_strong_incumbent_is_not_killed_on_arrival():
     over hundreds of resolved observations is not the same reference basis.
     A child must inherit its parent's current log_w, the same way it already
     inherits the parent's warm state."""
-    pool = [_make_entry(leaf(k=1), depth=0, recipe=[], k=1)]
+    pool = [_make_entry(depth=0, recipe=[], k=1)]
     pool[0]["warmed"] = True
     pool[0]["log_w"] = [100.0]   # a long, strongly positive run
 
     children = _expand(pool, k=1, top_n=1, max_depth=3, transforms=TRANSFORMS[:2])
     assert children, "expected at least one child"
-    buf = deque([0.0] * 200)
+    buf = list([0.0] * 200)
     for child in children:
-        _warmup(child, buf, k=1)
+        _warmup(child, _build_from_recipe(child["recipe"], k=1), buf, k=1)
     pool.extend(children)
     _prune(pool, threshold=-50.0, max_pool=30, k=1)
 

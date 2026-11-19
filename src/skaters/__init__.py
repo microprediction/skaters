@@ -35,6 +35,7 @@ from skaters.anomaly import mahalanobis, zbank
 from skaters.residual_transform import residual_transform, ResidualDiagnostics, CorrectedDist
 from skaters.homogenize import homogenize, make_candidates as homogenize_candidates, HomogenizedDist
 from skaters.sticky import sticky
+from skaters.state import state_to_json, state_from_json, assert_plain_state
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
     ema_spec, ensemble_spec, conjugate_spec,
@@ -90,6 +91,10 @@ __all__ = [
     "homogenize_candidates",
     "HomogenizedDist",
     "search",
+    # Checkpoint and restore (docs/STATE.md)
+    "state_to_json",
+    "state_from_json",
+    "assert_plain_state",
     # Spec system
     "build",
     "spec_name",

@@ -31,6 +31,14 @@ from skaters.dist import Dist
 _LOGPDF_FLOOR = -20.0
 
 
+def _migrate(state: dict) -> dict:
+    """Re-key a pre-canonical checkpoint, whose per-scale dicts used int keys."""
+    out = dict(state)
+    for name in ("phase", "pending", "latest", "score"):
+        out[name] = {str(s): v for s, v in state[name].items()}
+    return out
+
+
 def multiscale(base, k: int, scales: list[int] | None = None,
                forget: float = 0.99, max_components: int = 20):
     """Wrap a base forecaster factory in a multi-scale ensemble.
@@ -55,27 +63,32 @@ def multiscale(base, k: int, scales: list[int] | None = None,
     if scales == [1]:
         return base(k)
     subs = {s: base(max(1, math.ceil(k / s))) for s in scales}
+    # State is keyed by the stride as a decimal string ("1", "3", ...): JSON
+    # object keys are strings, and the JS port's objects key the same way.
+    keys = [str(s) for s in scales]
 
     def _skater(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
             state = {
                 "t": 0,
-                "phase": {s: [None] * s for s in scales},   # per-phase sub states
-                "pending": {s: [None] * s for s in scales}, # per-phase 1-step Dist to score
+                "phase": {ks: [None] * s for s, ks in zip(scales, keys)},   # per-phase sub states
+                "pending": {ks: [None] * s for s, ks in zip(scales, keys)}, # per-phase 1-step Dist to score
                 "latest": {},                                # per-scale freshest dists
-                "score": {s: None for s in scales},          # EWMA mean one-step logpdf
+                "score": {ks: None for ks in keys},          # EWMA mean one-step logpdf
             }
+        elif keys[0] not in state["score"]:                  # pre-canonical checkpoint: int keys
+            state = _migrate(state)
         t = state["t"]
-        for s in scales:
+        for s, ks in zip(scales, keys):
             ph = t % s
-            prev = state["pending"][s][ph]
+            prev = state["pending"][ks][ph]
             if prev is not None:
                 lp = max(prev.logpdf(y), _LOGPDF_FLOOR)
-                m = state["score"][s]
-                state["score"][s] = lp if m is None else forget * m + (1.0 - forget) * lp
-            dists, state["phase"][s][ph] = subs[s](y, state["phase"][s][ph])
-            state["pending"][s][ph] = dists[0]
-            state["latest"][s] = dists
+                m = state["score"][ks]
+                state["score"][ks] = lp if m is None else forget * m + (1.0 - forget) * lp
+            dists, state["phase"][ks][ph] = subs[s](y, state["phase"][ks][ph])
+            state["pending"][ks][ph] = dists[0]
+            state["latest"][ks] = dists
         state["t"] = t + 1
 
         scores = state["score"]
@@ -84,15 +97,15 @@ def multiscale(base, k: int, scales: list[int] | None = None,
         out = []
         for h in range(1, k + 1):
             fcs, wts = [], []
-            for s in scales:
-                if s > h or s not in state["latest"]:
+            for s, ks in zip(scales, keys):
+                if s > h or ks not in state["latest"]:
                     continue
                 j = max(1, int(h / s + 0.5))   # half-up, portable to the JS twin
-                dists = state["latest"][s]
+                dists = state["latest"][ks]
                 if j - 1 >= len(dists):
                     continue
                 fcs.append(dists[j - 1])
-                m = scores[s]
+                m = scores[ks]
                 wts.append(math.exp((m if m is not None else top) - top))
             # One eligible scale (e.g. h < every coarse stride): pass its Dist
             # through untouched — no renormalise, no prune.

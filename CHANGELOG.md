@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Skater state is now plain JSON data with one documented layout
+  (`docs/STATE.md`), so a Python checkpoint can be written with
+  `json.dumps(state_to_json(state))` and read back with `state_from_json`.
+  New exports `state_to_json`, `state_from_json`, `assert_plain_state`.
+  Queues are lists, `sticky` counts are `[value, weight]` pairs, multiscale and
+  period-detector tables have string keys, `zbank` keeps a list per grid point,
+  and `search`/`dantzig` rebuild pool skaters from recipes instead of storing
+  closures. Numerics are unchanged. Old Python checkpoints still resume.
+  `tests/test_state_json.py` gates every exported skater on an exact JSON resume.
+  The JS, R and Julia ports will adopt the same layout in follow-up work.
+
 - Fix: `SplicedDist` gains `shift` and `scale`, so `ema_transform`, `seasonal_difference`,
   `seasonal_anchor` and `ou_transform` conjugated around
   `laplace` no longer raise `AttributeError` once the tail splice is live. The
