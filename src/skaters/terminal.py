@@ -24,9 +24,9 @@ distribution is estimated — once, at the top, instead of once per candidate.
 
 from __future__ import annotations
 import math
-from collections import deque
 from skaters.dist import Dist
 from skaters.leaf import crps_leaf
+from skaters.state import _unqueue
 
 
 _PIT_DISPERSION_TARGET = 1.0 / 12.0     # Var[U] for U ~ Uniform(0,1): E[(u-0.5)^2] at perfect calibration
@@ -109,19 +109,24 @@ def terminal_leaf_ensemble(
         if state is None:
             state = {
                 "sub": [None] * n,
-                "qdist": [deque() for _ in range(n)],          # h=1 Dist queue for weighting
+                "qdist": [[] for _ in range(n)],          # h=1 Dist queue for weighting
                 "log_w": [prior[i] for i in range(n)],
                 "leaf_state": [None] * k,
                 "leaf_pred": [None] * k,
-                "mean_q": [deque() for _ in range(k)],          # pending combined means per horizon
+                "mean_q": [[] for _ in range(k)],          # pending combined means per horizon
                 "adapt": {
                     "log_eta": math.log(learning_rate),
                     "pit_ewma": _PIT_DISPERSION_TARGET,
                     "loss_fast": None,
                     "loss_slow": None,
-                    "pred_q": deque(),          # pending issued h=1 predictive, for next step's signal
+                    "pred_q": [],          # pending issued h=1 predictive, for next step's signal
                 } if adaptive_temperature else None,
             }
+        elif type(state["qdist"][0]) is not list:     # pre-canonical checkpoint: deques
+            state["qdist"] = _unqueue(state["qdist"])
+            state["mean_q"] = _unqueue(state["mean_q"])
+            if state.get("adapt") is not None:
+                state["adapt"]["pred_q"] = _unqueue(state["adapt"]["pred_q"])
 
         # Run all sub-models; collect their k Dists.
         all_dists = []
@@ -139,7 +144,7 @@ def terminal_leaf_ensemble(
             ad = state["adapt"]
             pq = ad["pred_q"]
             if pq:
-                prev_pred = pq.popleft()
+                prev_pred = pq.pop(0)
                 lp_c = prev_pred.logpdf(y)
                 if not (lp_c >= -20.0):
                     lp_c = -20.0
@@ -178,7 +183,7 @@ def terminal_leaf_ensemble(
                 # -inf (y far from every component) nor a +inf (an exact hit on a
                 # Dirac atom, e.g. the sticky lattice path) can dominate or
                 # NaN-poison log_w. The `not (lp >= -20.0)` arm also catches NaN.
-                lp = q.popleft().logpdf(y)
+                lp = q.pop(0).logpdf(y)
                 if lp > 20.0:
                     lp = 20.0
                 elif not (lp >= -20.0):
@@ -206,7 +211,7 @@ def terminal_leaf_ensemble(
             # ago into a residual, and update this horizon's terminal leaf.
             mq = state["mean_q"][h]
             if len(mq) >= h + 1:
-                r = y - mq.popleft()
+                r = y - mq.pop(0)
                 ld, state["leaf_state"][h] = tleafs[h](r, state["leaf_state"][h])
                 state["leaf_pred"][h] = ld[0]
 

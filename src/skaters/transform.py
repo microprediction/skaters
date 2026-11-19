@@ -1775,7 +1775,7 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
                 cs, zs = _emin_knots(buf, cs, zs, idxs)
             else:
                 _cap_slopes(cs, zs)
-            return cs, zs, None
+            return [cs, zs, None]           # a list: state is plain data
         # kernel-smoothed CDF on the sketch, Silverman bandwidth
         mm = len(cs)
         i1, i3 = mm // 4, 3 * mm // 4
@@ -1805,7 +1805,7 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
         if len(cs2) < 2:
             return None
         _cap_slopes(cs2, zs2)
-        return cs2, zs2, _tangents(cs2, zs2)
+        return [cs2, zs2, _tangents(cs2, zs2)]
 
     def _fwd(y, knots):
         cs, zs, ts = knots
