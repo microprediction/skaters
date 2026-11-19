@@ -5,6 +5,15 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## Unreleased
+
+- `powerTransform` and `yeoJohnson` no longer fail on laplace's tail-spliced
+  predictive: they emit its exact pushforward, a `PushforwardDist` (new module
+  `pushforward.mjs`, a port of `skaters/pushforward.py`). At k > 1,
+  `emaTransform`, `seasonalDifference` and `seasonalAnchor` widen the spliced
+  body and the GPD splice follows it. `SplicedDist` gains `_withBody`. Outputs
+  on Gaussian-mixture predictives are unchanged.
+
 ## 0.17.0
 
 - Gaussian-mixture quantiles in the stdlib, JavaScript and Rust cores use a

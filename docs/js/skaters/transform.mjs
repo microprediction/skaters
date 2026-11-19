@@ -8,8 +8,43 @@
 // the transformed space back to the original space.
 
 import { fsum, Dist } from "./dist.mjs";
+import { SplicedDist } from "./tails.mjs";
+import { PushforwardDist, tableFromMap } from "./pushforward.mjs";
 
 // --- small helpers ---
+
+// Shift by delta and add independent Gaussian variance add. Exact for a
+// Gaussian mixture (each component widens). A tail-spliced predictive has no
+// components to widen, so its body widens and the GPD splice, which lives in
+// the body's PIT space, follows it.
+function widen(d, delta, add) {
+  if (d instanceof SplicedDist) return d._withBody(widen(d.body, delta, add), false);
+  return new Dist(d.components.map(([w, m, s]) => [w, m + delta, Math.sqrt(s * s + add)]));
+}
+
+function hasComponents(d) {
+  return !(d instanceof PushforwardDist) && d.components !== undefined && d.components !== null;
+}
+
+// The exact pushforward of d through the monotone map invFn. The table window
+// adapts to each predictive: [m - 10s, m + 10s] over the mixture, or, with no
+// mixture to read (laplace's tail-spliced SplicedDist), the extreme quantiles
+// padded by their own span on each side.
+function pushforward(d, invFn) {
+  let lo, hi;
+  if (hasComponents(d)) {
+    lo = Infinity; hi = -Infinity;
+    for (const [, m, s] of d.components) {
+      lo = Math.min(lo, m - 10.0 * s);
+      hi = Math.max(hi, m + 10.0 * s);
+    }
+  } else {
+    const qLo = d.quantile(1e-6), qHi = d.quantile(1.0 - 1e-6);
+    lo = 2.0 * qLo - qHi; hi = 2.0 * qHi - qLo;
+  }
+  const [ys, zs] = tableFromMap(invFn, lo, hi);
+  return new PushforwardDist(d, ys, zs, { invFn });
+}
 
 function copysign(a, b) {
   const m = Math.abs(a);
@@ -174,7 +209,7 @@ export function emaTransform(alpha = 0.05) {
     const out = [];
     let add = 0.0; // alpha^2 * sum_{i<h} var_i: the level's accumulated response (ETS(A,N,N), issue #254)
     for (const d of dists) {
-      if (add > 0.0) out.push(new Dist(d.components.map(([w, m, s]) => [w, m + level, Math.sqrt(s * s + add)])));
+      if (add > 0.0) out.push(widen(d, level, add));
       else out.push(d.shift(level));
       add += alpha * alpha * d.var;
     }
@@ -415,11 +450,8 @@ export function seasonalDifference(period = 12) {
       recoveredMeans.push(dists[h].mean + anchorMean);
       recoveredVars.push(dists[h].var + anchorVar);
       if (anchorVar > 0.0) {
-        // Convolve the mixture with N(0, anchorVar): shift means, inflate stds.
-        const comps = dists[h].components.map(
-          ([w, m, s]) => [w, m + anchorMean, Math.sqrt(s * s + anchorVar)]
-        );
-        result.push(new Dist(comps));
+        // Convolve with N(0, anchorVar): shift means, inflate stds.
+        result.push(widen(dists[h], anchorMean, anchorVar));
       } else {
         result.push(dists[h].shift(anchorMean));
       }
@@ -492,10 +524,7 @@ export function seasonalAnchor(period, alpha = 0.2, weight = 0.5) {
       if (e === null || e === undefined) emaResp[p] = r.slice();
       else emaResp[p] = emaResp[p].map((v, i) => (1.0 - alpha) * v + alpha * r[i]);
       if (aVar > 0.0) {
-        const comps = dists[h].components.map(
-          ([w, m, s]) => [w, m + aMean, Math.sqrt(s * s + aVar)]
-        );
-        result.push(new Dist(comps));
+        result.push(widen(dists[h], aMean, aVar));
       } else {
         result.push(dists[h].shift(aMean));
       }
@@ -520,6 +549,10 @@ export function powerTransform(p = 0.5) {
   function inverseK(dists, state) {
     const result = [];
     for (const d of dists) {
+      if (d.components === undefined || d.components === null) {   // tail-spliced: exact pushforward
+        result.push(pushforward(d, inv));
+        continue;
+      }
       const components = [];
       for (const [w, mu, sigma] of d.components) {
         const origMean = inv(mu);
@@ -569,6 +602,10 @@ export function yeoJohnson(lmbda = 0.0) {
   function inverseK(dists, state) {
     const result = [];
     for (const d of dists) {
+      if (d.components === undefined || d.components === null) {   // tail-spliced: exact pushforward
+        result.push(pushforward(d, inv));
+        continue;
+      }
       const components = [];
       for (const [w, mu, sigma] of d.components) {
         components.push([w, inv(mu), Math.max(sigma * dinv(mu), 1e-12)]);

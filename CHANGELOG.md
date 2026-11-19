@@ -13,7 +13,8 @@
   pushforward of the spliced law. At k > 1, `ema_transform`, `seasonal_difference`
   and `seasonal_anchor` widen the body and the GPD splice follows it. Outputs on
   Gaussian-mixture predictives are unchanged, and laplace's k=1 signatures are
-  identical.
+  identical. The JavaScript port takes the same fix, with a new `PushforwardDist`
+  in `pushforward.mjs` (`gaussianize` is not ported to JavaScript).
 
 ## 0.17.0
 

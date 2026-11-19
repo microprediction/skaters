@@ -230,6 +230,16 @@ export class SplicedDist {
                            this.gUp, this.sUp, this.gLo, this.sLo);
   }
 
+  // The same splice around a new body; flip mirrors it (a negative map).
+  _withBody(body, flip) {
+    if (!flip) {
+      return new SplicedDist(body, this.tLo, this.tUp, this.zetaLo, this.zetaUp,
+                             this.gLo, this.sLo, this.gUp, this.sUp);
+    }
+    return new SplicedDist(body, -this.tUp, -this.tLo, this.zetaUp, this.zetaLo,
+                           this.gUp, this.sUp, this.gLo, this.sLo);
+  }
+
   // x -> x + delta and x -> factor * x, delegating to the body like affine.
   shift(delta) {
     return new SplicedDist(this.body.shift(delta), this.tLo, this.tUp, this.zetaLo, this.zetaUp,
