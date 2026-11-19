@@ -303,6 +303,23 @@ class SplicedDist:
         return SplicedDist(body, -self.t_up, -self.t_lo, self.zeta_up, self.zeta_lo,
                            self.g_up, self.s_up, self.g_lo, self.s_lo)
 
+    def _with_body(self, body, flip: bool) -> "SplicedDist":
+        if not flip:
+            return SplicedDist(body, self.t_lo, self.t_up, self.zeta_lo, self.zeta_up,
+                               self.g_lo, self.s_lo, self.g_up, self.s_up)
+        return SplicedDist(body, -self.t_up, -self.t_lo, self.zeta_up, self.zeta_lo,
+                           self.g_up, self.s_up, self.g_lo, self.s_lo)
+
+    def shift(self, delta: float) -> "SplicedDist":
+        """x -> x + delta; only the body moves (see ``affine``)."""
+        return self._with_body(self.body.shift(delta), False)
+
+    def scale(self, factor: float) -> "SplicedDist":
+        """x -> factor * x; a negative factor swaps the tails (see ``affine``)."""
+        if factor == 0:
+            raise ValueError("scale factor must be nonzero")
+        return self._with_body(self.body.scale(factor), factor < 0)
+
     def __repr__(self) -> str:
         return (f"SplicedDist(zeta=({self.zeta_lo:.4f},{self.zeta_up:.4f}), "
                 f"gamma=({self.g_lo:.3f},{self.g_up:.3f}), body={self.body!r})")

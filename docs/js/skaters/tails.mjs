@@ -215,6 +215,38 @@ export class SplicedDist {
     return t1 - 0.5 * t2;
   }
 
+  // x -> a*x + b. The splice lives in the body's PIT space, so the thresholds,
+  // tail masses and GPD parameters are invariant: only the body moves. A
+  // negative a reflects the PIT (u -> 1 - u), which swaps the two tails and
+  // negates the z thresholds.
+  affine(a, b) {
+    if (a === 0) throw new Error("affine multiplier must be nonzero");
+    const body = this.body.affine(a, b);
+    if (a > 0) {
+      return new SplicedDist(body, this.tLo, this.tUp, this.zetaLo, this.zetaUp,
+                             this.gLo, this.sLo, this.gUp, this.sUp);
+    }
+    return new SplicedDist(body, -this.tUp, -this.tLo, this.zetaUp, this.zetaLo,
+                           this.gUp, this.sUp, this.gLo, this.sLo);
+  }
+
+  // x -> x + delta and x -> factor * x, delegating to the body like affine.
+  shift(delta) {
+    return new SplicedDist(this.body.shift(delta), this.tLo, this.tUp, this.zetaLo, this.zetaUp,
+                           this.gLo, this.sLo, this.gUp, this.sUp);
+  }
+
+  scale(factor) {
+    if (factor === 0) throw new Error("scale factor must be nonzero");
+    const body = this.body.scale(factor);
+    if (factor > 0) {
+      return new SplicedDist(body, this.tLo, this.tUp, this.zetaLo, this.zetaUp,
+                             this.gLo, this.sLo, this.gUp, this.sUp);
+    }
+    return new SplicedDist(body, -this.tUp, -this.tLo, this.zetaUp, this.zetaLo,
+                           this.gUp, this.sUp, this.gLo, this.sLo);
+  }
+
   static fromDict(d) {
     return new SplicedDist(Dist.fromDict(d.body), d.t_lo, d.t_up,
                            d.zeta_lo, d.zeta_up, d.g_lo, d.s_lo, d.g_up, d.s_up);
