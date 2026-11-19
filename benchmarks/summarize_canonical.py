@@ -185,13 +185,14 @@ def main():
     with open(os.path.join(_HERE, f"canonical_summary_coverage{SUFFIX}.csv"), "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["study", "method", "n_steps", "cov_central90", "cal_median"])
+        cells = {}                      # (study, method) -> [d, ...], one pass over the store
+        for (st, s, mm), d in store.items():
+            cells.setdefault((st, mm), []).append(d)
         for study in studies:
             for m in methods:
-                ys, q05s, q50s, q95s = [], [], [], []
-                for (st, s, mm), d in store.items():
-                    if st == study and mm == m:
-                        ys.append(d["y"]); q05s.append(d["q05"])
-                        q50s.append(d["q50"]); q95s.append(d["q95"])
+                ds = cells.get((study, m), [])
+                ys = [d["y"] for d in ds]; q05s = [d["q05"] for d in ds]
+                q50s = [d["q50"] for d in ds]; q95s = [d["q95"] for d in ds]
                 if not ys:
                     continue
                 y = np.concatenate(ys); q05 = np.concatenate(q05s)
