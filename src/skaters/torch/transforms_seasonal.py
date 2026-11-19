@@ -14,6 +14,7 @@ import torch
 
 from skaters.torch.dist import TorchDist, DTYPE, _t
 from skaters.torch.transform import TorchTransform, _p, _zero, register
+from skaters.torch.pushforward import widen
 
 
 def _f(x) -> torch.Tensor:
@@ -119,8 +120,7 @@ class SeasonalDifference(TorchTransform):
             if bool(anchor_var > 0.0):
                 av = anchor_var
                 am = anchor_mean
-                result.append(dists[h].map(lambda m, s: m + am,
-                                           lambda m, s: torch.sqrt(s * s + av)))
+                result.append(widen(dists[h], am, av))
             else:
                 result.append(dists[h].shift(anchor_mean))
         return result
@@ -206,8 +206,7 @@ class SeasonalAnchor(TorchTransform):
             if bool(_f(a_var) > 0.0):
                 av = _f(a_var)
                 am = a_mean
-                out.append(dists[h].map(lambda m, s: m + am,
-                                        lambda m, s: torch.sqrt(s * s + av)))
+                out.append(widen(dists[h], am, av))
             else:
                 out.append(dists[h].shift(a_mean))
         return out

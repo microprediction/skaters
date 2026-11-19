@@ -166,7 +166,8 @@ class EMA(TorchTransform):
         add = _zero()
         for d in dists:
             if bool(add > 0):
-                out.append(d.map(lambda m, s: m + level, lambda m, s: torch.sqrt(s * s + add)))
+                from skaters.torch.pushforward import widen
+                out.append(widen(d, level, add))
             else:
                 out.append(d.shift(level))
             add = add + self.alpha * self.alpha * d.var
