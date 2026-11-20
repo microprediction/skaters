@@ -17,7 +17,7 @@ jobs:
       with:
         node-version: '20'
     - name: Install test deps
-      run: pip install pytest
+      run: pip install pytest numpy
     - name: Run tests + JS parity before publishing
       env:
         PYTHONPATH: src

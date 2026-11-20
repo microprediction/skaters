@@ -72,3 +72,64 @@ def test_rust_parity():
     subprocess.run(
         ["cargo", "test", "--release", "--test", "parity"],
         check=True, cwd=os.path.join(ROOT, "rust"))
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_quantile_contract():
+    subprocess.run(["node", os.path.join(ROOT, "parity", "quantile_contract.mjs")], check=True, cwd=ROOT)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_spliced_affine():
+    subprocess.run(["node", os.path.join(ROOT, "parity", "spliced_affine.mjs")], check=True, cwd=ROOT)
+
+
+def _spliced_nonaffine_reference(path):
+    """A Python SplicedDist and its transforms' outputs, for the JS checker."""
+    import json
+    import math
+    import random
+    from skaters import laplace
+    from skaters.tails import SplicedDist
+    from skaters.transform import ema_transform, power_transform, yeo_johnson
+
+    rng, x, st, d = random.Random(5), 0.0, None, None
+    for t in range(1500):
+        x = 0.9 * x + rng.gauss(0.0, 1.0) * (1.0 + 0.5 * math.sin(t / 7.0))
+        d, st = laplace()(x, st)
+    sd = d[0]
+    assert isinstance(sd, SplicedDist)
+    ps = (0.001, 0.05, 0.5, 0.95, 0.999)
+    pushforward = {}
+    for key, t in (("power_transform", power_transform(0.5)),
+                   ("yeo_johnson_0", yeo_johnson(0.0)),
+                   ("yeo_johnson_half", yeo_johnson(0.5))):
+        e = t[1]([sd], {})[0]
+        xs = [e.quantile(p) for p in (0.01, 0.3, 0.5, 0.7, 0.99)]
+        pushforward[key] = {
+            "quantile": [[p, e.quantile(p)] for p in ps],
+            "cdf": [[v, e.cdf(v)] for v in xs],
+            "logpdf": [[v, e.logpdf(v)] for v in xs],
+            "crps": [[v, e.crps(v)] for v in xs],
+            "mean": e.mean, "std": e.std,
+        }
+    level, alpha = 2.0, 0.05
+    w = ema_transform(alpha)[1]([sd, sd], {"level": level})[1]
+    ref = {"dist": sd.to_dict(), "pushforward": pushforward,
+           "widen": {"level": level, "alpha": alpha, "mean": w.mean,
+                     "quantile": [[p, w.quantile(p)] for p in ps]}}
+    with open(path, "w") as f:
+        json.dump(ref, f)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_spliced_nonaffine(tmp_path):
+    ref = str(tmp_path / "spliced_nonaffine.json")
+    _spliced_nonaffine_reference(ref)
+    subprocess.run(["node", os.path.join(ROOT, "parity", "spliced_nonaffine.mjs"), ref],
+                   check=True, cwd=ROOT)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_pushforward_affine():
+    subprocess.run(["node", os.path.join(ROOT, "parity", "pushforward_affine.mjs")], check=True, cwd=ROOT)

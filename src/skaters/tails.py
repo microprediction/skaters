@@ -86,6 +86,61 @@ def _phi_inv(p: float) -> float:
     return x - u / (1.0 + 0.5 * x * u)
 
 
+# Below this tail mass the body quantile is solved on erfc sums. Dist.cdf is
+# 0.5 * (1 + erf), whose resolution (about 5.5e-17) is a sizable fraction of
+# a 1e-12 tail: bisection on it stops on a plateau whose position turns on the
+# last bit of erf, which differs between libm builds and between the ports
+# (about 1.8e-6 in x at the 1e-12 PIT clamp). The erfc sum keeps relative
+# precision, so the answer is fixed by tol alone. Above 1e-8 the plateau is
+# already below tol and the plain Dist quantile is kept.
+_TAIL_U = 1e-8
+_SQRT2 = math.sqrt(2.0)
+
+
+def _body_tail_quantile(body, t: float, upper: bool, tol: float, max_iter: int) -> float:
+    """x with body mass t beyond it (below x, or above x when ``upper``)."""
+    sign = -1.0 if upper else 1.0       # mirror the upper tail onto the lower
+    comps = [(w, sign * m, s) for w, m, s in body.components]
+
+    def mass(x):
+        total = 0.0
+        for w, m, s in comps:
+            if s > 0.0:
+                total += w * 0.5 * math.erfc((m - x) / (s * _SQRT2))
+            elif x >= m:
+                total += w
+        return total
+
+    mu = sign * body.mean
+    sigma = math.sqrt(body.var)
+    scale = min((s for w, _, s in comps if w > 0 and s > 0), default=1.0)
+    x_tol = tol * min(1.0, scale)
+    seed = max(8.0 * sigma, 1e-12 * max(1.0, abs(mu)))
+    lo, hi, width = mu - seed, mu, seed
+    for _ in range(120):
+        if mass(hi) >= t:
+            break
+        hi += width
+        width *= 2.0
+    width = seed
+    for _ in range(120):
+        if mass(lo) < t:
+            break
+        lo -= width
+        width *= 2.0
+    for _ in range(max_iter):
+        if hi - lo < x_tol:
+            break
+        mid = 0.5 * (lo + hi)
+        if not lo < mid < hi:
+            break
+        if mass(mid) < t:
+            lo = mid
+        else:
+            hi = mid
+    return sign * (0.5 * (lo + hi))
+
+
 # ---------------------------------------------------------------------------
 # GPD helpers
 # ---------------------------------------------------------------------------
@@ -227,7 +282,7 @@ class SplicedDist:
         return math.exp(lp) if lp < 700.0 else math.inf
 
     def quantile(self, p: float, tol: float = 1e-9,
-                 max_iter: int = 100) -> float:
+                 max_iter: int = 2100) -> float:
         assert 0 < p < 1
         if p < self.zeta_lo:
             z = self.t_lo - _gpd_isf(p / self.zeta_lo, self.g_lo, self.s_lo)
@@ -237,6 +292,9 @@ class SplicedDist:
         else:
             u = self._plo + (p - self.zeta_lo) / self._c
             z = _phi_inv(min(max(u, _EPS), 1.0 - _EPS))
+        t = max(_phi(-abs(z)), _EPS)    # body tail mass beyond the target
+        if t < _TAIL_U and getattr(self.body, "components", None) is not None:
+            return _body_tail_quantile(self.body, t, z > 0.0, tol, max_iter)
         ub = min(max(_phi(z), _EPS), 1.0 - _EPS)
         return self.body.quantile(ub, tol=tol, max_iter=max_iter)
 
@@ -288,6 +346,37 @@ class SplicedDist:
                            d["t_lo"], d["t_up"],
                            d["zeta_lo"], d["zeta_up"],
                            d["g_lo"], d["s_lo"], d["g_up"], d["s_up"])
+
+    def affine(self, a: float, b: float) -> "SplicedDist":
+        """x -> a*x + b. The splice lives in the body's PIT space, so the
+        thresholds, tail masses and GPD parameters are invariant: only the
+        body moves. A negative ``a`` reflects the PIT (u -> 1 - u), which swaps
+        the two tails and negates the z thresholds."""
+        if a == 0:
+            raise ValueError("affine multiplier must be nonzero")
+        body = self.body.affine(a, b)
+        if a > 0:
+            return SplicedDist(body, self.t_lo, self.t_up, self.zeta_lo, self.zeta_up,
+                               self.g_lo, self.s_lo, self.g_up, self.s_up)
+        return SplicedDist(body, -self.t_up, -self.t_lo, self.zeta_up, self.zeta_lo,
+                           self.g_up, self.s_up, self.g_lo, self.s_lo)
+
+    def _with_body(self, body, flip: bool) -> "SplicedDist":
+        if not flip:
+            return SplicedDist(body, self.t_lo, self.t_up, self.zeta_lo, self.zeta_up,
+                               self.g_lo, self.s_lo, self.g_up, self.s_up)
+        return SplicedDist(body, -self.t_up, -self.t_lo, self.zeta_up, self.zeta_lo,
+                           self.g_up, self.s_up, self.g_lo, self.s_lo)
+
+    def shift(self, delta: float) -> "SplicedDist":
+        """x -> x + delta; only the body moves (see ``affine``)."""
+        return self._with_body(self.body.shift(delta), False)
+
+    def scale(self, factor: float) -> "SplicedDist":
+        """x -> factor * x; a negative factor swaps the tails (see ``affine``)."""
+        if factor == 0:
+            raise ValueError("scale factor must be nonzero")
+        return self._with_body(self.body.scale(factor), factor < 0)
 
     def __repr__(self) -> str:
         return (f"SplicedDist(zeta=({self.zeta_lo:.4f},{self.zeta_up:.4f}), "

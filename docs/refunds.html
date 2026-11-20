@@ -11,7 +11,7 @@
   <meta property="og:description" content="Full refunds, processed instantly. Issues and PRs, processed faster." />
   <meta property="og:url" content="https://skaters.microprediction.org/refunds.html" />
   <meta name="twitter:card" content="summary" />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     .lede { color: #555; margin: 0 0 26px; font-size: 1.05em; }
     table.res { border-collapse: collapse; margin: 0 0 24px; width: 100%; }
@@ -30,33 +30,69 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -64,15 +100,11 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -118,8 +150,99 @@ Refund due                         $0.00</div>
           <td>Not monitored by the issue tracker. Neither are horoscopes.</td></tr>
         <tr><td>Social media post claiming a benchmark nobody can rerun</td><td class="num">&infin; + 1</td>
           <td>Scored at the 95% Winkler level, it looks great.</td></tr>
+        <tr><td>Fifteen-minute Medium article, no issue filed</td><td class="num">&infin; + 2</td>
+          <td>Two documentation pages were written in response. Neither was needed by anyone who had read the first two.</td></tr>
       </tbody>
     </table>
+
+    <h2>A worked example: 228 datasets</h2>
+    <p>
+      A <a href="https://valeman.medium.com/laplace-beats-almost-everything-i-tested-it-on-228-datasets-f9a75e551ebe">recent
+      article</a> ran <code>laplace</code> on 228 datasets and reported, with
+      pictures, that it forecast negative electricity demand, produced an
+      interval reaching 10<sup>35</sup> on the Bitcoin hash rate, and was slow at
+      horizons of 96 and 336. All three are true. Here is what each one tells you.
+    </p>
+    <figure>
+      <img src="./assets/skaters-csp.jpg" alt="Cartoon of a workshop. A girl assembles a red racing car
+        labelled Laplace from bins of parts named after the package's transforms: theta, difference,
+        drift, holt_linear, ar, fractional_difference, standardize, garch, ou_transform. Beside her a
+        boy strains to fit two bolts together on a stand labelled Conformal Seasonal Pools, next to
+        bins labelled empirical transform and seasonal pools." style="max-width:100%;height:auto;" />
+      <figcaption>It's curious that most refund requests have come from the author of a time-series
+        package that obviously cannot work in general
+        (<a href="https://conformalprediction.net/csp.html">review</a>).</figcaption>
+    </figure>
+    <p>
+      <strong>Negative electricity demand.</strong> <code>laplace</code> forecasts
+      a distribution on the real line. It does not know that demand is positive,
+      because nothing in a stream of numbers says so. If you know it, you say it:
+      one log transform, and every quantile comes back positive. That is
+      <a href="/examples.html#positive">recipe three on the examples page</a>, and
+      it is how every transform in the package works. The author ran the model
+      on 2,460 windows of non-negative data and did not apply one. The
+      <a href="/scope.html">scope page</a> now spells this out, under the
+      heading <em>Prior knowledge</em>, for readers who need it spelled out.
+    </p>
+    <p>
+      <a href="/flesaker.html"><code>flesaker</code></a> now applies the log
+      transform for you. It is experimental, Python only and not part of the
+      official API. There are many possible domains, and skaters provides a clean
+      way to add your own custom conjugations. We lean towards making
+      <code>flesaker</code> permanent if people keep making YouTube videos
+      criticising the fact that an inanimate library doesn't know ahead of time
+      that a series will always be positive (but maybe you do).
+    </p>
+    <p>
+      <strong>Intervals at 10<sup>35</sup>.</strong> The hash rate was fed in as
+      hashes per second, a number near 10<sup>20</sup>. Nobody who works with
+      that series writes it that way; it is quoted in exahashes, where it is a
+      number near 100. The package's transforms carry constants in absolute units,
+      like every statistical package since the slide rule, and the
+      <a href="/scope.html">scope page</a> gives the working range. Dividing by
+      10<sup>18</sup> before calling the function is the whole fix. It did not
+      occur to the author to divide.
+    </p>
+    <p>
+      <strong>Slow at horizon 336.</strong> The documentation gives twelve steps
+      as the upper limit and says longer horizons are ongoing work. The article
+      ran it at 96 and estimated 336, then reported that it was slow and wrong
+      there. It was. The 12 microseconds per observation that the article
+      disputes is the Rust port, one step ahead, on a warm model, which is what
+      the <a href="/performance.html">performance page</a> says it is, next to
+      the Python numbers the article prefers.
+    </p>
+    <p>
+      So: a real-line model run on positive data without the one-line fix, a
+      series fed in units a million million million times too large, and a
+      horizon outside the stated scope. The parts of the article that stay
+      inside the documentation are correct and are already on this site: at one
+      step ahead on M4 hourly, the author's method beats <code>laplace</code> on
+      144 series and loses on 19, and the
+      <a href="https://conformalprediction.net/csp.html">review</a> says so in its
+      first table. The portfolio of the two beats both.
+    </p>
+    <p>
+      Take the advice of someone who is apparently new to time series but posing as an
+      expert at your own risk. The signs, all from this one article:
+    </p>
+    <ul>
+      <li>They run a model on data it was not built for (positive data on a
+        real-line model) and report the result as a flaw in the model.</li>
+      <li>They do not check units. A series quoted near 10<sup>20</sup> instead
+        of near 100 is a data-preparation error, not a forecasting result.</li>
+      <li>They test outside the documented scope (horizon 336 against a stated
+        limit of twelve) and present the failure as a finding.</li>
+      <li>They dispute a published number by measuring something else: Python
+        at long horizons against a figure stated for Rust, one step ahead.</li>
+      <li>They review a competitor's package while promoting their own method,
+        and the method is the one being compared.</li>
+    </ul>
+    <p>
+      It is really hard to make any package idiot-proof. We keep trying: the
+      scope page, the examples page and <a href="/flesaker.html"><code>flesaker</code></a> all exist because
+      of this article. The refund stands at $0.00.
+    </p>
 
     <h2>Frequently heard</h2>
     <p><strong>"It is slower than my method."</strong>
@@ -136,7 +259,11 @@ Refund due                         $0.00</div>
       explains ours, and every benchmark reports more than one. A metric chosen
       after seeing which one you win is not on the list.</p>
     <p><strong>"This package is garbage."</strong>
-      Your refund has been processed. See above.</p>
+      This package is deployed for monitoring hundreds of thousands of economic
+      time series, public and private. It was written because nothing else could
+      be found that performs nearly as well. If you make basic errors trying to
+      use it, or if CSP was the best you could muster until you studied Laplace,
+      you are probably not the best person to judge.</p>
 
     <h2>How to get more than $0.00</h2>
     <ol>
@@ -156,9 +283,8 @@ Refund due                         $0.00</div>
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

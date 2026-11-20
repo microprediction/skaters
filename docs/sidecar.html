@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters &mdash; Every foundational time-series model needs a sidecar, for now</title>
   <meta name="description" content="Zero-shot time-series foundation models against the Laplace online ensemble on identical windows, with the quantile reconstruction named, and a model-agnostic sidecar that makes any of them safe to use." />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     /* page-local: lightweight inline bars, in the site palette */
     .bar { display:inline-block; height:11px; border-radius:2px; vertical-align:middle;
@@ -32,33 +32,69 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -66,15 +102,11 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -331,7 +363,7 @@
     <p>The arms above were built on the tight reconstruction, and part of what they repaired was the
       reconstruction. The same four sandwiches have now been run on the fair bases: Timestral-209M and
       t0-gamma on their native 21 levels, and TimesFM 3.0, TimesFM 2.5, TiRex and Chronos through the
-      generous reconstruction, plus the PyMC-forecast challenger (a Student-t regression on lagged
+      generous reconstruction, plus the PyMC-forecast model (a Student-t regression on lagged
       changes, fit by ADVI) on the monthly stratum. Each arm is paired with its standalone run on
       identical series and windows; <code>~lap</code> and <code>@lap</code> need a longer warm-up
       window, so their series counts are smaller. Median per-series &Delta; log-likelihood against
@@ -340,27 +372,27 @@
       <thead><tr><th>stratum</th><th>base</th><th class="num">standalone</th><th class="num">+lap</th>
       <th class="num">~lap</th><th class="num">@lap</th><th class="num">&amp;lap</th></tr></thead>
       <tbody>
-      <tr><td>economic change-series, weekly</td><td>Timestral</td><td class="num">+0.044 <span style="color:var(--muted)">(3,013)</span></td><td class="num">+0.019 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.283 <span style="color:var(--muted)">(3,011)</span></td><td class="num">+0.005 <span style="color:var(--muted)">(3,011)</span></td><td class="num">+0.028 <span style="color:var(--muted)">(3,011)</span></td></tr>
-<tr><td>economic change-series, weekly</td><td>t0-gamma</td><td class="num">-0.012 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.044 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.358 <span style="color:var(--muted)">(3,011)</span></td><td class="num">-0.031 <span style="color:var(--muted)">(3,011)</span></td><td class="num">+0.021 <span style="color:var(--muted)">(3,011)</span></td></tr>
-<tr><td>economic change-series, weekly</td><td>TimesFM3</td><td class="num">+0.001 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.136 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.263 <span style="color:var(--muted)">(3,011)</span></td><td class="num">-0.096 <span style="color:var(--muted)">(3,011)</span></td><td class="num">-0.007 <span style="color:var(--muted)">(3,011)</span></td></tr>
-<tr><td>economic change-series, weekly</td><td>TimesFM</td><td class="num">-0.030 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.244 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.343 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.124 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.014 <span style="color:var(--muted)">(2,918)</span></td></tr>
-<tr><td>economic change-series, weekly</td><td>TiRex</td><td class="num">-0.143 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.239 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.343 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.114 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.020 <span style="color:var(--muted)">(2,918)</span></td></tr>
-<tr><td>economic change-series, weekly</td><td>Chronos</td><td class="num">-0.218 <span style="color:var(--muted)">(2,930)</span></td><td class="num">-0.302 <span style="color:var(--muted)">(2,930)</span></td><td class="num">-0.349 <span style="color:var(--muted)">(2,928)</span></td><td class="num">-0.094 <span style="color:var(--muted)">(2,928)</span></td><td class="num">-0.018 <span style="color:var(--muted)">(2,928)</span></td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td>Timestral</td><td class="num">+0.105 <span style="color:var(--muted)">(5,576)</span></td><td class="num">+0.047 <span style="color:var(--muted)">(5,576)</span></td><td class="num">-0.214 <span style="color:var(--muted)">(5,195)</span></td><td class="num">+0.057 <span style="color:var(--muted)">(5,195)</span></td><td class="num">+0.031 <span style="color:var(--muted)">(5,195)</span></td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td>t0-gamma</td><td class="num">+0.061 <span style="color:var(--muted)">(5,576)</span></td><td class="num">+0.029 <span style="color:var(--muted)">(5,576)</span></td><td class="num">-0.274 <span style="color:var(--muted)">(5,195)</span></td><td class="num">+0.020 <span style="color:var(--muted)">(5,195)</span></td><td class="num">+0.016 <span style="color:var(--muted)">(5,195)</span></td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td>TimesFM3</td><td class="num">+0.046 <span style="color:var(--muted)">(5,576)</span></td><td class="num">-0.057 <span style="color:var(--muted)">(5,576)</span></td><td class="num">-0.246 <span style="color:var(--muted)">(5,195)</span></td><td class="num">-0.002 <span style="color:var(--muted)">(5,195)</span></td><td class="num">+0.003 <span style="color:var(--muted)">(5,195)</span></td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td>TimesFM</td><td class="num">-0.011 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.103 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.235 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.055 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.011 <span style="color:var(--muted)">(2,700)</span></td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td>TiRex</td><td class="num">-0.001 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.097 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.263 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.048 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.008 <span style="color:var(--muted)">(2,700)</span></td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td>Chronos</td><td class="num">-0.069 <span style="color:var(--muted)">(2,930)</span></td><td class="num">-0.121 <span style="color:var(--muted)">(2,930)</span></td><td class="num">-0.292 <span style="color:var(--muted)">(2,710)</span></td><td class="num">-0.069 <span style="color:var(--muted)">(2,710)</span></td><td class="num">-0.016 <span style="color:var(--muted)">(2,710)</span></td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td>PyMC-forecast</td><td class="num">-0.067 <span style="color:var(--muted)">(471)</span></td><td class="num">-0.067 <span style="color:var(--muted)">(471)</span></td><td class="num">-0.356 <span style="color:var(--muted)">(354)</span></td><td class="num">-0.101 <span style="color:var(--muted)">(354)</span></td><td class="num">-0.016 <span style="color:var(--muted)">(354)</span></td></tr>
+      <tr><td>economic change-series, weekly</td><td>Timestral</td><td class="num">+0.045 <span style="color:var(--muted)">(3,013)</span></td><td class="num">+0.023 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.278 <span style="color:var(--muted)">(3,011)</span></td><td class="num">+0.007 <span style="color:var(--muted)">(3,011)</span></td><td class="num">+0.032 <span style="color:var(--muted)">(3,011)</span></td></tr>
+<tr><td>economic change-series, weekly</td><td>t0-gamma</td><td class="num">-0.008 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.036 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.358 <span style="color:var(--muted)">(3,011)</span></td><td class="num">-0.027 <span style="color:var(--muted)">(3,011)</span></td><td class="num">+0.025 <span style="color:var(--muted)">(3,011)</span></td></tr>
+<tr><td>economic change-series, weekly</td><td>TimesFM3</td><td class="num">+0.001 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.128 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.256 <span style="color:var(--muted)">(3,011)</span></td><td class="num">-0.089 <span style="color:var(--muted)">(3,011)</span></td><td class="num">-0.002 <span style="color:var(--muted)">(3,011)</span></td></tr>
+<tr><td>economic change-series, weekly</td><td>TimesFM</td><td class="num">-0.024 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.237 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.343 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.124 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.011 <span style="color:var(--muted)">(2,918)</span></td></tr>
+<tr><td>economic change-series, weekly</td><td>TiRex</td><td class="num">-0.145 <span style="color:var(--muted)">(3,000)</span></td><td class="num">-0.239 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.343 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.108 <span style="color:var(--muted)">(2,918)</span></td><td class="num">-0.017 <span style="color:var(--muted)">(2,918)</span></td></tr>
+<tr><td>economic change-series, weekly</td><td>Chronos</td><td class="num">-0.222 <span style="color:var(--muted)">(3,013)</span></td><td class="num">-0.293 <span style="color:var(--muted)">(2,930)</span></td><td class="num">-0.349 <span style="color:var(--muted)">(2,928)</span></td><td class="num">-0.090 <span style="color:var(--muted)">(2,928)</span></td><td class="num">-0.015 <span style="color:var(--muted)">(2,928)</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td>Timestral</td><td class="num">+0.108 <span style="color:var(--muted)">(5,600)</span></td><td class="num">+0.048 <span style="color:var(--muted)">(5,600)</span></td><td class="num">-0.214 <span style="color:var(--muted)">(5,219)</span></td><td class="num">+0.061 <span style="color:var(--muted)">(5,219)</span></td><td class="num">+0.031 <span style="color:var(--muted)">(5,219)</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td>t0-gamma</td><td class="num">+0.063 <span style="color:var(--muted)">(5,600)</span></td><td class="num">+0.032 <span style="color:var(--muted)">(5,600)</span></td><td class="num">-0.269 <span style="color:var(--muted)">(5,219)</span></td><td class="num">+0.021 <span style="color:var(--muted)">(5,219)</span></td><td class="num">+0.015 <span style="color:var(--muted)">(5,219)</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td>TimesFM3</td><td class="num">+0.048 <span style="color:var(--muted)">(5,600)</span></td><td class="num">-0.055 <span style="color:var(--muted)">(5,600)</span></td><td class="num">-0.245 <span style="color:var(--muted)">(5,219)</span></td><td class="num">-0.002 <span style="color:var(--muted)">(5,219)</span></td><td class="num">+0.003 <span style="color:var(--muted)">(5,219)</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td>TimesFM</td><td class="num">-0.009 <span style="color:var(--muted)">(3,000)</span></td><td class="num">-0.098 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.232 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.054 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.010 <span style="color:var(--muted)">(2,700)</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td>TiRex</td><td class="num">+0.000 <span style="color:var(--muted)">(3,000)</span></td><td class="num">-0.094 <span style="color:var(--muted)">(2,920)</span></td><td class="num">-0.263 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.049 <span style="color:var(--muted)">(2,700)</span></td><td class="num">-0.008 <span style="color:var(--muted)">(2,700)</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td>Chronos</td><td class="num">-0.063 <span style="color:var(--muted)">(3,719)</span></td><td class="num">-0.121 <span style="color:var(--muted)">(2,930)</span></td><td class="num">-0.289 <span style="color:var(--muted)">(2,710)</span></td><td class="num">-0.070 <span style="color:var(--muted)">(2,710)</span></td><td class="num">-0.013 <span style="color:var(--muted)">(2,710)</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td>PyMC-forecast</td><td class="num">-0.061 <span style="color:var(--muted)">(471)</span></td><td class="num">-0.060 <span style="color:var(--muted)">(471)</span></td><td class="num">-0.348 <span style="color:var(--muted)">(354)</span></td><td class="num">-0.097 <span style="color:var(--muted)">(354)</span></td><td class="num">-0.010 <span style="color:var(--muted)">(354)</span></td></tr>
       </tbody>
     </table>
     <p>With no reconstruction defect to repair, the wraps mostly cost accuracy. Replacing the model's
       scale with Laplace's residual scale (<code>~lap</code>) lowers the median in 19 of 19
       economic cells, by -0.35 (t0-gamma, weekly) to
-      -0.12 nats (Chronos, daily econ). Forecasting the model's normal
-      scores (<code>@lap</code>) lowers it in 17 of 19, from -0.14
-      (TimesFM, daily econ) to +0.12
+      -0.13 nats (Chronos, weekly). Forecasting the model's normal
+      scores (<code>@lap</code>) lowers it in 17 of 19, from -0.15
+      (TimesFM, daily econ) to +0.13
       (Chronos, weekly): it still helps the weakest base and costs the
       strongest. The standalone fair bases cover 0.82 to 0.91 at the 90% level;
       <code>@lap</code> pushes that to 0.93 to 0.96, past the target, and
@@ -369,16 +401,16 @@
     <table>
       <thead><tr><th>stratum</th><th>Timestral</th><th>t0-gamma</th><th>TimesFM3</th><th>TimesFM</th><th>TiRex</th><th>Chronos</th><th>PyMC-forecast</th></tr></thead>
       <tbody>
-      <tr><td>economic change-series, business-daily</td><td class="num">27% &rarr; 31%</td><td class="num">33% &rarr; 32%</td><td class="num">28% &rarr; 32%</td><td class="num">32% &rarr; 31%</td><td class="num">35% &rarr; 31%</td><td class="num">44% &rarr; 31%</td><td class="num">&ndash;</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">24% &rarr; 15%</td><td class="num">29% &rarr; 15%</td><td class="num">21% &rarr; 16%</td><td class="num">24% &rarr; 15%</td><td class="num">31% &rarr; 16%</td><td class="num">38% &rarr; 16%</td><td class="num">&ndash;</td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">7% &rarr; 5%</td><td class="num">10% &rarr; 5%</td><td class="num">11% &rarr; 5%</td><td class="num">15% &rarr; 6%</td><td class="num">12% &rarr; 6%</td><td class="num">19% &rarr; 6%</td><td class="num">23% &rarr; 7%</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">10% &rarr; 0%</td><td class="num">27% &rarr; 0%</td><td class="num">31% &rarr; 0%</td><td class="num">25% &rarr; 0%</td><td class="num">22% &rarr; 0%</td><td class="num">30% &rarr; 0%</td><td class="num">&ndash;</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">4% &rarr; 4%</td><td class="num">1% &rarr; 5%</td><td class="num">3% &rarr; 5%</td><td class="num">5% &rarr; 6%</td><td class="num">5% &rarr; 6%</td><td class="num">13% &rarr; 6%</td><td class="num">&ndash;</td></tr>
+      <tr><td>economic change-series, business-daily</td><td class="num">27% &rarr; 31%</td><td class="num">32% &rarr; 31%</td><td class="num">28% &rarr; 32%</td><td class="num">32% &rarr; 31%</td><td class="num">35% &rarr; 32%</td><td class="num">42% &rarr; 32%</td><td class="num">&ndash;</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">24% &rarr; 14%</td><td class="num">29% &rarr; 14%</td><td class="num">21% &rarr; 15%</td><td class="num">24% &rarr; 15%</td><td class="num">32% &rarr; 15%</td><td class="num">38% &rarr; 16%</td><td class="num">&ndash;</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">7% &rarr; 5%</td><td class="num">10% &rarr; 5%</td><td class="num">11% &rarr; 5%</td><td class="num">15% &rarr; 6%</td><td class="num">12% &rarr; 6%</td><td class="num">19% &rarr; 6%</td><td class="num">22% &rarr; 6%</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">10% &rarr; 0%</td><td class="num">27% &rarr; 0%</td><td class="num">32% &rarr; 0%</td><td class="num">25% &rarr; 0%</td><td class="num">22% &rarr; 0%</td><td class="num">30% &rarr; 0%</td><td class="num">&ndash;</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">4% &rarr; 4%</td><td class="num">1% &rarr; 5%</td><td class="num">2% &rarr; 5%</td><td class="num">4% &rarr; 6%</td><td class="num">4% &rarr; 6%</td><td class="num">12% &rarr; 6%</td><td class="num">&ndash;</td></tr>
       </tbody>
     </table>
     <p>The portfolio lowers the loss rate in 24 of 31 base-stratum
-      cells; the exceptions are Timestral on daily econ; TimesFM3 on daily econ; Timestral on price; t0-gamma on price; TimesFM3 on price; TimesFM on price; TiRex on price. Its median moves by -0.07 (Timestral, monthly) to
-      +0.20 nats (Chronos, weekly) against the standalone base:
+      cells; the exceptions are Timestral on daily econ; TimesFM3 on daily econ; Timestral on price; t0-gamma on price; TimesFM3 on price; TimesFM on price; TiRex on price. Its median moves by -0.08 (Timestral, monthly) to
+      +0.21 nats (Chronos, weekly) against the standalone base:
       a strong base gives up part of its lead for the lower loss rate, a weak base is pulled most of
       the way back to Laplace. The reading for the strongest base is on
       <a href="/foundation/timestral.html">Timestral's page</a>: no sandwich improves it at the
@@ -389,7 +421,7 @@
       An earlier version of the home-page figure showed this construction edging laplace, from a
       July study with a frozen pre-test fit and a typed speed table. Through the canonical protocol,
       paired against laplace on the first 500 series of each economic stratum, the median is below
-      zero on every stratum: daily econ -0.052 (61W/248D/191L of 500); weekly -0.012 (83W/355D/61L of 499); monthly -0.015 (81W/321D/69L of 471). That claim is withdrawn.</p>
+      zero on every stratum: daily econ -0.052 (65W/233D/202L of 500); weekly -0.012 (88W/352D/59L of 499); monthly -0.010 (98W/318D/55L of 471). That claim is withdrawn.</p>
     <!-- fairbase:end -->
 
     <h2>Open items</h2>
@@ -402,10 +434,8 @@
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://github.com/microprediction">microprediction</a> family
-    (see also <a href="https://github.com/microprediction/precise">precise</a>,
-    <a href="https://github.com/microprediction/allocation">allocation</a>,
-    <a href="https://github.com/microprediction/humpday">humpday</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 
   <script>

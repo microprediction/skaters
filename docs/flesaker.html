@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — flesaker</title>
+  <meta name="description" content="flesaker: laplace for a series that never crosses a known bound. Forecast log(y), map back through exp." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — flesaker" />
+  <meta property="og:description" content="flesaker: laplace for a series that never crosses a known bound. Forecast log(y), map back through exp." />
+  <meta property="og:url" content="https://skaters.microprediction.org/flesaker.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="academic.css?v=20261117" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>flesaker</h1>
+    <p class="subtitle">laplace for a series that never crosses a known bound.</p>
+
+    <p><code>flesaker</code> forecasts log(<em>y</em> &minus; <em>b</em>) with <code>laplace</code> and
+      maps the forecast back through <em>b</em> + exp. Every quantile it reports lies above the bound,
+      the predictive keeps the skew of the map, and its log density includes the Jacobian. Use it for
+      a rate, a price, a volume or a volatility: anything you know is positive, especially when it can
+      get close to zero.</p>
+<pre>pip install skaters
+
+from skaters import flesaker
+
+f = flesaker(k=8)            # lower=0 by default
+state = None
+for y in observations:
+    dists, state = f(y, state)
+
+dists[0].quantile(0.01)      # always &gt; 0
+state["z"], state["pit"]     # laplace's own, unchanged by the map</pre>
+
+    <h2 id="demo">Live</h2>
+    <p>Grey is plain <code>laplace</code> on the same series; red is the probability it puts below
+      zero. <a href="/demos/flesaker.html">Full demo page</a> &middot;
+      <a href="https://lnkd.in/p/eidtb3KY">Discuss</a>.</p>
+    <iframe id="flesaker-embed" src="/demos/flesaker.html?embed" title="flesaker, live"
+      loading="lazy" style="width:100%;height:760px;border:0;display:block;margin:8px 0 28px;"></iframe>
+    <script>
+      addEventListener("message", (e) => {
+        const h = e.data && e.data.flesakerHeight;
+        if (h) document.getElementById("flesaker-embed").style.height = (h + 8) + "px";
+      });
+    </script>
+
+    <h2 id="options">Options</h2>
+    <table>
+      <thead><tr><th>call</th><th>support</th></tr></thead>
+      <tbody>
+        <tr><td><code>flesaker()</code></td><td>(0, &infin;)</td></tr>
+        <tr><td><code>flesaker(lower=-3.0)</code></td><td>(&minus;3, &infin;)</td></tr>
+        <tr><td><code>flesaker(upper=1.0)</code></td><td>(&minus;&infin;, 1)</td></tr>
+        <tr><td><code>flesaker(k=8, tails="gaussian")</code></td><td>other keywords go to <code>laplace</code></td></tr>
+      </tbody>
+    </table>
+    <p>Every finite observation must lie strictly inside the bound, or <code>flesaker</code> raises
+      <code>ValueError</code>. A series with exact zeros needs the floor set a little below zero.
+      Missing values pass through to <code>laplace</code>. The same model by hand is
+      <code>conjugate(laplace(), log_transform(lower=0.0))</code>.</p>
+
+    <h2 id="scoring">Scoring across the map</h2>
+    <p>The log score moves between coordinates exactly: the Jacobian term depends on the observation,
+      not the forecast, so differences between forecasters are the same in <em>y</em> and in
+      log <em>y</em>. PIT values and coverage are unchanged too. CRPS and pinball loss are not: they
+      integrate over <em>y</em>, so the map reweights them, and two forecasters can rank differently
+      in levels than in logs. Score <code>flesaker</code> in the units you care about.</p>
+    <p>The same applies inside the model. <code>laplace</code> fits its terminal leaves to CRPS by
+      default, and inside <code>flesaker</code> that CRPS is measured in log units.
+      <code>flesaker(objective="likelihood")</code> fits to the log score instead, which gives the same
+      fit whichever coordinates it is computed in.</p>
+
+    <h2 id="measured">Measured on a synthetic rate</h2>
+    <p>A mean-reverting rate that dips from about 0.5 to about 0.05 and back, 600 points. It is
+      generated on the log scale, so the comparison favours <code>flesaker</code> by construction.
+      Source: <a href="https://github.com/microprediction/skaters/blob/main/examples/positive_series.py"><code>examples/positive_series.py</code></a>.</p>
+    <table>
+      <thead><tr><th>skater</th><th>mean log score</th><th>80% coverage</th><th>max P(Y&lt;0)</th></tr></thead>
+      <tbody>
+        <tr><td><code>laplace()</code></td><td>1.289</td><td>79.4%</td><td>0.329</td></tr>
+        <tr><td><code>flesaker()</code></td><td><strong>1.665</strong></td><td>84.4%</td><td><strong>0.000</strong></td></tr>
+        <tr><td><code>laplace</code> on Yeo&ndash;Johnson</td><td>1.449</td><td>78.2%</td><td>0.223</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="status">Status</h2>
+    <p class="callout"><code>flesaker</code> is not part of the official API and is not cross-port: it is
+      experimental and Python only, from 0.17.0. There are many possible domains (positive, bounded
+      above, inside an interval, on a circle), and skaters provides a clean way to add your own:
+      write the transform and conjugate <code>laplace</code> by it, as
+      <code>conjugate(laplace(), log_transform(lower=0.0))</code> does here. We lean towards making
+      <code>flesaker</code> permanent if people keep making YouTube videos criticising the fact that an
+      inanimate library doesn't know ahead of time that a series will always be positive (but maybe
+      you do).</p>
+    <p>Named after Bjorn Flesaker, whose positive-interest framework with Hughston builds the
+      guarantee that rates stay positive into the model. His interest-rate work was decidedly less
+      trivial than this little homage.</p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
+  </footer>
+</body>
+</html>

@@ -226,7 +226,7 @@ def ema_transform(alpha: float = 0.05):
         add = 0.0            # alpha^2 * sum_{i<h} var_i: the level's accumulated response
         for d in dists:
             if add > 0.0:
-                out.append(Dist([(w, m + level, math.sqrt(s * s + add)) for w, m, s in d.components]))
+                out.append(_widen(d, level, add))
             else:
                 out.append(d.shift(level))
             add += alpha * alpha * d.var
@@ -653,8 +653,7 @@ def seasonal_difference(period: int = 12):
             recovered_means.append(dists[h].mean + anchor_mean)
             recovered_vars.append(dists[h].var + anchor_var)
             if anchor_var > 0.0:
-                result.append(Dist([(w, m + anchor_mean, math.sqrt(s * s + anchor_var))
-                                    for w, m, s in dists[h].components]))
+                result.append(_widen(dists[h], anchor_mean, anchor_var))
             else:
                 result.append(dists[h].shift(anchor_mean))
         return result
@@ -745,8 +744,7 @@ def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
             else:
                 ema_resp[p] = [(1.0 - alpha) * ema_resp[p][i] + alpha * r[i] for i in range(H)]
             if a_var > 0.0:
-                out.append(Dist([(w, m + a_mean, math.sqrt(s * s + a_var))
-                                 for w, m, s in dists[h].components]))
+                out.append(_widen(dists[h], a_mean, a_var))
             else:
                 out.append(dists[h].shift(a_mean))
         return out
@@ -851,8 +849,26 @@ def seasonal_scale(period: int, alpha: float = 0.05, center: bool = False,
 # Signed power transform (works on any real value)
 # ---------------------------------------------------------------------------
 
-def _exact_inverse_k(inv_fn):
-    """Build an inverse_k that emits the exact pushforward.
+def _widen(d, delta: float, add: float):
+    """Shift by ``delta`` and add independent Gaussian variance ``add``.
+
+    Exact for a Gaussian mixture (each component widens). A tail-spliced
+    predictive has no components to widen, so its body widens and the GPD
+    splice, which lives in the body's PIT space, follows it.
+    """
+    from skaters.tails import SplicedDist
+    if isinstance(d, SplicedDist):
+        return d._with_body(_widen(d.body, delta, add), False)
+    return Dist([(w, m + delta, math.sqrt(s * s + add)) for w, m, s in d.components])
+
+
+def _has_components(d) -> bool:
+    from skaters.pushforward import PushforwardDist
+    return not isinstance(d, PushforwardDist) and getattr(d, "components", None) is not None
+
+
+def _pushforward(d, inv_fn):
+    """The exact pushforward of ``d`` through the monotone map ``inv_fn``.
 
     The table window adapts to each predictive: [m - 10s, m + 10s] over the
     mixture. A fixed window fails in level coordinates (positive levels live
@@ -860,15 +876,23 @@ def _exact_inverse_k(inv_fn):
     everything beyond a table extrapolates with the wrong curvature.
     """
     from skaters.pushforward import PushforwardDist, table_from_map
+    if _has_components(d):
+        comps = d.components
+        lo = min(m - 10.0 * s for _, m, s in comps)
+        hi = max(m + 10.0 * s for _, m, s in comps)
+    else:
+        # no mixture to read (e.g. laplace's tail-spliced SplicedDist):
+        # pad its extreme quantiles by their own span on each side
+        q_lo, q_hi = d.quantile(1e-6), d.quantile(1.0 - 1e-6)
+        lo, hi = 2.0 * q_lo - q_hi, 2.0 * q_hi - q_lo
+    ys, zs = table_from_map(inv_fn, lo, hi)
+    return PushforwardDist(d, ys, zs, inv_fn=inv_fn)
 
+
+def _exact_inverse_k(inv_fn):
+    """Build an inverse_k that emits the exact pushforward."""
     def inverse_k(dists: list, state: dict) -> list:
-        out = []
-        for d in dists:
-            lo = min(m - 10.0 * s for _, m, s in d.components)
-            hi = max(m + 10.0 * s for _, m, s in d.components)
-            ys, zs = table_from_map(inv_fn, lo, hi)
-            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
-        return out
+        return [_pushforward(d, inv_fn) for d in dists]
 
     return inverse_k
 
@@ -912,6 +936,9 @@ def power_transform(p: float = 0.5, exact: bool = False):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         result = []
         for d in dists:
+            if getattr(d, "components", None) is None:   # tail-spliced: exact pushforward
+                result.append(_pushforward(d, _inv))
+                continue
             components = []
             for w, mu, sigma in d.components:
                 orig_mean = _inv(mu)
@@ -934,10 +961,9 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 
     A one-parameter family that picks the *coordinate in which the series is
     simple*. It subsumes log (lmbda=0, on the shifted level), identity
-    (lmbda=1), and reciprocal-ish (lmbda<0) shapes, but unlike Box-Cox it is
-    defined for all reals (no positivity requirement) — so the same primitive
-    expresses a non-negativity prior (lmbda~0 makes the inverse predictive
-    non-negative for non-negative data) and a generic re-scaling prior.
+    (lmbda=1), and reciprocal-ish (lmbda<0) shapes. Both positive and negative
+    observations have a branch. At lmbda=0 the inverse predictive can assign
+    mass anywhere on the real line, even for strictly positive observations.
 
     Forward:
         y >= 0:  ((y+1)**L - 1) / L            (L != 0);   log(y+1)      (L == 0)
@@ -1007,6 +1033,9 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         result = []
         for d in dists:
+            if getattr(d, "components", None) is None:   # tail-spliced: exact pushforward
+                result.append(_pushforward(d, _inv))
+                continue
             comps = []
             for w, mu, sigma in d.components:
                 comps.append((w, _inv(mu), max(sigma * _dinv(mu), 1e-12)))
@@ -1017,8 +1046,105 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
 
 
 # ---------------------------------------------------------------------------
+# Log coordinate with a one-sided bound
+# ---------------------------------------------------------------------------
+
+def log_transform(lower: float | None = None, upper: float | None = None):
+    """Log coordinate for a series with a one-sided bound.
+
+    Forward:   y' = log(y - lower)        (lower bound; the default, lower = 0)
+               y' = -log(upper - y)       (upper bound)
+    Inverse:   the exact pushforward through the inverse map, so the
+               predictive in y keeps the skew of the coordinate change, its
+               logpdf includes the Jacobian, and every quantile it reports
+               lies on the right side of the bound.
+
+    PIT values are invariant under the map. A finite observation on or past
+    the bound raises ``ValueError``. Missing observations pass through for
+    the inner skater to handle. Quantiles that round to the bound are rounded
+    inward by one floating-point step. A quantile beyond the representable
+    range returns the corresponding infinity. Experimental, alongside
+    :func:`skaters.api.flesaker`.
+
+    Args:
+        lower: the lower bound (default 0 when neither bound is given).
+        upper: the upper bound. Give one bound, not both.
+    """
+    from skaters.parade import _missing
+    from skaters.pushforward import PushforwardDist, _exp_or_inf
+
+    if lower is not None and upper is not None:
+        raise ValueError("log_transform takes one bound: lower or upper")
+    b = float(upper if upper is not None else (0.0 if lower is None else lower))
+    if not math.isfinite(b):
+        raise ValueError("log_transform needs a finite bound")
+    direction = -1.0 if upper is not None else 1.0
+    bound_label = "upper" if upper is not None else "lower"
+    log_two = math.log(2.0)
+
+    def _fwd_query(y: float) -> float:
+        gap = direction * (y - b)
+        if gap <= 0.0:
+            return -direction * math.inf
+        if math.isinf(gap):
+            # A gap between finite floats can overflow even when its log fits.
+            half_gap = direction * (0.5 * y - 0.5 * b)
+            return direction * (math.log(half_gap) + log_two)
+        return direction * math.log(gap)
+
+    def _inverse_at_scale(z: float, weight: float) -> float:
+        bound = weight * b
+        log_gap = direction * z + math.log(weight)
+        gap = _exp_or_inf(log_gap)
+        if math.isinf(gap):
+            # The shift by the bound can bring an overflowing gap into range.
+            return 2.0 * (0.5 * bound + direction * _exp_or_inf(log_gap - log_two))
+        return bound + direction * gap
+
+    def _inv(z: float) -> float:
+        y = _inverse_at_scale(z, 1.0)
+        return math.nextafter(b, direction * math.inf) if y == b else y
+
+    def _log_jacobian(z: float) -> float:
+        return -direction * z
+
+    def _moments(m: float, s: float) -> tuple[float, float]:
+        variance = s * s
+        log_mean_gap = direction * m + 0.5 * variance
+        mean = _inverse_at_scale(direction * log_mean_gap, 1.0)
+        if s == 0.0:
+            return mean, 0.0
+        # log(sqrt(expm1(s**2))) remains stable as the spread approaches zero
+        # or grows large, where the correction to s**2 / 2 rounds to zero.
+        if variance < 1e-16:
+            log_relative_std = math.log(s)
+        elif variance > 40.0:
+            log_relative_std = 0.5 * variance
+        else:
+            log_relative_std = 0.5 * math.log(math.expm1(variance))
+        return mean, _exp_or_inf(log_mean_gap + log_relative_std)
+
+    def forward(y: float, state: dict | None) -> tuple[float, dict]:
+        if _missing(y):
+            return y, state or {}
+        z = _fwd_query(y)
+        if z == -direction * math.inf:
+            raise ValueError(f"log_transform: observation {y!r} must lie inside {bound_label}={b}")
+        return z, state or {}
+
+    def inverse_k(dists: list, state: dict) -> list:
+        return [PushforwardDist(d, inv_fn=_inv, fwd_fn=_fwd_query,
+                                log_jacobian_fn=_log_jacobian, component_moments_fn=_moments,
+                                scaled_inv_fn=_inverse_at_scale)
+                for d in dists]
+
+    return forward, inverse_k
+
+
+# ---------------------------------------------------------------------------
 # AR(p) transform with online recursive least squares
 # ---------------------------------------------------------------------------
+
 
 def _ar_spectral_radius(phi: list[float]) -> float:
     """Spectral radius of the AR companion matrix (largest |characteristic root|).
@@ -1649,7 +1775,7 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
                 cs, zs = _emin_knots(buf, cs, zs, idxs)
             else:
                 _cap_slopes(cs, zs)
-            return cs, zs, None
+            return [cs, zs, None]           # a list: state is plain data
         # kernel-smoothed CDF on the sketch, Silverman bandwidth
         mm = len(cs)
         i1, i3 = mm // 4, 3 * mm // 4
@@ -1679,7 +1805,7 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
         if len(cs2) < 2:
             return None
         _cap_slopes(cs2, zs2)
-        return cs2, zs2, _tangents(cs2, zs2)
+        return [cs2, zs2, _tangents(cs2, zs2)]
 
     def _fwd(y, knots):
         cs, zs, ts = knots
@@ -1751,6 +1877,9 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
             return [d.affine(sigma, mu) for d in dists]
         result = []
         for d in dists:
+            if getattr(d, "components", None) is None:   # tail-spliced: exact pushforward
+                result.append(_pushforward(d, lambda z: _inv(z, knots)))
+                continue
             comps = []
             for w, mu, sig in d.components:
                 pts = [_inv(mu + sig * q, knots) for q in _mids]

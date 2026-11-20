@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters &mdash; footprint</title>
   <meta name="description" content="What it costs to carry skaters: source size per port, dependencies, import time, checkpoint bytes and resident memory of a live laplace, all measured." />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     table.fp { border-collapse: collapse; margin: 0 0 26px; width: 100%; }
     table.fp th, table.fp td { border-bottom: 1px solid #e3e3e3; padding: 6px 10px; text-align: left; font-size: 0.94em; }
@@ -20,33 +20,69 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -54,15 +90,11 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -80,17 +112,17 @@
     <table class="fp">
       <thead><tr><th>item</th><th>measured</th><th>how</th></tr></thead>
       <tbody>
-      <tr><td>Python reference, source</td><td>292 KB, 7,284 lines in 28 files</td><td class="muted">the whole library, standard library only; skaters.torch excluded</td></tr>
+      <tr><td>Python reference, source</td><td>318 KB, 7,909 lines in 29 files</td><td class="muted">the whole library, standard library only; skaters.torch excluded</td></tr>
       <tr><td>Declared dependencies</td><td>none</td><td class="muted">pyproject.toml; numpy is not required</td></tr>
       <tr><td>Published wheel</td><td>106 KB (skaters 0.16.0 on PyPI)</td><td class="muted">what pip downloads</td></tr>
-      <tr><td>Import time</td><td>22 ms</td><td class="muted">fresh interpreter, median of 5</td></tr>
+      <tr><td>Import time</td><td>29 ms</td><td class="muted">fresh interpreter, median of 5</td></tr>
       <tr><td>laplace(1) checkpoint</td><td>23 KB</td><td class="muted">pickled state after 500 observations</td></tr>
       <tr><td>laplace(3) checkpoint</td><td>132 KB</td><td class="muted">pickled state after 500 observations</td></tr>
       <tr><td>laplace(1) resident memory</td><td>192 KB</td><td class="muted">tracemalloc, one instance, 500 steps; peak 204 KB</td></tr>
       <tr><td>laplace(3) resident memory</td><td>1027 KB</td><td class="muted">tracemalloc, one instance, 500 steps; peak 1067 KB</td></tr>
-      <tr><td>JavaScript port, source</td><td>114 KB, 3,148 lines</td><td class="muted">ES modules, no dependencies; runs in the browser</td></tr>
-      <tr><td>Rust core, source</td><td>149 KB, 4,855 lines</td><td class="muted">the fast backend and the wasm build</td></tr>
-      <tr><td>skaters_fast binary</td><td>1491 KB</td><td class="muted">the compiled PyO3 extension, this machine</td></tr>
+      <tr><td>JavaScript port, source</td><td>126 KB, 3,449 lines</td><td class="muted">ES modules, no dependencies; runs in the browser</td></tr>
+      <tr><td>Rust core, source</td><td>166 KB, 5,355 lines</td><td class="muted">the fast backend and the wasm build</td></tr>
+      <tr><td>skaters_fast binary</td><td>n/a</td><td class="muted">the compiled PyO3 extension, this machine</td></tr>
       </tbody>
     </table>
 
@@ -105,15 +137,14 @@
 
     <h2>Reproducing this</h2>
 <pre><code>PYTHONPATH=src python benchmarks/footprint.py</code></pre>
-    <p class="stamp">Measured 2026-10-28 on arm64, Python 3.13.7,
-      commit 4fa186b.</p>
+    <p class="stamp">Measured 2026-11-16 on arm64, Python 3.12.13,
+      commit 38c4939.</p>
   </main>
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

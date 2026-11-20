@@ -56,10 +56,14 @@ import numpy as np
 
 warnings.filterwarnings("ignore")
 logging.disable(logging.WARNING)
-import torch                                                    # noqa: E402
+try:
+    import torch                                                # noqa: E402
+except ModuleNotFoundError:                                     # a venv without torch (csp) times no torch model
+    torch = None
 
 THREADS = int(os.environ.get("TORCH_THREADS", "1"))
-torch.set_num_threads(THREADS)
+if torch is not None:
+    torch.set_num_threads(THREADS)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 L = int(os.environ.get("PERF_L", "256"))
@@ -106,7 +110,46 @@ GROUPS = {
     "timeh2o": ("TimeH2O-",),
     "learned": ("laplace++",),
     "classical2": ("AutoTheta", "GARCH-t", "ARIMA (order fixed"),
+    # #329 models, timed through the study's own adapter functions
+    "chronos2": ("Chronos-2",),
+    "tirex2": ("TiRex-2",),
+    "toto2": ("Toto 2.0",),
+    "ttm3": ("TTM-R3",),
+    "moirai2": ("Moirai 2.0",),
+    "tinycast": ("TinyCast",),
+    # #355 models and the conformal baseline, each in its own venv
+    "simons": ("Simons-297M", "Simons-60M"),
+    "ciproto": ("ci-proto",),
+    "hirondel": ("Hirondel-7M",),
+    "iamtime": ("iAmTime-base",),
+    "timessm": ("TimeSSM-2.5M",),
+    "csp": ("CSP",),
 }
+
+
+def _adapters():
+    """arm_adapters with the #329 adapters: PERF_ARM_ADAPTERS names the file when
+    this checkout's copy predates them."""
+    path = os.environ.get("PERF_ARM_ADAPTERS")
+    if not path:
+        import arm_adapters
+        return arm_adapters
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("arm_adapters_329", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _fresh(aa, fn):
+    """Call an adapter's quantile function with its one-window caches cleared, so a
+    repeated timing call pays for the forward pass."""
+    def call(cs, **kw):
+        for memo in ("_ttm3_memo", "_moirai2_memo", "_tinycast_memo", "_QMEMO"):
+            if hasattr(aa, memo):
+                getattr(aa, memo).clear()
+        return fn(np.asarray(cs, dtype=np.float32), h=1, **kw)
+    return call
 
 
 def measure_only(group):
@@ -227,6 +270,48 @@ def measure_only(group):
         t = med(lambda: one_garch(CTX[0]), reps=3) * 1000
         add("GARCH-t (refit)", "cold", t, f"fit on {L} points")
         add("GARCH-t (refit)", "warm", t, "refits from scratch every step")
+    elif group in ("chronos2", "tirex2", "toto2", "ttm3", "moirai2", "tinycast"):
+        aa = _adapters()
+        if group == "chronos2":
+            fm("Chronos-2", _fresh(aa, aa.chronos2_quantiles_from_contexts), "120M params")
+        elif group == "tirex2":
+            fm("TiRex-2", _fresh(aa, aa.tirex2_quantiles_from_contexts), "38.4M params (univariate)")
+        elif group == "toto2":
+            for size, params in (("313m", "313M params"), ("2.5B", "2.45B params")):
+                q = _fresh(aa, aa.toto2_quantiles_from_contexts)
+                fm(f"Toto 2.0 {size.upper()}", lambda cs, q=q, s=size: q(cs, size=s), params)
+        elif group == "ttm3":
+            fm("TTM-R3", _fresh(aa, aa.ttm3_quantiles_from_contexts), "1.48M params")
+        elif group == "moirai2":
+            fm("Moirai 2.0 small", _fresh(aa, aa.moirai2_quantiles_from_contexts), "11.4M params")
+        elif group == "tinycast":
+            fm("TinyCast", _fresh(aa, aa.tinycast_quantiles_from_contexts), "146.5K params")
+    elif group in ("simons", "ciproto", "hirondel", "iamtime", "timessm"):
+        aa = _adapters()
+        if group == "simons":
+            for size, params in (("60M", "60.3M params"), ("297M", "297.2M params")):
+                q = _fresh(aa, aa.simons_quantiles_from_contexts)
+                fm(f"Simons-{size}", lambda cs, q=q, s=size: q(cs, size=s), params)
+        elif group == "ciproto":
+            fm("ci-proto", _fresh(aa, aa.ciproto_quantiles_from_contexts), "167.2M params")
+        elif group == "hirondel":
+            fm("Hirondel-7M", _fresh(aa, aa.hirondel_quantiles_from_contexts), "7.5M params")
+        elif group == "iamtime":
+            fm("iAmTime-base", _fresh(aa, aa.iamtime_quantiles_from_contexts), "302.1M params (21 levels)")
+        elif group == "timessm":
+            fm("TimeSSM-2.5M", _fresh(aa, aa.timessm_quantiles_from_contexts), "2.5M params")
+    elif group == "csp":
+        # the conformal baseline: one fit on the context and one h=1 draw block,
+        # as the study's adapter does at every step (refit each step, 256 samples)
+        from csp_forecaster import ConformalSeasonalPool
+        aa = _adapters()
+        kw = aa.CSP_VARIANTS["default"]
+        def one_csp(cs):
+            for c in cs:
+                f = ConformalSeasonalPool(random_state=np.random.default_rng(0), **kw).fit(
+                    np.asarray(c, dtype=np.float64), seasonal_period=12)
+                f.predict(H=1, n_samples=aa.CSP_NSAMPLES)
+        fm("CSP", one_csp, "csp-forecaster 0.2.0, refit per forecast")
     else:
         raise SystemExit(f"unknown PERF_ONLY group {group!r}; have {sorted(GROUPS)}")
     return rows
@@ -426,7 +511,7 @@ def render(rows, meta):
   <meta property="og:description" content="Measured cost of laplace against foundation models, batch and streaming." />
   <meta property="og:url" content="https://skaters.microprediction.org/performance.html" />
   <meta name="twitter:card" content="summary" />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     .lede {{ color: #555; margin: 0 0 28px; font-size: 1.05em; }}
     table.perf {{ border-collapse: collapse; margin: 0 0 26px; width: 100%; }}
@@ -522,9 +607,8 @@ def render(rows, meta):
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

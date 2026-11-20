@@ -143,36 +143,18 @@ class TorchDist:
         v = self.var
         return torch.where(v > 0, torch.sqrt(torch.clamp(v, min=0.0)), torch.zeros_like(v))
 
-    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100) -> torch.Tensor:
-        """Inverse CDF by the reference bisection; no gradient."""
+    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 2100) -> torch.Tensor:
+        """Inverse CDF by the reference search; no gradient.
+
+        Delegates to :meth:`skaters.dist.Dist.quantile` on the detached
+        components, so the scale-relative tolerance, the float-resolution
+        stop and the atom snap are the reference's own and cannot drift
+        from it (see ``parity/QUANTILE_CONTRACT.md``)."""
         if not 0 < p < 1:
             raise ValueError(f"quantile needs 0 < p < 1, got {p}")
         with torch.no_grad():
-            mu = float(self.mean); sigma = math.sqrt(max(float(self.var), 0.0))
-            lo = mu - 8 * sigma; hi = mu + 8 * sigma
-            width = max(16 * sigma, 1e-12)
-            for _ in range(120):
-                if float(self.cdf(lo)) <= p:
-                    break
-                lo -= width; width *= 2.0
-            else:
-                raise ArithmeticError(f"could not bracket quantile p={p} from below")
-            width = max(16 * sigma, 1e-12)
-            for _ in range(120):
-                if float(self.cdf(hi)) >= p:
-                    break
-                hi += width; width *= 2.0
-            else:
-                raise ArithmeticError(f"could not bracket quantile p={p} from above")
-            for _ in range(max_iter):
-                mid = 0.5 * (lo + hi)
-                if float(self.cdf(mid)) < p:
-                    lo = mid
-                else:
-                    hi = mid
-                if hi - lo < tol:
-                    break
-            return torch.as_tensor(0.5 * (lo + hi), dtype=DTYPE)
+            q = self.to_reference().quantile(p, tol=tol, max_iter=max_iter)
+        return torch.as_tensor(q, dtype=DTYPE)
 
     # --- transform support -----------------------------------------------
 

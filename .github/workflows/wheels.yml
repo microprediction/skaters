@@ -1,8 +1,9 @@
 name: wheels
 
 # Build the skaters-fast (PyO3) abi3 wheel matrix. abi3-py39 means one wheel
-# per platform serves all of CPython >= 3.9. Artifacts only: no PyPI publish
-# (see the commented stanza at the end).
+# per platform serves all of CPython >= 3.9. On a v* tag the publish job uploads
+# them to PyPI as skaters-fast (trusted publisher: microprediction/skaters,
+# wheels.yml, no environment).
 
 on:
   push:
@@ -21,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.9" }
+        with: { python-version: "3.10" }
       - name: build manylinux wheel
         uses: PyO3/maturin-action@v1
         with:
@@ -41,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.9" }
+        with: { python-version: "3.10" }
       - name: build musllinux wheel
         uses: PyO3/maturin-action@v1
         with:
@@ -58,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.9" }
+        with: { python-version: "3.10" }
       - name: build macOS universal2 wheel
         uses: PyO3/maturin-action@v1
         with:
@@ -77,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.9" }
+        with: { python-version: "3.10" }
       - name: build windows wheel
         uses: PyO3/maturin-action@v1
         with:
@@ -102,21 +103,18 @@ jobs:
           name: sdist
           path: dist
 
-  # ---------------------------------------------------------------------------
-  # PyPI publish is intentionally NOT enabled. To turn it on, add a trusted
-  # publisher on PyPI for this project and uncomment:
-  #
-  # publish:
-  #   name: publish to PyPI
-  #   needs: [linux, musllinux, macos, windows, sdist]
-  #   runs-on: ubuntu-latest
-  #   if: startsWith(github.ref, 'refs/tags/v')
-  #   permissions:
-  #     id-token: write        # trusted publishing (OIDC), no API token
-  #   steps:
-  #     - uses: actions/download-artifact@v4
-  #       with: { path: dist, merge-multiple: true }
-  #     - uses: PyO3/maturin-action@v1
-  #       with:
-  #         command: upload
-  #         args: --non-interactive --skip-existing dist/*
+  publish:
+    name: publish to PyPI
+    needs: [linux, musllinux, macos, windows, sdist]
+    runs-on: ubuntu-latest
+    # tags publish; a manual dispatch also publishes (re-run a failed release from main)
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    permissions:
+      id-token: write        # trusted publishing (OIDC), no API token
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: upload
+          args: --non-interactive --skip-existing dist/*

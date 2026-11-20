@@ -23,6 +23,7 @@ import sys
 import torch
 
 ATOL = RTOL = 1e-6
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -74,7 +75,7 @@ def _mods():
                 "bayesian_ensemble": ("skaters.torch.bayesian", "bayesian_ensemble"),
                 "multiscale": ("skaters.torch.multiscale", "multiscale"), "gpdtails": ("skaters.torch.tails", "gpdtails"),
                 "adaptive_search": ("skaters.torch.search", "search"), "S": ("skaters.torch", "spec"),
-                "laplace": ("skaters.torch.api", "laplace"), "sticky": ("skaters.torch.sticky", "sticky"),
+                "laplace": ("skaters.torch.api", "laplace"), "flesaker": ("skaters.torch.api", "flesaker"), "sticky": ("skaters.torch.sticky", "sticky"),
             }[name]
             m = importlib.import_module(mod)
             return getattr(m, attr) if attr != "spec" else importlib.import_module("skaters.torch.spec")
@@ -106,6 +107,16 @@ def build_scenarios():
         s[f"grouped_ar{suf}"] = (k, tx("grouped_ar", max_lag=8))
         s[f"yeojohnson_log{suf}"] = (k, tx("yeo_johnson", lmbda=0.0))
         s[f"yeojohnson_half{suf}"] = (k, tx("yeo_johnson", lmbda=0.5))
+        s[f"seasonal_scale{suf}"] = (k, tx("seasonal_scale", period=7))
+        s[f"seasonal_scale_c{suf}"] = (k, tx("seasonal_scale", period=7, alpha=0.1, center=True))
+        s[f"power_exact{suf}"] = (k, tx("power_transform", p=0.5, exact=True))
+        s[f"yeojohnson_exact{suf}"] = (k, tx("yeo_johnson", lmbda=0.5, exact=True))
+        s[f"log_lower{suf}"] = (k, tx("log_transform", lower=-15.0))
+        s[f"log_upper{suf}"] = (k, tx("log_transform", upper=15.0))
+        s[f"gaussianize{suf}"] = (k, tx("gaussianize"))
+        s[f"gaussianize_smooth{suf}"] = (k, tx("gaussianize", smooth=True))
+        s[f"gaussianize_delete{suf}"] = (k, tx("gaussianize", max_knots=15, guard="delete", slope_cap=1.5))
+        s[f"gaussianize_emin{suf}"] = (k, tx("gaussianize", max_knots=15, guard="emin", slope_cap=1.5))
         s[f"ou{suf}"] = (k, tx("ou_transform", kappa=0.1))
         s[f"ou_sqrt{suf}"] = (k, lambda kk=k: M.conj(M.conj(M.leaf(k=kk), M.T("ou_transform", kappa=0.1), k=kk),
                                                      M.T("yeo_johnson", lmbda=0.5), k=kk))
@@ -124,6 +135,27 @@ def build_scenarios():
     s["spec_ema"] = (1, lambda: M.S.build(M.S.ema_spec(0.05, 1)))
     s["gpd_tails"] = (1, lambda: M.gpdtails(M.conj(M.leaf(k=1), M.T("ema_transform", alpha=0.1), k=1),
                                             k=1, level=0.9, nexc=50, warmup=100))
+    def spliced(kk):
+        return M.gpdtails(M.conj(M.leaf(k=kk), M.T("ema_transform", alpha=0.1), k=kk),
+                          k=kk, level=0.9, nexc=50, warmup=100)
+    for k in (1, 3):
+        suf = "" if k == 1 else f"_k{k}"
+        def sp(name, kk=k, **kw):
+            return lambda: M.conj(spliced(kk), M.T(name, **kw), k=kk)
+        s[f"spliced_power{suf}"] = (k, sp("power_transform", p=0.5))
+        s[f"spliced_yeojohnson{suf}"] = (k, sp("yeo_johnson", lmbda=0.5))
+        s[f"spliced_gaussianize{suf}"] = (k, sp("gaussianize"))
+        s[f"spliced_log{suf}"] = (k, sp("log_transform", lower=-15.0))
+        s[f"spliced_ema_t{suf}"] = (k, sp("ema_transform", alpha=0.1))
+        s[f"spliced_seasonal{suf}"] = (k, sp("seasonal_difference", period=2))
+        s[f"spliced_anchor{suf}"] = (k, sp("seasonal_anchor", period=2))
+        s[f"spliced_sscale{suf}"] = (k, sp("seasonal_scale", period=7))
+        s[f"pf_affine_yj{suf}"] = (k, lambda kk=k: M.conj(
+            M.conj(M.leaf(k=kk), M.T("yeo_johnson", lmbda=0.0, exact=True), k=kk), M.T("standardize"), k=kk))
+        s[f"pf_affine_log{suf}"] = (k, lambda kk=k: M.conj(
+            M.conj(M.leaf(k=kk), M.T("log_transform", upper=200.0), k=kk),
+            M.T("seasonal_scale", period=7, alpha=0.1, center=True), k=kk))
+    s["pol_flesaker"] = (1, lambda: M.flesaker(k=1, lower=-15.0))
     s["scale_mixture_leaf"] = (1, lambda: M.scale_mixture_leaf(k=1))
     s["crps_leaf"] = (1, lambda: M.crps_leaf(k=1))
     s["garch_leaf"] = (1, lambda: M.garch_leaf(k=1))

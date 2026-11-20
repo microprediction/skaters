@@ -49,6 +49,14 @@ STRATA = [
     ("daily:price",    "price",      "asset prices and returns, daily"),
 ]
 
+def _fixed_tight(arm):
+    """Text for a #329 model's tight arm: nine deciles through the fixed-bandwidth
+    reconstruction (half the local quantile spacing), as in arm_adapters."""
+    return (f"<h3>Tight reconstruction</h3><p>Arm <code>{arm}</code>: the same nine deciles "
+            f"through the fixed-bandwidth reconstruction, with a bandwidth of half the local "
+            f"quantile spacing. It is shown for comparison with the headline arm.</p>")
+
+
 MODELS = {
     "chronos": dict(name="Chronos", key="Chronos(wide)", tight_key="Chronos", vendor="Amazon",
                     license="Apache-2.0", arms=True,
@@ -248,6 +256,344 @@ MODELS = {
                         ("t0-gamma(q21+sym)", "21 levels, sign-flip averaging"),
                         ("t0-gamma", "nine deciles"),
                     ]),
+    "timeh2o": dict(name="TimeH2O", key="TimeH2O-v1(wide)", tight_key="TimeH2O-v1", vendor="H2O.ai",
+                    version="v1 (108.8M) and v1-tiny (5.8M)", license="H2O Model Non-Commercial Licence v1.0",
+                    arms=False,
+                    blurb="TimeH2O is H2O.ai's time-series foundation model, released 23 October "
+                          "2026 in a 108.8M and a 5.8M size, trained on the nine deciles.",
+                    note="Run zero-shot on CPU with a fixed 128-length context through h2ofm's "
+                         "forecast_many, with the nonnegativity clip and integer snapping off "
+                         "and the package's own patch ensemble and flip-equivariant blend kept. "
+                         "The weights are gated and licensed for testing, evaluation and "
+                         "research only.",
+                    links=[
+                        ("Model card", "https://huggingface.co/h2oai/timeh2o-v1"),
+                        ("Package (h2ofm)", "https://pypi.org/project/h2ofm/"),
+                    ],
+                    arch="The architecture is described on the model card. Two sizes are run "
+                         "here; the tight arm reconstructs the nine deciles with quantile_dist, "
+                         "the original study's reconstruction. Pretraining contamination is "
+                         "unchecked.",
+                    variants=[
+                        ("TimeH2O-v1(wide)", "108.8M, wide"),
+                        ("TimeH2O-v1-tiny(wide)", "5.8M, wide"),
+                        ("TimeH2O-v1", "108.8M, tight"),
+                    ]),
+    "chronos2": dict(name="Chronos-2", key="Chronos-2", tight_key="Chronos-2", recon="native21",
+                     vendor="Amazon", version="120M", license="Apache-2.0", arms=False,
+                     blurb="Chronos-2 is Amazon's encoder-only successor to Chronos-Bolt (arXiv "
+                           "2510.15821, October 2025): 120M parameters with group attention and 21 "
+                           "native quantile levels.",
+                     note="Run zero-shot on CPU with a fixed 128-length context, one series per "
+                          "group with no covariates and cross_learning off, so a forecast does "
+                          "not depend on the rest of the batch. Its quantile levels are not "
+                          "constrained to be monotone; crossings are rearranged by sorting.",
+                     links=[
+                         ("GitHub", "https://github.com/amazon-science/chronos-forecasting"),
+                         ("Model card", "https://huggingface.co/amazon/chronos-2"),
+                         ("Report (arXiv 2510.15821)", "https://arxiv.org/abs/2510.15821"),
+                     ],
+                     arch="Pretraining includes all 414 M4 hourly series, the whole hourly panel "
+                          "here, and other M4 frequencies, so its hourly row measures recall as "
+                          "well as forecasting. No FRED dataset is named in its training data.",
+                     variants=[("Chronos-2", "21 levels")]),
+    "tirex2": dict(name="TiRex-2", key="TiRex-2(wide)", tight_key="TiRex-2", vendor="NX-AI",
+                   version="38.4M (univariate)", license="Apache-2.0", arms=False,
+                   blurb="TiRex-2 is NX-AI's successor to TiRex (arXiv 2607.01204, NeurIPS 2026 "
+                         "oral), an xLSTM forecaster with a nine-decile head; package 0.5.0 of "
+                         "9 November 2026.",
+                   note="Run zero-shot on CPU with a fixed 128-length context, with both "
+                        "test-time augmentations (sign flip, trend differencing) off.",
+                   links=[
+                       ("GitHub", "https://github.com/NX-AI/tirex-2"),
+                       ("Model card", "https://huggingface.co/NX-AI/TiRex-2"),
+                       ("Paper (arXiv 2607.01204)", "https://arxiv.org/abs/2607.01204"),
+                   ],
+                   arch="Pretrained on the Chronos datasets and LOTSA, which include M4 and the "
+                        "Monash archive's fred_md. NX-AI also publishes a GIFT-Eval-"
+                        "decontaminated checkpoint, not used here.",
+                   tight_text=_fixed_tight("TiRex-2"),
+                   variants=[("TiRex-2(wide)", "wide"), ("TiRex-2", "tight")]),
+    "toto2": dict(name="Toto 2.0", key="Toto2-2.5B(wide)", tight_key="Toto2-2.5B", vendor="Datadog",
+                  version="4M, 22M, 313M, 1B, 2.5B", license="Apache-2.0", arms=False,
+                  blurb="Toto 2.0 is Datadog's family of forecasting transformers (arXiv "
+                        "2605.20119, May 2026) in five sizes from 4M to 2.5B parameters, with a "
+                        "nine-decile head. The headline row is the largest size.",
+                  note="Run zero-shot on CPU with a fixed 128-length context through the direct "
+                       "forecast path, one variate per series, no covariates, and the GluonTS "
+                       "wrapper's quantile cap off.",
+                  links=[
+                      ("GitHub", "https://github.com/DataDog/toto"),
+                      ("Model card", "https://huggingface.co/Datadog/Toto-2.0-2.5B"),
+                      ("Paper (arXiv 2605.20119)", "https://arxiv.org/abs/2605.20119"),
+                  ],
+                  arch="The base checkpoints are trained on Datadog observability metrics and "
+                       "synthetic series only, with no public forecasting data, so none of the "
+                       "panels here can have been seen in training. The five sizes test the "
+                       "paper's claim that accuracy improves with scale.",
+                  tight_text=_fixed_tight("Toto2-2.5B"),
+                  variants=[(f"Toto2-{s}(wide)", f"{s}, wide") for s in ("4m", "22m", "313m", "1B", "2.5B")]),
+    "ttm3": dict(name="TTM-R3", key="TTM-R3(wide)", tight_key="TTM-R3", vendor="IBM Research",
+                 version="1.48M (90-30 branch)", license="Apache-2.0", arms=False,
+                 blurb="TTM-R3 is IBM's third release of the TinyTimeMixer family (Granite time "
+                       "series), small MLP-mixer forecasters with a nine-decile head.",
+                 note="TTM checkpoints are tied to a context length and none takes 128, so the "
+                      "arm uses the 90-30 branch on the last 90 values of the 128-length "
+                      "context. Univariate, no exogenous inputs, no fine-tuning.",
+                 links=[
+                     ("GitHub", "https://github.com/ibm-granite/granite-tsfm"),
+                     ("Model card", "https://huggingface.co/ibm-granite/granite-timeseries-ttm-r3"),
+                 ],
+                 arch="Trained on selected GIFT-Eval pretraining and training datasets; the list "
+                      "is not published, so overlap with the M4 hourly panel cannot be ruled out.",
+                 tight_text=_fixed_tight("TTM-R3"),
+                 variants=[("TTM-R3(wide)", "wide"), ("TTM-R3", "tight")]),
+    "moirai2": dict(name="Moirai 2.0", key="Moirai-2.0-small(wide)", tight_key="Moirai-2.0-small",
+                    vendor="Salesforce", version="small (11.4M)", license="CC BY-NC 4.0", arms=False,
+                    blurb="Moirai 2.0 is Salesforce's decoder-only successor to Moirai (arXiv "
+                          "2511.11698) with a nine-decile head. Only the small size is public.",
+                    note="Run zero-shot on CPU with a fixed 128-length context, univariate. Its "
+                         "deciles are not constrained to be monotone; crossings are rearranged "
+                         "by sorting. The weights are licensed for research use only.",
+                    links=[
+                        ("GitHub (uni2ts)", "https://github.com/SalesforceAIResearch/uni2ts"),
+                        ("Model card", "https://huggingface.co/Salesforce/moirai-2.0-R-small"),
+                        ("Paper (arXiv 2511.11698)", "https://arxiv.org/abs/2511.11698"),
+                    ],
+                    arch="Pretraining includes GIFT-Eval's pretraining set, which contains "
+                         "fred_md (107 FRED-MD monthly series), and GIFT-Eval's training split, "
+                         "which covers every M4 frequency, so its monthly and hourly rows "
+                         "measure recall as well as forecasting.",
+                    tight_text=_fixed_tight("Moirai-2.0-small"),
+                    variants=[("Moirai-2.0-small(wide)", "wide"), ("Moirai-2.0-small", "tight")]),
+    "tinycast": dict(name="TinyCast", key="TinyCast(wide)", tight_key="TinyCast", vendor="RAWS Labs",
+                     version="146,505 parameters", license="Apache-2.0", arms=False,
+                     blurb="TinyCast is a 146,505-parameter attention-free forecaster with a "
+                           "periodogram phase prior and a nine-decile head (arXiv 2608.15767, "
+                           "August 2026).",
+                     note="Run zero-shot on CPU with a fixed 128-length context, which the "
+                          "package left-pads to its 2048-step input with the first value; no "
+                          "downsampling, no frequency hint, sign-flip averaging off in the "
+                          "headline arm and on in TinyCast(flip), the setting behind its "
+                          "published GIFT-Eval numbers.",
+                     links=[
+                         ("GitHub", "https://github.com/raws-labs/tinycast"),
+                         ("Model card", "https://huggingface.co/raws-labs/tinycast"),
+                         ("Paper (arXiv 2608.15767)", "https://arxiv.org/abs/2608.15767"),
+                     ],
+                     arch="An attention-free model: a dilated causal convolution encoder, a "
+                          "periodogram phase prior with no parameters, and a nine-decile decoder "
+                          "rolled out in 48-step blocks. Trained on GIFT-Eval's pretraining set, "
+                          "with the datasets overlapping the GIFT-Eval and Chronos zero-shot test "
+                          "sets removed (the exclusion list is not published), plus Chronos "
+                          "KernelSynth and synthetic series.",
+                     tight_text=_fixed_tight("TinyCast"),
+                     variants=[("TinyCast(wide)", "wide"), ("TinyCast", "tight"),
+                               ("TinyCast(flip)", "tight, sign-flip averaging")]),
+    # #355 batch (November 2026)
+    "simons": dict(name="Simons", key="Simons-297M(wide)", tight_key="Simons-297M", vendor="Abel AI Lab",
+                   version="25M, 60M, 178M and 297M", license="Apache-2.0 code; permissive weights", arms=False,
+                   blurb="Simons is Abel AI Lab's family of nine-decile forecasters (Hugging Face repos "
+                         "29 October 2026, code released 11 November 2026 as simons 0.1.0), in four sizes "
+                         "from 25M to 297M parameters.",
+                   note="Run zero-shot on CPU with a fixed 128-length context, which the package left-pads "
+                        "to its own window. Pretrained on abel-lab/Simons-Pretrain, synthetic series plus "
+                        "real data; the published list has no FRED, FRED-MD or M4, and carries Monash "
+                        "copies. The four sizes score within 0.02 nats of each other on every stratum.",
+                   links=[
+                        ("Model card (297M)", "https://huggingface.co/abel-lab/Simons-297M"),
+                        ("Code", "https://github.com/Abel-ai-lab/Simons"),
+                        ("Pretraining data", "https://huggingface.co/datasets/abel-lab/Simons-Pretrain"),
+                   ],
+                   arch="Nine native deciles; context 16,384 (25M, 60M) or 32,768 (178M, 297M). The tight "
+                        "arm reconstructs the deciles with quantile_dist, the original study's "
+                        "reconstruction.",
+                   variants=[
+                        ("Simons-297M(wide)", "297M, wide"),
+                        ("Simons-178M(wide)", "178M, wide"),
+                        ("Simons-60M(wide)", "60M, wide"),
+                        ("Simons-25M(wide)", "25M, wide"),
+                        ("Simons-297M", "297M, tight"),
+                   ]),
+    "ciproto": dict(name="ci-proto", key="ci-proto(wide)", tight_key="ci-proto", vendor="Continuous Intelligence",
+                    version="167M", license="ci-proto Code and Model Licence v1.0", arms=False,
+                    blurb="ci-proto is Continuous Intelligence's nine-decile forecaster (code and weights "
+                          "released 11 November 2026): 167M parameters adapted from TiRex-2 and xLSTM.",
+                    note="Run zero-shot on CPU with a fixed 128-length context through the "
+                         "continuousintelligence package at a pinned weights revision. The licence is "
+                         "Apache-2.0 plus a public attribution notice and a one-time e-mail to the vendor "
+                         "when a product, service or model using its code, weights or outputs is "
+                         "distributed. Training data is undisclosed beyond 'a large corpus of real-world "
+                         "and synthetic time series'; its fev-bench submission declares no fev-bench data.",
+                    links=[
+                        ("Model card", "https://huggingface.co/ContinuousIntelligence/ci-proto"),
+                        ("Code", "https://github.com/continuousintelligence/ci"),
+                    ],
+                    arch="Nine native deciles, xLSTM backbone adapted from TiRex-2. The tight arm "
+                         "reconstructs the deciles with quantile_dist, the original study's reconstruction.",
+                    variants=[
+                        ("ci-proto(wide)", "167M, wide"),
+                        ("ci-proto", "167M, tight"),
+                    ]),
+    "hirondel": dict(name="Hirondel-7M", key="Hirondel-7M(wide)", tight_key="Hirondel-7M", vendor="Tncrd",
+                     version="7.5M (v1.1.0)", license="Apache-2.0", arms=False,
+                     blurb="Hirondel-7M is a 7.5M-parameter nine-decile forecaster by a single anonymous "
+                           "author (Hugging Face repo 23 October 2026, code v1.1.0 on 2 November 2026): a "
+                           "patch-16 looped stack of delta-rule blocks.",
+                     note="Run zero-shot on CPU with a fixed 128-length context from the hirondel package at "
+                          "tag v1.1.0 and a pinned weights revision. Its DATA.md lists 56 real sources plus "
+                          "about half synthetic windows; ERA5 reached it through GiftEvalPretrain. Its "
+                          "coarse long-history window is inactive at this context.",
+                     links=[
+                        ("Model card", "https://huggingface.co/Tncrd/Hirondel-7M"),
+                        ("Code", "https://github.com/tncrd/hirondel"),
+                     ],
+                     arch="Nine native deciles, monotone by construction. The tight arm reconstructs them "
+                          "with quantile_dist, the original study's reconstruction.",
+                     variants=[
+                        ("Hirondel-7M(wide)", "7.5M, wide"),
+                        ("Hirondel-7M", "7.5M, tight"),
+                     ]),
+    "iamtime": dict(name="iAmTime", key="iAmTime-base", tight_key="iAmTime-base", recon="native21",
+                    vendor="Anish Saha", version="base (302M)", license="Apache-2.0", arms=False,
+                    blurb="iAmTime (arXiv 2603.22586, March 2026; weights 25 September 2026) is a T5-style "
+                          "encoder-decoder of 302M parameters that emits 21 native quantile levels.",
+                    note="Run zero-shot on CPU with a fixed 128-length context from the iamtime package at a "
+                         "pinned commit, scored on its own 21 levels with no reconstruction choice to make. "
+                         "Trained on the Chronos pretraining corpus (which includes M4 Monthly and several "
+                         "Monash sets) plus 2.5M series from a listed subset of GiftEvalPretrain; no FRED or "
+                         "FRED-MD in its training lists.",
+                    links=[
+                        ("Model card", "https://huggingface.co/anishsaha/iAmTime-base-forecast"),
+                        ("Paper", "https://arxiv.org/abs/2603.22586"),
+                        ("Code", "https://github.com/anishsaha12/iAmTime"),
+                    ],
+                    arch="12+12 layer encoder-decoder, d_model 768, 21 native quantile levels. M4 Monthly "
+                         "is in its pretraining corpus, so its monthly row is not a clean zero-shot read.",
+                    variants=[
+                        ("iAmTime-base", "302M, 21 native levels"),
+                    ]),
+    "timessm": dict(name="TimeSSM", key="TimeSSM-2.5M(wide)", tight_key="TimeSSM-2.5M", vendor="Yvann Vincent",
+                    version="2.5M", license="Apache-2.0", arms=False,
+                    blurb="TimeSSM-2.5M (weights 11 October 2026) is an independent 2.5M-parameter state-space "
+                          "forecaster: six gated S4D blocks emitting quantiles through cumulative softplus "
+                          "widths.",
+                    note="Run zero-shot on CPU with a fixed 128-length context from the TimeSSM package at a "
+                         "pinned commit and weights revision. It loses to laplace on every stratum by 0.4 to "
+                         "1.1 nats under either reconstruction; it is listed for completeness.",
+                    links=[
+                        ("Model card", "https://huggingface.co/IUseAMouse/timessm-2.5m"),
+                        ("Code", "https://github.com/IUseAMouse/TimeSSM"),
+                    ],
+                    arch="Six gated S4D blocks with complex diagonal state, quantile head with monotone "
+                         "widths. The tight arm reconstructs the deciles with quantile_dist.",
+                    variants=[
+                        ("TimeSSM-2.5M(wide)", "2.5M, wide"),
+                        ("TimeSSM-2.5M", "2.5M, tight"),
+                    ]),
+    # November 2026 additions (GIFT-Eval scan and foundationalprediction #4, #5)
+    "patchtstfm": dict(name="PatchTST-FM", key="PatchTST-FM-r2(q99)", tight_key="PatchTST-FM-r2(q99)",
+                       recon="native99", vendor="IBM Research", version="r2 (~385M)", license="OpenMDW-1.0",
+                       arms=False,
+                       blurb="Granite PatchTST-FM r2 (weights 7 August 2026) is a patch transformer that emits "
+                             "99 quantile levels. On GIFT-Eval it is the best open-weight entry (CRPS 0.467 "
+                             "relative to seasonal naive).",
+                       note="Run zero-shot on CPU with a fixed 128-length context from granite-tsfm 0.3.9 at "
+                            "pinned weights revision b125275. Pretraining: a GiftEvalPretrain subset, "
+                            "KernelSynth, TSMixup outside GIFT-Eval's evaluation set, and CauKer; FRED and "
+                            "M4 are not named.",
+                       links=[
+                          ("Model card", "https://huggingface.co/ibm-granite/granite-timeseries-patchtst-fm-r2"),
+                          ("Code", "https://github.com/ibm-granite/granite-tsfm"),
+                       ],
+                       arch="Patch transformer with conformer blocks, 99 native quantile levels.",
+                       variants=[("PatchTST-FM-r2(q99)", "r2, 99 native levels")]),
+    "tafsut": dict(name="Tafsut", key="Tafsut-base(wide)", tight_key="Tafsut-base",
+                   vendor="Huawei GTS and EURECOM", version="univariate base (105M)", license="MIT", arms=False,
+                   blurb="Tafsut univariate-base (weights 12 August 2026) is a 105M-parameter forecaster "
+                         "trained on about 40M synthetic series and then about 30M real series.",
+                   note="Run zero-shot on CPU with a fixed 128-length context from the tafsut package 0.1.0 "
+                        "at pinned weights revision a17c92c. The card says series overlapping the evaluation "
+                        "benchmarks were excluded; its real data come from GiftEvalPretrain and the Chronos "
+                        "corpus, and FRED and M4 are not named.",
+                   links=[("Model card", "https://huggingface.co/Tafsut-FM/tafsut-univariate-base")],
+                   arch="Nine native deciles. The tight arm reconstructs them with quantile_dist.",
+                   variants=[("Tafsut-base(wide)", "base, wide"), ("Tafsut-base", "base, tight")]),
+    "tabby": dict(name="Tabby", key="Tabby-Pretrain(q99)", tight_key="Tabby-Pretrain(q99)", recon="native99",
+                  vendor="Huawei Paris Noah's Ark Lab", version="Pretrain (~146M)", license="CC BY-NC 4.0",
+                  arms=False,
+                  blurb="Tabby-Pretrain (report 12 September 2026) is an encoder-only patch transformer with "
+                        "an 8,192-position window and 99 monotone quantile levels. The prompt-tuned Tabby is "
+                        "a separate model and is not scored here.",
+                  note="Run zero-shot on CPU in float32 with a fixed 128-length context through the official "
+                       "predictor (trustworthyAI commit 8675af0) at pinned weights revision b26c277. Weights "
+                       "are non-commercial.",
+                  links=[("Model card", "https://huggingface.co/paris-noah/Tabby-Pretrain"),
+                         ("Paper", "https://arxiv.org/abs/2609.13956"),
+                         ("Code", "https://github.com/huawei-noah/trustworthyAI/tree/master/TabbyTSFM")],
+                  arch="Encoder-only patch transformer, 99 native quantile levels.",
+                  variants=[("Tabby-Pretrain(q99)", "Pretrain, 99 native levels")]),
+    "yug": dict(name="Yug", key="Yug(wide)", tight_key="Yug", vendor="Birla AI Labs", version="0.1.2 (271.8M)",
+                license="CC BY-NC 4.0", arms=False,
+                blurb="Yug (October 2026) is a 271.8M-parameter forecaster that returns nine quantiles "
+                      "estimated from sampled trajectories.",
+                note="Run zero-shot on CPU with a fixed 128-length context from the yug package 0.1.2 at "
+                     "pinned weights revision ec53758, with 100 sampled trajectories and seed 0. Its "
+                     "frequency argument selects a learned embedding and is set from the corpus. Code is "
+                     "Apache-2.0; weights are non-commercial.",
+                links=[("Model card", "https://huggingface.co/birlaailabs/yug"),
+                       ("Code", "https://github.com/birla-ai-labs/yug")],
+                arch="Nine quantiles estimated from 100 sampled trajectories; the tight arm reconstructs "
+                     "them with quantile_dist.",
+                variants=[("Yug(wide)", "wide"), ("Yug", "tight")]),
+    "citras": dict(name="CITRAS-FM", key="CITRAS-FM(wide)", tight_key="CITRAS-FM", vendor="Hitachi",
+                   version="7M", license="CC BY-NC-SA 4.0", arms=False,
+                   blurb="CITRAS-FM (EUSIPCO 2026) is a 7M-parameter covariate-informed forecaster with nine "
+                         "quantile outputs, run here on the target alone.",
+                   note="Run zero-shot on CPU with a fixed 128-length context from the citras-fm code at "
+                        "commit a7f5648 (not on PyPI) and pinned weights revision 8633940, one call per "
+                        "context window. Weights are non-commercial.",
+                   links=[("Model card", "https://huggingface.co/hitachi-nlp/citras-fm"),
+                          ("Paper", "https://arxiv.org/abs/2606.10798"),
+                          ("Code", "https://github.com/hitachi-ais/citras-fm")],
+                   arch="Nine native deciles. The tight arm reconstructs them with quantile_dist.",
+                   variants=[("CITRAS-FM(wide)", "7M, wide"), ("CITRAS-FM", "7M, tight")]),
+    "tsicl": dict(name="TS-ICL", key="TS-ICL(q99)", tight_key="TS-ICL", recon="native99", vendor="EDF",
+                  version="tsicl-v1", license="Non-commercial", arms=False,
+                  blurb="TS-ICL (EDF, June 2026) is an in-context forecaster trained to emit 99 quantile "
+                        "levels.",
+                  note="Run zero-shot on CPU with a fixed 128-length context from the tsicl package at pinned "
+                       "weights revision 19c9403. Its public quantile-level check cannot represent some "
+                       "levels (0.07), so the adapter takes every trained level; its quantiles can cross, "
+                       "so they are sorted before scoring.",
+                  links=[("Model card", "https://huggingface.co/taharnbl/TS-ICL")],
+                  arch="99 trained quantile levels, monotone after sorting.",
+                  variants=[("TS-ICL(q99)", "99 native levels"), ("TS-ICL(wide)", "nine deciles, wide"),
+                            ("TS-ICL", "nine deciles, tight")]),
+    "kairos": dict(name="Kairos", key="Kairos-50m(wide)", tight_key="Kairos-50m", vendor="MLDI Lab",
+                   version="50M", license="Apache-2.0", arms=False,
+                   blurb="Kairos (September 2025) is a parameter-efficient forecaster with a multi-patch "
+                         "decoder, trained on the PreSTS corpus of about 300 billion points.",
+                   note="Run zero-shot on CPU with a fixed 128-length context from the Kairos code at commit "
+                        "16eb4b9 and pinned weights revision b788434. Vendor defaults are kept (averaging "
+                        "with the flipped input) except preserve_positivity, which would truncate a signed "
+                        "change series and is off.",
+                   links=[("Model card", "https://huggingface.co/mldi-lab/Kairos_50m"),
+                          ("Code", "https://github.com/foundation-model-research/Kairos")],
+                   arch="Nine native deciles. The tight arm reconstructs them with quantile_dist.",
+                   variants=[("Kairos-50m(wide)", "50M, wide"), ("Kairos-50m", "50M, tight")]),
+    "timers1": dict(name="Timer-S1", key="Timer-S1(wide)", tight_key="Timer-S1(wide)",
+                    vendor="Tsinghua (THUML) and ByteDance", version="8.3B MoE (0.75B active)",
+                    license="Apache-2.0", arms=False,
+                    blurb="Timer-S1 (April 2026) is a mixture-of-experts sibling of Sundial and Timer-XL, "
+                          "8.3B parameters in total with 0.75B active, emitting nine quantiles.",
+                    note="Run zero-shot on CPU in bfloat16 with a fixed 128-length context through "
+                         "transformers 4.57 at pinned weights revision 8911430. Only the generous "
+                         "reconstruction is run, to save CPU time. Pretraining includes UTSD, LOTSA, "
+                         "GiftEvalPretrain and the Chronos corpus.",
+                    links=[("Model card", "https://huggingface.co/bytedance-research/Timer-S1")],
+                    arch="Mixture-of-experts decoder, nine native deciles.",
+                    variants=[("Timer-S1(wide)", "wide")]),
 }
 
 # NAV comes from docs/sweep_nav.py, the single source of truth. This file used
@@ -330,6 +676,57 @@ def _ratio(store, study, subset, method, col, higher_wins):
     return (round((wins + 0.5 * ties) / n / 0.5, 3), n) if n >= 30 else (None, n)
 
 
+def compute_radar_from_per_series(path, methods):
+    """The same per-method radar as compute_radar, read from the summarizer's
+    canonical_per_series.csv (study, series, model, verdict, dLL, crps_ratio,
+    ...) instead of the full preds store. dLL > 0 is a log-score win over
+    laplace, crps_ratio < 1 a CRPS win; equality is a tie, as in _ratio. Loads
+    only the rows of ``methods``, so it needs megabytes where load_all needs
+    the whole store in memory."""
+    soft, hard = _m4_blocks()
+    rows = collections.defaultdict(dict)          # (study, method) -> {series: (dLL, crps_ratio)}
+    want = set(methods)
+    with open(path) as fh:
+        for r in csv.DictReader(fh):
+            if r["model"] not in want:
+                continue
+            try:
+                rows[(r["study"], r["model"])][r["series"]] = (float(r["dLL"]), float(r["crps_ratio"]))
+            except ValueError:
+                continue
+    def ratio(study, subset, method, idx, higher_wins):
+        d = rows.get((study, method), {})
+        wins = ties = n = 0
+        for s in subset:
+            if s not in d:
+                continue
+            v = d[s][idx]
+            ref = 0.0 if idx == 0 else 1.0
+            if not np.isfinite(v):
+                continue
+            n += 1
+            if v == ref:
+                ties += 1
+            elif (v > ref) == higher_wins:
+                wins += 1
+        return (round((wins + 0.5 * ties) / n / 0.5, 3), n) if n >= 30 else (None, n)
+    out = {}
+    for method in want:
+        ll, crps, ns = [], [], []
+        for _label, study, block in RADAR_AXES:
+            subset = set(rows.get((study, method), {}))
+            if block == "soft":
+                subset = subset & soft
+            elif block == "hard":
+                subset = subset & hard
+            l, n = ratio(study, subset, method, 0, True)
+            c, _ = ratio(study, subset, method, 1, False)
+            ll.append(l); crps.append(c); ns.append(n)
+        if any(v is not None for v in ll + crps):
+            out[method] = {"ll": ll, "crps": crps, "n": ns}
+    return out
+
+
 def compute_radar(store):
     """Per method -> {'ll':[6], 'crps':[6], 'n':[6]} over the six regime axes."""
     soft, hard = _m4_blocks()
@@ -396,7 +793,7 @@ def radar_svg(model, radar):
     parts.append(f'<text x="{lref_x + 6:.1f}" y="{lref_y - 5:.1f}" font-size="11" '
                  f'fill="#1a8c4a">Laplace = 1.0</text>')
     layers = [(model["key"], color, "", "")]
-    if model.get("tight_key"):
+    if model.get("tight_key") and model["tight_key"] != model["key"]:
         layers.append((model["tight_key"], "#8a8a9a", ' stroke-dasharray="6 4"', " (tight nine-decile reconstruction)"))
     for key, col, dash, tag in reversed(layers):
         d = radar.get(key)
@@ -478,7 +875,15 @@ def standalone_tables(model, vs, cov):
                 f"models have, so these numbers are a lower bound on the model.</p>")
         return (head + _TABLE_HEAD + standalone_rows(model, vs, cov) + _TABLE_TAIL
                 + f'<p style="font-size:.9rem;color:var(--muted)">{_COLS_NOTE}</p>')
-    if model.get("recon") == "native21":
+    if model.get("recon") == "native99":
+        fair = (f"<h3>On the model's native 99 quantile levels</h3>"
+                f"<p>Arm <code>{model['key']}</code>: the model's own 1% to 99% quantiles, every "
+                f"percentile, through the fixed-bandwidth reconstruction with no bandwidth "
+                f"inflation. The density beyond the 1% and 99% anchors is the Gaussian-mixture "
+                f"reconstruction's, not an output of the model. This is the fairest density the "
+                f"model can be given here, so it is the headline.</p>")
+        fair_note = "Coverage is that of the reconstruction on the model's 99 native levels."
+    elif model.get("recon") == "native21":
         fair = (f"<h3>On the model's native 21 quantile levels</h3>"
                 f"<p>Arm <code>{model['key']}</code>: the model's own 1% to 99% quantiles "
                 f"through the fixed-bandwidth reconstruction, with no bandwidth inflation. "
@@ -499,7 +904,11 @@ def standalone_tables(model, vs, cov):
         fair_note = ("Coverage is that of the wide reconstruction; fed a calibrated "
                      "normal's deciles it covers about 0.88, so a perfectly calibrated "
                      "model reads 0.88 here.")
-    tight_block = (f"<h3>Tight nine-decile reconstruction</h3>"
+    if tight == model["key"]:                 # one arm only (Chronos-2 on its native levels)
+        return (fair + _TABLE_HEAD + standalone_rows(model, vs, cov, model["key"]) + _TABLE_TAIL
+                + f'<p style="font-size:.9rem;color:var(--muted)">{_COLS_NOTE} {fair_note}</p>')
+    tight_block = model.get("tight_text") or (
+                   f"<h3>Tight nine-decile reconstruction</h3>"
                    f"<p>Arm <code>{tight}</code>: the same forecasts through "
                    f"<code>quantile_dist</code>, the reconstruction the original study used. "
                    f"Fed the exact deciles of a standard normal it covers 0.81, so a "
@@ -587,7 +996,7 @@ def variants_section(model, vs, cov):
     level sets) scored on the same windows: median dLL vs Laplace and the
     reconstruction's central-90% coverage per stratum."""
     variants = model.get("variants")
-    if not variants:
+    if not variants or len(variants) < 2:
         return ""
     head = "".join(f'<th class="num">{short}</th>' for _k, short, _long in STRATA)
     rows = []
@@ -604,10 +1013,11 @@ def variants_section(model, vs, cov):
     return f"""<h2>Checkpoints and level sets</h2>
     <p>The same model family scored several ways on the identical windows. Each cell is the
       median per-series &Delta; log-likelihood in nats against Laplace (negative is worse),
-      with the reconstructed central-90% coverage in parentheses (0.90 target). The nine-decile
-      rows use the same fixed-bandwidth reconstruction as TiRex-2; the 21-level rows feed the
-      model's native 1% to 99% quantiles to that reconstruction. The model is the same in
-      both blocks; only the reconstruction differs.</p>
+      with the reconstructed central-90% coverage in parentheses (0.90 target). Rows differ
+      by checkpoint, level set or reconstruction, as each label says: 21-level rows feed the
+      model's native 1% to 99% quantiles to the fixed-bandwidth reconstruction, wide rows
+      reconstruct nine deciles at three times the local bandwidth, and the remaining
+      nine-decile rows use the tighter reconstruction described above.</p>
     <table>
       <thead><tr><th>arm</th>{head}</tr></thead>
       <tbody>
@@ -736,7 +1146,7 @@ def build_page(slug, model, vs, cov, radar):
       with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
       less. Here a series counts as a win when the model's mean per-series log score exceeds
       Laplace's by any amount, and as a tie only at exact equality: the same rule the
-      challengers radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
+      comparison radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
       loss above, which fold statistically unresolved differences into draws. The two
       agree on direction and differ in how they treat small gaps. The solid polygon is the headline arm and
       the dashed grey one, where present, is the tight nine-decile reconstruction. The
@@ -841,7 +1251,7 @@ def sidecar_fairbase_section(vs, cov):
     <p>The arms above were built on the tight reconstruction, and part of what they repaired was the
       reconstruction. The same four sandwiches have now been run on the fair bases: Timestral-209M and
       t0-gamma on their native 21 levels, and TimesFM 3.0, TimesFM 2.5, TiRex and Chronos through the
-      generous reconstruction, plus the PyMC-forecast challenger (a Student-t regression on lagged
+      generous reconstruction, plus the PyMC-forecast model (a Student-t regression on lagged
       changes, fit by ADVI) on the monthly stratum. Each arm is paired with its standalone run on
       identical series and windows; <code>~lap</code> and <code>@lap</code> need a longer warm-up
       window, so their series counts are smaller. Median per-series &Delta; log-likelihood against
@@ -901,7 +1311,15 @@ def main():
     vs, cov = load_vs(), load_cov()
     import summarize_canonical as sc
     print("[radar] loading per-step store ...", flush=True)
-    radar = compute_radar(sc.load_all())
+    per_series = os.path.join(BENCH, "canonical_per_series.csv")
+    if os.path.exists(per_series):
+        needed = {"laplace"}
+        for m in MODELS.values():
+            needed.update(k for k in (m.get("key"), m.get("tight_key")) if k)
+            needed.update(v[0] for v in m.get("variants", []))
+        radar = compute_radar_from_per_series(per_series, needed)
+    else:
+        radar = compute_radar(sc.load_all())
     print(f"[radar] {len(radar)} methods over {len(RADAR_AXES)} regime axes", flush=True)
     for slug, model in MODELS.items():
         html = build_page(slug, model, vs, cov, radar)

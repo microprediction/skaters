@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>skaters — JavaScript port</title>
+  <meta name="description" content="Zero-dependency ES modules for the browser and Node." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="skaters" />
+  <meta property="og:title" content="skaters — JavaScript port" />
+  <meta property="og:description" content="Zero-dependency ES modules for the browser and Node." />
+  <meta property="og:url" content="https://skaters.microprediction.org/ports/javascript.html" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="stylesheet" href="../academic.css?v=20261117" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="/">skaters</a>
+      <nav>
+        <a href="/">Home</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
+          <span class="drop">
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
+          <span class="drop">
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
+            <a href="/sandwich.html">Sandwich pattern</a>
+            <a href="/sidecar.html">Sidecar pattern</a>
+            <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+          <span class="drop">
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
+          </span>
+        </span>
+        <a href="/demos/">Demos</a>
+        <a href="/papers.html">Papers</a>
+        <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html">Methodology</a>
+            <a href="/draws.html">Draws</a>
+            <a href="/scope.html">Scope</a>
+            <a href="/languages.html">Languages</a>
+            <a href="/heritage.html">Heritage</a>
+            <a href="/acknowledgements.html">Acknowledgements</a>
+          </span>
+        </span>
+        <a href="https://github.com/microprediction/skaters">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>JavaScript</h1>
+    <p class="subtitle">Zero-dependency ES modules for the browser and Node.</p>
+
+<pre><code>npm install skaters</code></pre>
+
+    <p>Zero-dependency ES modules covering the whole library. It runs in the browser and in Node;
+      every live demo on this site is this build. Parity is enforced at more than 105,000 values on
+      every test run, and every exported skater must round-trip through JSON and resume bit-exactly
+      (<code>stateToJSON</code>, <code>stateFromJSON</code>).</p>
+    <p>In a page without a build step:
+      <code>import { laplace } from "https://cdn.jsdelivr.net/npm/skaters@0.17.0/index.mjs"</code>.</p>
+
+    <h2>Links</h2>
+    <table>
+        <tr><th>Package</th><td><a href="https://www.npmjs.com/package/skaters">npm</a></td></tr>
+        <tr><th>CDN</th><td><a href="https://cdn.jsdelivr.net/npm/skaters@0.17.0/">jsDelivr</a></td></tr>
+        <tr><th>Source</th><td><a href="https://github.com/microprediction/skaters/tree/main/docs/js/skaters">docs/js/skaters</a></td></tr>
+        <tr><th>Changes</th><td><a href="https://github.com/microprediction/skaters/blob/main/docs/js/skaters/CHANGELOG.md">CHANGELOG.md</a></td></tr>
+        <tr><th>Live</th><td><a href="/demos/">Demos</a></td></tr>
+        <tr><th>Parity</th><td><a href="https://github.com/microprediction/skaters/tree/main/parity">parity/</a></td></tr>
+    </table>
+
+    <p>Every port is checked against the Python reference by the same parity vectors, to 1e-6.
+      <a href="/languages.html">How the ports are kept identical &rarr;</a></p>
+    <p class="muted small">Other implementations: <a href="/ports/python.html">Python</a> &middot; <a href="/ports/torch.html">torch</a> &middot; <a href="/ports/rust.html">Rust</a> &middot; <a href="/ports/r.html">R</a> &middot; <a href="/ports/julia.html">Julia</a></p>
+  </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
+  </footer>
+</body>
+</html>

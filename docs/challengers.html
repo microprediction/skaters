@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>skaters &mdash; Laplace Algorithm Empirical Results</title>
   <meta name="description" content="One tiny, fast, online model against heavy machinery on their respective home turf. Every comparison with its tape, and the corners where other methods win." />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
 </head>
 <body>
   <header class="site-header">
@@ -13,33 +13,69 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -47,15 +83,11 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -72,15 +104,15 @@
     <h2>Strengths by regime</h2>
     <p>
       Five regimes plus a price/returns axis, one score each: how often a
-      challenger beats <code>laplace</code> per series, ties split, scaled so a
+      compared model beats <code>laplace</code> per series, ties split, scaled so a
       50/50 draw is 1.0. The dashed ring is <code>laplace</code> itself; outside
-      the ring the challenger is winning that regime, inside it is losing. Soft
+      the ring the compared model is winning that regime, inside it is losing. Soft
       vs hard waveforms are the two halves of M4-Hourly (noisy daily cycles
       vs nearly deterministic ones; see the
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-tbats">TBATS bout</a>).
       Price/returns is the one axis <code>laplace</code> is not built for, and
       <code>GARCH-t</code> wins it decisively (~1.8x on 2500 return series).
-      Pick up to six challengers &mdash; <code>GARCH-t</code>, Prophet, the
+      Pick up to six compared models &mdash; <code>GARCH-t</code>, Prophet, the
       foundation models and more. Entries marked <em>(sandwiched)</em> are drawn
       <strong>dashed</strong>: those models run inside <code>laplace</code>'s own
       coordinates, so they measure collaboration rather than a standalone
@@ -94,7 +126,7 @@
     <div class="panel" id="radar-panel">
       <div class="controls">
         <div class="control" style="max-width:100%">
-          <label>Challengers (up to 6)</label>
+          <label>Comparison models (up to 6)</label>
           <div id="radar-models" style="display:flex;flex-wrap:wrap;gap:2px 14px;max-width:760px"></div>
         </div>
         <div class="control">
@@ -107,7 +139,7 @@
         </div>
       </div>
       <canvas id="radar" class="plot" width="640" height="480" tabindex="0"
-              aria-label="Radar chart: challenger strength relative to laplace by regime"></canvas>
+              aria-label="Radar chart: compared model strength relative to laplace by regime"></canvas>
       <div class="legend" id="radar-legend"></div>
       <div id="radar-tip" style="position:absolute;display:none;background:#fff;border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:0.85rem;box-shadow:0 2px 8px rgba(0,0,0,0.12);pointer-events:none"></div>
       <table id="radar-table">
@@ -135,7 +167,7 @@
     <p>
       Very possibly &mdash; and it is the more interesting question. skaters
       cooperates as well as it competes: sandwiched in laplace's coordinates a
-      challenger keeps its own strengths but inherits laplace's calibration and
+      compared model keeps its own strengths but inherits laplace's calibration and
       manufactured stationarity, and usually improves dramatically
       (<a href="/sandwich.html">the sandwich</a>). <strong>PyMC</strong>'s
       dashed entry above is historical: the later canonical sandwich has
@@ -257,7 +289,7 @@
         var name = e.target.value;
         if (e.target.checked) {
           selOrder.push(name);
-          // Drop the oldest so picking a new challenger never needs unclicking one first.
+          // Drop the oldest so picking a new compared model never needs unclicking one first.
           while (selOrder.length > MAXSEL) {
             var old = selOrder.shift();
             uncheckByName(old);
@@ -337,7 +369,7 @@
           ctx.fillStyle = FILLS[slot]; ctx.fill();
           // "(sandwiched)" models run inside laplace's coordinates (collaboration,
           // they beat laplace by construction), so draw them dashed to distinguish
-          // them from the head-to-head challengers.
+          // them from the head-to-head compared models.
           ctx.strokeStyle = SLOTS[slot]; ctx.lineWidth = 2;
           if (name.indexOf("(sandwiched)") >= 0) ctx.setLineDash([7, 5]);
           ctx.stroke();
@@ -495,7 +527,7 @@
       points. Every row links its tape.
     </p>
 <table>
-      <thead><tr><th>challenger</th><th>corner</th><th>LL</th><th>CRPS</th><th>tape</th></tr></thead>
+      <thead><tr><th>compared model</th><th>corner</th><th>LL</th><th>CRPS</th><th>tape</th></tr></thead>
       <tbody>
         <tr><td>AutoARIMA (statsforecast)</td><td>classical</td><td>82%</td><td>53%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#headline-vs-eight-distributional-baselines-studypy-sota">study</a></td></tr>
         <tr><td>auto.arima (real R)</td><td>classical</td><td>79%</td><td>51%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-autoarima">bout</a></td></tr>
@@ -509,8 +541,8 @@
         <tr><td><strong>PYMC-Forecast 0.0.1 (PyMC Labs)</strong></td><td>Bayesian</td><td>82%</td><td>&mdash;</td><td><a href="/challengers/pymc-forecast.html"><strong>the day-one bout</strong></a></td></tr>
         <tr><td>nnetar (neural AR, R)</td><td>neural</td><td>96%</td><td>76%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-nnetar">bout</a></td></tr>
         <tr><td>NF-StudentT (NeuralForecast)</td><td>neural</td><td>100%</td><td>78%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#headline-vs-eight-distributional-baselines-studypy-sota">study</a></td></tr>
-        <tr><td>CSP (official <code>csp-forecaster</code>, 12 configs)</td><td>conformal</td><td>98&ndash;99%</td><td>98&ndash;99%</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
-        <tr><td><em>CSP, strongly-seasonal series (M4-Hourly)</em></td><td>conformal</td><td colspan="2"><em>the belt is theirs; seasonal pooling earns it there</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
+        <tr><td>CSP (official <code>csp-forecaster</code>, 12 configs)</td><td>conformal</td><td>98&ndash;99% (July 2026)</td><td>98&ndash;99% (July 2026)</td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
+        <tr><td><em>CSP, strongly-seasonal series (M4-Hourly)</em></td><td>conformal</td><td colspan="2"><em>the belt is theirs; seasonal pooling earns it there (November 2026 paired run: CSP wins 144 of 414, loses 19, +0.06 nats; on every FRED stratum laplace is ahead by 0.13 to 0.43 nats)</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-csp">bout</a></td></tr>
         <tr><td>AutoARIMA + conformal / ACI</td><td>conformal</td><td>86% / 88%</td><td>31% / 29%</td><td><a href="https://github.com/microprediction/skaters/blob/main/benchmarks/README.md#headline-vs-eight-distributional-baselines-studypy-sota">study</a></td></tr>
         <tr><td><strong>Timestral 209M (Mistral), native 21 quantiles</strong></td><td>foundation</td><td>27% (64% draw)&dagger;</td><td>ratio 0.98&dagger;</td><td><a href="/foundation/timestral.html">page</a></td></tr>
         <tr><td><strong>t0-gamma 256M (The Forecasting Company), native 21 quantiles</strong></td><td>foundation</td><td>33% (64% draw)&dagger;</td><td>ratio 1.00&dagger;</td><td><a href="/foundation/t0gamma.html">page</a></td></tr>
@@ -528,19 +560,21 @@
         <tr><td><em>GARCH-t, price/return series</em></td><td>heavy-tail SOTA</td><td colspan="2"><em>the belt is theirs; we recommend it there</em></td><td><a href="https://github.com/microprediction/skaters/tree/main/benchmarks/comparisons/laplace-vs-garch">study</a></td></tr>
       </tbody>
     </table>
-    <p style="font-size:.9rem;color:var(--muted)">&dagger; Foundation-model rows are the daily economic stratum of the 18,815-series panel (one step ahead, 128-length context, 64-point test window). LL is the share of series Laplace wins by a per-series <a href="/draws.html">Diebold&ndash;Mariano test</a>, with the draw share in parentheses; the remainder are series the model wins. CRPS is the median per-series ratio of the model's CRPS to Laplace's (below 1 is better than Laplace). Each quantile model is scored on the generous reconstruction of its quantiles, or on its native 21 levels in Timestral's case, because the tight nine-decile reconstruction produces most of the half-nat gap (<a href="/papers.html">benchmark paper</a>). On weekly and monthly series these models beat Laplace on CRPS, and most of them on log score as well. Each model's page has the per-stratum table. &Dagger; Moirai and Lag-Llama were scored only in the original 120-series study (July 2026), where they emit a native density; they have not been rescored on the panel.</p>
+    <p style="font-size:.9rem;color:var(--muted)">&dagger; Foundation-model rows are the daily economic stratum of the 19,940-series panel (July 2026 reconstruction of the run; the November 2026 panel with TimeH2O, Toto 2.0, Chronos-2, Simons, iAmTime and the rest is on the leaderboards) (one step ahead, 128-length context, 64-point test window). LL is the share of series Laplace wins by a per-series <a href="/draws.html">Diebold&ndash;Mariano test</a>, with the draw share in parentheses; the remainder are series the model wins. CRPS is the median per-series ratio of the model's CRPS to Laplace's (below 1 is better than Laplace). Each quantile model is scored on the generous reconstruction of its quantiles, or on its native 21 levels in Timestral's case, because the tight nine-decile reconstruction produces most of the half-nat gap (<a href="/papers.html">benchmark paper</a>). On weekly and monthly series these models beat Laplace on CRPS, and most of them on log score as well. Each model's page has the per-stratum table. &Dagger; Moirai and Lag-Llama were scored only in the original 120-series study (July 2026), where they emit a native density; they have not been rescored on the panel.</p>
 
     <p style="color:var(--muted);font-size:0.92em;">
-      Challengers that earn a full treatment get a bout page:
+      Models that earn a full treatment get their own page:
       <a href="/timesfm.html">TimesFM</a>,
       <a href="/challengers/tabfm.html">TabFM</a>, and
       <a href="/challengers/pymc-forecast.html">PYMC-Forecast</a> so far.
-      The next candidates are the native-density foundation models, Moirai
-      and Lag-Llama, which came closest. Rematch conditions for TimesFM are
+      Every foundation model run since (TimeH2O, Toto 2.0, Chronos-2, TiRex-2,
+      Simons, iAmTime and others) has a page under the Foundational menu and a
+      paired row on <a href="https://foundationalprediction.com/">foundationalprediction.com</a>.
+      Rematch conditions for TimesFM are
       tracked in <a href="https://github.com/microprediction/skaters/issues/97">skaters#97</a>.
     </p>
 
-    <h2>Send a challenger</h2>
+    <h2 id="propose">Propose a model</h2>
     <p>
       The protocol is packaged and copyable: the
       <a href="/skills.html#benchmark-against-laplace">benchmark-against-laplace</a>
@@ -564,10 +598,8 @@
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://github.com/microprediction">microprediction</a> family
-    (see also <a href="https://github.com/microprediction/precise">precise</a>,
-    <a href="https://github.com/microprediction/allocation">allocation</a>,
-    <a href="https://github.com/microprediction/humpday">humpday</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

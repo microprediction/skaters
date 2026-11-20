@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>The Rosenblatt bijection — skaters demo</title>
   <meta name="description" content="laplace is a causal bijection: upstairs the raw series trends, cycles and bursts; downstairs its image is boring N(0,1) noise. Forecast where it's easy, answer where it matters — live in your browser." />
-  <link rel="stylesheet" href="../academic.css" />
+  <link rel="stylesheet" href="../academic.css?v=20261117" />
   <style>
     .demo-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 18px 10px; margin: 24px 0; }
     .panel-label { color: var(--muted); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; margin: 6px 0 2px; }
@@ -23,7 +23,22 @@
     .diagram line, .diagram path { stroke: var(--muted); stroke-width: 1.4; fill: none; }
     .diagram .accent { stroke: var(--accent); }
     .diagram .hot { stroke: var(--warn); }
+    /* ?embed: just the diagram and the live panels, for the landing page iframe */
+    html.embed .site-header, html.embed footer, html.embed main > :not(.diagram):not(.demo-wrap) { display: none; }
+    html.embed main { margin: 0; padding: 0; max-width: none; }
+    html.embed .diagram { margin-top: 0; }
+    html.embed .demo-wrap { margin: 0; }
   </style>
+  <script>
+    if (new URLSearchParams(location.search).has("embed")) {
+      document.documentElement.classList.add("embed");
+      addEventListener("DOMContentLoaded", () => {
+        const wrap = document.querySelector(".demo-wrap");
+        const post = () => parent.postMessage({ rosenblattHeight: Math.ceil(wrap.getBoundingClientRect().bottom) }, "*");
+        new ResizeObserver(post).observe(wrap); post(); setInterval(post, 500);
+      });
+    }
+  </script>
 </head>
 <body>
   <header class="site-header">
@@ -31,33 +46,69 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -65,15 +116,11 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -152,6 +199,12 @@
       <a href="https://timemachines.microprediction.org/">timemachines</a>, the decision layer
       built on these surprise streams.</p>
   </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
+  </footer>
 
   <script type="module">
     import { laplace } from "../js/skaters/api.mjs";

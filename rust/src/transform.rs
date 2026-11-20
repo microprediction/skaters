@@ -7,6 +7,8 @@
 
 use crate::dist::Dist;
 use crate::mathx::fsum;
+use crate::pushforward::{bisect_right, log_fwd_query, CoordMap, Pred};
+use crate::tails::PDist;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,6 +28,9 @@ pub enum Transform {
     YeoJohnson(YeoJohnson),
     Ar(Ar),
     GroupedAr(GroupedAr),
+    SeasonalScale(SeasonalScale),
+    LogT(LogT),
+    Gaussianize(Box<Gaussianize>),
 }
 
 impl Transform {
@@ -46,10 +51,25 @@ impl Transform {
             Transform::YeoJohnson(t) => t.forward(y),
             Transform::Ar(t) => t.forward(y),
             Transform::GroupedAr(t) => t.forward(y),
+            Transform::SeasonalScale(t) => t.forward(y),
+            Transform::LogT(t) => t.forward(y),
+            Transform::Gaussianize(t) => t.forward(y),
         }
     }
 
+    /// Map k transformed-space mixtures back. A transform whose inverse is a
+    /// pushforward (exact flags, log_transform) hands a mixture consumer its
+    /// moment-matched components, as Python's ensembles read `.components`.
     pub fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+        self.inverse_k_g(dists)
+    }
+
+    /// Map k predictives (mixture, tail-spliced or pushforward) back.
+    pub fn inverse_k_p(&self, dists: &[PDist]) -> Vec<PDist> {
+        self.inverse_k_g(dists)
+    }
+
+    pub fn inverse_k_g<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         match self {
             Transform::Difference(t) => t.inverse_k(dists),
             Transform::FracDiff(t) => t.inverse_k(dists),
@@ -66,6 +86,9 @@ impl Transform {
             Transform::YeoJohnson(t) => t.inverse_k(dists),
             Transform::Ar(t) => t.inverse_k(dists),
             Transform::GroupedAr(t) => t.inverse_k(dists),
+            Transform::SeasonalScale(t) => t.inverse_k(dists),
+            Transform::LogT(t) => t.inverse_k(dists),
+            Transform::Gaussianize(t) => t.inverse_k(dists),
         }
     }
 }
@@ -99,7 +122,7 @@ impl Difference {
         dy
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let anchor = self.last;
         let mut result = Vec::with_capacity(dists.len());
         let mut cumsum_mean = 0.0;
@@ -112,7 +135,7 @@ impl Difference {
             } else {
                 d.std().max(1e-12)
             };
-            result.push(Dist::gaussian(anchor + cumsum_mean, std));
+            result.push(P::from_mix(Dist::gaussian(anchor + cumsum_mean, std)));
         }
         result
     }
@@ -156,7 +179,7 @@ impl FracDiff {
         fsum((0..n).map(|j| self.w_fwd[j] * self.buffer[n - 1 - j]))
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         // Recovered horizons feed back through the same weights, so each carries a
         // row of responses to the future innovations and Var = sum_i c_i^2 var_i
         // (issue #255).
@@ -191,7 +214,7 @@ impl FracDiff {
             } else {
                 d_in.std().max(1e-12)
             };
-            result.push(Dist::gaussian(recovered_mean, std));
+            result.push(P::from_mix(Dist::gaussian(recovered_mean, std)));
             if buf.len() > self.window {
                 buf.remove(0);
                 cbuf.remove(0);
@@ -253,7 +276,7 @@ impl Standardize {
         y_prime
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let sigma = if self.var > 1e-16 {
             self.var.sqrt()
         } else {
@@ -295,19 +318,14 @@ impl EmaT {
         residual
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let level = self.level;
         let mut out = Vec::with_capacity(dists.len());
         // alpha^2 * sum_{i<h} var_i: the level's accumulated response (ETS(A,N,N), issue #254)
         let mut add = 0.0;
         for d in dists {
             if add > 0.0 {
-                out.push(Dist::new(
-                    d.components
-                        .iter()
-                        .map(|&(w, m, s)| (w, m + level, (s * s + add).sqrt()))
-                        .collect(),
-                ));
+                out.push(d.widen(level, add));
             } else {
                 out.push(d.shift(level));
             }
@@ -368,7 +386,7 @@ impl Ou {
         resid
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let (m, ylast) = (self.m, self.y);
         let phi = self.phi;
         let mut out = Vec::with_capacity(dists.len());
@@ -463,7 +481,7 @@ impl Theta {
         residual
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let mut result = Vec::with_capacity(dists.len());
         for (h, d) in dists.iter().enumerate() {
             let forecast = self.ses + (h + 1) as f64 * self.slope / 2.0 + d.mean();
@@ -478,7 +496,7 @@ impl Theta {
             } else {
                 d.std().max(1e-12)
             };
-            result.push(Dist::gaussian(forecast, std));
+            result.push(P::from_mix(Dist::gaussian(forecast, std)));
         }
         result
     }
@@ -524,7 +542,7 @@ impl Drift {
         residual
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let anchor = self.last;
         let mu = self.mu;
         let rho = self.decay + self.alpha; // 1 - shrinkage: persistence of the drift estimate
@@ -551,7 +569,7 @@ impl Drift {
             } else {
                 d.std().max(1e-12)
             };
-            result.push(Dist::gaussian(total_mean, total_std));
+            result.push(P::from_mix(Dist::gaussian(total_mean, total_std)));
         }
         result
     }
@@ -600,7 +618,7 @@ impl Holt {
         residual
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let mut result = Vec::with_capacity(dists.len());
         for (h, d) in dists.iter().enumerate() {
             let forecast = self.level + (h + 1) as f64 * self.trend + d.mean();
@@ -615,7 +633,7 @@ impl Holt {
             } else {
                 d.std().max(1e-12)
             };
-            result.push(Dist::gaussian(forecast, std));
+            result.push(P::from_mix(Dist::gaussian(forecast, std)));
         }
         result
     }
@@ -689,7 +707,7 @@ impl Garch {
         dev / sigma
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let sigma = if self.var > 1e-16 {
             self.var.sqrt()
         } else {
@@ -738,7 +756,7 @@ impl Seasonal {
         y_prime
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let buf = &self.buffer;
         let period = self.period;
         let mut recovered_means: Vec<f64> = Vec::new();
@@ -762,13 +780,7 @@ impl Seasonal {
             recovered_means.push(dists[h].mean() + anchor_mean);
             recovered_vars.push(dists[h].var() + anchor_var);
             if anchor_var > 0.0 {
-                result.push(Dist::new(
-                    dists[h]
-                        .components
-                        .iter()
-                        .map(|&(w, m, s)| (w, m + anchor_mean, (s * s + anchor_var).sqrt()))
-                        .collect(),
-                ));
+                result.push(dists[h].widen(anchor_mean, anchor_var));
             } else {
                 result.push(dists[h].shift(anchor_mean));
             }
@@ -842,7 +854,7 @@ impl SeasonalAnchor {
         y_prime
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         let buf = &self.buffer;
         let period = self.period;
         let hn = dists.len();
@@ -898,13 +910,7 @@ impl SeasonalAnchor {
                     .collect(),
             };
             if a_var > 0.0 {
-                result.push(Dist::new(
-                    dists[h]
-                        .components
-                        .iter()
-                        .map(|&(w, m, s)| (w, m + a_mean, (s * s + a_var).sqrt()))
-                        .collect(),
-                ));
+                result.push(dists[h].widen(a_mean, a_var));
             } else {
                 result.push(dists[h].shift(a_mean));
             }
@@ -921,11 +927,23 @@ impl SeasonalAnchor {
 pub struct Power {
     pub p: f64,
     pub inv_p: f64,
+    /// emit the exact pushforward instead of the delta method
+    #[serde(default)]
+    pub exact: bool,
 }
 
 pub fn power_transform(p: f64) -> Transform {
+    power_transform_exact(p, false)
+}
+
+/// `power_transform(p, exact=...)`.
+pub fn power_transform_exact(p: f64, exact: bool) -> Transform {
     assert!(0.0 < p && p < 1.0);
-    Transform::Power(Power { p, inv_p: 1.0 / p })
+    Transform::Power(Power {
+        p,
+        inv_p: 1.0 / p,
+        exact,
+    })
 }
 
 impl Power {
@@ -933,11 +951,21 @@ impl Power {
         libm::copysign(libm::pow(y.abs(), self.p), y)
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
+        let map = CoordMap::Power { inv_p: self.inv_p };
+        if self.exact {
+            return dists.iter().map(|d| d.push(map.clone())).collect();
+        }
         let mut result = Vec::with_capacity(dists.len());
         for d in dists {
-            let mut components = Vec::with_capacity(d.components.len());
-            for &(w, mu, sigma) in &d.components {
+            if !d.has_components() {
+                // tail-spliced: exact pushforward
+                result.push(d.push(map.clone()));
+                continue;
+            }
+            let comps_in = d.comps();
+            let mut components = Vec::with_capacity(comps_in.len());
+            for &(w, mu, sigma) in comps_in.iter() {
                 let orig_mean = libm::copysign(libm::pow(mu.abs(), self.inv_p), mu);
                 let abs_mu = mu.abs();
                 let deriv = if abs_mu > 1e-12 {
@@ -948,7 +976,7 @@ impl Power {
                 let orig_std = (sigma * deriv).max(1e-12);
                 components.push((w, orig_mean, orig_std));
             }
-            result.push(Dist::new(components));
+            result.push(P::from_mix(Dist::new(components)));
         }
         result
     }
@@ -961,10 +989,34 @@ impl Power {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct YeoJohnson {
     pub l: f64,
+    /// emit the exact pushforward instead of the delta method
+    #[serde(default)]
+    pub exact: bool,
 }
 
 pub fn yeo_johnson(lmbda: f64) -> Transform {
-    Transform::YeoJohnson(YeoJohnson { l: lmbda })
+    yeo_johnson_exact(lmbda, false)
+}
+
+/// `yeo_johnson(lmbda, exact=...)`.
+pub fn yeo_johnson_exact(lmbda: f64, exact: bool) -> Transform {
+    Transform::YeoJohnson(YeoJohnson { l: lmbda, exact })
+}
+
+/// The Yeo-Johnson inverse at lambda (exp arguments clamped at 350).
+pub(crate) fn yj_inv(l: f64, yp: f64) -> f64 {
+    if yp >= 0.0 {
+        if l == 0.0 {
+            return libm::expm1(yp.min(350.0));
+        }
+        let base = (l * yp + 1.0).max(1e-12);
+        return libm::pow(base, 1.0 / l) - 1.0;
+    }
+    if l == 2.0 {
+        return 1.0 - libm::exp((-yp).min(350.0));
+    }
+    let base = (-(2.0 - l) * yp + 1.0).max(1e-12);
+    1.0 - libm::pow(base, 1.0 / (2.0 - l))
 }
 
 impl YeoJohnson {
@@ -984,19 +1036,7 @@ impl YeoJohnson {
     }
 
     fn inv(&self, yp: f64) -> f64 {
-        let l = self.l;
-        if yp >= 0.0 {
-            if l == 0.0 {
-                return libm::expm1(yp.min(350.0));
-            }
-            let base = (l * yp + 1.0).max(1e-12);
-            return libm::pow(base, 1.0 / l) - 1.0;
-        }
-        if l == 2.0 {
-            return 1.0 - libm::exp((-yp).min(350.0));
-        }
-        let base = (-(2.0 - l) * yp + 1.0).max(1e-12);
-        1.0 - libm::pow(base, 1.0 / (2.0 - l))
+        yj_inv(self.l, yp)
     }
 
     fn dinv(&self, yp: f64) -> f64 {
@@ -1019,15 +1059,24 @@ impl YeoJohnson {
         self.fwd(y)
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
+        let map = CoordMap::YeoJohnson { l: self.l };
+        if self.exact {
+            return dists.iter().map(|d| d.push(map.clone())).collect();
+        }
         let mut result = Vec::with_capacity(dists.len());
         for d in dists {
+            if !d.has_components() {
+                // tail-spliced: exact pushforward
+                result.push(d.push(map.clone()));
+                continue;
+            }
             let comps = d
-                .components
+                .comps()
                 .iter()
                 .map(|&(w, mu, sigma)| (w, self.inv(mu), (sigma * self.dinv(mu)).max(1e-12)))
                 .collect();
-            result.push(Dist::new(comps));
+            result.push(P::from_mix(Dist::new(comps)));
         }
         result
     }
@@ -1162,7 +1211,7 @@ impl Ar {
         residual
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         if self.phi_used.len() != self.p {
             // pre-#235 checkpoint: the cache follows from the raw coefficients
             return ar_inverse(dists, &self.buffer, &ar_stationary(&self.phi), self.p);
@@ -1256,7 +1305,7 @@ fn ar_stationary(phi: &[f64]) -> Vec<f64> {
 /// Shared AR-style inverse (used by Ar and GroupedAr). `phi` must already be
 /// the stationarity-projected coefficients the caller's forward() emitted
 /// residuals under (skaters#232) -- not re-derived here from the raw fit.
-fn ar_inverse(dists: &[Dist], buf: &[f64], phi: &[f64], p: usize) -> Vec<Dist> {
+fn ar_inverse<P: Pred>(dists: &[P], buf: &[f64], phi: &[f64], p: usize) -> Vec<P> {
     let n = dists.len();
     // Impulse responses psi_0..psi_{n-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
     let mut psi = vec![0.0_f64; n];
@@ -1299,7 +1348,7 @@ fn ar_inverse(dists: &[Dist], buf: &[f64], phi: &[f64], p: usize) -> Vec<Dist> {
             dists[h].std().max(1e-12)
         };
         recovered_means.push(total_mean);
-        result.push(Dist::gaussian(total_mean, total_std));
+        result.push(P::from_mix(Dist::gaussian(total_mean, total_std)));
     }
     result
 }
@@ -1428,7 +1477,7 @@ impl GroupedAr {
         residual
     }
 
-    fn inverse_k(&self, dists: &[Dist]) -> Vec<Dist> {
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
         // Same coefficients forward() already emitted residuals under
         // (skaters#232) -- maintained incrementally there, not re-derived here,
         // except for a pre-#235 checkpoint that has no cache yet.
@@ -1437,5 +1486,689 @@ impl GroupedAr {
             return ar_inverse(dists, &self.buffer, &ar_stationary(&raw), self.max_lag);
         }
         ar_inverse(dists, &self.buffer, &self.phi_used, self.max_lag)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// seasonal scale: phase-indexed running standardization
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SeasonalScale {
+    pub period: usize,
+    pub alpha: f64,
+    pub center: bool,
+    pub eps: f64,
+    pub init: bool,
+    pub mu_g: f64,
+    pub var_g: f64,
+    pub mu: Vec<f64>,
+    pub var: Vec<f64>,
+    pub vis: Vec<u64>,
+    pub n: u64,
+}
+
+/// `seasonal_scale(period, alpha, center, eps)`.
+pub fn seasonal_scale(period: usize, alpha: f64, center: bool, eps: f64) -> Transform {
+    assert!(period >= 1);
+    assert!(0.0 < alpha && alpha < 1.0);
+    Transform::SeasonalScale(SeasonalScale {
+        period,
+        alpha,
+        center,
+        eps,
+        init: false,
+        mu_g: 0.0,
+        var_g: 0.0,
+        mu: vec![0.0; period],
+        var: vec![0.0; period],
+        vis: vec![0; period],
+        n: 0,
+    })
+}
+
+const SEASONAL_SCALE_K0: f64 = 3.0;
+
+impl SeasonalScale {
+    fn a_g(&self) -> f64 {
+        self.alpha / self.period as f64
+    }
+
+    /// Bias-corrected global variance (the slow EWMA starts from zero).
+    fn vg(&self) -> f64 {
+        let updates = self.n as i64 - 1;
+        if updates <= 0 {
+            return 0.0;
+        }
+        self.var_g / (1.0 - libm::pow(1.0 - self.a_g(), updates as f64))
+    }
+
+    /// Shrunk (mu, sigma) for phase p, blending variances in log space.
+    fn phase_stats(&self, p: usize) -> (f64, f64) {
+        let vis = self.vis[p] as f64;
+        let w = vis / (vis + SEASONAL_SCALE_K0);
+        let vp = self.var[p].max(self.eps * self.eps);
+        let vg = self.vg().max(self.eps * self.eps);
+        let var_eff = libm::exp(w * libm::log(vp) + (1.0 - w) * libm::log(vg));
+        let mu_eff = if self.center {
+            w * self.mu[p] + (1.0 - w) * self.mu_g
+        } else {
+            0.0
+        };
+        (mu_eff, var_eff.sqrt())
+    }
+
+    fn forward(&mut self, y: f64) -> f64 {
+        if !self.init {
+            self.init = true;
+            self.mu_g = y;
+            self.var_g = 0.0;
+            self.n = 1;
+            return 0.0;
+        }
+        let p = (self.n % self.period as u64) as usize;
+        let (mu_eff, _) = self.phase_stats(p);
+        let a_g = self.a_g();
+        let dg = y - self.mu_g;
+        self.mu_g += a_g * dg;
+        self.var_g = (1.0 - a_g) * self.var_g + a_g * dg * dg;
+        if self.vis[p] == 0 {
+            self.mu[p] = y;
+            self.var[p] = self.vg();
+        } else {
+            let dp = y - self.mu[p];
+            self.mu[p] += self.alpha * dp;
+            self.var[p] = (1.0 - self.alpha) * self.var[p] + self.alpha * dp * dp;
+        }
+        self.vis[p] += 1;
+        self.n += 1;
+        let (_, sigma) = self.phase_stats(p);
+        (y - mu_eff) / sigma
+    }
+
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
+        (0..dists.len())
+            .map(|h| {
+                let p = ((self.n + h as u64) % self.period as u64) as usize;
+                let (mu_eff, sigma) = self.phase_stats(p);
+                dists[h].affine(sigma, mu_eff)
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// log coordinate with a one-sided bound
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LogT {
+    pub b: f64,
+    /// +1 for a lower bound, -1 for an upper bound
+    pub direction: f64,
+}
+
+/// `log_transform(lower=..., upper=...)`: give one bound; neither means lower = 0.
+pub fn log_transform(lower: Option<f64>, upper: Option<f64>) -> Transform {
+    assert!(
+        !(lower.is_some() && upper.is_some()),
+        "log_transform takes one bound: lower or upper"
+    );
+    let b = upper.unwrap_or(lower.unwrap_or(0.0));
+    assert!(b.is_finite(), "log_transform needs a finite bound");
+    let direction = if upper.is_some() { -1.0 } else { 1.0 };
+    Transform::LogT(LogT { b, direction })
+}
+
+impl LogT {
+    fn forward(&mut self, y: f64) -> f64 {
+        if !y.is_finite() {
+            return y; // missing: passes through for the inner skater
+        }
+        let z = log_fwd_query(self.b, self.direction, y);
+        if z == -self.direction * f64::INFINITY {
+            let label = if self.direction < 0.0 { "upper" } else { "lower" };
+            panic!("log_transform: observation {y} must lie inside {label}={}", self.b);
+        }
+        z
+    }
+
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
+        let map = CoordMap::Log {
+            b: self.b,
+            direction: self.direction,
+        };
+        dists.iter().map(|d| d.push_analytic(map.clone())).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// empirical Gaussianization
+// ---------------------------------------------------------------------------
+
+/// The standard normal quantile by Wichura's AS241, as CPython's
+/// `statistics.NormalDist().inv_cdf`.
+pub fn normal_inv_cdf(p: f64) -> f64 {
+    assert!(p > 0.0 && p < 1.0, "p must be in the range 0.0 < p < 1.0");
+    let q = p - 0.5;
+    if q.abs() <= 0.425 {
+        let r = 0.180625 - q * q;
+        let num = (((((((2.5090809287301226727e+3 * r + 3.3430575583588128105e+4) * r
+            + 6.7265770927008700853e+4)
+            * r
+            + 4.5921953931549871457e+4)
+            * r
+            + 1.3731693765509461125e+4)
+            * r
+            + 1.9715909503065514427e+3)
+            * r
+            + 1.3314166789178437745e+2)
+            * r
+            + 3.3871328727963666080e+0)
+            * q;
+        let den = ((((((5.2264952788528545610e+3 * r + 2.8729085735721942674e+4) * r
+            + 3.9307895800092710610e+4)
+            * r
+            + 2.1213794301586595867e+4)
+            * r
+            + 5.3941960214247511077e+3)
+            * r
+            + 6.8718700749205790830e+2)
+            * r
+            + 4.2313330701600911252e+1)
+            * r
+            + 1.0;
+        return 0.0 + num / den;
+    }
+    let mut r = if q <= 0.0 { p } else { 1.0 - p };
+    r = libm::sqrt(-libm::log(r));
+    let (num, den);
+    if r <= 5.0 {
+        r -= 1.6;
+        num = ((((((7.74545014278341407640e-4 * r + 2.27238449892691845833e-2) * r
+            + 2.41780725177450611770e-1)
+            * r
+            + 1.27045825245236838258e+0)
+            * r
+            + 3.64784832476320460504e+0)
+            * r
+            + 5.76949722146069140550e+0)
+            * r
+            + 4.63033784615654529590e+0)
+            * r
+            + 1.42343711074968357734e+0;
+        den = ((((((1.05075007164441684324e-9 * r + 5.47593808499534494600e-4) * r
+            + 1.51986665636164571966e-2)
+            * r
+            + 1.48103976427480074590e-1)
+            * r
+            + 6.89767334985100004550e-1)
+            * r
+            + 1.67638483018380384940e+0)
+            * r
+            + 2.05319162663775882187e+0)
+            * r
+            + 1.0;
+    } else {
+        r -= 5.0;
+        num = ((((((2.01033439929228813265e-7 * r + 2.71155556874348757815e-5) * r
+            + 1.24266094738807843860e-3)
+            * r
+            + 2.65321895265761230930e-2)
+            * r
+            + 2.96560571828504891230e-1)
+            * r
+            + 1.78482653991729133580e+0)
+            * r
+            + 5.46378491116411436990e+0)
+            * r
+            + 6.65790464350110377720e+0;
+        den = ((((((2.04426310338993978564e-15 * r + 1.42151175831644588870e-7) * r
+            + 1.84631831751005468180e-5)
+            * r
+            + 7.86869131145613259100e-4)
+            * r
+            + 1.48753612908506148525e-2)
+            * r
+            + 1.36929880922735805310e-1)
+            * r
+            + 5.99832206555887937690e-1)
+            * r
+            + 1.0;
+    }
+    let mut x = num / den;
+    if q < 0.0 {
+        x = -x;
+    }
+    0.0 + x
+}
+
+fn herm(s: f64, dx: f64, v0: f64, v1: f64, t0: f64, t1: f64) -> f64 {
+    let s2 = s * s;
+    let s3 = s2 * s;
+    v0 * (2.0 * s3 - 3.0 * s2 + 1.0)
+        + dx * t0 * (s3 - 2.0 * s2 + s)
+        + v1 * (-2.0 * s3 + 3.0 * s2)
+        + dx * t1 * (s3 - s2)
+}
+
+fn herm_ds(s: f64, dx: f64, v0: f64, v1: f64, t0: f64, t1: f64) -> f64 {
+    let s2 = s * s;
+    v0 * (6.0 * s2 - 6.0 * s)
+        + dx * t0 * (3.0 * s2 - 4.0 * s + 1.0)
+        + v1 * (-6.0 * s2 + 6.0 * s)
+        + dx * t1 * (3.0 * s2 - 2.0 * s)
+}
+
+fn gaussianize_fwd(y: f64, cs: &[f64], zs: &[f64], ts: Option<&[f64]>) -> f64 {
+    let k = cs.len();
+    if y <= cs[0] {
+        let s0 = match ts {
+            Some(t) => t[0],
+            None => (zs[1] - zs[0]) / (cs[1] - cs[0]),
+        };
+        return zs[0] + s0 * (y - cs[0]);
+    }
+    if y >= cs[k - 1] {
+        let s1 = match ts {
+            Some(t) => t[k - 1],
+            None => (zs[k - 1] - zs[k - 2]) / (cs[k - 1] - cs[k - 2]),
+        };
+        return zs[k - 1] + s1 * (y - cs[k - 1]);
+    }
+    let i = bisect_right(cs, y) - 1;
+    match ts {
+        None => zs[i] + (zs[i + 1] - zs[i]) * (y - cs[i]) / (cs[i + 1] - cs[i]),
+        Some(t) => {
+            let dx = cs[i + 1] - cs[i];
+            herm((y - cs[i]) / dx, dx, zs[i], zs[i + 1], t[i], t[i + 1])
+        }
+    }
+}
+
+/// gaussianize's inverse map on its knots (z -> y).
+pub(crate) fn gaussianize_inv(z: f64, cs: &[f64], zs: &[f64], ts: Option<&[f64]>) -> f64 {
+    let k = cs.len();
+    if z <= zs[0] {
+        let s0 = match ts {
+            Some(t) => t[0],
+            None => (zs[1] - zs[0]) / (cs[1] - cs[0]),
+        };
+        return cs[0] + (z - zs[0]) / s0.max(1e-12);
+    }
+    if z >= zs[k - 1] {
+        let s1 = match ts {
+            Some(t) => t[k - 1],
+            None => (zs[k - 1] - zs[k - 2]) / (cs[k - 1] - cs[k - 2]),
+        };
+        return cs[k - 1] + (z - zs[k - 1]) / s1.max(1e-12);
+    }
+    let i = bisect_right(zs, z) - 1;
+    match ts {
+        None => cs[i] + (cs[i + 1] - cs[i]) * (z - zs[i]) / (zs[i + 1] - zs[i]),
+        Some(t) => {
+            let dx = cs[i + 1] - cs[i];
+            let mut s = (z - zs[i]) / (zs[i + 1] - zs[i]);
+            for _ in 0..6 {
+                let d = herm_ds(s, dx, zs[i], zs[i + 1], t[i], t[i + 1]);
+                if d <= 1e-14 {
+                    break;
+                }
+                s -= (herm(s, dx, zs[i], zs[i + 1], t[i], t[i + 1]) - z) / d;
+                s = if s < 0.0 {
+                    0.0
+                } else if s > 1.0 {
+                    1.0
+                } else {
+                    s
+                };
+            }
+            cs[i] + s * dx
+        }
+    }
+}
+
+/// Knots of the empirical map: centers, levels, optional cubic tangents.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Knots {
+    pub cs: Vec<f64>,
+    pub zs: Vec<f64>,
+    pub ts: Option<Vec<f64>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Gaussianize {
+    pub max_knots: usize,
+    pub warmup: usize,
+    pub n_particles: usize,
+    pub smooth: bool,
+    pub slope_cap: f64,
+    pub z_max: f64,
+    /// "move", "delete" or "emin"
+    pub guard: String,
+    pub buf: Vec<f64>,
+    pub n: usize,
+    pub mu: f64,
+    pub m2: f64,
+    pub knots: Option<Knots>,
+}
+
+/// `gaussianize(max_knots, warmup, n_particles, smooth, slope_cap, z_max, guard)`.
+pub fn gaussianize(
+    max_knots: usize,
+    warmup: usize,
+    n_particles: usize,
+    smooth: bool,
+    slope_cap: f64,
+    z_max: f64,
+    guard: &str,
+) -> Transform {
+    Transform::Gaussianize(Box::new(Gaussianize {
+        max_knots,
+        warmup,
+        n_particles,
+        smooth,
+        slope_cap,
+        z_max,
+        guard: guard.to_string(),
+        buf: Vec::new(),
+        n: 0,
+        mu: 0.0,
+        m2: 0.0,
+        knots: None,
+    }))
+}
+
+/// Python's defaults: gaussianize().
+pub fn gaussianize_default() -> Transform {
+    gaussianize(39, 30, 9, false, 20.0, 8.0, "move")
+}
+
+impl Gaussianize {
+    fn cap_of(&self, ys: &[f64], zs: &[f64]) -> Option<f64> {
+        let (i1, i3) = (ys.len() / 4, 3 * ys.len() / 4);
+        if i3 <= i1 || zs[i3] <= zs[i1] {
+            return None;
+        }
+        let cap = self.slope_cap * (ys[i3] - ys[i1]) / (zs[i3] - zs[i1]);
+        if cap <= 0.0 {
+            return None;
+        }
+        Some(cap)
+    }
+
+    fn prune_slopes(&self, ys: Vec<f64>, zs: Vec<f64>) -> (Vec<f64>, Vec<f64>) {
+        let Some(cap) = self.cap_of(&ys, &zs) else {
+            return (ys, zs);
+        };
+        let c = ys.len() / 2;
+        let mut keep = vec![c];
+        for i in c + 1..ys.len() {
+            let j = *keep.last().unwrap();
+            if (ys[i] - ys[j]) / (zs[i] - zs[j]) <= cap {
+                keep.push(i);
+            }
+        }
+        for i in (0..c).rev() {
+            let j = *keep.iter().min().unwrap();
+            if (ys[j] - ys[i]) / (zs[j] - zs[i]) <= cap {
+                keep.push(i);
+            }
+        }
+        keep.sort_unstable();
+        if keep.len() < 2 {
+            return (ys, zs);
+        }
+        (
+            keep.iter().map(|&i| ys[i]).collect(),
+            keep.iter().map(|&i| zs[i]).collect(),
+        )
+    }
+
+    fn emin_knots(&self, buf: &[f64], ys: Vec<f64>, zs: Vec<f64>, idxs: &[usize]) -> (Vec<f64>, Vec<f64>) {
+        let Some(cap) = self.cap_of(&ys, &zs) else {
+            return (ys, zs);
+        };
+        let (nb, kk) = (buf.len(), ys.len());
+        let dz: Vec<f64> = (0..kk - 1).map(|j| zs[j + 1] - zs[j]).collect();
+        let corridor = |e: usize| -> Option<(Vec<f64>, Vec<f64>)> {
+            let lo: Vec<f64> = (0..kk).map(|j| buf[idxs[j].saturating_sub(e)]).collect();
+            let hi: Vec<f64> = (0..kk).map(|j| buf[(idxs[j] + e).min(nb - 1)]).collect();
+            let mut u = vec![0.0; kk];
+            u[kk - 1] = hi[kk - 1];
+            for j in (0..kk - 1).rev() {
+                u[j] = hi[j].min(u[j + 1]);
+            }
+            let mut db = vec![0.0; kk];
+            db[kk - 1] = lo[kk - 1];
+            for j in (0..kk - 1).rev() {
+                db[j] = lo[j].max(db[j + 1] - cap * dz[j]);
+            }
+            let mut l = vec![0.0; kk];
+            l[0] = db[0];
+            for j in 1..kk {
+                l[j] = db[j].max(l[j - 1]);
+            }
+            if (0..kk).any(|j| l[j] > u[j]) {
+                return None;
+            }
+            Some((l, u))
+        };
+        if corridor(0).is_some() {
+            return (ys, zs);
+        }
+        let (mut lo_e, mut hi_e) = (0usize, nb);
+        while hi_e - lo_e > 1 {
+            let mid = (lo_e + hi_e) / 2;
+            if corridor(mid).is_some() {
+                hi_e = mid;
+            } else {
+                lo_e = mid;
+            }
+        }
+        let Some((l, u)) = corridor(hi_e) else {
+            return (ys, zs);
+        };
+        let mut w = vec![0.0; kk];
+        w[0] = l[0].max(ys[0].min(u[0]));
+        for j in 1..kk {
+            let a_j = l[j].max(w[j - 1]);
+            let b_j = u[j].min(w[j - 1] + cap * dz[j - 1]);
+            w[j] = a_j.max(ys[j].min(b_j));
+        }
+        let (mut ks, mut kz) = (vec![w[0]], vec![zs[0]]);
+        for j in 1..kk {
+            if w[j] > *ks.last().unwrap() {
+                ks.push(w[j]);
+                kz.push(zs[j]);
+            }
+        }
+        (ks, kz)
+    }
+
+    fn cap_slopes(&self, ys: &mut [f64], zs: &[f64]) {
+        let Some(cap) = self.cap_of(ys, zs) else {
+            return;
+        };
+        let c = ys.len() / 2;
+        for i in c + 1..ys.len() {
+            ys[i] = ys[i].min(ys[i - 1] + cap * (zs[i] - zs[i - 1]));
+        }
+        for i in (0..c).rev() {
+            ys[i] = ys[i].max(ys[i + 1] - cap * (zs[i + 1] - zs[i]));
+        }
+    }
+
+    fn tangents(xs: &[f64], vs: &[f64]) -> Vec<f64> {
+        let d: Vec<f64> = (0..xs.len() - 1)
+            .map(|i| (vs[i + 1] - vs[i]) / (xs[i + 1] - xs[i]))
+            .collect();
+        let mut t = vec![d[0]];
+        for i in 1..xs.len() - 1 {
+            let (a, b) = (d[i - 1], d[i]);
+            t.push(if a * b > 0.0 { 2.0 * a * b / (a + b) } else { 0.0 });
+        }
+        t.push(*d.last().unwrap());
+        t
+    }
+
+    fn build(&self) -> Option<Knots> {
+        let buf = &self.buf;
+        let n = buf.len();
+        let m = self.max_knots.min(n);
+        let mut cs: Vec<f64> = Vec::new();
+        let mut idxs: Vec<usize> = Vec::new();
+        for i in 0..m {
+            let idx = ((i as f64 + 0.5) * n as f64 / m as f64) as usize;
+            let y = buf[idx];
+            if !cs.is_empty() && y <= *cs.last().unwrap() {
+                continue;
+            }
+            cs.push(y);
+            idxs.push(idx);
+        }
+        if cs.len() < 2 {
+            return None;
+        }
+        if !self.smooth {
+            let zs: Vec<f64> = idxs
+                .iter()
+                .map(|&idx| normal_inv_cdf((idx + 1) as f64 / (n + 1) as f64))
+                .collect();
+            let (cs, zs) = match self.guard.as_str() {
+                "delete" => self.prune_slopes(cs, zs),
+                "emin" => self.emin_knots(buf, cs, zs, &idxs),
+                _ => {
+                    let mut cs = cs;
+                    self.cap_slopes(&mut cs, &zs);
+                    (cs, zs)
+                }
+            };
+            return Some(Knots { cs, zs, ts: None });
+        }
+        // kernel-smoothed CDF on the sketch, Silverman bandwidth
+        let mm = cs.len();
+        let (i1, i3) = (mm / 4, 3 * mm / 4);
+        let iqr = cs[i3] - cs[i1];
+        let mean = fsum(cs.iter().copied()) / mm as f64;
+        let sd = (fsum(cs.iter().map(|&c| (c - mean) * (c - mean))) / mm as f64).sqrt();
+        let mut scale = if iqr > 0.0 { sd.min(iqr / 1.34) } else { sd };
+        if scale <= 0.0 {
+            scale = (cs[mm - 1] - cs[0]).abs().max(1e-8);
+        }
+        let h = (0.9 * scale * libm::pow(n as f64, -0.2)).max(1e-12);
+        let r = 8.0 * h;
+        let sq2 = std::f64::consts::SQRT_2;
+        let mut zs = Vec::with_capacity(mm);
+        let (mut lo, mut hi) = (0usize, 0usize);
+        for &c in &cs {
+            while lo < mm && cs[lo] < c - r {
+                lo += 1;
+            }
+            while hi < mm && cs[hi] <= c + r {
+                hi += 1;
+            }
+            let f = (lo as f64
+                + fsum((lo..hi).map(|j| 0.5 * (1.0 + libm::erf((c - cs[j]) / (sq2 * h))))))
+                / mm as f64;
+            zs.push(normal_inv_cdf((1.0 + n as f64 * f) / (n as f64 + 2.0)));
+        }
+        let (mut cs2, mut zs2) = (vec![cs[0]], vec![zs[0]]);
+        for i in 1..mm {
+            if zs[i] > *zs2.last().unwrap() + 1e-12 {
+                cs2.push(cs[i]);
+                zs2.push(zs[i]);
+            }
+        }
+        if cs2.len() < 2 {
+            return None;
+        }
+        self.cap_slopes(&mut cs2, &zs2);
+        let ts = Self::tangents(&cs2, &zs2);
+        Some(Knots {
+            cs: cs2,
+            zs: zs2,
+            ts: Some(ts),
+        })
+    }
+
+    fn moments(&self) -> (f64, f64) {
+        let var = if self.n > 2 {
+            self.m2 / (self.n - 1) as f64
+        } else {
+            0.0
+        };
+        let sigma = if var > 0.0 { var.sqrt() } else { 1e-8 };
+        (self.mu, sigma)
+    }
+
+    fn forward(&mut self, y: f64) -> f64 {
+        let mut z = match &self.knots {
+            Some(k) => gaussianize_fwd(y, &k.cs, &k.zs, k.ts.as_deref()),
+            None => {
+                let (mu, mut sigma) = self.moments();
+                if sigma <= 1e-8 {
+                    sigma = (y - mu).abs().max(1e-8);
+                }
+                if self.n > 0 {
+                    (y - mu) / sigma
+                } else {
+                    0.0
+                }
+            }
+        };
+        z = (-self.z_max).max(self.z_max.min(z));
+        let at = bisect_right(&self.buf, y);
+        self.buf.insert(at, y);
+        let n = self.n + 1;
+        let d0 = y - self.mu;
+        let mu = self.mu + d0 / n as f64;
+        self.m2 += d0 * (y - mu);
+        self.n = n;
+        self.mu = mu;
+        self.knots = if n >= self.warmup { self.build() } else { None };
+        z
+    }
+
+    fn inverse_k<P: Pred>(&self, dists: &[P]) -> Vec<P> {
+        let Some(k) = &self.knots else {
+            let (mu, sigma) = self.moments();
+            return dists.iter().map(|d| d.affine(sigma, mu)).collect();
+        };
+        let jn = self.n_particles;
+        let mids: Vec<f64> = (0..jn).map(|j| normal_inv_cdf((j as f64 + 0.5) / jn as f64)).collect();
+        let edges: Vec<f64> = (1..jn).map(|j| normal_inv_cdf(j as f64 / jn as f64)).collect();
+        let ts = k.ts.as_deref();
+        let inv = |z: f64| gaussianize_inv(z, &k.cs, &k.zs, ts);
+        let mut result = Vec::with_capacity(dists.len());
+        for d in dists {
+            if !d.has_components() {
+                // tail-spliced: exact pushforward
+                result.push(d.push(CoordMap::Gaussianize {
+                    cs: k.cs.clone(),
+                    zs: k.zs.clone(),
+                    ts: k.ts.clone(),
+                }));
+                continue;
+            }
+            let mut comps = Vec::new();
+            for &(w, mu, sig) in d.comps().iter() {
+                let pts: Vec<f64> = mids.iter().map(|&q| inv(mu + sig * q)).collect();
+                let eds: Vec<f64> = edges.iter().map(|&e| inv(mu + sig * e)).collect();
+                for j in 0..jn {
+                    let lo = if j > 0 { Some(eds[j - 1]) } else { None };
+                    let hi = if j < jn - 1 { Some(eds[j]) } else { None };
+                    let std = match (lo, hi) {
+                        (Some(l), Some(h)) => (h - l) / 2.0,
+                        (None, Some(h)) => h - pts[j],
+                        (Some(l), None) => pts[j] - l,
+                        (None, None) => unreachable!(),
+                    };
+                    comps.push((w / jn as f64, pts[j], std.max(1e-9)));
+                }
+            }
+            result.push(P::from_mix(Dist::new(comps).prune(12)));
+        }
+        result
     }
 }

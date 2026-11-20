@@ -163,7 +163,7 @@ class TorchSplicedDist:
             return torch.exp(lp)
         return torch.as_tensor(math.inf, dtype=DTYPE)
 
-    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 100):
+    def quantile(self, p: float, tol: float = 1e-9, max_iter: int = 2100):
         assert 0 < p < 1
         if p < self.zeta_lo:
             z = self.t_lo - ref._gpd_isf(p / self.zeta_lo, self.g_lo, self.s_lo)
@@ -172,6 +172,11 @@ class TorchSplicedDist:
         else:
             u = self._plo + (p - self.zeta_lo) / self._c
             z = ref._phi_inv(min(max(u, _EPS), 1.0 - _EPS))
+        t = max(ref._phi(-abs(z)), _EPS)    # deep tail: the reference's erfc solve
+        if t < ref._TAIL_U:
+            with torch.no_grad():
+                q = ref._body_tail_quantile(self.body.to_reference(), t, z > 0.0, tol, max_iter)
+            return torch.as_tensor(q, dtype=DTYPE)
         ub = min(max(ref._phi(z), _EPS), 1.0 - _EPS)
         return self.body.quantile(ub, tol=tol, max_iter=max_iter)
 
@@ -204,6 +209,28 @@ class TorchSplicedDist:
         idx = torch.arange(n, dtype=DTYPE)
         t2 = 2.0 * torch.sum(q * (2.0 * (idx + 0.5) / n - 1.0)) / n
         return t1 - t2 * 0.5
+
+    # --- affine maps (the splice lives in the body's PIT space) ------------
+
+    def _with_body(self, body, flip: bool) -> "TorchSplicedDist":
+        if not flip:
+            return TorchSplicedDist(body, self.t_lo, self.t_up, self.zeta_lo, self.zeta_up,
+                                    self.g_lo, self.s_lo, self.g_up, self.s_up)
+        return TorchSplicedDist(body, -self.t_up, -self.t_lo, self.zeta_up, self.zeta_lo,
+                                self.g_up, self.s_up, self.g_lo, self.s_lo)
+
+    def affine(self, a, b) -> "TorchSplicedDist":
+        if float(_t(a)) == 0:
+            raise ValueError("affine multiplier must be nonzero")
+        return self._with_body(self.body.affine(a, b), float(_t(a)) < 0)
+
+    def shift(self, delta) -> "TorchSplicedDist":
+        return self._with_body(self.body.shift(delta), False)
+
+    def scale(self, factor) -> "TorchSplicedDist":
+        if float(_t(factor)) == 0:
+            raise ValueError("scale factor must be nonzero")
+        return self._with_body(self.body.scale(factor), float(_t(factor)) < 0)
 
     def __repr__(self) -> str:
         return (f"TorchSplicedDist(zeta=({self.zeta_lo:.4f},{self.zeta_up:.4f}), "

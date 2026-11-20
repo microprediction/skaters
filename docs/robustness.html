@@ -30,6 +30,9 @@
   .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:16px;
     padding:10px 0 18px;font-family:var(--mono);font-size:12px;color:var(--muted)}
   .topbar a{color:var(--accent);text-decoration:none}
+  footer{grid-column:1/-1;max-width:none;margin:40px 0 24px;padding:16px 24px;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+  footer a{color:var(--accent);text-decoration:none}
+  .sub a{color:var(--accent)}
   .topbar a:hover{text-decoration:underline}
   .topbar .crumb{color:var(--faint);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
   header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px}
@@ -102,44 +105,100 @@
   select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
     font-family:var(--mono);font-size:12px;border-radius:6px;padding:3px 7px;cursor:pointer}
   select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  /* site header, as in academic.css */
+  header.site-header{background:#1f1d3d;color:#fff;padding:14px 24px;margin:0;border-bottom:1px solid #15132a;
+    position:sticky;top:0;z-index:100;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  header.site-header .nav-inner{max-width:980px;margin:0 auto;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  header.site-header a{text-decoration:none}
+  header.site-header .brand{font-weight:600;font-size:1.1rem;color:#fff}
+  header.site-header nav{display:flex;flex-wrap:wrap;gap:0 18px;margin-left:auto}
+  header.site-header nav a{color:#fff;opacity:.85;font-size:.95rem}
+  header.site-header nav a:hover{opacity:1}
+  header.site-header nav .menu{position:relative}
+  header.site-header nav .menu>.menu-label{color:#fff;opacity:.85;font-size:.95rem;cursor:default}
+  header.site-header nav .menu:hover>.menu-label,header.site-header nav .menu:focus-within>.menu-label{opacity:1}
+  header.site-header nav .menu .drop{display:none;position:absolute;left:0;top:100%;z-index:50;min-width:10em;padding:6px 0;
+    background:#1f1d3d;border:1px solid #15132a;border-radius:0 0 6px 6px;box-shadow:0 4px 10px rgba(0,0,0,.25)}
+  header.site-header nav .menu:hover .drop,header.site-header nav .menu:focus-within .drop{display:block}
+  header.site-header nav .menu .drop a{display:block;padding:4px 14px;white-space:nowrap}
+  header.site-header nav .menu .drop .sub{position:relative;display:block}
+  header.site-header nav .menu .drop .sub>.menu-label{display:block;padding:4px 14px;white-space:nowrap}
+  header.site-header nav .menu .drop .subdrop{display:none;position:absolute;left:100%;top:-7px;z-index:60;min-width:9em;padding:6px 0;
+    background:#1f1d3d;border:1px solid #15132a;border-radius:0 6px 6px 6px;box-shadow:0 4px 10px rgba(0,0,0,.25)}
+  header.site-header nav .menu .drop .sub:hover>.subdrop,header.site-header nav .menu .drop .sub:focus-within>.subdrop{display:block}
 </style>
 </head>
 <body>
 
 
-<div class="wrap">
   <header class="site-header">
     <div class="nav-inner">
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -147,26 +206,27 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
       </nav>
     </div>
   </header>
+
+<div class="wrap">
   <header>
     <p class="eyebrow">skaters · non-price benchmark</p>
     <h1>How robust is the win? Slice it and see.</h1>
-    <p class="sub">Every non-price FRED change-series scored so far, one-step-ahead, held-out. Pick any
-      subset — sample it at random, balance by category, filter by keyword, seasonality, tails, whatever —
+    <p class="sub">Snapshot of 2 July 2026: every non-price FRED change-series scored by then, one step ahead,
+      held-out, before the daily corpus was de-duplicated and before the November laplace rerun. The opponents and
+      win-rates are as of that run; the current paired panel is on
+      <a href="https://foundationalprediction.com/">foundationalprediction.com</a>. Pick any
+      subset (sample it at random, balance by category, filter by keyword, seasonality, tails, whatever)
       and the per-series win-rate of <b>laplace</b> against each opponent recomputes live, with a bootstrap
       90% band. A robust edge stays high <em>and</em> tight no matter how you cut the data.</p>
   </header>
@@ -260,6 +320,12 @@
 
       <p class="note" id="foot"></p>
     </main>
+
+  <footer>
+    <a href="https://github.com/microprediction/skaters">Source</a> &middot;
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
+  </footer>
   </div>
 </div>
 

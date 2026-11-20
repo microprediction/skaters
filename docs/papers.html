@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>skaters — papers</title>
+  <title>skaters — papers and technical notes</title>
   <meta name="description" content="The skaters papers: the methods paper and the conformal information gap companion study." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="skaters" />
-  <meta property="og:title" content="skaters — papers" />
+  <meta property="og:title" content="skaters — papers and technical notes" />
   <meta property="og:description" content="The skaters papers: the methods paper and the conformal information gap companion study." />
   <meta property="og:url" content="https://skaters.microprediction.org/papers.html" />
   <meta property="og:image" content="https://skaters.microprediction.org/assets/frontier.png" />
   <meta property="og:image:alt" content="Accuracy vs speed: laplace has the best held-out likelihood at a fraction of the baselines' runtime." />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" crossorigin="anonymous">
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     .lede { color: #555; margin: 0 0 32px; font-size: 1.05em; }
     .paper { margin: 0 0 34px; }
@@ -33,33 +33,69 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -67,15 +103,11 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -84,33 +116,24 @@
   </header>
 
   <main>
-    <h1>Papers</h1>
+    <h1>Papers and Technical Notes</h1>
     <p class="lede">Papers built on the skaters library. Sources and run logs are in the
       <a href="https://github.com/microprediction/skaters/tree/main/papers">papers/</a> and
       <a href="https://github.com/microprediction/skaters/tree/main/benchmarks">benchmarks/</a>
       directories of the repository. The benchmark studies themselves live on the
-      <a href="/benchmarks.html">benchmarks page</a>.</p>
+      <a href="/benchmarks.html">benchmarks page</a>. Notes on evaluating foundational
+      time-series models are also listed on
+      <a href="https://foundationalprediction.com/papers.html">foundationalprediction.com</a>.</p>
 
-    <div class="paper">
-      <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.pdf">A
-      stronger univariate benchmark for foundational time-series model evaluation</a></h2>
-      <p class="abstract">Reported progress for foundation time-series models rests on
-      comparisons that leave out a strong classical reference. Across eleven benchmark papers
-      the classical arms are per-window refits of ETS, ARIMA and Theta; no online forecaster
-      appears, and no suite scores a full predictive density by log score. This paper supplies the missing
-      reference, scored one step ahead on held-out log density over an 18,815-series panel.
-      The comparison is decided by a step the suites leave unstated: how the model's nine
-      quantiles become a density. Under a tight reconstruction the reference leads TimesFM 3.0
-      by half a nat on the median series of every stratum; under a generous one the two are
-      level at the median, and the reference keeps the better coverage. Every number derives
-      from a version-controlled store; the verifier and a three-tier reproduction guide live
-      next to the paper.</p>
-      <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.pdf">PDF</a>
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.tex">LaTeX</a>
-      <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/REPRODUCE.md">Reproduce</a>
-      <a href="https://papers.ssrn.com/abstract=7583618">SSRN</a>
-      <span class="status">SSRN 7583618, 2026</span></p>
-    </div>
+    <h2 id="citation">Citation</h2>
+    <p>Please cite the first paper listed, as it explains the methodology.</p>
+<pre><code>@misc{cotton2026skaters,
+  title  = {Transforms All the Way Down --- Automatic Online Distributional
+            Forecasting by Conjugation},
+  author = {Cotton, Peter},
+  year   = {2026},
+  note   = {SSRN 7220478, https://skaters.microprediction.org}
+}</code></pre>
 
     <div class="paper">
       <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.pdf">Transforms
@@ -127,6 +150,51 @@
       <a href="https://github.com/microprediction/skaters/blob/main/papers/skaters-jss.tex">LaTeX</a>
       <a href="https://papers.ssrn.com/abstract=7220478">SSRN</a>
       <span class="status">SSRN 7220478, 2026</span></p>
+    </div>
+
+    <div class="paper">
+      <h2><a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.pdf">A
+      stronger univariate benchmark for foundational time-series model evaluation</a></h2>
+      <p class="abstract">Reported progress for foundation time-series models rests on
+      comparisons that leave out a strong classical reference. Across eleven benchmark papers
+      the classical arms are per-window refits of ETS, ARIMA and Theta; no online forecaster
+      appears, and no suite scores a full predictive density by log score. This paper supplies the missing
+      reference, scored one step ahead on held-out log density over an 19,940-series panel.
+      The comparison is decided by a step the suites leave unstated: how the model's nine
+      quantiles become a density. Under a tight reconstruction the reference leads TimesFM 3.0
+      by half a nat on the median series of every stratum; under a generous one the two are
+      level at the median, and the reference keeps the better coverage. Every number derives
+      from a version-controlled store; the verifier and a three-tier reproduction guide live
+      next to the paper.</p>
+      <p class="links"><a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.pdf">PDF</a>
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/stronger-benchmark.tex">LaTeX</a>
+      <a href="https://github.com/microprediction/skaters/blob/main/papers/stronger-benchmark/REPRODUCE.md">Reproduce</a>
+      <a href="https://papers.ssrn.com/abstract=7583618">SSRN</a>
+      <span class="status">SSRN 7583618, 2026</span></p>
+    </div>
+
+    <div class="paper">
+      <h2><a href="https://foundationalprediction.com/horizon-note.pdf">On the importance of evaluating
+      foundational time-series models one step ahead in an investment context</a></h2>
+      <p class="abstract">A technical note. Under log utility, an investor who can trade every
+      interval chooses today's position from the distribution of the next return alone, and the
+      regret from trading on a forecast is bounded by its excess expected log loss. Scores pooled
+      over long horizons therefore do not establish superiority for that decision. The note
+      recommends reporting one step ahead on its own.</p>
+      <p class="links"><a href="https://foundationalprediction.com/horizon-note.pdf">PDF</a>
+      <a href="https://github.com/microprediction/foundationalprediction/blob/main/papers/horizon-note/horizon-note.tex">LaTeX</a>
+      <a href="https://foundationalprediction.com/papers.html">foundationalprediction.com</a>
+      <span class="status">technical note, November 2026</span></p>
+    </div>
+
+    <div class="paper">
+      <h2><a href="/corrections.html">Two ways to correct a predictive</a></h2>
+      <p class="abstract">A research note. Recalibration delivers nominal coverage and costs
+      sharpness; a conditional reparameterisation of <code>laplace</code>'s residual scale gains a
+      little and moves coverage toward nominal. The two are case studies on different forecasts,
+      panels and scores, not a paired comparison.</p>
+      <p class="links"><a href="/corrections.html">Read the note</a>
+      <span class="status">research note, 2026</span></p>
     </div>
 
     <div class="paper">
@@ -155,21 +223,12 @@
       <span class="status">under review at the Journal of Open Source Software</span></p>
     </div>
 
-    <h2>Citation</h2>
-<pre><code>@misc{cotton2026skaters,
-  title  = {Transforms All the Way Down --- Automatic Online Distributional
-            Forecasting by Conjugation},
-  author = {Cotton, Peter},
-  year   = {2026},
-  note   = {SSRN 7220478, https://skaters.microprediction.org}
-}</code></pre>
   </main>
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>

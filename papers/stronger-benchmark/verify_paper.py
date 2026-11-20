@@ -149,15 +149,22 @@ def main():
     perf = constants.performance()["models"]
     def _perf(model, regime):
         return perf.get(model, {}).get(regime)
+    # the warm figures the prose quotes: read from the perf table in the paper
+    # itself, so the check is table-against-store rather than a second typed copy
+    def _paper_warm(row_label):
+        m2 = re.search(re.escape(row_label) + r"[^\n]*?& \$([\d.]+)\$ \\\\", text)
+        return float(m2.group(1)) if m2 else None
     for model, regime, want in [
-        ("laplace (Rust) k=1", "warm", 0.012),
-        ("laplace (Python) k=1", "warm", 0.251),
-        ("Chronos-Bolt-small", "warm", 7.44),
-        ("TimesFM-2.5-200M", "warm", 329.83),
+        ("laplace (Rust) k=1", "warm", _paper_warm("\\code{laplace} (\\proglang{Rust})")),
+        ("laplace (Python) k=1", "warm", _paper_warm("\\code{laplace} (\\proglang{Python})")),
+        ("Chronos-Bolt-small", "warm", _paper_warm("Chronos-Bolt-small")),
+        ("TimesFM-2.5-200M", "warm", _paper_warm("TimesFM-2.5-200M")),
     ]:
         got = _perf(model, regime)
         if got is None:
             bad.append(f"perf     {model} {regime}: missing from perf_results.json")
+        elif want is None:
+            bad.append(f"perf     {model} {regime}: row not found in the paper's perf table")
         elif abs(round(got, 3 if want < 1 else 2) - want) > 1e-9:
             bad.append(f"perf     {model} {regime}: paper {want} vs store {got:.4f}")
 
@@ -168,6 +175,35 @@ def main():
         bad.append("panel    step-count sentence not found")
     elif m.group(1) != want_steps:
         bad.append(f"panel    steps: paper {m.group(1)} vs store {want_steps}")
+
+    # the pretrained-panel table (tab:fmpanel): label & five "$+0.050$ ($19\,\%$)" cells
+    pan = constants.panel()
+    i = text.find("\\label{tab:fmpanel}")
+    block = text[text.rfind("\\midrule", 0, i):i] if i >= 0 else ""
+    seen = 0
+    for line in block.splitlines():
+        if "&" not in line or not line.strip().endswith("\\\\"):
+            continue
+        cells = [x.strip() for x in line.strip()[:-2].split("&")]
+        if len(cells) != 6:
+            continue
+        label = cells[0]
+        key = next((k for k, v in pan.items() if v["label"] == label), None)
+        if key is None:
+            bad.append(f"fmpanel  {label}: not in constants.PANEL")
+            continue
+        seen += 1
+        for s_key, cell in zip(constants.STRATA, cells[1:]):
+            store = pan[key][s_key]
+            m3 = re.match(r"\$([-+][\d.]+)\$ \(\$(\d+)\\,\\%\$\)", cell)
+            if store is None or not m3:
+                if not (store is None and cell == "---"):
+                    bad.append(f"fmpanel  {label} {s_key}: cell {cell!r} vs store {store}")
+                continue
+            if abs(float(m3.group(1)) - round(store["med_dLL"], 3)) > 5e-4 or int(m3.group(2)) != round(store["loss_rate"] * 100):
+                bad.append(f"fmpanel  {label} {s_key}: paper {cell} vs store {store['med_dLL']:+.3f} ({store['loss_rate']*100:.0f}%)")
+    if seen != len(pan):
+        bad.append(f"fmpanel  rows: paper {seen} vs PANEL {len(pan)}")
 
     pkg = constants.package_size()
     m = re.search(r"\$(\d+)\$\\,KB of source across \$(\d+)\$", text)

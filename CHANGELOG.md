@@ -12,6 +12,108 @@
   with `state["ready"]` False until the window is full. A
   conditioning feature with no inverse, not a conjugate transform, and not in
   laplace's pool.
+- Skater state is now plain JSON data with one documented layout
+  (`docs/STATE.md`), so a Python checkpoint can be written with
+  `json.dumps(state_to_json(state))` and read back with `state_from_json`.
+  New exports `state_to_json`, `state_from_json`, `assert_plain_state`.
+  Queues are lists, `sticky` counts are `[value, weight]` pairs, multiscale and
+  period-detector tables have string keys, `zbank` keeps a list per grid point,
+  and `search`/`dantzig` rebuild pool skaters from recipes instead of storing
+  closures. Numerics are unchanged. Old Python checkpoints still resume.
+  `tests/test_state_json.py` gates every exported skater on an exact JSON resume.
+  The JS, R and Julia ports will adopt the same layout in follow-up work.
+- `PushforwardDist` gains `affine`, `shift` and `scale`, so an exact pushforward
+  predictive can be wrapped by `standardize`, `seasonal_scale` and the other affine
+  transforms. A negative multiplier reflects the inner law so the map stays
+  increasing.
+- Fix: `SplicedDist` gains `shift` and `scale`, so `ema_transform`, `seasonal_difference`,
+  `seasonal_anchor` and `ou_transform` conjugated around
+  `laplace` no longer raise `AttributeError` once the tail splice is live. The
+  0.17.0 entry said `ema_transform` was covered by the `affine` fix; it was not.
+  The JavaScript `SplicedDist` gains `affine`, `shift` and `scale` (it had none).
+  Julia and R take the same fix in their own repositories.
+- Fix: transforms that read mixture components no longer fail on a spliced
+  predictive. `power_transform`, `yeo_johnson` and `gaussianize` emit the exact
+  pushforward of the spliced law. At k > 1, `ema_transform`, `seasonal_difference`
+  and `seasonal_anchor` widen the body and the GPD splice follows it. Outputs on
+  Gaussian-mixture predictives are unchanged. The JavaScript port takes the same
+  fix, with a new `PushforwardDist` in `pushforward.mjs`.
+- Fix: `SplicedDist` quantiles deep in a tail are solved on erfc sums. Once the
+  body's tail mass beyond the target falls below 1e-8, the body quantile came
+  from bisection on `0.5 * (1 + erf)`, which cannot resolve a 1e-12 tail: the
+  answer sat on a plateau set by the last bit of `erf`, so it differed between
+  libm builds and between ports by about 1.8e-6 in x at the PIT clamp. On the
+  spike stream of the signature check, a q0.999 was off by 4e4 against an
+  exact value. Python, Torch, JavaScript
+  and Rust share the new solve. Of laplace's k=1 signatures only `regimes_spike`
+  moves, at q0.001 and q0.999, to the correct values.
+- The JavaScript transform surface matches Python's: `gaussianize`,
+  `seasonalScale`, `logTransform` and `flesaker` are ported, and
+  `powerTransform` and `yeoJohnson` take the `exact` flag. `index.mjs` exports
+  `yeoJohnson`, `logTransform` and `flesaker`, as `skaters/__init__.py` does.
+  The JavaScript `erf` is now fdlibm's, with `erfc`, and the tail splice's
+  normal CDF uses `erfc` as `tails.py` does. Parity vectors cover every new
+  transform.
+- The Rust crate and `skaters.torch` match the transform surface too. Rust
+  gains `gaussianize`, `seasonal_scale`, `log_transform`, the `exact` flag
+  (`power_transform_exact`, `yeo_johnson_exact`), `PushforwardDist` with
+  `affine`, `shift` and `scale` (its map is serde data, so a predictive stays
+  serializable), `flesaker`, and `conjugate_f`, a conjugate around any
+  `Forecaster` whose inverse sees tail-spliced and pushforward predictives. The
+  Rust transforms take every predictive kind through one generic inverse, with
+  the Gaussian-mixture path unchanged. `skaters.torch` gains
+  `TorchPushforwardDist`, the exact inverses, `log_transform`, `gaussianize`,
+  `flesaker`, and the spliced handling in `ema_transform`,
+  `seasonal_difference`, `seasonal_anchor`, `power_transform` and
+  `yeo_johnson`; its `logpdf`, `cdf` and `quantile` differentiate through the
+  map. Parity vectors add tail-spliced predictives through each
+  component-reading transform and pushforwards through affine transforms, and
+  every port runs every scenario.
+
+## 0.17.0
+
+- `skaters-fast` (the PyO3 backend) is published to PyPI for the first time, so
+  `pip install "skaters[fast]"` installs it. Before this release the extra named a
+  package that did not exist, and an unpinned install fell back to skaters 0.13.0
+  (#372).
+
+- Experimental forecaster `flesaker` (after Bjorn Flesaker): `laplace` on
+  log(y - lower), mapped back by the exact pushforward, for series with a
+  one-sided bound (default `lower=0`; `upper=` for a ceiling). Every quantile
+  stays inside the bound; the state is laplace's own. An example composition,
+  not settled API: it may change or move to `examples/`. New transform
+  `log_transform(lower=, upper=)` underneath it. Python only. Example:
+  `examples/positive_series.py`.
+- Fix: `exact=True` on `yeo_johnson` / `power_transform` raised
+  `AttributeError` when wrapped around `laplace` once its tail splice was
+  live (the spliced predictive has no mixture components). The table window
+  now falls back to the predictive's extreme quantiles. For a spliced
+  predictive, `PushforwardDist` estimates moments by quantile quadrature and
+  exposes a moment-matched Gaussian for mixture consumers. `log_transform`
+  uses analytic maps and a log Jacobian, with quantile quadrature for CRPS
+  on either side of the bound.
+- Fix: `SplicedDist.affine`, so an affine transform (`standardize`, `garch`,
+  `seasonal_scale`, `ema_transform`) conjugated around `laplace` no longer
+  raises `AttributeError` once the GPD tail splice is live. The splice lives
+  in PIT space, so only the body moves; a negative multiplier swaps the tails.
+- Docs: an Examples page of runnable recipes (`docs/examples.html`, in the
+  nav), and a units-and-scale note on the scope page: the transforms carry
+  constants in absolute units, so keep values and steps roughly within
+  1e-3 to 1e6.
+- Gaussian-mixture quantiles in the stdlib, JavaScript and Rust cores use a
+  scale-relative tolerance below unit scale and a 2100-step default budget
+  (including forwarding wrappers), fixing tiny components and extreme separation.
+  Float-resolution handling preserves historical rounding for resolved components
+  where the old absolute tolerance could not stop, and handles collapsed components
+  and atom jumps explicitly. Nonfinite search brackets fail explicitly. The optional
+  torch port follows: `TorchDist.quantile` now delegates to the reference search,
+  and `TorchSplicedDist.quantile` carries the same default budget. The R and Julia
+  ports take the same change in their own repositories. The `granger` mixture
+  quantile keeps its own bisection and tolerance. On the frozen k=1 signature
+  streams the issued quantiles of ordinary series move by less than 5e-10 and
+  log density and CDF are unchanged; the reference digests in
+  `parity/laplace_k1_signatures.txt` are regenerated. Contributed by
+  verityengine in #328. See `parity/QUANTILE_CONTRACT.md`.
 - New forecaster `granger` (horizon 1), after Clive Granger: laplace with
   trained values for its continuous hyperparameters plus a small gate on the
   ensemble's combining weights, mixed with laplace by the Aggregating
@@ -24,7 +126,7 @@
   `terminal_leaf_ensemble` gains an optional `gate_hook`; laplace is unchanged
   (output signatures identical).
 - `skaters.torch.learned` (#297 step 2): a learned forecaster that is laplace
-  at worst. Two experts, the frozen reference `laplace` and a trainable torch
+  at worst; shipped as `granger` (above), for which it is the training twin. Two experts, the frozen reference `laplace` and a trainable torch
   `laplace` with a state-conditioned gate added to the trunk's prequential log
   weights at the combine step (`TerminalLeafEnsemble.gate_offset`), under an
   exact density mixture weighted by undiscounted cumulative log-likelihood (the

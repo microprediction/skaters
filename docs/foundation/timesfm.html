@@ -30,33 +30,69 @@
       <a class="brand" href="/">skaters</a>
       <nav>
         <a href="/">Home</a>
-        <a href="/guide.html">Methodology</a>
-        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Implementations &#9662;</span>
           <span class="drop">
-            <a href="/benchmarks.html">Accuracy</a>
-            <a href="/metrics.html">Metrics</a>
-            <a href="/performance.html">Performance</a>
-            <a href="/footprint.html">Footprint</a>
+            <a href="/languages.html">Overview</a>
+            <a href="/ports/python.html">Python</a>
+            <a href="/ports/torch.html">torch</a>
+            <a href="/ports/rust.html">Rust</a>
+            <a href="/ports/javascript.html">JavaScript</a>
+            <a href="/ports/r.html">R</a>
+            <a href="/ports/julia.html">Julia</a>
+          </span>
+        </span>
+        <span class="menu" tabindex="0"><span class="menu-label">Models &#9662;</span>
+          <span class="drop">
+            <a href="/guide.html#laplace">laplace</a>
+            <a href="/learned.html">granger</a>
+            <a href="/flesaker.html">flesaker</a>
           </span>
         </span>
         <span class="menu" tabindex="0"><span class="menu-label">Usage &#9662;</span>
           <span class="drop">
-            <a href="/challengers.html">Standalone</a>
+            <a href="/examples.html">Examples</a>
+            <a href="/faq.html">FAQ</a>
+            <a href="/skills.html">Skills</a>
             <a href="/sandwich.html">Sandwich pattern</a>
             <a href="/sidecar.html">Sidecar pattern</a>
             <a href="/homogenization.html">Homogenization</a>
+            <a href="/refunds.html">Misuse</a>
           </span>
         </span>
-        <span class="menu" tabindex="0"><span class="menu-label">Foundational &#9662;</span>
+        <span class="menu" tabindex="0"><span class="menu-label">Assessment &#9662;</span>
           <span class="drop">
-            <a href="/foundation/chronos.html">Chronos</a>
-            <a href="/foundation/tirex.html">TiRex</a>
-            <a href="/foundation/timesfm.html">TimesFM</a>
-            <a href="/foundation/timesfm3.html">TimesFM3</a>
-            <a href="/foundation/sundial.html">Sundial</a>
-            <a href="/foundation/flowstate.html">FlowState</a>
-            <a href="/foundation/timestral.html">Timestral</a>
-            <a href="/foundation/t0gamma.html">t0-gamma</a>
+            <a href="/benchmarks.html">Accuracy</a>
+            <a href="/challengers.html">Results</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/performance.html">Performance</a>
+            <a href="/footprint.html">Footprint</a>
+            <span class="sub" tabindex="0"><span class="menu-label">Foundational &#9656;</span>
+              <span class="subdrop">
+                <a href="https://foundationalprediction.com/">All</a>
+                <a href="/foundation/chronos.html">Chronos</a>
+                <a href="/foundation/tirex.html">TiRex</a>
+                <a href="/foundation/timesfm.html">TimesFM</a>
+                <a href="/foundation/timesfm3.html">TimesFM3</a>
+                <a href="/foundation/sundial.html">Sundial</a>
+                <a href="/foundation/flowstate.html">FlowState</a>
+                <a href="/foundation/timestral.html">Timestral</a>
+                <a href="/foundation/t0gamma.html">t0-gamma</a>
+                <a href="/foundation/timeh2o.html">TimeH2O</a>
+                <a href="/foundation/chronos2.html">Chronos-2</a>
+                <a href="/foundation/tirex2.html">TiRex-2</a>
+                <a href="/foundation/toto2.html">Toto 2.0</a>
+                <a href="/foundation/ttm3.html">TTM-R3</a>
+                <a href="/foundation/moirai2.html">Moirai 2.0</a>
+                <a href="/foundation/tinycast.html">TinyCast</a>
+                <a href="/foundation/simons.html">Simons</a>
+                <a href="/foundation/ciproto.html">ci-proto</a>
+                <a href="/foundation/hirondel.html">Hirondel</a>
+                <a href="/foundation/iamtime.html">iAmTime</a>
+                <a href="/foundation/timessm.html">TimeSSM</a>
+                <a href="/foundation/kairos.html">Kairos</a>
+                <a href="/foundation/timers1.html">Timer-S1</a>
+              </span>
+            </span>
           </span>
         </span>
         <a href="/demos/">Demos</a>
@@ -64,15 +100,11 @@
         <span class="menu" tabindex="0"><span class="menu-label">Docs &#9662;</span>
           <span class="drop">
             <a href="/guide.html">Methodology</a>
-            <a href="/corrections.html">Corrections</a>
             <a href="/draws.html">Draws</a>
             <a href="/scope.html">Scope</a>
             <a href="/languages.html">Languages</a>
             <a href="/heritage.html">Heritage</a>
             <a href="/acknowledgements.html">Acknowledgements</a>
-            <a href="/faq.html">FAQ</a>
-            <a href="/refunds.html">Refunds</a>
-            <a href="/skills.html">Skills</a>
           </span>
         </span>
         <a href="https://github.com/microprediction/skaters">GitHub</a>
@@ -123,11 +155,11 @@
       <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
       <th class="num">cov&#8320;&#8320;</th></tr></thead>
       <tbody>
-<tr><td>economic change-series, business-daily</td><td class="num">1381</td><td><span class="wdl"><i class="w" style="width:10.7%"></i><i class="d" style="width:57.2%"></i><i class="l" style="width:32.1%"></i></span></td><td class="num">-0.08</td><td class="num">0.993</td><td class="num">0.88</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:27.6%"></i><i class="d" style="width:48.3%"></i><i class="l" style="width:24.1%"></i></span></td><td class="num">-0.03</td><td class="num">0.957</td><td class="num">0.87</td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">2920</td><td><span class="wdl"><i class="w" style="width:18.7%"></i><i class="d" style="width:66.4%"></i><i class="l" style="width:14.9%"></i></span></td><td class="num">-0.01</td><td class="num">0.943</td><td class="num">0.86</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:13.3%"></i><i class="d" style="width:62.1%"></i><i class="l" style="width:24.6%"></i></span></td><td class="num">-0.02</td><td class="num">0.987</td><td class="num">0.88</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">1539</td><td><span class="wdl"><i class="w" style="width:5.8%"></i><i class="d" style="width:89.3%"></i><i class="l" style="width:4.8%"></i></span></td><td class="num">-0.02</td><td class="num">1.008</td><td class="num">0.86</td></tr>      </tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">1408</td><td><span class="wdl"><i class="w" style="width:10.3%"></i><i class="d" style="width:57.5%"></i><i class="l" style="width:32.2%"></i></span></td><td class="num">-0.09</td><td class="num">0.991</td><td class="num">0.88</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">3013</td><td><span class="wdl"><i class="w" style="width:28.3%"></i><i class="d" style="width:47.9%"></i><i class="l" style="width:23.8%"></i></span></td><td class="num">-0.02</td><td class="num">0.952</td><td class="num">0.87</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">3000</td><td><span class="wdl"><i class="w" style="width:18.7%"></i><i class="d" style="width:66.5%"></i><i class="l" style="width:14.8%"></i></span></td><td class="num">-0.01</td><td class="num">0.941</td><td class="num">0.86</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:12.8%"></i><i class="d" style="width:62.6%"></i><i class="l" style="width:24.6%"></i></span></td><td class="num">-0.02</td><td class="num">0.989</td><td class="num">0.88</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">1592</td><td><span class="wdl"><i class="w" style="width:5.5%"></i><i class="d" style="width:90.2%"></i><i class="l" style="width:4.3%"></i></span></td><td class="num">-0.02</td><td class="num">1.009</td><td class="num">0.86</td></tr>      </tbody>
     </table>
     <div class="key">
       <span><i style="background:var(--good)"></i>beats Laplace</span>
@@ -139,11 +171,11 @@
       <th class="num">med &Delta;LL</th><th class="num">CRPS ratio</th>
       <th class="num">cov&#8320;&#8320;</th></tr></thead>
       <tbody>
-<tr><td>economic change-series, business-daily</td><td class="num">1378</td><td><span class="wdl"><i class="w" style="width:5.2%"></i><i class="d" style="width:42.7%"></i><i class="l" style="width:52.1%"></i></span></td><td class="num">-0.79</td><td class="num">0.997</td><td class="num">0.83</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">2912</td><td><span class="wdl"><i class="w" style="width:18.3%"></i><i class="d" style="width:39.0%"></i><i class="l" style="width:42.7%"></i></span></td><td class="num">-0.76</td><td class="num">0.964</td><td class="num">0.83</td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">2910</td><td><span class="wdl"><i class="w" style="width:4.7%"></i><i class="d" style="width:57.4%"></i><i class="l" style="width:37.9%"></i></span></td><td class="num">-0.74</td><td class="num">0.949</td><td class="num">0.80</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:1.7%"></i><i class="d" style="width:60.9%"></i><i class="l" style="width:37.4%"></i></span></td><td class="num">-0.51</td><td class="num">0.994</td><td class="num">0.82</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">1529</td><td><span class="wdl"><i class="w" style="width:0.6%"></i><i class="d" style="width:57.0%"></i><i class="l" style="width:42.4%"></i></span></td><td class="num">-0.67</td><td class="num">1.016</td><td class="num">0.80</td></tr>      </tbody>
+<tr><td>economic change-series, business-daily</td><td class="num">1408</td><td><span class="wdl"><i class="w" style="width:4.9%"></i><i class="d" style="width:42.3%"></i><i class="l" style="width:52.8%"></i></span></td><td class="num">-0.79</td><td class="num">0.995</td><td class="num">0.83</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">3013</td><td><span class="wdl"><i class="w" style="width:18.8%"></i><i class="d" style="width:38.4%"></i><i class="l" style="width:42.8%"></i></span></td><td class="num">-0.76</td><td class="num">0.960</td><td class="num">0.83</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">3000</td><td><span class="wdl"><i class="w" style="width:4.6%"></i><i class="d" style="width:57.6%"></i><i class="l" style="width:37.8%"></i></span></td><td class="num">-0.74</td><td class="num">0.947</td><td class="num">0.80</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">414</td><td><span class="wdl"><i class="w" style="width:1.4%"></i><i class="d" style="width:61.1%"></i><i class="l" style="width:37.4%"></i></span></td><td class="num">-0.51</td><td class="num">0.996</td><td class="num">0.82</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">1592</td><td><span class="wdl"><i class="w" style="width:0.6%"></i><i class="d" style="width:57.3%"></i><i class="l" style="width:42.1%"></i></span></td><td class="num">-0.67</td><td class="num">1.015</td><td class="num">0.80</td></tr>      </tbody>
     </table>
     <div class="key">
       <span><i style="background:var(--good)"></i>beats Laplace</span>
@@ -161,14 +193,14 @@
       with Laplace sits on the dashed 1.0 ring; outward beats Laplace more often, inward
       less. Here a series counts as a win when the model's mean per-series log score exceeds
       Laplace's by any amount, and as a tie only at exact equality: the same rule the
-      challengers radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
+      comparison radar uses, and a different one from the Diebold&ndash;Mariano win, draw and
       loss above, which fold statistically unresolved differences into draws. The two
       agree on direction and differ in how they treat small gaps. The solid polygon is the headline arm and
       the dashed grey one, where present, is the tight nine-decile reconstruction. The
       M4-hourly set splits into soft and hard waveforms by corpus order, matching that
       radar.</p>
     <figure style="margin:16px 0 6px">
-      <svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of TimesFM standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,220.0 329.7,211.3 305.9,254.9 280.0,276.0 264.9,248.7 276.9,238.2" fill="none" stroke="#8a8a9a" stroke-width="2" stroke-dasharray="6 4"/><circle cx="280.0" cy="220.0" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>economic (daily): TimesFM log-likelihood win rate 0.17 vs Laplace (tight nine-decile reconstruction) (n=1378)</title></circle><circle cx="329.7" cy="211.3" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>weekly cycles: TimesFM log-likelihood win rate 0.48 vs Laplace (tight nine-decile reconstruction) (n=2912)</title></circle><circle cx="305.9" cy="254.9" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>yearly cycles: TimesFM log-likelihood win rate 0.25 vs Laplace (tight nine-decile reconstruction) (n=2910)</title></circle><circle cx="280.0" cy="276.0" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>soft waveforms: TimesFM log-likelihood win rate 0.30 vs Laplace (tight nine-decile reconstruction) (n=180)</title></circle><circle cx="264.9" cy="248.7" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>hard waveforms: TimesFM log-likelihood win rate 0.14 vs Laplace (tight nine-decile reconstruction) (n=234)</title></circle><circle cx="276.9" cy="238.2" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>price / returns: TimesFM log-likelihood win rate 0.03 vs Laplace (tight nine-decile reconstruction) (n=1529)</title></circle><polygon points="280.0,157.3 376.0,184.6 379.6,297.5 280.0,393.4 216.1,276.9 208.9,199.0" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="157.3" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): TimesFM(wide) log-likelihood win rate 0.69 vs Laplace (n=1381)</title></circle><circle cx="376.0" cy="184.6" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: TimesFM(wide) log-likelihood win rate 0.92 vs Laplace (n=2920)</title></circle><circle cx="379.6" cy="297.5" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: TimesFM(wide) log-likelihood win rate 0.96 vs Laplace (n=2920)</title></circle><circle cx="280.0" cy="393.4" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>soft waveforms: TimesFM(wide) log-likelihood win rate 1.28 vs Laplace (n=180)</title></circle><circle cx="216.1" cy="276.9" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>hard waveforms: TimesFM(wide) log-likelihood win rate 0.61 vs Laplace (n=234)</title></circle><circle cx="208.9" cy="199.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>price / returns: TimesFM(wide) log-likelihood win rate 0.68 vs Laplace (n=1539)</title></circle></svg>
+      <svg viewBox="0 0 560 470" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto" role="img" aria-label="Star plot of TimesFM standalone versus Laplace across six regime axes; the log-likelihood win rate, Laplace on the 1.0 ring."><polygon points="280.0,180.0 332.0,210.0 332.0,270.0 280.0,300.0 228.0,270.0 228.0,210.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><polygon points="280.0,120.0 383.9,180.0 383.9,300.0 280.0,360.0 176.1,300.0 176.1,180.0" fill="none" stroke="#1a8c4a" stroke-dasharray="5 4" stroke-width="1.5" opacity=".75"/><polygon points="280.0,60.0 435.9,150.0 435.9,330.0 280.0,420.0 124.1,330.0 124.1,150.0" fill="none" stroke="#e2e2e2" stroke-width="1"/><line x1="280" y1="240" x2="280.0" y2="60.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="102.0" text-anchor="middle" font-size="13" fill="#5a5a5a">economic (daily)</text><line x1="280" y1="240" x2="435.9" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="171.0" text-anchor="start" font-size="13" fill="#5a5a5a">weekly cycles</text><line x1="280" y1="240" x2="435.9" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="399.5" y="313.0" text-anchor="start" font-size="13" fill="#5a5a5a">yearly cycles</text><line x1="280" y1="240" x2="280.0" y2="420.0" stroke="#e2e2e2" stroke-width="1"/><text x="280.0" y="382.0" text-anchor="middle" font-size="13" fill="#5a5a5a">soft waveforms</text><line x1="280" y1="240" x2="124.1" y2="330.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="313.0" text-anchor="end" font-size="13" fill="#5a5a5a">hard waveforms</text><line x1="280" y1="240" x2="124.1" y2="150.0" stroke="#e2e2e2" stroke-width="1"/><text x="160.5" y="171.0" text-anchor="end" font-size="13" fill="#5a5a5a">price / returns</text><text x="286.0" y="115.0" font-size="11" fill="#1a8c4a">Laplace = 1.0</text><polygon points="280.0,223.4 315.3,219.6 306.4,255.2 280.0,276.0 264.9,248.7 277.4,238.5" fill="none" stroke="#8a8a9a" stroke-width="2" stroke-dasharray="6 4"/><circle cx="280.0" cy="223.4" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>economic (daily): TimesFM log-likelihood win rate 0.14 vs Laplace (tight nine-decile reconstruction) (n=1290)</title></circle><circle cx="315.3" cy="219.6" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>weekly cycles: TimesFM log-likelihood win rate 0.34 vs Laplace (tight nine-decile reconstruction) (n=2751)</title></circle><circle cx="306.4" cy="255.2" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>yearly cycles: TimesFM log-likelihood win rate 0.25 vs Laplace (tight nine-decile reconstruction) (n=3000)</title></circle><circle cx="280.0" cy="276.0" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>soft waveforms: TimesFM log-likelihood win rate 0.30 vs Laplace (tight nine-decile reconstruction) (n=180)</title></circle><circle cx="264.9" cy="248.7" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>hard waveforms: TimesFM log-likelihood win rate 0.14 vs Laplace (tight nine-decile reconstruction) (n=234)</title></circle><circle cx="277.4" cy="238.5" r="4" fill="#8a8a9a" stroke="#fff" stroke-width="1.5"><title>price / returns: TimesFM log-likelihood win rate 0.03 vs Laplace (tight nine-decile reconstruction) (n=1578)</title></circle><polygon points="280.0,156.1 367.1,189.7 379.8,297.6 280.0,392.0 216.1,276.9 209.6,199.4" fill="#4a3aff" fill-opacity=".16" stroke="#4a3aff" stroke-width="2"/><circle cx="280.0" cy="156.1" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>economic (daily): TimesFM(wide) log-likelihood win rate 0.70 vs Laplace (n=1290)</title></circle><circle cx="367.1" cy="189.7" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>weekly cycles: TimesFM(wide) log-likelihood win rate 0.84 vs Laplace (n=2751)</title></circle><circle cx="379.8" cy="297.6" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>yearly cycles: TimesFM(wide) log-likelihood win rate 0.96 vs Laplace (n=3000)</title></circle><circle cx="280.0" cy="392.0" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>soft waveforms: TimesFM(wide) log-likelihood win rate 1.27 vs Laplace (n=180)</title></circle><circle cx="216.1" cy="276.9" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>hard waveforms: TimesFM(wide) log-likelihood win rate 0.61 vs Laplace (n=234)</title></circle><circle cx="209.6" cy="199.4" r="4" fill="#4a3aff" stroke="#fff" stroke-width="1.5"><title>price / returns: TimesFM(wide) log-likelihood win rate 0.68 vs Laplace (n=1578)</title></circle></svg>
     </figure>
 
     <h2>Collaborative use</h2>
@@ -184,11 +216,11 @@
       <thead><tr><th rowspan="2">stratum</th><th class="num" colspan="2">standalone</th><th class="num" colspan="2">+lap</th><th class="num" colspan="2">~lap</th><th class="num" colspan="2">@lap</th><th class="num" colspan="2">&amp;lap</th></tr>
       <tr><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th></tr></thead>
       <tbody>
-      <tr><td>economic change-series, business-daily</td><td class="num">-0.082</td><td class="num">32%</td><td class="num">-0.276</td><td class="num">37%</td><td class="num">-0.271</td><td class="num">37%</td><td class="num">-0.224</td><td class="num">39%</td><td class="num">-0.081</td><td class="num">31%</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">-0.030</td><td class="num">24%</td><td class="num">-0.244</td><td class="num">33%</td><td class="num">-0.343</td><td class="num">40%</td><td class="num">-0.124</td><td class="num">31%</td><td class="num">-0.014</td><td class="num">15%</td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">-0.011</td><td class="num">15%</td><td class="num">-0.103</td><td class="num">15%</td><td class="num">-0.235</td><td class="num">36%</td><td class="num">-0.055</td><td class="num">16%</td><td class="num">-0.011</td><td class="num">6%</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">-0.020</td><td class="num">25%</td><td class="num">-0.025</td><td class="num">8%</td><td class="num">-0.131</td><td class="num">19%</td><td class="num">-0.061</td><td class="num">20%</td><td class="num">+0.013</td><td class="num">0%</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">-0.023</td><td class="num">5%</td><td class="num">-0.086</td><td class="num">3%</td><td class="num">-0.071</td><td class="num">7%</td><td class="num">-0.067</td><td class="num">23%</td><td class="num">-0.014</td><td class="num">6%</td></tr>
+      <tr><td>economic change-series, business-daily</td><td class="num">-0.089</td><td class="num">32%</td><td class="num">-0.264</td><td class="num">36%</td><td class="num">-0.273</td><td class="num">37%</td><td class="num">-0.237</td><td class="num">39%</td><td class="num">-0.082</td><td class="num">31%</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">-0.024</td><td class="num">24%</td><td class="num">-0.237</td><td class="num">32%</td><td class="num">-0.343</td><td class="num">40%</td><td class="num">-0.124</td><td class="num">31%</td><td class="num">-0.011</td><td class="num">15%</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">-0.009</td><td class="num">15%</td><td class="num">-0.098</td><td class="num">15%</td><td class="num">-0.232</td><td class="num">36%</td><td class="num">-0.054</td><td class="num">16%</td><td class="num">-0.010</td><td class="num">6%</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">-0.023</td><td class="num">25%</td><td class="num">-0.026</td><td class="num">8%</td><td class="num">-0.132</td><td class="num">19%</td><td class="num">-0.065</td><td class="num">20%</td><td class="num">+0.012</td><td class="num">0%</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">-0.023</td><td class="num">4%</td><td class="num">-0.085</td><td class="num">3%</td><td class="num">-0.071</td><td class="num">8%</td><td class="num">-0.067</td><td class="num">24%</td><td class="num">-0.014</td><td class="num">6%</td></tr>
       </tbody>
     </table>
     <p>Central-90% coverage (0.90 target) of the standalone model, its <code>@lap</code> and
@@ -198,9 +230,9 @@
       <th class="num">&amp;lap</th><th class="num">laplace</th></tr></thead>
       <tbody>
       <tr><td>economic change-series, business-daily</td><td class="num">0.884</td><td class="num">0.947</td><td class="num">0.927</td><td class="num">0.919</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">0.872</td><td class="num">0.931</td><td class="num">0.922</td><td class="num">0.910</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">0.872</td><td class="num">0.931</td><td class="num">0.922</td><td class="num">0.908</td></tr>
 <tr><td>economic change-series, monthly (annual cycle)</td><td class="num">0.856</td><td class="num">0.943</td><td class="num">0.932</td><td class="num">0.923</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">0.878</td><td class="num">0.935</td><td class="num">0.913</td><td class="num">0.892</td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">0.878</td><td class="num">0.935</td><td class="num">0.913</td><td class="num">0.891</td></tr>
 <tr><td>asset prices and returns, daily</td><td class="num">0.864</td><td class="num">0.950</td><td class="num">0.927</td><td class="num">0.919</td></tr>
       </tbody>
     </table>

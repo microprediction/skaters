@@ -4,10 +4,81 @@
 
 use crate::dist::Dist;
 use crate::mathx::{fsum, LOG_SQRT2PI, SQRT2, SQRT2PI};
+use crate::pushforward::PushforwardDist;
 use crate::skater::Sk;
 use serde::{Deserialize, Serialize};
 
 pub const EPS: f64 = 1e-12;
+
+// Below this tail mass the body quantile is solved on erfc sums (tails.py):
+// 0.5 * (1 + erf) cannot resolve a 1e-12 tail, so bisection on it stops on a
+// plateau set by the last bit of erf, which differs between libm builds.
+const TAIL_U: f64 = 1e-8;
+
+/// x with body mass t beyond it (below x, or above x when `upper`).
+fn body_tail_quantile(body: &Dist, t: f64, upper: bool, tol: f64, max_iter: usize) -> f64 {
+    let sign = if upper { -1.0 } else { 1.0 }; // mirror the upper tail onto the lower
+    let comps: Vec<(f64, f64, f64)> = body
+        .components
+        .iter()
+        .map(|&(w, m, s)| (w, sign * m, s))
+        .collect();
+    let mass = |x: f64| -> f64 {
+        let mut total = 0.0;
+        for &(w, m, s) in &comps {
+            if s > 0.0 {
+                total += w * 0.5 * libm::erfc((m - x) / (s * SQRT2));
+            } else if x >= m {
+                total += w;
+            }
+        }
+        total
+    };
+    let mu = sign * body.mean();
+    let sigma = body.var().sqrt();
+    let mut scale = f64::INFINITY;
+    for &(w, _, s) in &comps {
+        if w > 0.0 && s > 0.0 {
+            scale = scale.min(s);
+        }
+    }
+    if scale == f64::INFINITY {
+        scale = 1.0;
+    }
+    let x_tol = tol * scale.min(1.0);
+    let seed = (8.0 * sigma).max(1e-12 * mu.abs().max(1.0));
+    let (mut lo, mut hi, mut width) = (mu - seed, mu, seed);
+    for _ in 0..120 {
+        if mass(hi) >= t {
+            break;
+        }
+        hi += width;
+        width *= 2.0;
+    }
+    width = seed;
+    for _ in 0..120 {
+        if mass(lo) < t {
+            break;
+        }
+        lo -= width;
+        width *= 2.0;
+    }
+    for _ in 0..max_iter {
+        if hi - lo < x_tol {
+            break;
+        }
+        let mid = 0.5 * (lo + hi);
+        if !(lo < mid && mid < hi) {
+            break;
+        }
+        if mass(mid) < t {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    sign * (0.5 * (lo + hi))
+}
 const REFIT_EVERY: u64 = 25;
 
 // ---------------------------------------------------------------------------
@@ -221,6 +292,50 @@ impl SplicedDist {
         }
     }
 
+    /// The same splice around a new body; `flip` mirrors it (a negative map).
+    pub fn with_body(&self, body: Dist, flip: bool) -> SplicedDist {
+        if !flip {
+            return SplicedDist::new(
+                body,
+                self.t_lo,
+                self.t_up,
+                self.zeta_lo,
+                self.zeta_up,
+                self.g_lo,
+                self.s_lo,
+                self.g_up,
+                self.s_up,
+            );
+        }
+        SplicedDist::new(
+            body,
+            -self.t_up,
+            -self.t_lo,
+            self.zeta_up,
+            self.zeta_lo,
+            self.g_up,
+            self.s_up,
+            self.g_lo,
+            self.s_lo,
+        )
+    }
+
+    /// x -> a*x + b. The splice lives in the body's PIT space, so only the
+    /// body moves; a negative `a` reflects the PIT and swaps the tails.
+    pub fn affine(&self, a: f64, b: f64) -> SplicedDist {
+        assert!(a != 0.0, "affine multiplier must be nonzero");
+        self.with_body(self.body.affine(a, b), a < 0.0)
+    }
+
+    pub fn shift(&self, delta: f64) -> SplicedDist {
+        self.with_body(self.body.shift(delta), false)
+    }
+
+    pub fn scale(&self, factor: f64) -> SplicedDist {
+        assert!(factor != 0.0, "scale factor must be nonzero");
+        self.with_body(self.body.scale(factor), factor < 0.0)
+    }
+
     fn z(&self, x: f64) -> f64 {
         let u = self.body.cdf(x).max(EPS).min(1.0 - EPS);
         phi_inv(u)
@@ -256,7 +371,7 @@ impl SplicedDist {
     }
 
     pub fn quantile(&self, p: f64) -> f64 {
-        self.quantile_tol(p, 1e-9, 100)
+        self.quantile_tol(p, 1e-9, 2100)
     }
 
     pub fn quantile_tol(&self, p: f64, tol: f64, max_iter: usize) -> f64 {
@@ -269,6 +384,10 @@ impl SplicedDist {
         } else {
             let u = self.plo + (p - self.zeta_lo) / self.c;
             z = phi_inv(u.max(EPS).min(1.0 - EPS));
+        }
+        let t = phi(-z.abs()).max(EPS); // body tail mass beyond the target
+        if t < TAIL_U {
+            return body_tail_quantile(&self.body, t, z > 0.0, tol, max_iter);
         }
         let ub = phi(z).max(EPS).min(1.0 - EPS);
         self.body.quantile_tol(ub, tol, max_iter)
@@ -300,22 +419,23 @@ impl SplicedDist {
         let q = self.qgrid();
         let n = q.len() as f64;
         let t1 = fsum(q.iter().map(|&v| (v - x).abs())) / n;
-        let t2 = 2.0
-            * fsum(
+        let t2 =
+            2.0 * fsum(
                 q.iter()
                     .enumerate()
                     .map(|(i, &v)| v * (2.0 * (i as f64 + 0.5) / n - 1.0)),
-            )
-            / n;
+            ) / n;
         t1 - t2 * 0.5
     }
 }
 
-/// A predictive that is either a plain Gaussian mixture or a tail-spliced one.
+/// A predictive: a plain Gaussian mixture, a tail-spliced one, or the exact
+/// pushforward of one through a monotone coordinate map.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PDist {
     Mix(Dist),
     Spliced(SplicedDist),
+    Push(Box<PushforwardDist>),
 }
 
 impl PDist {
@@ -323,36 +443,92 @@ impl PDist {
         match self {
             PDist::Mix(d) => d.mean(),
             PDist::Spliced(d) => d.mean(),
+            PDist::Push(d) => d.mean(),
+        }
+    }
+    pub fn var(&self) -> f64 {
+        match self {
+            PDist::Mix(d) => d.var(),
+            PDist::Spliced(d) => d.var(),
+            PDist::Push(d) => d.var(),
         }
     }
     pub fn std(&self) -> f64 {
         match self {
             PDist::Mix(d) => d.std(),
             PDist::Spliced(d) => d.std(),
+            PDist::Push(d) => d.std(),
         }
     }
     pub fn logpdf(&self, x: f64) -> f64 {
         match self {
             PDist::Mix(d) => d.logpdf(x),
             PDist::Spliced(d) => d.logpdf(x),
+            PDist::Push(d) => d.logpdf(x),
         }
     }
     pub fn cdf(&self, x: f64) -> f64 {
         match self {
             PDist::Mix(d) => d.cdf(x),
             PDist::Spliced(d) => d.cdf(x),
+            PDist::Push(d) => d.cdf(x),
         }
     }
     pub fn quantile(&self, p: f64) -> f64 {
+        self.quantile_tol(p, 1e-9, 2100)
+    }
+    pub fn quantile_tol(&self, p: f64, tol: f64, max_iter: usize) -> f64 {
         match self {
-            PDist::Mix(d) => d.quantile(p),
-            PDist::Spliced(d) => d.quantile(p),
+            PDist::Mix(d) => d.quantile_tol(p, tol, max_iter),
+            PDist::Spliced(d) => d.quantile_tol(p, tol, max_iter),
+            PDist::Push(d) => d.quantile_tol(p, tol, max_iter),
         }
     }
     pub fn crps(&self, x: f64) -> f64 {
         match self {
             PDist::Mix(d) => d.crps(x),
             PDist::Spliced(d) => d.crps(x),
+            PDist::Push(d) => d.crps(x),
+        }
+    }
+    pub fn shift(&self, delta: f64) -> PDist {
+        match self {
+            PDist::Mix(d) => PDist::Mix(d.shift(delta)),
+            PDist::Spliced(d) => PDist::Spliced(d.shift(delta)),
+            PDist::Push(d) => PDist::Push(Box::new(d.shift(delta))),
+        }
+    }
+    pub fn scale(&self, factor: f64) -> PDist {
+        match self {
+            PDist::Mix(d) => PDist::Mix(d.scale(factor)),
+            PDist::Spliced(d) => PDist::Spliced(d.scale(factor)),
+            PDist::Push(d) => PDist::Push(Box::new(d.scale(factor))),
+        }
+    }
+    pub fn affine(&self, a: f64, b: f64) -> PDist {
+        match self {
+            PDist::Mix(d) => PDist::Mix(d.affine(a, b)),
+            PDist::Spliced(d) => PDist::Spliced(d.affine(a, b)),
+            PDist::Push(d) => PDist::Push(Box::new(d.affine(a, b))),
+        }
+    }
+    /// Mixture components, as Python's `.components`: a pushforward gives its
+    /// moment-matched compatibility view, a spliced law has none.
+    pub fn components(&self) -> Option<Vec<(f64, f64, f64)>> {
+        match self {
+            PDist::Mix(d) => Some(d.components.clone()),
+            PDist::Spliced(_) => None,
+            PDist::Push(d) => Some(d.components()),
+        }
+    }
+    /// The plain mixture a component-reading consumer sees.
+    pub fn to_mix(&self) -> Dist {
+        match self {
+            PDist::Mix(d) => d.clone(),
+            PDist::Spliced(_) => panic!("a tail-spliced predictive has no mixture components"),
+            PDist::Push(d) => Dist {
+                components: d.components(),
+            },
         }
     }
 }

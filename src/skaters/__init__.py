@@ -23,13 +23,13 @@ from skaters.conjugate import conjugate
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, ou_transform,
     garch, seasonal_difference, power_transform, ar, grouped_ar, drift, holt_linear, theta,
-    yeo_johnson,
+    yeo_johnson, log_transform,
 )
 from skaters.robust_mad_standardize import robust_mad_standardize
 from skaters.residual_variance_lens import residual_variance_lens
 from skaters.search import search
 from skaters.periodicity import period_detector, top_periods
-from skaters.api import laplace, dantzig
+from skaters.api import laplace, dantzig, flesaker
 from skaters.granger import granger
 from skaters.multiscale import multiscale
 from skaters.parade import parade
@@ -37,6 +37,7 @@ from skaters.anomaly import mahalanobis, zbank
 from skaters.residual_transform import residual_transform, ResidualDiagnostics, CorrectedDist
 from skaters.homogenize import homogenize, make_candidates as homogenize_candidates, HomogenizedDist
 from skaters.sticky import sticky
+from skaters.state import state_to_json, state_from_json, assert_plain_state
 from skaters.spec import (
     build, name as spec_name, to_json, from_json,
     ema_spec, ensemble_spec, conjugate_spec,
@@ -50,6 +51,7 @@ __all__ = [
     # Search policies (the main user API)
     "laplace",
     "granger",
+    "flesaker",
     "dantzig",
     "sticky",
     "period_detector",
@@ -70,6 +72,7 @@ __all__ = [
     "seasonal_difference",
     "power_transform",
     "yeo_johnson",
+    "log_transform",
     "ar",
     "grouped_ar",
     "drift",
@@ -92,6 +95,10 @@ __all__ = [
     "homogenize_candidates",
     "HomogenizedDist",
     "search",
+    # Checkpoint and restore (docs/STATE.md)
+    "state_to_json",
+    "state_from_json",
+    "assert_plain_state",
     # Spec system
     "build",
     "spec_name",

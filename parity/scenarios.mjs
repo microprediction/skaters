@@ -8,8 +8,9 @@ import { bayesianEnsemble } from "../docs/js/skaters/bayesian.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
+  seasonalScale, logTransform, gaussianize, seasonalAnchor,
 } from "../docs/js/skaters/transform.mjs";
-import { laplace } from "../docs/js/skaters/api.mjs";
+import { laplace, flesaker } from "../docs/js/skaters/api.mjs";
 import { multiscale } from "../docs/js/skaters/multiscale.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
@@ -40,6 +41,16 @@ export function buildScenarios() {
     s.push([`yeojohnson_half${suf}`, k, conjugate(leaf(k), yeoJohnson(0.5), k)]);
     s.push([`ou${suf}`, k, conjugate(leaf(k), ouTransform(0.1), k)]);
     s.push([`ou_sqrt${suf}`, k, conjugate(conjugate(leaf(k), ouTransform(0.1), k), yeoJohnson(0.5), k)]);
+    s.push([`seasonal_scale${suf}`, k, conjugate(leaf(k), seasonalScale(7), k)]);
+    s.push([`seasonal_scale_c${suf}`, k, conjugate(leaf(k), seasonalScale(7, 0.1, true), k)]);
+    s.push([`power_exact${suf}`, k, conjugate(leaf(k), powerTransform(0.5, true), k)]);
+    s.push([`yeojohnson_exact${suf}`, k, conjugate(leaf(k), yeoJohnson(0.5, true), k)]);
+    s.push([`log_lower${suf}`, k, conjugate(leaf(k), logTransform(-15.0), k)]);
+    s.push([`log_upper${suf}`, k, conjugate(leaf(k), logTransform(null, 15.0), k)]);
+    s.push([`gaussianize${suf}`, k, conjugate(leaf(k), gaussianize(), k)]);
+    s.push([`gaussianize_smooth${suf}`, k, conjugate(leaf(k), gaussianize(39, 30, 9, true), k)]);
+    s.push([`gaussianize_delete${suf}`, k, conjugate(leaf(k), gaussianize(15, 30, 9, false, 1.5, 8.0, "delete"), k)]);
+    s.push([`gaussianize_emin${suf}`, k, conjugate(leaf(k), gaussianize(15, 30, 9, false, 1.5, 8.0, "emin"), k)]);
     s.push([`ema_skater${suf}`, k, ema(0.05, k)]);
     s.push([`pw_ensemble${suf}`, k,
       precisionWeightedEnsemble([ema(0.05, k), ema(0.2, k)], k)]);
@@ -53,6 +64,7 @@ export function buildScenarios() {
   s.push(["pol_laplace", 1, laplace(1)]);
   // laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
   s.push(["pol_laplace_k3", 3, laplace(3)]);
+  s.push(["pol_flesaker", 1, flesaker(1, -15.0)]);
 
   // Adaptive-search engine (still public via skaters.search)
   s.push(["search_default", 1, search({ k: 1, expandInterval: 50 })]);
@@ -65,6 +77,24 @@ export function buildScenarios() {
   // Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
   // GPD tail splice (fast warm-up so it activates within the 150-pt series)
   s.push(["gpd_tails", 1, gpdtails(conjugate(leaf(1), emaTransform(0.1), 1), 1, 0.9, 50, 100)]);
+
+  // Tail-spliced predictives through the transforms that read components or
+  // map nonlinearly, and pushforwards through affine transforms.
+  const spliced = (k) => gpdtails(conjugate(leaf(k), emaTransform(0.1), k), k, 0.9, 50, 100);
+  for (const k of [1, 3]) {
+    const suf = k === 1 ? "" : `_k${k}`;
+    s.push([`spliced_power${suf}`, k, conjugate(spliced(k), powerTransform(0.5), k)]);
+    s.push([`spliced_yeojohnson${suf}`, k, conjugate(spliced(k), yeoJohnson(0.5), k)]);
+    s.push([`spliced_gaussianize${suf}`, k, conjugate(spliced(k), gaussianize(), k)]);
+    s.push([`spliced_log${suf}`, k, conjugate(spliced(k), logTransform(-15.0), k)]);
+    s.push([`spliced_ema_t${suf}`, k, conjugate(spliced(k), emaTransform(0.1), k)]);
+    s.push([`spliced_seasonal${suf}`, k, conjugate(spliced(k), seasonalDifference(2), k)]);
+    s.push([`spliced_anchor${suf}`, k, conjugate(spliced(k), seasonalAnchor(2), k)]);
+    s.push([`spliced_sscale${suf}`, k, conjugate(spliced(k), seasonalScale(7), k)]);
+    s.push([`pf_affine_yj${suf}`, k, conjugate(conjugate(leaf(k), yeoJohnson(0.0, true), k), standardize(), k)]);
+    s.push([`pf_affine_log${suf}`, k,
+      conjugate(conjugate(leaf(k), logTransform(null, 200.0), k), seasonalScale(7, 0.1, true), k)]);
+  }
 
   s.push(["scale_mixture_leaf", 1, scaleMixtureLeaf(1)]);
   s.push(["crps_leaf", 1, crpsLeaf(1)]);

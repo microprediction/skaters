@@ -2,63 +2,109 @@
 //
 // A Dist is a weighted mixture of Gaussians: components = [[w, m, s], ...].
 // Weights are positive and normalized to sum to 1; std is always > 0.
-// Pure JS, no dependencies. JS lacks Math.erf, so we provide a
-// high-accuracy erf (regularized incomplete gamma) to match Python's
-// math.erf closely enough for CDF/quantile parity.
+// Pure JS, no dependencies. JS lacks Math.erf, so erf and erfc are a port
+// of fdlibm s_erf.c (FreeBSD msun; Copyright (C) 1993 Sun Microsystems, Inc.;
+// permission to use, copy, modify and distribute this software is freely
+// granted, provided that this notice is preserved). The same algorithm
+// backs the Rust port (libm crate). Both stay within about 1 ulp of the
+// platform libm that Python's math.erf and math.erfc call.
 
 const SQRT2 = Math.SQRT2;
 const SQRT2PI = Math.sqrt(2.0 * Math.PI);
 const LOG_SQRT2PI = 0.5 * Math.log(2.0 * Math.PI);
-const LGAMMA_HALF = 0.5723649429247001; // ln(Gamma(1/2)) = ln(sqrt(pi))
 
-// --- erf via the regularized lower incomplete gamma P(1/2, x^2) ---
+const ERX = 8.45062911510467529297e-01;
+const EFX8 = 1.02703333676410069053e+00;
+const PP0 = 1.28379167095512558561e-01, PP1 = -3.25042107247001499370e-01,
+  PP2 = -2.84817495755985104766e-02, PP3 = -5.77027029648944159157e-03,
+  PP4 = -2.37630166566501626084e-05;
+const QQ1 = 3.97917223959155352819e-01, QQ2 = 6.50222499887672944485e-02,
+  QQ3 = 5.08130628187576562776e-03, QQ4 = 1.32494738004321644526e-04,
+  QQ5 = -3.96022827877536812320e-06;
+const PA0 = -2.36211856075265944077e-03, PA1 = 4.14856118683748331666e-01,
+  PA2 = -3.72207876035701323847e-01, PA3 = 3.18346619901161753674e-01,
+  PA4 = -1.10894694282396677476e-01, PA5 = 3.54783043256182359371e-02,
+  PA6 = -2.16637559486879084300e-03;
+const QA1 = 1.06420880400844228286e-01, QA2 = 5.40397917702171048937e-01,
+  QA3 = 7.18286544141962662868e-02, QA4 = 1.26171219808761642112e-01,
+  QA5 = 1.36370839120290507362e-02, QA6 = 1.19844998467991074170e-02;
+const RA0 = -9.86494403484714822705e-03, RA1 = -6.93858572707181764372e-01,
+  RA2 = -1.05586262253232909814e+01, RA3 = -6.23753324503260060396e+01,
+  RA4 = -1.62396669462573470355e+02, RA5 = -1.84605092906711035994e+02,
+  RA6 = -8.12874355063065934246e+01, RA7 = -9.81432934416914548592e+00;
+const SA1 = 1.96512716674392571292e+01, SA2 = 1.37657754143519042600e+02,
+  SA3 = 4.34565877475229228821e+02, SA4 = 6.45387271733267880336e+02,
+  SA5 = 4.29008140027567833386e+02, SA6 = 1.08635005541779435134e+02,
+  SA7 = 6.57024977031928170135e+00, SA8 = -6.04244152148580987438e-02;
+const RB0 = -9.86494292470009928597e-03, RB1 = -7.99283237680523006574e-01,
+  RB2 = -1.77579549177547519889e+01, RB3 = -1.60636384855821916062e+02,
+  RB4 = -6.37566443368389627722e+02, RB5 = -1.02509513161107724954e+03,
+  RB6 = -4.83519191608651397019e+02;
+const SB1 = 3.03380607434824582924e+01, SB2 = 3.25792512996573918826e+02,
+  SB3 = 1.53672958608443695994e+03, SB4 = 3.19985821950859553908e+03,
+  SB5 = 2.55305040643316442583e+03, SB6 = 4.74528541206955367215e+02,
+  SB7 = -2.24409524465858183362e+01;
+const X1P_1022 = 2.2250738585072014e-308;
 
-function _gser(a, x) {
-  // Series expansion for P(a, x), valid for x < a + 1.
-  let ap = a;
-  let sum = 1.0 / a;
-  let del = sum;
-  for (let i = 0; i < 300; i++) {
-    ap += 1.0;
-    del *= x / ap;
-    sum += del;
-    if (Math.abs(del) < Math.abs(sum) * 1e-17) break;
-  }
-  return sum * Math.exp(-x + a * Math.log(x) - LGAMMA_HALF);
+const _buf = new DataView(new ArrayBuffer(8));
+function highWord(x) { _buf.setFloat64(0, x); return _buf.getUint32(0); }
+function clearLowWord(x) { _buf.setFloat64(0, x); _buf.setUint32(4, 0); return _buf.getFloat64(0); }
+
+function erfc1(x) {
+  const s = Math.abs(x) - 1.0;
+  const p = PA0 + s * (PA1 + s * (PA2 + s * (PA3 + s * (PA4 + s * (PA5 + s * PA6)))));
+  const q = 1.0 + s * (QA1 + s * (QA2 + s * (QA3 + s * (QA4 + s * (QA5 + s * QA6)))));
+  return 1.0 - ERX - p / q;
 }
 
-function _gcf(a, x) {
-  // Continued fraction for Q(a, x) via the modified Lentz algorithm.
-  const TINY = 1e-300;
-  let b = x + 1.0 - a;
-  let c = 1.0 / TINY;
-  let d = 1.0 / b;
-  let h = d;
-  for (let i = 1; i <= 300; i++) {
-    const an = -i * (i - a);
-    b += 2.0;
-    d = an * d + b;
-    if (Math.abs(d) < TINY) d = TINY;
-    c = b + an / c;
-    if (Math.abs(c) < TINY) c = TINY;
-    d = 1.0 / d;
-    const del = d * c;
-    h *= del;
-    if (Math.abs(del - 1.0) < 1e-17) break;
+function erfc2(ix, x) {
+  if (ix < 0x3ff40000) return erfc1(x);
+  x = Math.abs(x);
+  const s = 1.0 / (x * x);
+  let r, S;
+  if (ix < 0x4006db6d) {
+    r = RA0 + s * (RA1 + s * (RA2 + s * (RA3 + s * (RA4 + s * (RA5 + s * (RA6 + s * RA7))))));
+    S = 1.0 + s * (SA1 + s * (SA2 + s * (SA3 + s * (SA4 + s * (SA5 + s * (SA6 + s * (SA7 + s * SA8)))))));
+  } else {
+    r = RB0 + s * (RB1 + s * (RB2 + s * (RB3 + s * (RB4 + s * (RB5 + s * RB6)))));
+    S = 1.0 + s * (SB1 + s * (SB2 + s * (SB3 + s * (SB4 + s * (SB5 + s * (SB6 + s * SB7))))));
   }
-  return Math.exp(-x + a * Math.log(x) - LGAMMA_HALF) * h;
-}
-
-function _gammp(a, x) {
-  if (x <= 0.0) return 0.0;
-  if (x < a + 1.0) return _gser(a, x);
-  return 1.0 - _gcf(a, x);
+  const z = clearLowWord(x);
+  return Math.exp(-z * z - 0.5625) * Math.exp((z - x) * (z + x) + r / S) / x;
 }
 
 export function erf(x) {
-  if (x === 0.0) return 0.0;
-  const r = _gammp(0.5, x * x);
-  return x < 0.0 ? -r : r;
+  let ix = highWord(x);
+  const sign = ix >>> 31;
+  ix &= 0x7fffffff;
+  if (ix >= 0x7ff00000) return 1.0 - 2.0 * sign + 1.0 / x;
+  if (ix < 0x3feb0000) {
+    if (ix < 0x3e300000) return 0.125 * (8.0 * x + EFX8 * x);
+    const z = x * x;
+    const r = PP0 + z * (PP1 + z * (PP2 + z * (PP3 + z * PP4)));
+    const s = 1.0 + z * (QQ1 + z * (QQ2 + z * (QQ3 + z * (QQ4 + z * QQ5))));
+    return x + x * (r / s);
+  }
+  const y = ix < 0x40180000 ? 1.0 - erfc2(ix, x) : 1.0 - X1P_1022;
+  return sign ? -y : y;
+}
+
+export function erfc(x) {
+  let ix = highWord(x);
+  const sign = ix >>> 31;
+  ix &= 0x7fffffff;
+  if (ix >= 0x7ff00000) return 2.0 * sign + 1.0 / x;
+  if (ix < 0x3feb0000) {
+    if (ix < 0x3c700000) return 1.0 - x;
+    const z = x * x;
+    const r = PP0 + z * (PP1 + z * (PP2 + z * (PP3 + z * PP4)));
+    const s = 1.0 + z * (QQ1 + z * (QQ2 + z * (QQ3 + z * (QQ4 + z * QQ5))));
+    const y = r / s;
+    if (sign || ix < 0x3fd00000) return 1.0 - (x + x * y);
+    return 0.5 - (x - 0.5 + x * y);
+  }
+  if (ix < 0x403c0000) return sign ? 2.0 - erfc2(ix, x) : erfc2(ix, x);
+  return sign ? 2.0 - X1P_1022 : X1P_1022 * X1P_1022;
 }
 
 // --- pure-JS Gaussian math (mirrors dist.py) ---
@@ -204,19 +250,63 @@ export class Dist {
     return t1 - 0.5 * t2;
   }
 
-  quantile(p, tol = 1e-9, maxIter = 100) {
+  // Same bracket, tolerance, atom and binary64 convergence rules as Python.
+  quantile(p, tol = 1e-9, maxIter = 2100) {
     if (!(p > 0 && p < 1)) throw new Error("quantile p must be in (0, 1)");
-    const mu = this.mean;
-    const sigma = Math.sqrt(this.var);
-    let lo = mu - 8 * sigma;
-    let hi = mu + 8 * sigma;
+    const mu = this.mean, sigma = Math.sqrt(this.var);
+    if (!Number.isFinite(sigma)) throw new Error("quantile needs a finite mixture variance");
+    let minSigma = Infinity;
+    for (const [w, , s] of this.components) if (w > 0 && s > 0) minSigma = Math.min(minSigma, s);
+    if (!Number.isFinite(minSigma)) minSigma = 1.0;
+    const xTol = tol * Math.min(1.0, minSigma);
+    let lo = mu - 8 * sigma, hi = mu + 8 * sigma;
+    const seed = Math.max(16 * sigma, 1e-12 * Math.max(1.0, Math.abs(mu)));
+    let width = seed, found = false;
+    for (let i = 0; i < 120; i++) {
+      if (this.cdf(lo) < p) { found = true; break; }
+      lo -= width; width *= 2.0;
+    }
+    if (!found) throw new Error("could not bracket quantile from below");
+    width = seed; found = false;
+    for (let i = 0; i < 120; i++) {
+      if (this.cdf(hi) >= p) { found = true; break; }
+      hi += width; width *= 2.0;
+    }
+    if (!found) throw new Error("could not bracket quantile from above");
+    if (!(Number.isFinite(lo) && Number.isFinite(hi))) throw new Error("quantile needs a finite search bracket");
     for (let i = 0; i < maxIter; i++) {
-      const mid = 0.5 * (lo + hi);
+      let mid = 0.5 * (lo + hi);
+      if (!Number.isFinite(mid)) mid = 0.5 * lo + 0.5 * hi;
+      if (!(lo < mid && mid < hi)) {
+        const gap = hi - lo;
+        if (0 < tol && tol <= 2 * gap) {
+          let lower = 0, upper = 0, swappedLower = 0, swappedUpper = 0;
+          for (const [w, m, s] of this.components) {
+            const cl = w * gaussianCdf(lo, m, s), cu = w * gaussianCdf(hi, m, s);
+            lower += cl; upper += cu;
+            const unresolved = w > 0 && s <= gap;
+            swappedLower += unresolved ? cu : cl;
+            swappedUpper += unresolved ? cl : cu;
+          }
+          if (swappedLower === lower && swappedUpper === upper) return mid;
+        }
+        return hi;
+      }
       if (this.cdf(mid) < p) lo = mid;
       else hi = mid;
-      if (hi - lo < tol) break;
+      if (hi - lo < xTol) {
+        for (const [w, m, s] of this.components) {
+          if (w > 0 && s === 0 && lo <= m && m <= hi) {
+            let left = 0.0;
+            for (const [wi, mi, si] of this.components) left += wi * (si === 0 ? Number(mi < m) : gaussianCdf(m, mi, si));
+            if (left < p && p <= this.cdf(m)) return m;
+          }
+        }
+        break;
+      }
     }
-    return 0.5 * (lo + hi);
+    const mid = 0.5 * (lo + hi);
+    return Number.isFinite(mid) ? mid : 0.5 * lo + 0.5 * hi;
   }
 
   get mean() {

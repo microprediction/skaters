@@ -145,7 +145,7 @@ def render(d):
   <meta property="og:description" content="An online correction for the part of a predictive distribution that is systematically the wrong width." />
   <meta property="og:url" content="https://skaters.microprediction.org/homogenization.html" />
   <meta name="twitter:card" content="summary" />
-  <link rel="stylesheet" href="./academic.css" />
+  <link rel="stylesheet" href="./academic.css?v=20261117" />
   <style>
     .lede {{ color: #555; margin: 0 0 28px; font-size: 1.05em; }}
     table.res {{ border-collapse: collapse; margin: 0 0 24px; width: 100%; }}
@@ -288,9 +288,8 @@ for y in stream:
 
   <footer>
     <a href="https://github.com/microprediction/skaters">Source</a> &middot;
-    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family
-    (see also <a href="http://thurstone.microprediction.org">thurstone</a>,
-    <a href="http://schur.microprediction.org">schur</a>).
+    Part of the <a href="https://repos.microprediction.org/">microprediction</a> family &middot;
+    Authored by <a href="https://home.microprediction.org">Peter Cotton</a>.
   </footer>
 </body>
 </html>
