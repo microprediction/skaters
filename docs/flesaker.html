@@ -175,8 +175,8 @@ state["z"], state["pit"]     # laplace's own, unchanged by the map</pre>
     </table>
 
     <h2 id="status">Status</h2>
-    <p class="callout"><code>flesaker</code> is not part of the official API and is not cross-port: it is
-      experimental and Python only, from 0.17.0. There are many possible domains (positive, bounded
+    <p class="callout"><code>flesaker</code> is not part of the official API: it is
+      experimental, from 0.17.0, in Python and JavaScript. There are many possible domains (positive, bounded
       above, inside an interval, on a circle), and skaters provides a clean way to add your own:
       write the transform and conjugate <code>laplace</code> by it, as
       <code>conjugate(laplace(), log_transform(lower=0.0))</code> does here. We lean towards making

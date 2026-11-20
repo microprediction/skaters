@@ -79,18 +79,21 @@ walkers throw, naming the path, if a state holds anything JSON would damage.
 
 ## What's exported
 
-`laplace`, `flesaker` and `buildCandidates`; the `Dist` object; transforms (`difference`,
+`laplace`, `flesaker`, `dantzig` and `buildCandidates`; the `Dist` object; transforms (`difference`,
 `standardize`, `garch`, `ar`, `holtLinear`, `powerTransform`, `yeoJohnson`,
 `logTransform`, …, with `gaussianize` and `seasonalScale` in `transform.mjs`); ensembles
 (`precisionWeightedEnsemble`, `bayesianEnsemble`, `terminalLeafEnsemble`); leaves
-(`scaleMixtureLeaf`, `crpsLeaf`, `garchLeaf`); `multiscale`, `sticky`, periodicity
-and covariance helpers; and spec (de)serialisers. See `index.mjs` for the full
+(`scaleMixtureLeaf`, `crpsLeaf`, `garchLeaf`); `multiscale`, `sticky`, `parade`, periodicity
+and covariance helpers; the residual wrappers `homogenize` (with `homogenizeCandidates`,
+`HomogenizedDist`) and `residualTransform` (with `CorrectedDist`, `ResidualDiagnostics`);
+and spec (de)serialisers, whose `toJson` is byte-identical to Python's `to_json`. See `index.mjs` for the full
 surface.
 
 ## Notes
 
 - `laplace` is the general-purpose default; its signature is
-  `laplace(k = 1, objective = "crps", sticky = true, scales = null)`. On
+  `laplace(k = 1, objective = "crps", sticky = true, scales = null, scaleAlpha = 0.03,
+  tails = "gpd", leaf = null)`; `leaf` is a terminal-leaf factory such as `garchLeaf`. On
   price/return series with volatility clustering there is no free lunch — a
   dedicated GARCH-t model is the right tool there.
 - The port is a faithful mirror of the Python package; the two agree to `1e-6`.
