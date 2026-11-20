@@ -1,6 +1,7 @@
 """skaters.torch parity for the shape transforms: fractional differencing,
-power_transform and yeo_johnson (delta-method inverses) match the reference
-to 1e-9 on seeded series, and their parameters carry finite gradients."""
+power_transform and yeo_johnson (delta-method and exact inverses),
+log_transform and gaussianize match the reference to 1e-9 on seeded series,
+and their parameters carry finite gradients."""
 import math
 
 import pytest
@@ -23,11 +24,22 @@ CASES = [
     ("yeo_johnson", {"lmbda": 0.0}, "positive", False),
     ("yeo_johnson", {"lmbda": 0.5}, "positive", False),
     ("yeo_johnson", {"lmbda": 0.5}, "ar", False),
+    ("power_transform", {"p": 0.5, "exact": True}, "ar", False),
+    ("yeo_johnson", {"lmbda": 0.5, "exact": True}, "ar", False),
+    ("yeo_johnson", {"lmbda": 0.0, "exact": True}, "positive", False),
+    ("log_transform", {}, "positive", False),
+    ("log_transform", {"upper": 40.0}, "ar", False),
+    ("gaussianize", {}, "ar", False),
+    ("gaussianize", {"smooth": True}, "seasonal", False),
+    ("gaussianize", {"max_knots": 15, "guard": "delete", "slope_cap": 1.5}, "ar", False),
+    ("gaussianize", {"max_knots": 15, "guard": "emin", "slope_cap": 1.5}, "ar", False),
 ]
 
 # gradient cases: yeo_johnson at lmbda=0 takes the closed-form log1p/expm1
 # limit, in which the parameter does not appear, so it has no gradient there
-GRAD_CASES = [c for c in CASES if not (c[0] == "yeo_johnson" and c[1].get("lmbda") == 0.0)]
+# log_transform and gaussianize have no continuous parameter
+GRAD_CASES = [c for c in CASES if not (c[0] == "yeo_johnson" and c[1].get("lmbda") == 0.0)
+              and c[0] not in ("log_transform", "gaussianize")]
 
 
 @pytest.mark.parametrize("name,kwargs,kind,zm", CASES, ids=lambda c: str(c))
@@ -49,10 +61,14 @@ def test_registry_covers_the_cases():
     assert {c[0] for c in CASES} <= set(REGISTRY)
 
 
-def test_exact_pushforward_is_refused():
-    for name in ("power_transform", "yeo_johnson"):
-        with pytest.raises(NotImplementedError):
-            from_reference(name, exact=True)
+def test_exact_inverse_is_a_pushforward():
+    from skaters.torch.pushforward import TorchPushforwardDist
+    from skaters.torch.dist import TorchDist
+    for name, kw in (("power_transform", {"p": 0.5}), ("yeo_johnson", {"lmbda": 0.5})):
+        t = from_reference(name, exact=True, **kw)
+        _, st = t(1.0, None)
+        d = t.inverse_k([TorchDist.gaussian(0.3, 0.8)], st)[0]
+        assert isinstance(d, TorchPushforwardDist)
 
 
 def test_power_transform_gradient_is_finite_at_exact_zero():
