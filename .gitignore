@@ -275,6 +275,7 @@ surrogate/
 # Multi-horizon and surrogate prediction tapes: large, regenerable, same rule as
 # benchmarks/preds/. The derived canonical_summary_*.csv ARE committed.
 benchmarks/preds_multi/
+benchmarks/preds_pr307/
 benchmarks/preds_surrogate/
 benchmarks/preds_surrogate_big/
 

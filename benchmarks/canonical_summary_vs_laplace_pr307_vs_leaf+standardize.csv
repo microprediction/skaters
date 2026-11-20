@@ -1,0 +1,4 @@
+study,model,n_series,win,draw,loss,med_dLL,q25_dLL,q75_dLL,med_crps_ratio
+daily:econ,leaf+robust-mad,616,77,379,160,-0.0244,-0.1279,0.0144,1.0060
+daily:price,leaf+robust-mad,338,69,177,92,-0.0154,-0.0644,0.0402,1.0048
+m4-hourly:econ,leaf+robust-mad,414,35,208,171,-0.0577,-0.1759,0.0055,1.0374
