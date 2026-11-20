@@ -42,8 +42,6 @@ inside their valid regions after an optimizer step.
 from __future__ import annotations
 
 import math
-from collections import deque
-
 import torch
 import torch.nn as nn
 
@@ -202,6 +200,12 @@ class LearnedLaplace(nn.Module):
         return dists
 
     def _laplace_dists(self, yv, state):
+        if _holds_torch(state["lap"]):
+            # restored by skaters.torch.state_from_json: the frozen reference
+            # expert reads its own (float, Dist) state
+            from skaters.state import state_from_json as ref_from_json
+            from skaters.torch.state import state_to_json
+            state["lap"] = ref_from_json(state_to_json(state["lap"]))
         dists, state["lap"] = self.ref_f(yv, state["lap"])
         return [_to_torch_dist(d) for d in dists]
 
@@ -234,13 +238,17 @@ class LearnedLaplace(nn.Module):
         if state is None:
             state = {
                 "lap": None, "learned": None,
-                "pend": deque(maxlen=k),              # (lap_dists, learned_dists) issued earlier
-                # cumulative log-lik [horizon, phase, expert]: phase = issue time mod horizon
-                "cum": torch.zeros(k, k, 2, dtype=DTYPE),
+                "pend": [],                           # [lap_dists, learned_dists] issued earlier, bound k
+                # cumulative log-lik [horizon][phase][expert]: phase = issue time mod horizon
+                "cum": [[[0.0, 0.0] for _ in range(k)] for _ in range(k)],
                 "t": 0,
                 "z": [None] * k, "repeat_frac": 0.0, "abs_z_mean": 0.0,
                 "n": 0, "last_y": None,
             }
+        else:
+            from skaters.torch.state import floats
+            for key in ("cum", "z", "repeat_frac", "abs_z_mean", "last_y"):
+                state[key] = floats(state[key])     # float bookkeeping, tensors after a restore
         yv = float("nan") if y is None else float(y)
         finite = math.isfinite(yv)
         t = state["t"]
@@ -249,19 +257,20 @@ class LearnedLaplace(nn.Module):
         if finite:
             pend = state["pend"]
             m = len(pend)
-            cum = state["cum"].clone()
+            cum = state["cum"]
             for h in range(1, k + 1):
                 if h <= m:
                     lap_d, lrn_d = pend[m - h]
-                    ph = t % h
+                    c = cum[h - 1][t % h]
                     for j, d in enumerate((lap_d[h - 1], lrn_d[h - 1])):
-                        lp = float(d.logpdf(yv))
+                        lp = float(_t(d.logpdf(yv)).detach())
                         # +inf (an exact hit on a lattice atom) counts in the expert's favour
-                        cum[h - 1, ph, j] += 1e6 if lp == math.inf else (lp if math.isfinite(lp) else _NONFINITE_LP)
+                        c[j] += 1e6 if lp == math.inf else (lp if math.isfinite(lp) else _NONFINITE_LP)
                     # re-centre (the weights depend only on the difference; keeps
                     # later differences out of rounding after an extreme step)
-                    cum[h - 1, ph] -= torch.max(cum[h - 1, ph])
-            state["cum"] = cum
+                    mx = max(c)
+                    c[0] -= mx
+                    c[1] -= mx
         # 2. the experts' forecasts for y_{t+1..t+k}; the gate reads step t-1's features
         self._set_gate_offsets(state)
         try:
@@ -269,7 +278,9 @@ class LearnedLaplace(nn.Module):
         finally:
             self._clear_gate_offsets()
         lap = self._laplace_dists(yv, state)
-        state["pend"].append((lap, lrn))
+        state["pend"].append([lap, lrn])
+        if len(state["pend"]) > k:
+            del state["pend"][0]
         # 3. descriptors for the next step's gate (from the learned expert's parade)
         pz = state["learned"].get("z") if isinstance(state["learned"], dict) else None
         state["z"] = list(pz) if pz is not None else [None] * k
@@ -284,7 +295,7 @@ class LearnedLaplace(nn.Module):
         # 4. the guaranteed mixture, per horizon, from this issue time's phase
         out = []
         for h in range(1, k + 1):
-            lw = self.log_prior + state["cum"][h - 1, t % h]
+            lw = self.log_prior + torch.as_tensor(state["cum"][h - 1][t % h], dtype=DTYPE)
             out.append(MixtureDist([lap[h - 1], lrn[h - 1]], lw))
         state["t"] = t + 1
         return out, state
@@ -306,10 +317,28 @@ class LearnedLaplace(nn.Module):
         return list(self.learned.parameters()) + list(self.gates.parameters())
 
 
+def _holds_torch(x) -> bool:
+    """Whether the first float-like value found in ``x`` (depth first) is a
+    tensor or a torch predictive: a state is all of one kind, so one value
+    decides, and the search stops there."""
+    def first(v):
+        if isinstance(v, (torch.Tensor, TorchDist, TorchSplicedDist)):
+            return True
+        if isinstance(v, float) or hasattr(v, "components"):
+            return False
+        items = v.values() if isinstance(v, dict) else (v if isinstance(v, (list, tuple)) else ())
+        for u in items:
+            r = first(u)
+            if r is not None:
+                return r
+        return None
+    return bool(first(x))
+
+
 def detach_state(state):
     """Return the state with every tensor detached (a training window boundary
     for truncated backprop: the values carry on, the graph does not). Dicts and
-    lists are rebuilt in place; tuples and deques are rebuilt as the same type."""
+    lists are rebuilt in place; tuples are rebuilt as tuples."""
     if torch.is_tensor(state):
         return state.detach()
     if isinstance(state, dict):
@@ -320,9 +349,6 @@ def detach_state(state):
         for i in range(len(state)):
             state[i] = detach_state(state[i])
         return state
-    if isinstance(state, deque):
-        items = [detach_state(x) for x in state]
-        return deque(items, maxlen=state.maxlen)
     if isinstance(state, tuple):
         return tuple(detach_state(x) for x in state)
     if isinstance(state, (TorchDist, TorchSplicedDist, MixtureDist)):

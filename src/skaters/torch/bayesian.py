@@ -14,7 +14,6 @@ reference merge (no gradient along the merge path), as in the trunk.
 
 from __future__ import annotations
 
-from collections import deque
 
 import torch
 from torch import nn
@@ -61,7 +60,7 @@ class BayesianEnsemble(nn.Module):
         if state is None:
             state = {
                 "sub": [None] * n,
-                "queues": [[deque() for _ in range(k)] for _ in range(n)],
+                "queues": [[[] for _ in range(k)] for _ in range(n)],
                 "log_w": [[self.prior_log_weights[i] for _ in range(k)] for i in range(n)],
                 "n_obs": 0,
             }
@@ -75,7 +74,7 @@ class BayesianEnsemble(nn.Module):
                 q = state["queues"][i][h]
                 q.append(all_dists[i][h])
                 if len(q) > h + 1:
-                    lp = _clamp_lp(q.popleft().logpdf(y))
+                    lp = _clamp_lp(q.pop(0).logpdf(y))
                     carried = _t(state["log_w"][i][h])
                     if self.detach_carry:
                         # truncate the recursion's graph at one step, but keep the prior's

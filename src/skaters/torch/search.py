@@ -3,9 +3,10 @@
 
 Same grammar, same expand/prune/merge schedule and the same #223
 parent-relative child initialisation. Candidates are torch conjugation
-chains built from a recipe (never stored as data: the pool holds the live
-chain, its recipe and its transform modules, exactly as the reference pool
-holds closures), the leaf is the reference leaf as a constant, and every
+chains built from a recipe. The state holds only the recipe, as the
+reference's does (docs/STATE.md); the chain and its transform modules live
+in the skater, cached by recipe and rebuilt on demand after a restore
+(``f.modules_for(entry)`` returns an entry's modules), and the leaf is the reference leaf as a constant, and every
 candidate's per-horizon ``log_w`` is a 0-d tensor so a log score at the
 combined output differentiates through the softmax weights into the
 transforms' parameters. Ordering decisions (which candidates to expand,
@@ -16,7 +17,6 @@ values; the arithmetic that reaches the output stays on tensors.
 from __future__ import annotations
 
 import math
-from collections import deque
 
 import torch
 
@@ -93,6 +93,18 @@ def search(
 ):
     """Adaptive-search skater; same arguments and defaults as the reference."""
     _pd_func = period_detector()
+    # Closures and modules are configuration: one chain per recipe, built on
+    # demand, dropped when its entry leaves the pool. State stays plain data.
+    fn_cache: dict = {}
+
+    def _chain(entry: dict, state: dict):
+        key = "|".join(entry["recipe"])
+        got = fn_cache.get(key)
+        if got is None:
+            f, mods = _build_from_recipe(entry["recipe"], k, _transforms_for(state))
+            f.__name__ = "|".join(entry["recipe"] + ["leaf"])
+            got = fn_cache[key] = (f, mods)
+        return got
 
     def _search(y, state=None):
         y = _t(y)
@@ -100,17 +112,19 @@ def search(
             state = {
                 "pool": _init_pool(k, cost_budget=cost_budget),
                 "n_obs": 0,
-                "buffer": deque(maxlen=replay_buffer),
+                "buffer": [],
                 "pd_state": None,
-                "detected_periods": set(),
-                "transforms": list(TRANSFORMS),
+                "detected_periods": [],
             }
         state["n_obs"] += 1
-        state["buffer"].append(y)
+        buffer = state["buffer"]
+        buffer.append(y)
+        if len(buffer) > replay_buffer:
+            del buffer[0]
         pool = state["pool"]
 
         for entry in pool:
-            dists, entry["s"] = entry["f"](y, entry["s"])
+            dists, entry["s"] = _chain(entry, state)[0](y, entry["s"])
             entry["dists"] = dists
             entry["age"] += 1
 
@@ -119,7 +133,7 @@ def search(
                 q = entry["queues"][h]
                 q.append(entry["dists"][h])
                 if len(q) > h + 1:
-                    past_dist = q.popleft()
+                    past_dist = q.pop(0)
                     if entry["warmed"]:
                         lp = past_dist.logpdf(y)
                         if bool(lp > 20.0):
@@ -138,15 +152,16 @@ def search(
             detected = top_periods(scores, threshold=0.3, max_periods=3)
             for period in detected:
                 if period not in state["detected_periods"]:
-                    state["detected_periods"].add(period)
-                    state["transforms"].append(
-                        (f"seas({period})", ("seasonal_difference", {"period": period}), 2))
+                    state["detected_periods"].append(period)
             new_children = _expand(pool, k, expand_top_n, max_depth,
-                                   transforms=state["transforms"], cost_budget=cost_budget)
+                                   transforms=_transforms_for(state), cost_budget=cost_budget)
             for child in new_children:
-                _warmup(child, state["buffer"], k)
+                _warmup(child, _chain(child, state)[0], state["buffer"], k)
             pool.extend(new_children)
             _prune(pool, prune_threshold, max_pool, k)
+            live = {"|".join(e["recipe"]) for e in pool}
+            for key in [key for key in fn_cache if key not in live]:
+                del fn_cache[key]
 
         combined = []
         for h in range(k):
@@ -162,23 +177,28 @@ def search(
             combined.append(dist)
         return combined, state
 
+    def modules_for(entry: dict, state: dict | None = None):
+        """The transform modules of a pool entry's chain, outer first."""
+        return _chain(entry, state or {"detected_periods": []})[1]
+
     _search.__name__ = f"search(k={k})"
+    _search.modules_for = modules_for
     return _search
 
 
-class _SharedModules(list):
-    """The transform modules a pool entry's closure reads. A deepcopy of the
-    state (the restore leg) must keep pointing at the same modules, or an
-    optimizer over the copied list would update parameters the forecaster
-    never reads; parameters are the model's, not the state's."""
+def _transforms_for(state: dict) -> list:
+    """The grammar in force: the fixed table plus one seasonal difference per
+    detected period, in detection order (the reference's rule)."""
+    out = list(TRANSFORMS)
+    for period in state["detected_periods"]:
+        out.append((f"seas({period})", ("seasonal_difference", {"period": int(period)}), 2))
+    return out
 
-    def __deepcopy__(self, memo):
-        return self
 
-
-def _make_entry(skater_fn, depth: int, recipe: list, k: int, cost: float = 0.0, mods=None) -> dict:
+def _make_entry(depth: int, recipe: list, k: int, cost: float = 0.0) -> dict:
+    """A pool entry: plain data, no closure (the chain is rebuilt from
+    ``recipe`` by the skater)."""
     return {
-        "f": skater_fn,
         "s": None,
         "depth": depth,
         "recipe": recipe,
@@ -186,15 +206,14 @@ def _make_entry(skater_fn, depth: int, recipe: list, k: int, cost: float = 0.0, 
         "age": 0,
         "warmed": False,
         "log_w": [_zero() for _ in range(k)],
-        "queues": [deque() for _ in range(k)],
+        "queues": [[] for _ in range(k)],
         "dists": None,
-        "mods": _SharedModules(mods or []),   # the chain's transform modules, outer first
     }
 
 
-def _warmup(entry: dict, buffer: deque, k: int):
+def _warmup(entry: dict, f, buffer: list, k: int):
     for y in buffer:
-        dists, entry["s"] = entry["f"](y, entry["s"])
+        dists, entry["s"] = f(y, entry["s"])
         entry["dists"] = dists
         entry["age"] += 1
     if entry["dists"] is not None:
@@ -221,16 +240,14 @@ def _build_from_recipe(recipe: list, k: int, transforms=None):
 
 def _init_pool(k: int, cost_budget: float = float("inf")) -> list:
     pool = []
-    entry = _make_entry(reference_skater(reference_leaf(k=k)), depth=0, recipe=[], k=k, cost=1.0)
+    entry = _make_entry(depth=0, recipe=[], k=k, cost=1.0)
     entry["warmed"] = True
     pool.append(entry)
     for t_name, _spec, t_cost in TRANSFORMS:
         candidate_cost = 1.0 + t_cost
         if candidate_cost > cost_budget:
             continue
-        f, mods = _build_from_recipe([t_name], k)
-        f.__name__ = f"{t_name}|leaf"
-        entry = _make_entry(f, depth=1, recipe=[t_name], k=k, cost=candidate_cost, mods=mods)
+        entry = _make_entry(depth=1, recipe=[t_name], k=k, cost=candidate_cost)
         entry["warmed"] = True
         pool.append(entry)
     return pool
@@ -261,10 +278,7 @@ def _expand(pool: list, k: int, top_n: int, max_depth: int, transforms=None,
             if tuple(new_recipe) in existing:
                 continue
             existing.add(tuple(new_recipe))
-            child_fn, mods = _build_from_recipe(new_recipe, k, transforms)
-            child_fn.__name__ = "|".join(new_recipe) + "|leaf"
-            child = _make_entry(child_fn, depth=len(new_recipe), recipe=new_recipe, k=k,
-                                cost=child_cost, mods=mods)
+            child = _make_entry(depth=len(new_recipe), recipe=new_recipe, k=k, cost=child_cost)
             child["log_w"] = list(parent["log_w"])        # skaters#223: inherit the evidence
             children.append(child)
     return children

@@ -55,24 +55,25 @@ class Multiscale(nn.Module):
         if state is None:
             state = {
                 "t": 0,
-                "phase": {s: [None] * s for s in scales},
-                "pending": {s: [None] * s for s in scales},
+                "phase": {str(s): [None] * s for s in scales},
+                "pending": {str(s): [None] * s for s in scales},
                 "latest": {},
-                "score": {s: None for s in scales},
+                "score": {str(s): None for s in scales},
             }
         t = state["t"]
         for s in scales:
+            ks = str(s)                 # state is keyed by the stride string, as in the reference
             ph = t % s
-            prev = state["pending"][s][ph]
+            prev = state["pending"][ks][ph]
             if prev is not None:
                 lp = prev.logpdf(y)
                 if not bool(lp > _LOGPDF_FLOOR):
                     lp = torch.as_tensor(_LOGPDF_FLOOR, dtype=DTYPE)
-                m = state["score"][s]
-                state["score"][s] = lp if m is None else self.forget * m + (1.0 - self.forget) * lp
-            dists, state["phase"][s][ph] = self.subs[s](y, state["phase"][s][ph])
-            state["pending"][s][ph] = dists[0]
-            state["latest"][s] = dists
+                m = state["score"][ks]
+                state["score"][ks] = lp if m is None else self.forget * m + (1.0 - self.forget) * lp
+            dists, state["phase"][ks][ph] = self.subs[s](y, state["phase"][ks][ph])
+            state["pending"][ks][ph] = dists[0]
+            state["latest"][ks] = dists
         state["t"] = t + 1
 
         scores = state["score"]
@@ -87,14 +88,14 @@ class Multiscale(nn.Module):
         for h in range(1, k + 1):
             fcs, wts = [], []
             for s in scales:
-                if s > h or s not in state["latest"]:
+                if s > h or str(s) not in state["latest"]:
                     continue
                 j = max(1, int(h / s + 0.5))
-                dists = state["latest"][s]
+                dists = state["latest"][str(s)]
                 if j - 1 >= len(dists):
                     continue
                 fcs.append(dists[j - 1])
-                m = scores[s]
+                m = scores[str(s)]
                 wts.append(torch.exp((m if m is not None else top) - top))
             if len(fcs) == 1:
                 out.append(fcs[0])

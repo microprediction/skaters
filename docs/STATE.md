@@ -23,6 +23,12 @@ dists, state = f(next_y, state)
 JS has the same pair, `stateToJSON` and `stateFromJSON` in
 `docs/js/skaters/state.mjs`.
 
+The torch port (`skaters.torch`) keeps the same layout key for key. Its live
+state holds 0-d float64 tensors where the reference holds floats, and
+`TorchDist` or `TorchSplicedDist` where it holds a `Dist` or `SplicedDist`.
+`skaters.torch.state_to_json` and `skaters.torch.state_from_json` convert at
+the JSON boundary, so a checkpoint written by either resumes in the other.
+
 ## Values
 
 State holds only:
@@ -128,6 +134,9 @@ pickle-only; `state_to_json` refuses them until they have been stepped.
 - `parity/roundtrip.mjs`: the same gate for the JS port.
 - `parity/gen_vectors.py` restores through JSON at the burn-in step of every
   parity scenario.
+- `parity/check_torch_resume.py` and `tests/test_torch_resume.py`: torch
+  resumes every Python checkpoint of `parity/resume_vectors.json`, and Python
+  resumes torch's, to 1e-6; the torch state has exactly Python's layout.
 
 Within a port a resume is bit-exact. Across ports it is as exact as the
 ports' arithmetic: the parity suite holds them to 1e-6, and a resumed

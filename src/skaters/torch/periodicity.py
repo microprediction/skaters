@@ -35,7 +35,7 @@ def period_detector(lags=None, alpha: float = 0.01, min_observations: int = 50):
                 "n": 0,
                 "mean": _zero(),
                 "var": _zero(),
-                "cross": {L: _zero() for L in lags},
+                "cross": {str(L): _zero() for L in lags},   # keyed by the lag string, as in the reference
             }
         buf = state["buffer"]
         buf.append(y)
@@ -51,7 +51,7 @@ def period_detector(lags=None, alpha: float = 0.01, min_observations: int = 50):
             if len(buf) > L:
                 y_lagged = buf[-(L + 1)]
                 cross = (y - mu) * (y_lagged - mu)
-                state["cross"][L] = (1 - alpha) * state["cross"][L] + alpha * cross
+                state["cross"][str(L)] = (1 - alpha) * state["cross"][str(L)] + alpha * cross
 
         if len(buf) > max_lag + 1:
             buf.pop(0)
@@ -62,7 +62,7 @@ def period_detector(lags=None, alpha: float = 0.01, min_observations: int = 50):
         scores = []
         for L in lags:
             if state["n"] > L:
-                acf = state["cross"][L] / var if bool(var > 0) else _zero()
+                acf = state["cross"][str(L)] / var if bool(var > 0) else _zero()
                 scores.append((L, acf))
         scores.sort(key=lambda x: abs(float(x[1].detach())), reverse=True)
         return scores, state
