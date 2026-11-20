@@ -30,64 +30,28 @@ fn digest_push(v: f64) {
     );
 }
 
-use skaters::api::{conjugate_f, flesaker, laplace, Forecaster};
+mod common;
+
+use common::{build_scenario, parse_val, probes, same_bits};
+use skaters::api::Forecaster;
 use skaters::cov::{EmaCov, LedoitWolfCov, RunningCov};
 use skaters::periodicity::PeriodDetector;
-use skaters::search::search;
 use skaters::spec;
-use skaters::leaf::{CrpsLeaf, GarchLeaf, Leaf, ScaleMixLeaf};
-use skaters::skater::{
-    bayesian_ensemble, conjugate, ema, multiscale, precision_weighted_ensemble, sticky, Sk,
-};
-use skaters::tails::gpdtails;
-use skaters::transform::{
-    ar, ar_default, difference, drift, ema_transform, fractional_difference, garch_default,
-    gaussianize, gaussianize_default, grouped_ar, holt_linear, log_transform, ou_transform,
-    power_transform, power_transform_exact, seasonal_anchor, seasonal_difference, seasonal_scale,
-    standardize, theta, yeo_johnson, yeo_johnson_exact,
-};
+use skaters::state::State;
 
 const ATOL: f64 = 1e-6;
 const RTOL: f64 = 1e-6;
-const PROBE: f64 = 0.3;
-const Q_LO: f64 = 0.1;
-const Q_HI: f64 = 0.9;
-
-fn leaf(k: usize) -> Sk {
-    Sk::Leaf(Leaf::new(k))
-}
-
-fn parse_val(v: &Value) -> f64 {
-    match v {
-        Value::Number(n) => n.as_f64().unwrap(),
-        Value::String(s) => match s.as_str() {
-            "inf" => f64::INFINITY,
-            "-inf" => f64::NEG_INFINITY,
-            "nan" => f64::NAN,
-            _ => panic!("bad sentinel {s}"),
-        },
-        _ => panic!("bad probe value {v:?}"),
-    }
-}
 
 /// Compare a computed flat vector against an expected JSON array, folding
 /// every computed value into the digest.
-fn check_vec(
-    label: &str,
-    got: &[f64],
-    exp: &Value,
-    checked: &mut u64,
-    failures: &mut Vec<String>,
-) {
+fn check_vec(label: &str, got: &[f64], exp: &Value, checked: &mut u64, failures: &mut Vec<String>) {
     let exp: Vec<f64> = exp.as_array().unwrap().iter().map(parse_val).collect();
     assert_eq!(exp.len(), got.len(), "{label}: length mismatch");
     for (p, (&g, &e)) in got.iter().zip(exp.iter()).enumerate() {
         digest_push(g);
         *checked += 1;
         if !close(g, e) && failures.len() < 20 {
-            failures.push(format!(
-                "{label}[{p}]: got {g:.12e} expected {e:.12e}"
-            ));
+            failures.push(format!("{label}[{p}]: got {g:.12e} expected {e:.12e}"));
         }
     }
 }
@@ -102,149 +66,17 @@ fn close(a: f64, b: f64) -> bool {
     (a - b).abs() <= ATOL + RTOL * b.abs()
 }
 
-/// The fast-warm-up GPD splice the gpd_tails scenario uses, at horizon k.
-fn spliced(k: usize) -> Forecaster {
-    Forecaster::Gpd(Box::new(gpdtails(
-        conjugate(leaf(k), ema_transform(0.1), k),
-        k,
-        0.9,
-        50,
-        100,
-    )))
-}
-
-fn build(name: &str, k: usize) -> Forecaster {
-    let f = |sk: Sk| Forecaster::Sk(sk);
-    match name {
-        "leaf" => f(leaf(k)),
-        "diff" => f(conjugate(leaf(k), difference(), k)),
-        "ema_t" => f(conjugate(leaf(k), ema_transform(0.1), k)),
-        "standardize" => f(conjugate(leaf(k), standardize(0.05, 1e-8), k)),
-        "theta" => f(conjugate(leaf(k), theta(0.1), k)),
-        "drift" => f(conjugate(leaf(k), drift(0.05, 0.01), k)),
-        "holt" => f(conjugate(leaf(k), holt_linear(0.1, 0.05), k)),
-        "garch" => f(conjugate(leaf(k), garch_default(), k)),
-        "seasonal" => f(conjugate(leaf(k), seasonal_difference(7), k)),
-        "power" => f(conjugate(leaf(k), power_transform(0.5), k)),
-        "ar1" => f(conjugate(leaf(k), ar_default(1), k)),
-        "ar2" => f(conjugate(leaf(k), ar(2, 0.99, 1.0, 1.0), k)),
-        "frac" => f(conjugate(leaf(k), fractional_difference(0.4, 30), k)),
-        "grouped_ar" => f(conjugate(leaf(k), grouped_ar(8, 0.99, 1.0), k)),
-        "yeojohnson_log" => f(conjugate(leaf(k), yeo_johnson(0.0), k)),
-        "yeojohnson_half" => f(conjugate(leaf(k), yeo_johnson(0.5), k)),
-        "ou" => f(conjugate(leaf(k), ou_transform(0.1, 0.02), k)),
-        "ou_sqrt" => f(conjugate(
-            conjugate(leaf(k), ou_transform(0.1, 0.02), k),
-            yeo_johnson(0.5),
-            k,
-        )),
-        "seasonal_scale" => f(conjugate(leaf(k), seasonal_scale(7, 0.05, false, 1e-8), k)),
-        "seasonal_scale_c" => f(conjugate(leaf(k), seasonal_scale(7, 0.1, true, 1e-8), k)),
-        "power_exact" => conjugate_f(f(leaf(k)), power_transform_exact(0.5, true), k),
-        "yeojohnson_exact" => conjugate_f(f(leaf(k)), yeo_johnson_exact(0.5, true), k),
-        "log_lower" => conjugate_f(f(leaf(k)), log_transform(Some(-15.0), None), k),
-        "log_upper" => conjugate_f(f(leaf(k)), log_transform(None, Some(15.0)), k),
-        "gaussianize" => f(conjugate(leaf(k), gaussianize_default(), k)),
-        "gaussianize_smooth" => f(conjugate(
-            leaf(k),
-            gaussianize(39, 30, 9, true, 20.0, 8.0, "move"),
-            k,
-        )),
-        "gaussianize_delete" => f(conjugate(
-            leaf(k),
-            gaussianize(15, 30, 9, false, 1.5, 8.0, "delete"),
-            k,
-        )),
-        "gaussianize_emin" => f(conjugate(
-            leaf(k),
-            gaussianize(15, 30, 9, false, 1.5, 8.0, "emin"),
-            k,
-        )),
-        "spliced_power" => conjugate_f(spliced(k), power_transform(0.5), k),
-        "spliced_yeojohnson" => conjugate_f(spliced(k), yeo_johnson(0.5), k),
-        "spliced_gaussianize" => conjugate_f(spliced(k), gaussianize_default(), k),
-        "spliced_log" => conjugate_f(spliced(k), log_transform(Some(-15.0), None), k),
-        "spliced_ema_t" => conjugate_f(spliced(k), ema_transform(0.1), k),
-        "spliced_seasonal" => conjugate_f(spliced(k), seasonal_difference(2), k),
-        "spliced_anchor" => conjugate_f(spliced(k), seasonal_anchor(2, 0.2, 0.5), k),
-        "spliced_sscale" => conjugate_f(spliced(k), seasonal_scale(7, 0.05, false, 1e-8), k),
-        "pf_affine_yj" => conjugate_f(
-            conjugate_f(f(leaf(k)), yeo_johnson_exact(0.0, true), k),
-            standardize(0.05, 1e-8),
-            k,
-        ),
-        "pf_affine_log" => conjugate_f(
-            conjugate_f(f(leaf(k)), log_transform(None, Some(200.0)), k),
-            seasonal_scale(7, 0.1, true, 1e-8),
-            k,
-        ),
-        "pol_flesaker" => flesaker(1, Some(-15.0), None),
-        "ema_skater" => f(ema(0.05, k)),
-        "pw_ensemble" => f(precision_weighted_ensemble(
-            vec![ema(0.05, k), ema(0.2, k)],
-            k,
-        )),
-        "multiscale" => f(multiscale(
-            |kk| conjugate(leaf(kk), ema_transform(0.1), kk),
-            k,
-            None,
-        )),
-        "bayes_ensemble" => f(bayesian_ensemble(
-            vec![ema(0.05, k), conjugate(leaf(k), difference(), k)],
-            k,
-            0.5,
-            0.02,
-            vec![1.0, 1.0],
-        )),
-        "pol_laplace" => laplace(k),
-        "gpd_tails" => Forecaster::Gpd(Box::new(gpdtails(
-            conjugate(leaf(1), ema_transform(0.1), 1),
-            1,
-            0.9,
-            50,
-            100,
-        ))),
-        "scale_mixture_leaf" => f(Sk::ScaleMix(ScaleMixLeaf::new(1, 0.02, 0.01))),
-        "crps_leaf" => f(Sk::Crps(CrpsLeaf::new(1, 1.0, 0.01))),
-        "garch_leaf" => f(Sk::GarchLeaf(GarchLeaf::new(1))),
-        "scalemix_ema" => f(conjugate(
-            Sk::ScaleMix(ScaleMixLeaf::new(1, 0.02, 0.01)),
-            ema_transform(0.1),
-            1,
-        )),
-        "sticky_ema" => f(sticky(conjugate(leaf(1), ema_transform(0.1), 1), 1)),
-        "spec_diff_ensemble" => f(spec::build(&spec::conjugate_spec(
-            spec::ensemble_spec(vec![spec::ema_spec(0.01, 1), spec::ema_spec(0.1, 1)], 1),
-            spec::diff_spec(),
-        ))),
-        "spec_ema" => f(spec::build(&spec::ema_spec(0.05, 1))),
-        "search_default" => {
-            // Python: adaptive_search(k=1, expand_interval=50)
-            let mut s = search(1);
-            s.expand_interval = 50;
-            f(Sk::Search(Box::new(s)))
-        }
-        _ => panic!("unknown scenario {name}"),
-    }
-}
-
-fn scenario_name(full: &str) -> Option<(&str, usize)> {
-    // returns (base_name, k) for names we implement.
-    if full == "pol_laplace" {
-        return Some(("pol_laplace", 1));
-    }
-    if full == "pol_laplace_k3" {
-        return Some(("pol_laplace", 3));
-    }
-    if let Some(base) = full.strip_suffix("_k3") {
-        return Some((base, 3));
-    }
-    Some((full, 1))
-}
-
+/// Run a scenario over the series and compare the seven probes. At the
+/// burn-in step the state is checkpointed in the canonical JSON layout
+/// (docs/STATE.md), written to a string, and loaded into a freshly built
+/// twin, which then steps beside the original for the rest of the series:
+/// every probe of the twin must equal the original's bit for bit, and so must
+/// the final states. This is the restore leg gen_vectors.py runs in Python.
+#[allow(clippy::too_many_arguments)]
 fn run_scenario(
     name: &str,
     mut skater: Forecaster,
+    fresh: &dyn Fn() -> Forecaster,
     series: &[f64],
     burn: usize,
     expected: &Value,
@@ -253,8 +85,29 @@ fn run_scenario(
 ) {
     let out = expected.as_array().unwrap();
     let mut oi = 0usize;
+    let mut twin: Option<Forecaster> = None;
     for (i, &y) in series.iter().enumerate() {
         let dists = skater.step(y);
+        if let Some(t) = twin.as_mut() {
+            let td = t.step(y);
+            assert_eq!(td.len(), dists.len(), "{name}: restored twin horizon count");
+            for (a, b) in dists.iter().zip(td.iter()) {
+                let (pa, pb) = (probes(a), probes(b));
+                if !pa.iter().zip(pb.iter()).all(|(x, y)| same_bits(*x, *y)) && failures.len() < 20
+                {
+                    failures.push(format!(
+                        "{name} step {i}: the JSON-restored twin differs: {pa:?} vs {pb:?}"
+                    ));
+                }
+            }
+        }
+        if i + 1 == burn {
+            let text = serde_json::to_string(&skater.state_to_json()).unwrap();
+            let mut t = fresh();
+            t.load_state(&serde_json::from_str(&text).unwrap())
+                .unwrap_or_else(|e| panic!("{name}: canonical restore failed: {e}"));
+            twin = Some(t);
+        }
         if i < burn {
             continue;
         }
@@ -265,15 +118,7 @@ fn run_scenario(
             "{name}: horizon count mismatch at step {i}"
         );
         for (h, d) in dists.iter().enumerate() {
-            let got = [
-                d.mean(),
-                d.std(),
-                d.logpdf(PROBE),
-                d.cdf(PROBE),
-                d.quantile(Q_LO),
-                d.quantile(Q_HI),
-                d.crps(PROBE),
-            ];
+            let got = probes(d);
             for v in got.iter() {
                 digest_push(*v);
             }
@@ -283,8 +128,7 @@ fn run_scenario(
                 .iter()
                 .map(parse_val)
                 .collect();
-            const LABELS: [&str; 7] =
-                ["mean", "std", "logpdf", "cdf", "q_lo", "q_hi", "crps"];
+            const LABELS: [&str; 7] = ["mean", "std", "logpdf", "cdf", "q_lo", "q_hi", "crps"];
             for p in 0..7 {
                 *checked += 1;
                 if !close(got[p], exp[p]) && failures.len() < 20 {
@@ -298,6 +142,45 @@ fn run_scenario(
         oi += 1;
     }
     assert_eq!(oi, out.len(), "{name}: scored-step count mismatch");
+    if let Some(t) = twin {
+        if skater.state_to_json() != t.state_to_json() && failures.len() < 20 {
+            failures.push(format!(
+                "{name}: the JSON-restored twin's final state differs"
+            ));
+        }
+    }
+}
+
+/// Run every scenario of a block (name -> {k, out}) on a series.
+fn run_block(
+    label: &str,
+    block: &serde_json::Map<String, Value>,
+    series: &[f64],
+    burn: usize,
+    checked: &mut u64,
+    failures: &mut Vec<String>,
+) -> usize {
+    for (full, sc) in block {
+        let (skater, k) = build_scenario(full);
+        assert_eq!(sc["k"].as_u64().unwrap() as usize, k, "{full}: k mismatch");
+        let name = if label.is_empty() {
+            full.clone()
+        } else {
+            format!("{label}:{full}")
+        };
+        let f = full.clone();
+        run_scenario(
+            &name,
+            skater,
+            &move || build_scenario(&f).0,
+            series,
+            burn,
+            &sc["out"],
+            checked,
+            failures,
+        );
+    }
+    block.len()
 }
 
 #[test]
@@ -348,41 +231,22 @@ fn parity_vectors() {
     let mut failures: Vec<String> = Vec::new();
     let mut n_scenarios = 0;
 
-    let scenarios = v["scenarios"].as_object().unwrap();
-    for (full, sc) in scenarios {
-        let Some((base, k)) = scenario_name(full) else {
-            continue;
-        };
-        assert_eq!(sc["k"].as_u64().unwrap() as usize, k, "{full}: k mismatch");
-        let skater = build(base, k);
-        run_scenario(
-            full,
-            skater,
-            &series,
-            burn,
-            &sc["out"],
-            &mut checked,
-            &mut failures,
-        );
-        n_scenarios += 1;
-    }
-
-    let rep = v["repeat_scenarios"].as_object().unwrap();
-    for (full, sc) in rep {
-        let k = sc["k"].as_u64().unwrap() as usize;
-        let skater = build(full, k);
-        run_scenario(
-            full,
-            skater,
-            &repeat_series,
-            burn,
-            &sc["out"],
-            &mut checked,
-            &mut failures,
-        );
-        n_scenarios += 1;
-    }
-
+    n_scenarios += run_block(
+        "",
+        v["scenarios"].as_object().unwrap(),
+        &series,
+        burn,
+        &mut checked,
+        &mut failures,
+    );
+    n_scenarios += run_block(
+        "",
+        v["repeat_scenarios"].as_object().unwrap(),
+        &repeat_series,
+        burn,
+        &mut checked,
+        &mut failures,
+    );
     // Missing observations: the parade's non-finite tick rule (skip the update,
     // age the fan). The series carries the same "nan" sentinel the outputs use,
     // since JSON has no NaN literal.
@@ -393,20 +257,38 @@ fn parity_vectors() {
             .iter()
             .map(parse_val)
             .collect();
-        for (full, sc) in gap {
-            let k = sc["k"].as_u64().unwrap() as usize;
-            let (base, kk) = scenario_name(full).unwrap_or((full.as_str(), k));
-            run_scenario(
-                &format!("gap:{full}"),
-                build(base, kk),
-                &gap_series,
-                burn,
-                &sc["out"],
-                &mut checked,
-                &mut failures,
-            );
-            n_scenarios += 1;
+        n_scenarios += run_block("gap", gap, &gap_series, burn, &mut checked, &mut failures);
+    }
+    // The second-wave surface (homogenize, residual_transform, the adaptive
+    // temperature, dantzig) and the wrapper block of the JS state branch.
+    for blk in ["wave2_scenarios", "wrapper_scenarios"] {
+        if let Some(b) = v[blk].as_object() {
+            n_scenarios += run_block(blk, b, &series, burn, &mut checked, &mut failures);
         }
+    }
+    // Spec JSON: from_json then to_json must give back the string exactly, and
+    // the canonical name must match Python's.
+    if let Some(specs) = v["spec_json"].as_array() {
+        for ex in specs {
+            let text = ex["json"].as_str().unwrap();
+            let want = ex["name"].as_str().unwrap();
+            let sp = spec::from_json(text).unwrap_or_else(|e| panic!("spec {text}: {e}"));
+            checked += 2;
+            if spec::to_json(&sp) != text {
+                failures.push(format!(
+                    "spec_json: {text} wrote back as {}",
+                    spec::to_json(&sp)
+                ));
+            }
+            if spec::name(&sp) != want {
+                failures.push(format!(
+                    "spec_json: {text} named {} want {want}",
+                    spec::name(&sp)
+                ));
+            }
+            let _ = spec::build(&sp);
+        }
+        n_scenarios += specs.len();
     }
 
     // Covariance estimators on the fixed multivariate series (cov block).
@@ -539,7 +421,10 @@ fn parity_vectors() {
     println!("parity: {n_scenarios} scenarios, {checked} values checked");
     // Bit digest: FNV-1a over the bit patterns of every computed probe.
     // Identical across platforms iff the portable-math claim holds.
-    println!("PARITY_DIGEST={:016x}", DIGEST.load(std::sync::atomic::Ordering::Relaxed));
+    println!(
+        "PARITY_DIGEST={:016x}",
+        DIGEST.load(std::sync::atomic::Ordering::Relaxed)
+    );
     if !failures.is_empty() {
         panic!(
             "parity failures ({} shown):\n{}",

@@ -1146,7 +1146,7 @@ pub fn ar_default(order: usize) -> Transform {
 }
 
 impl Ar {
-    fn init_p(&self) -> Vec<f64> {
+    pub(crate) fn init_p(&self) -> Vec<f64> {
         let p = self.p;
         let mut pm = vec![0.0; p * p];
         for j in 0..p {

@@ -2,9 +2,31 @@
 
 Rust port of the [skaters](https://github.com/microprediction/skaters) online
 distributional forecasting core. Every forecaster is a struct with
-`step(&mut self, y: f64) -> Vec<Dist>`, and all state is plain
-serde-serializable data. That is a product contract: a skater can be
-checkpointed to JSON and restored.
+`step(&mut self, y: f64) -> Vec<Dist>`, and all state is plain data. That is
+a product contract: a skater can be checkpointed to JSON and restored, here or
+in another port.
+
+## State
+
+`State::state_to_json` writes a skater's state in the canonical layout of
+[docs/STATE.md](../docs/STATE.md), exactly as Python's `state_to_json` writes
+it, and `State::load_state` reads it into a skater built from the same
+factory. A Python state of `None` (before the first observation) is `null`
+here, and a fresh Rust skater writes `null`. So a checkpoint moves between
+Python and Rust in both directions:
+
+```rust
+use skaters::{laplace, State};
+
+let mut f = laplace(1);
+for y in history { f.step(y); }
+let text = serde_json::to_string(&f.state_to_json()).unwrap();   // Python reads this
+let mut g = laplace(1);
+g.load_state(&serde_json::from_str(&text).unwrap()).unwrap();      // or a Python checkpoint
+```
+
+The serde derives remain as Rust's native format (configuration plus state),
+which older skaters-fast checkpoints use; they still load.
 
 ## Parity discipline
 
@@ -16,14 +38,25 @@ compares seven probes per step and horizon (mean, std, logpdf at 0.3, cdf at
 
 ```
 cargo test --release
-# parity: 59 scenarios, 105658 values checked
+# parity: 120 scenarios, 209552 values checked
 ```
+
+At the burn-in step of every scenario the gate writes the canonical state to
+JSON text, loads it into a freshly built twin, and requires the twin to match
+the original bit for bit for the rest of the series. `tests/resume.rs` runs
+the cross-language resume on `parity/resume_vectors.json`
+(`parity/gen_resume.py`): every scenario resumes Python's checkpoints at
+t = 60, 250 and 530 and matches the next 20 steps to 1e-6, and writes its own
+checkpoints to `parity/resume_rust.json` for `parity/check_resume.py`.
+`tests/test_rust_resume.py` runs both directions, granger included.
 
 Coverage is the full library: every transform and leaf at k=1 and k=3, the
 ensembles (precision-weighted, bayesian, terminal-leaf), multiscale, sticky
 (on the repeat-heavy series), the GPD tail splice, the full `laplace`
 composition (`pol_laplace`, `pol_laplace_k3`), the adaptive search
-(`search_default`), the spec build path (`spec_diff_ensemble`, `spec_ema`),
+(`search_default`, `dantzig`), the wave-2 wrappers (`homogenize` in every
+couple mode, `residual_transform` m0/m1/m2, the terminal ensemble's adaptive
+temperature), the spec build path and spec JSON strings,
 the periodicity detector (ranked lag/acf block), and the covariance
 estimators (running, EMA, Ledoit-Wolf blocks). Nothing is skipped.
 

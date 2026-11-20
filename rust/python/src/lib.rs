@@ -8,18 +8,34 @@
 //!   - Cross-backend agreement is 1e-6. The same series through pure Python
 //!     and through skaters-fast yields distributional probes that agree to
 //!     that tolerance (the same contract the Rust core is parity-gated on).
-//!   - Within-backend resume is bit-exact. `state_json()` round-trips through
-//!     `from_state_json()` with no drift, because the core serializes floats
-//!     with serde_json's `float_roundtrip`.
-//!   - Do not switch backends mid-stream. Pick one backend for the life of a
-//!     stream; a resumed state must go back into the same backend that wrote
-//!     it.
+//!   - `state_json()` writes the canonical plain-JSON state layout of
+//!     docs/STATE.md, the one pure Python's `state_to_json` writes, so a
+//!     checkpoint resumes in either backend: `json.loads(f.state_json())` is a
+//!     Python state for `laplace(k)`, and a Python state passed through
+//!     `json.dumps(state_to_json(state))` resumes here.
+//!   - Within-backend resume is bit-exact (floats use serde_json's
+//!     `float_roundtrip`). Across backends a resume is as exact as the
+//!     backends' arithmetic, the same 1e-6 contract.
+//!   - `from_state_json` also reads the older native serde layout that
+//!     earlier skaters-fast releases wrote.
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use skaters::api::{laplace as core_laplace, Forecaster};
 use skaters::granger::{Granger as CoreGranger, GrangerParams, Mixture};
+use skaters::state::State;
 use skaters::tails::PDist;
+
+/// Variant tags of the core `Forecaster` in the native serde layout that
+/// earlier releases wrote: a one-key object such as `{"Parade": {...}}`.
+const NATIVE_TAGS: [&str; 6] = ["Sk", "Gpd", "Parade", "Conj", "Homog", "Residual"];
+
+fn is_native_layout(v: &serde_json::Value) -> bool {
+    match v.as_object() {
+        Some(m) => m.len() == 1 && m.keys().all(|k| NATIVE_TAGS.contains(&k.as_str())),
+        None => false,
+    }
+}
 
 /// A single-horizon distributional prediction handle.
 ///
@@ -128,22 +144,35 @@ impl Laplace {
         self.parade_state().1
     }
 
-    /// Serialize the full forecaster state to JSON. Round-trips bit-exactly
-    /// through `from_state_json` (floats use serde_json float_roundtrip).
+    /// The forecaster state as JSON text in the canonical layout
+    /// (docs/STATE.md), the same layout pure Python's `state_to_json` writes.
+    /// `null` before the first observation. Round-trips bit-exactly through
+    /// `from_state_json`.
     fn state_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
+        serde_json::to_string(&self.inner.state_to_json())
             .map_err(|e| PyValueError::new_err(format!("serialize failed: {e}")))
     }
 
-    /// Rebuild a forecaster from a `state_json` string. `k` must match the
-    /// horizon the state was written with.
+    /// Rebuild a forecaster from a state: canonical JSON text (from
+    /// `state_json`, or from pure Python's `json.dumps(state_to_json(state))`
+    /// for `laplace(k)`), or the native layout earlier releases wrote. `k`
+    /// must match the horizon the state was written with.
     #[staticmethod]
     fn from_state_json(s: &str, k: usize) -> PyResult<Self> {
         if k == 0 {
             return Err(PyValueError::new_err("k must be >= 1"));
         }
-        let inner: Forecaster = serde_json::from_str(s)
-            .map_err(|e| PyValueError::new_err(format!("deserialize failed: {e}")))?;
+        let v: serde_json::Value = serde_json::from_str(s)
+            .map_err(|e| PyValueError::new_err(format!("bad state JSON: {e}")))?;
+        if is_native_layout(&v) {
+            let inner: Forecaster = serde_json::from_value(v)
+                .map_err(|e| PyValueError::new_err(format!("deserialize failed: {e}")))?;
+            return Ok(Laplace { inner, k });
+        }
+        let mut inner = core_laplace(k);
+        inner
+            .load_state(&v)
+            .map_err(|e| PyValueError::new_err(format!("bad laplace state: {e}")))?;
         Ok(Laplace { inner, k })
     }
 
@@ -243,6 +272,28 @@ impl Granger {
         self.inner.z
     }
 
+    /// The state as JSON text in the canonical layout (docs/STATE.md, the
+    /// `granger` row), as pure Python's `state_to_json` writes it.
+    fn state_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner.state_to_json())
+            .map_err(|e| PyValueError::new_err(format!("serialize failed: {e}")))
+    }
+
+    /// Rebuild a granger from canonical state JSON (from `state_json`, or from
+    /// pure Python's `json.dumps(state_to_json(state))`), with the same
+    /// parameters it was written with.
+    #[staticmethod]
+    #[pyo3(signature = (s, frequency="monthly", params_json=None))]
+    fn from_state_json(s: &str, frequency: &str, params_json: Option<&str>) -> PyResult<Self> {
+        let mut g = Granger::new(frequency, params_json)?;
+        let v: serde_json::Value = serde_json::from_str(s)
+            .map_err(|e| PyValueError::new_err(format!("bad state JSON: {e}")))?;
+        g.inner
+            .load_state(&v)
+            .map_err(|e| PyValueError::new_err(format!("bad granger state: {e}")))?;
+        Ok(g)
+    }
+
     fn __repr__(&self) -> String {
         format!("Granger(frequency={:?})", self.frequency)
     }
@@ -262,10 +313,9 @@ fn skaters_fast(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "skaters_fast: opt-in accelerated backend for skaters.\n\n\
          The pure Python package remains the reference implementation. This \
          module is a PyO3 skin over the parity-gated Rust core.\n\n\
-         Cross-backend agreement is 1e-6; within-backend resume via \
-         state_json/from_state_json is bit-exact. Do not switch backends \
-         mid-stream: pick one backend for the life of a stream and resume a \
-         saved state into the same backend that wrote it.",
+         Cross-backend agreement is 1e-6. state_json writes the canonical \
+         state layout pure Python writes (docs/STATE.md), so a checkpoint \
+         resumes in either backend; within a backend the resume is bit-exact.",
     )?;
     m.add_function(wrap_pyfunction!(laplace, m)?)?;
     m.add_class::<Laplace>()?;
