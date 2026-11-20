@@ -172,6 +172,11 @@ class TorchSplicedDist:
         else:
             u = self._plo + (p - self.zeta_lo) / self._c
             z = ref._phi_inv(min(max(u, _EPS), 1.0 - _EPS))
+        t = max(ref._phi(-abs(z)), _EPS)    # deep tail: the reference's erfc solve
+        if t < ref._TAIL_U:
+            with torch.no_grad():
+                q = ref._body_tail_quantile(self.body.to_reference(), t, z > 0.0, tol, max_iter)
+            return torch.as_tensor(q, dtype=DTYPE)
         ub = min(max(ref._phi(z), _EPS), 1.0 - _EPS)
         return self.body.quantile(ub, tol=tol, max_iter=max_iter)
 

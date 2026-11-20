@@ -1,21 +1,16 @@
 // Transforms that read mixture components, fed laplace's tail-spliced
 // predictive, mirroring tests/test_spliced_nonaffine.py. The nonlinear
-// inverses (powerTransform, yeoJohnson) emit the exact pushforward of the
-// spliced law; the k>1 widening of emaTransform, seasonalDifference and
-// seasonalAnchor widens the body and lets the splice follow it. gaussianize
-// is not ported to JS.
+// inverses (powerTransform, yeoJohnson, gaussianize) emit the exact pushforward
+// of the spliced law; the k>1 widening of emaTransform, seasonalDifference and
+// seasonalAnchor widens the body and lets the splice follow it.
 //
 // Optional argument: a JSON file written by tests/test_js_parity.py holding a
 // Python SplicedDist (to_dict) and the Python outputs of the same transforms,
-// which this script then matches to the port's 1e-6 contract. Quantiles agree
-// to about 1e-12. Table-based queries (cdf, logpdf, crps) agree to about 1e-8:
-// the table window comes from the 1e-6 quantiles, which clamp to a body
-// quantile at 1e-12 where the JS erf and Python's differ by a few 1e-6 in x,
-// and the knots move with it.
+// which this script then matches to 1e-9 (in practice about 1e-14).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { conjugate, laplace } from "../docs/js/skaters/index.mjs";
-import { emaTransform, powerTransform, seasonalAnchor, seasonalDifference, yeoJohnson } from "../docs/js/skaters/transform.mjs";
+import { emaTransform, gaussianize, powerTransform, seasonalAnchor, seasonalDifference, yeoJohnson } from "../docs/js/skaters/transform.mjs";
 import { SplicedDist } from "../docs/js/skaters/tails.mjs";
 import { PushforwardDist } from "../docs/js/skaters/pushforward.mjs";
 
@@ -81,6 +76,7 @@ for (const [name, make, inv] of [["powerTransform", () => powerTransform(0.5), s
 // conjugated laplace runs once the splice is live
 for (const [name, make, k] of [["powerTransform", () => powerTransform(0.5), 1],
   ["yeoJohnson", () => yeoJohnson(0.5), 1],
+  ["gaussianize", () => gaussianize(), 1],
   ["emaTransform", () => emaTransform(0.05), 3],
   ["seasonalDifference", () => seasonalDifference(2), 3],
   ["seasonalAnchor", () => seasonalAnchor(2), 3]]) {
@@ -102,7 +98,7 @@ if (process.argv[2]) {
   const cmp = (got, want, what) => {
     const err = Math.abs(got - want) / Math.max(1.0, Math.abs(want));
     worst = Math.max(worst, err);
-    assert.ok(err <= 1e-6, `${what}: js ${got} py ${want}`);
+    assert.ok(err <= 1e-9, `${what}: js ${got} py ${want}`);
   };
   for (const [key, want] of Object.entries(ref.pushforward)) {
     const e = makers[key]().inverseK([sd], {})[0];

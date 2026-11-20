@@ -13,7 +13,7 @@ import { gpdtails } from "./tails.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, drift,
   holtLinear, ar, theta, seasonalDifference, seasonalAnchor, garch, powerTransform,
-  yeoJohnson,
+  yeoJohnson, logTransform,
 } from "./transform.mjs";
 
 // ---------------------------------------------------------------------------
@@ -181,4 +181,24 @@ export function laplace(k = 1, objective = "crps", sticky = true, scales = null,
   f = parade(f, k);
   f.skaterName = `laplace(k=${k})`;
   return f;
+}
+
+// laplace for a series that never crosses a known bound. Experimental (an
+// example composition, as in api.flesaker). Forecasts log(y - lower) with
+// laplace and maps the predictive back by the exact change of variables.
+// The default bound is lower = 0; pass upper for a one-sided ceiling. The
+// returned state is laplace's own. laplaceArgs are laplace's positional
+// arguments after k: [objective, sticky, scales, scaleAlpha, tails].
+export function flesaker(k = 1, lower = null, upper = null, ...laplaceArgs) {
+  const { forward, inverseK } = logTransform(lower, upper);
+  const inner = laplace(k, ...laplaceArgs);
+  function skater(y, state) {
+    const [yp] = forward(y, null);
+    const [dists, st] = inner(yp, state);
+    return [inverseK(dists, {}), st];
+  }
+  const bound = upper !== null && upper !== undefined
+    ? `upper=${upper}` : `lower=${lower === null || lower === undefined ? 0.0 : lower}`;
+  skater.skaterName = `flesaker(k=${k}, ${bound})`;
+  return skater;
 }

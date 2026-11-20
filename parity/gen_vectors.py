@@ -26,7 +26,7 @@ from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, ou_transform, theta,
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
-    grouped_ar, yeo_johnson,
+    grouped_ar, yeo_johnson, seasonal_scale, log_transform, gaussianize,
 )
 from skaters.api import laplace
 from skaters.multiscale import multiscale
@@ -77,6 +77,21 @@ def build_scenarios():
         s.append((f"ou{suf}", k, conjugate(leaf(k=k), ou_transform(0.1), k=k)))
         s.append((f"ou_sqrt{suf}", k,
                   conjugate(conjugate(leaf(k=k), ou_transform(0.1), k=k), yeo_johnson(0.5), k=k)))
+        s.append((f"seasonal_scale{suf}", k, conjugate(leaf(k=k), seasonal_scale(7), k=k)))
+        s.append((f"seasonal_scale_c{suf}", k,
+                  conjugate(leaf(k=k), seasonal_scale(7, 0.1, center=True), k=k)))
+        s.append((f"power_exact{suf}", k, conjugate(leaf(k=k), power_transform(0.5, exact=True), k=k)))
+        s.append((f"yeojohnson_exact{suf}", k,
+                  conjugate(leaf(k=k), yeo_johnson(0.5, exact=True), k=k)))
+        s.append((f"log_lower{suf}", k, conjugate(leaf(k=k), log_transform(lower=-15.0), k=k)))
+        s.append((f"log_upper{suf}", k, conjugate(leaf(k=k), log_transform(upper=15.0), k=k)))
+        s.append((f"gaussianize{suf}", k, conjugate(leaf(k=k), gaussianize(), k=k)))
+        s.append((f"gaussianize_smooth{suf}", k,
+                  conjugate(leaf(k=k), gaussianize(smooth=True), k=k)))
+        s.append((f"gaussianize_delete{suf}", k,
+                  conjugate(leaf(k=k), gaussianize(max_knots=15, guard="delete", slope_cap=1.5), k=k)))
+        s.append((f"gaussianize_emin{suf}", k,
+                  conjugate(leaf(k=k), gaussianize(max_knots=15, guard="emin", slope_cap=1.5), k=k)))
         s.append((f"ema_skater{suf}", k, ema(0.05, k=k)))
         s.append((f"pw_ensemble{suf}", k,
                   precision_weighted_ensemble([ema(0.05, k=k), ema(0.2, k=k)], k=k)))
@@ -90,6 +105,8 @@ def build_scenarios():
     s.append(("pol_laplace", 1, laplace(k=1)))
     # laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
     s.append(("pol_laplace_k3", 3, laplace(k=3)))
+    from skaters.api import flesaker
+    s.append(("pol_flesaker", 1, flesaker(k=1, lower=-15.0)))
 
     # Adaptive-search engine (still public via skaters.search)
     s.append(("search_default", 1, adaptive_search(k=1, expand_interval=50)))

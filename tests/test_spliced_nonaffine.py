@@ -81,3 +81,27 @@ def test_conjugated_laplace_runs(name, make, k):
     assert len(ds) == k
     for d in ds:
         _sane(d)
+
+
+def test_deep_tail_quantile_is_resolved():
+    """Below 1e-8 body tail mass the quantile is solved on erfc sums, so the
+    body mass beyond it matches the target to relative precision instead of
+    sitting on a 0.5 * (1 + erf) plateau."""
+    from skaters.tails import _EPS, _gpd_isf, _phi
+    d = _spliced()
+    hit = 0
+    for p in (1e-9, 1e-11, 1 - 1e-9, 1 - 1e-11):
+        x = d.quantile(p)
+        assert (x < d.quantile(0.5)) == (p < 0.5)
+        upper = p > 0.5
+        mass = sum(w * 0.5 * math.erfc((x - m) / (s * math.sqrt(2.0)) * (1 if upper else -1))
+                   for w, m, s in d.body.components)
+        if upper:
+            zt = d.t_up + _gpd_isf((1 - p) / d.zeta_up, d.g_up, d.s_up)
+        else:
+            zt = d.t_lo - _gpd_isf(p / d.zeta_lo, d.g_lo, d.s_lo)
+        t = max(_phi(-abs(zt)), _EPS)
+        if t < 1e-8:
+            hit += 1
+            assert mass == pytest.approx(t, rel=1e-6)
+    assert hit >= 2

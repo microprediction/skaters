@@ -11,7 +11,8 @@ export { ema } from "./ema.mjs";
 export { conjugate } from "./conjugate.mjs";
 export {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, theta, drift,
-  holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr,
+  holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
+  logTransform,
 } from "./transform.mjs";
 export { precisionWeightedEnsemble } from "./ensemble.mjs";
 export { bayesianEnsemble } from "./bayesian.mjs";
@@ -19,7 +20,7 @@ export { terminalLeafEnsemble } from "./terminal.mjs";
 export { search, TRANSFORMS } from "./search.mjs";
 export { periodDetector, topPeriods, DEFAULT_LAGS } from "./periodicity.mjs";
 export {
-  buildCandidates, laplace,
+  buildCandidates, laplace, flesaker,
 } from "./api.mjs";
 export { granger, loadGrangerParams, validateGrangerParams, MixtureDist } from "./granger.mjs";
 export { multiscale } from "./multiscale.mjs";
