@@ -26,7 +26,6 @@ immediately instead of wasting burn-in time.
 
 from __future__ import annotations
 import math
-from collections import deque
 from skaters.dist import Dist
 from skaters.leaf import leaf
 from skaters.conjugate import conjugate
@@ -103,25 +102,44 @@ def search(
 
     _pd_func = period_detector()
 
+    # Closures are configuration, not state. A pool skater is a pure function
+    # of its recipe, so it lives here, keyed by recipe, and is rebuilt on
+    # demand after a restore. Entries pruned from the pool drop out of the
+    # cache at the next expansion. State stays plain data (docs/STATE.md).
+    fn_cache: dict = {}
+
+    def _fn_for(entry: dict, state: dict):
+        key = "|".join(entry["recipe"])
+        f = fn_cache.get(key)
+        if f is None:
+            f = _build_from_recipe(entry["recipe"], k, _transforms_for(state))
+            f.__name__ = "|".join(entry["recipe"] + ["leaf"])
+            fn_cache[key] = f
+        return f
+
     def _search(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
             state = {
                 "pool": _init_pool(k, cost_budget=cost_budget),
                 "n_obs": 0,
-                "buffer": deque(maxlen=replay_buffer),
+                "buffer": [],
                 "pd_state": None,
-                "detected_periods": set(),
-                "transforms": list(TRANSFORMS),  # per-instance copy
+                "detected_periods": [],
             }
+        elif "transforms" in state:          # pre-canonical checkpoint
+            state = _migrate(state)
 
         state["n_obs"] += 1
-        state["buffer"].append(y)
+        buffer = state["buffer"]
+        buffer.append(y)
+        if len(buffer) > replay_buffer:
+            del buffer[0]
 
         pool = state["pool"]
 
         # 1. Run all active candidates
         for entry in pool:
-            dists, entry["s"] = entry["f"](y, entry["s"])
+            dists, entry["s"] = _fn_for(entry, state)(y, entry["s"])
             entry["dists"] = dists
             entry["age"] += 1
 
@@ -135,7 +153,7 @@ def search(
                 q = entry["queues"][h]
                 q.append(entry["dists"][h])
                 if len(q) > h + 1:
-                    past_dist = q.popleft()
+                    past_dist = q.pop(0)
                     if entry["warmed"]:
                         lp = past_dist.logpdf(y)
                         # Bounded loss: clamp both tails so neither -inf nor a
@@ -160,20 +178,19 @@ def search(
             detected = top_periods(scores, threshold=0.3, max_periods=3)
             for period in detected:
                 if period not in state["detected_periods"]:
-                    state["detected_periods"].add(period)
-                    t_name = f"seas({period})"
-                    state["transforms"].append(
-                        (t_name, lambda p=period: seasonal_difference(p), 2)
-                    )
+                    state["detected_periods"].append(period)
 
             new_children = _expand(pool, k, expand_top_n, max_depth,
-                                   transforms=state["transforms"],
+                                   transforms=_transforms_for(state),
                                    cost_budget=cost_budget)
             # Replay history through new children so they join warm
             for child in new_children:
-                _warmup(child, state["buffer"], k)
+                _warmup(child, _fn_for(child, state), state["buffer"], k)
             pool.extend(new_children)
             _prune(pool, prune_threshold, max_pool, k)
+            live = {"|".join(e["recipe"]) for e in pool}
+            for key in [key for key in fn_cache if key not in live]:
+                del fn_cache[key]
 
         # 5. Combine predictions via softmax weights
         combined = []
@@ -197,10 +214,10 @@ def search(
     return _search
 
 
-def _make_entry(skater_fn, depth: int, recipe: list[str], k: int, cost: float = 0.0) -> dict:
-    """Create a pool entry for a candidate."""
+def _make_entry(depth: int, recipe: list[str], k: int, cost: float = 0.0) -> dict:
+    """Create a pool entry for a candidate. It holds no closure: the skater
+    is rebuilt from ``recipe`` by the wrapper, so the entry is plain data."""
     return {
-        "f": skater_fn,
         "s": None,           # skater state
         "depth": depth,
         "recipe": recipe,    # list of transform names (for building children)
@@ -208,12 +225,40 @@ def _make_entry(skater_fn, depth: int, recipe: list[str], k: int, cost: float = 
         "age": 0,
         "warmed": False,     # becomes True after warmup/initial burn-in
         "log_w": [0.0] * k,
-        "queues": [deque() for _ in range(k)],
+        "queues": [[] for _ in range(k)],
         "dists": None,
     }
 
 
-def _warmup(entry: dict, buffer: deque, k: int):
+def _transforms_for(state: dict) -> list:
+    """The grammar in force: the fixed table plus one seasonal difference per
+    detected period, in detection order."""
+    out = list(TRANSFORMS)
+    for period in state["detected_periods"]:
+        out.append((f"seas({period})", lambda p=period: seasonal_difference(p), 2))
+    return out
+
+
+def _migrate(state: dict) -> dict:
+    """Bring a pre-canonical checkpoint to the plain layout: drop the pool
+    closures and the transform table (both rebuilt from recipes), keep the
+    detected periods in detection order, and turn deques into lists."""
+    out = {key: v for key, v in state.items() if key != "transforms"}
+    periods = []
+    for name, *_ in state["transforms"][len(TRANSFORMS):]:
+        periods.append(int(name[len("seas("):-1]))
+    out["detected_periods"] = periods
+    out["buffer"] = list(state["buffer"])
+    pool = []
+    for e in state["pool"]:
+        e = {key: v for key, v in e.items() if key != "f"}
+        e["queues"] = [list(q) for q in e["queues"]]
+        pool.append(e)
+    out["pool"] = pool
+    return out
+
+
+def _warmup(entry: dict, f, buffer: list, k: int):
     """Replay a history buffer through a candidate to warm up its state.
 
     Runs silently — no scoring, just state building. After warmup the
@@ -221,7 +266,7 @@ def _warmup(entry: dict, buffer: deque, k: int):
     is queued for scoring on the next real observation.
     """
     for y in buffer:
-        dists, entry["s"] = entry["f"](y, entry["s"])
+        dists, entry["s"] = f(y, entry["s"])
         entry["dists"] = dists
         entry["age"] += 1
 
@@ -239,18 +284,16 @@ def _init_pool(k: int, cost_budget: float = float("inf")) -> list[dict]:
     pool = []
 
     # Depth 0: just a leaf (cost = 1 for the leaf itself)
-    entry = _make_entry(leaf(k=k), depth=0, recipe=[], k=k, cost=1.0)
+    entry = _make_entry(depth=0, recipe=[], k=k, cost=1.0)
     entry["warmed"] = True
     pool.append(entry)
 
     # Depth 1: each single transform applied to leaf
-    for t_name, t_factory, t_cost in TRANSFORMS:
+    for t_name, _factory, t_cost in TRANSFORMS:
         candidate_cost = 1.0 + t_cost  # leaf + transform
         if candidate_cost > cost_budget:
             continue
-        f = conjugate(leaf(k=k), t_factory(), k=k)
-        f.__name__ = f"{t_name}|leaf"
-        entry = _make_entry(f, depth=1, recipe=[t_name], k=k, cost=candidate_cost)
+        entry = _make_entry(depth=1, recipe=[t_name], k=k, cost=candidate_cost)
         entry["warmed"] = True
         pool.append(entry)
 
@@ -291,10 +334,8 @@ def _expand(pool: list[dict], k: int, top_n: int, max_depth: int,
                 continue
             existing.add(tuple(new_recipe))
 
-            child_fn = _build_from_recipe(new_recipe, k, transforms)
-            child_fn.__name__ = "|".join(new_recipe) + "|leaf"
             child = _make_entry(
-                child_fn, depth=len(new_recipe), recipe=new_recipe, k=k,
+                depth=len(new_recipe), recipe=new_recipe, k=k,
                 cost=child_cost,
             )
             # Parent-relative initialization (skaters#223): a fresh log_w of

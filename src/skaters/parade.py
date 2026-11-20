@@ -21,7 +21,6 @@ forecasts marched in quarantine until they met their ground truth.
 
 from __future__ import annotations
 import math
-from collections import deque
 from skaters.dist import Dist
 
 _STD_NORMAL = Dist.gaussian(0.0, 1.0)
@@ -49,9 +48,11 @@ def parade(base, k: int):
 
     def _skater(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
-            state = {"base": None, "pending": deque(maxlen=k),
+            state = {"base": None, "pending": [],
                      "pit": [None] * k, "z": [None] * k, "skipped": 0}
         pend = state["pending"]
+        if type(pend) is not list:            # pre-canonical checkpoint: a deque
+            pend = state["pending"] = list(pend)
         n = len(pend)
         # Missing observation. A non-finite y must never reach the tree: an EWMA
         # fed NaN is poisoned permanently (mu + alpha*(nan - mu) = nan) and no
@@ -77,6 +78,8 @@ def parade(base, k: int):
             prev = pend[-1]
             shifted = [prev[min(h, len(prev) - 1)] for h in range(1, k + 1)]
             pend.append(shifted)
+            if len(pend) > k:                 # a queue of the last k issued fans
+                del pend[0]
             return shifted, state
         pit = [None] * k
         z = [None] * k
@@ -115,6 +118,8 @@ def parade(base, k: int):
                     y_fed = min(max(y_fed, mp - w), mp + w)
         dists, state["base"] = base(y_fed, state["base"])
         pend.append(list(dists))
+        if len(pend) > k:
+            del pend[0]
         state["pit"] = pit
         state["z"] = z
         return dists, state

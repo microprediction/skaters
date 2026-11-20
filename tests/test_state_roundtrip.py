@@ -1,17 +1,14 @@
 """A skater is a fold: Python state must survive a pickle round trip exactly.
 
-The JS twin's contract is JSON (parity/roundtrip.mjs); Python's is pickle,
-which carries the deques and float-keyed dicts the reference uses. For every
+The cross-port contract is JSON (tests/test_state_json.py here,
+parity/roundtrip.mjs in JS, layout in docs/STATE.md). Pickle stays supported
+for Python-only checkpoints, and this test holds it too. For every
 parity scenario the state is checkpointed every 50 steps, restored through
 pickle.loads(pickle.dumps(state)), and the restored copy is stepped beside
 the original for the next 25 steps: every predictive and both states must
 be equal under gen_vectors.state_snapshot, which is float-exact, strict on
 container types, and reads Dist through to_dict. (Pickled bytes are not a
 usable equality: pickle memoises tuples and strings by identity.)
-
-search is exempt: its pool holds recipe-built closures, which pickle cannot
-carry. The JS port rebuilds them from the recipe; the Python mirror of that
-is separate work.
 """
 
 import os

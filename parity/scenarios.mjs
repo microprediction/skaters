@@ -8,7 +8,7 @@ import { bayesianEnsemble } from "../docs/js/skaters/bayesian.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
-  seasonalScale, logTransform, gaussianize,
+  seasonalScale, logTransform, gaussianize, seasonalAnchor,
 } from "../docs/js/skaters/transform.mjs";
 import { laplace, flesaker } from "../docs/js/skaters/api.mjs";
 import { multiscale } from "../docs/js/skaters/multiscale.mjs";
@@ -77,6 +77,24 @@ export function buildScenarios() {
   // Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
   // GPD tail splice (fast warm-up so it activates within the 150-pt series)
   s.push(["gpd_tails", 1, gpdtails(conjugate(leaf(1), emaTransform(0.1), 1), 1, 0.9, 50, 100)]);
+
+  // Tail-spliced predictives through the transforms that read components or
+  // map nonlinearly, and pushforwards through affine transforms.
+  const spliced = (k) => gpdtails(conjugate(leaf(k), emaTransform(0.1), k), k, 0.9, 50, 100);
+  for (const k of [1, 3]) {
+    const suf = k === 1 ? "" : `_k${k}`;
+    s.push([`spliced_power${suf}`, k, conjugate(spliced(k), powerTransform(0.5), k)]);
+    s.push([`spliced_yeojohnson${suf}`, k, conjugate(spliced(k), yeoJohnson(0.5), k)]);
+    s.push([`spliced_gaussianize${suf}`, k, conjugate(spliced(k), gaussianize(), k)]);
+    s.push([`spliced_log${suf}`, k, conjugate(spliced(k), logTransform(-15.0), k)]);
+    s.push([`spliced_ema_t${suf}`, k, conjugate(spliced(k), emaTransform(0.1), k)]);
+    s.push([`spliced_seasonal${suf}`, k, conjugate(spliced(k), seasonalDifference(2), k)]);
+    s.push([`spliced_anchor${suf}`, k, conjugate(spliced(k), seasonalAnchor(2), k)]);
+    s.push([`spliced_sscale${suf}`, k, conjugate(spliced(k), seasonalScale(7), k)]);
+    s.push([`pf_affine_yj${suf}`, k, conjugate(conjugate(leaf(k), yeoJohnson(0.0, true), k), standardize(), k)]);
+    s.push([`pf_affine_log${suf}`, k,
+      conjugate(conjugate(leaf(k), logTransform(null, 200.0), k), seasonalScale(7, 0.1, true), k)]);
+  }
 
   s.push(["scale_mixture_leaf", 1, scaleMixtureLeaf(1)]);
   s.push(["crps_leaf", 1, crpsLeaf(1)]);
