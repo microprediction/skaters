@@ -226,7 +226,7 @@ def ema_transform(alpha: float = 0.05):
         add = 0.0            # alpha^2 * sum_{i<h} var_i: the level's accumulated response
         for d in dists:
             if add > 0.0:
-                out.append(Dist([(w, m + level, math.sqrt(s * s + add)) for w, m, s in d.components]))
+                out.append(_widen(d, level, add))
             else:
                 out.append(d.shift(level))
             add += alpha * alpha * d.var
@@ -653,8 +653,7 @@ def seasonal_difference(period: int = 12):
             recovered_means.append(dists[h].mean + anchor_mean)
             recovered_vars.append(dists[h].var + anchor_var)
             if anchor_var > 0.0:
-                result.append(Dist([(w, m + anchor_mean, math.sqrt(s * s + anchor_var))
-                                    for w, m, s in dists[h].components]))
+                result.append(_widen(dists[h], anchor_mean, anchor_var))
             else:
                 result.append(dists[h].shift(anchor_mean))
         return result
@@ -745,8 +744,7 @@ def seasonal_anchor(period: int, alpha: float = 0.2, weight: float = 0.5):
             else:
                 ema_resp[p] = [(1.0 - alpha) * ema_resp[p][i] + alpha * r[i] for i in range(H)]
             if a_var > 0.0:
-                out.append(Dist([(w, m + a_mean, math.sqrt(s * s + a_var))
-                                 for w, m, s in dists[h].components]))
+                out.append(_widen(dists[h], a_mean, a_var))
             else:
                 out.append(dists[h].shift(a_mean))
         return out
@@ -851,8 +849,26 @@ def seasonal_scale(period: int, alpha: float = 0.05, center: bool = False,
 # Signed power transform (works on any real value)
 # ---------------------------------------------------------------------------
 
-def _exact_inverse_k(inv_fn):
-    """Build an inverse_k that emits the exact pushforward.
+def _widen(d, delta: float, add: float):
+    """Shift by ``delta`` and add independent Gaussian variance ``add``.
+
+    Exact for a Gaussian mixture (each component widens). A tail-spliced
+    predictive has no components to widen, so its body widens and the GPD
+    splice, which lives in the body's PIT space, follows it.
+    """
+    from skaters.tails import SplicedDist
+    if isinstance(d, SplicedDist):
+        return d._with_body(_widen(d.body, delta, add), False)
+    return Dist([(w, m + delta, math.sqrt(s * s + add)) for w, m, s in d.components])
+
+
+def _has_components(d) -> bool:
+    from skaters.pushforward import PushforwardDist
+    return not isinstance(d, PushforwardDist) and getattr(d, "components", None) is not None
+
+
+def _pushforward(d, inv_fn):
+    """The exact pushforward of ``d`` through the monotone map ``inv_fn``.
 
     The table window adapts to each predictive: [m - 10s, m + 10s] over the
     mixture. A fixed window fails in level coordinates (positive levels live
@@ -860,22 +876,23 @@ def _exact_inverse_k(inv_fn):
     everything beyond a table extrapolates with the wrong curvature.
     """
     from skaters.pushforward import PushforwardDist, table_from_map
+    if _has_components(d):
+        comps = d.components
+        lo = min(m - 10.0 * s for _, m, s in comps)
+        hi = max(m + 10.0 * s for _, m, s in comps)
+    else:
+        # no mixture to read (e.g. laplace's tail-spliced SplicedDist):
+        # pad its extreme quantiles by their own span on each side
+        q_lo, q_hi = d.quantile(1e-6), d.quantile(1.0 - 1e-6)
+        lo, hi = 2.0 * q_lo - q_hi, 2.0 * q_hi - q_lo
+    ys, zs = table_from_map(inv_fn, lo, hi)
+    return PushforwardDist(d, ys, zs, inv_fn=inv_fn)
 
+
+def _exact_inverse_k(inv_fn):
+    """Build an inverse_k that emits the exact pushforward."""
     def inverse_k(dists: list, state: dict) -> list:
-        out = []
-        for d in dists:
-            comps = None if isinstance(d, PushforwardDist) else getattr(d, "components", None)
-            if comps is not None:
-                lo = min(m - 10.0 * s for _, m, s in comps)
-                hi = max(m + 10.0 * s for _, m, s in comps)
-            else:
-                # no mixture to read (e.g. laplace's tail-spliced SplicedDist):
-                # pad its extreme quantiles by their own span on each side
-                q_lo, q_hi = d.quantile(1e-6), d.quantile(1.0 - 1e-6)
-                lo, hi = 2.0 * q_lo - q_hi, 2.0 * q_hi - q_lo
-            ys, zs = table_from_map(inv_fn, lo, hi)
-            out.append(PushforwardDist(d, ys, zs, inv_fn=inv_fn))
-        return out
+        return [_pushforward(d, inv_fn) for d in dists]
 
     return inverse_k
 
@@ -919,6 +936,9 @@ def power_transform(p: float = 0.5, exact: bool = False):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         result = []
         for d in dists:
+            if getattr(d, "components", None) is None:   # tail-spliced: exact pushforward
+                result.append(_pushforward(d, _inv))
+                continue
             components = []
             for w, mu, sigma in d.components:
                 orig_mean = _inv(mu)
@@ -1013,6 +1033,9 @@ def yeo_johnson(lmbda: float = 0.0, exact: bool = False):
     def inverse_k(dists: list[Dist], state: dict) -> list[Dist]:
         result = []
         for d in dists:
+            if getattr(d, "components", None) is None:   # tail-spliced: exact pushforward
+                result.append(_pushforward(d, _inv))
+                continue
             comps = []
             for w, mu, sigma in d.components:
                 comps.append((w, _inv(mu), max(sigma * _dinv(mu), 1e-12)))
@@ -1854,6 +1877,9 @@ def gaussianize(max_knots: int = 39, warmup: int = 30, n_particles: int = 9,
             return [d.affine(sigma, mu) for d in dists]
         result = []
         for d in dists:
+            if getattr(d, "components", None) is None:   # tail-spliced: exact pushforward
+                result.append(_pushforward(d, lambda z: _inv(z, knots)))
+                continue
             comps = []
             for w, mu, sig in d.components:
                 pts = [_inv(mu + sig * q, knots) for q in _mids]

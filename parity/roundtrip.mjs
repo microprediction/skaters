@@ -17,7 +17,7 @@ import { execFileSync } from "child_process";
 import { readFileSync } from "fs";
 import { buildScenarios, buildRepeatScenarios } from "./scenarios.mjs";
 import { stateToJSON, stateFromJSON, assertPlainState } from "../docs/js/skaters/state.mjs";
-import { Dist } from "../docs/js/skaters/dist.mjs";
+import { Dist, isDistInstance } from "../docs/js/skaters/dist.mjs";
 import { laplace } from "../docs/js/skaters/api.mjs";
 import { parade } from "../docs/js/skaters/parade.mjs";
 import { gpdtails } from "../docs/js/skaters/tails.mjs";
@@ -70,6 +70,14 @@ function makeRepeatSeries(n, seed) {
 
 function enc(x) { return JSON.stringify(stateToJSON(x)); }
 
+// Predictives are compared by their dict form where they have one. A
+// PushforwardDist (exact inverses, logTransform) carries its coordinate map as
+// a function and never enters state, so it is compared through exact probes.
+function encDists(ds) {
+  return JSON.stringify(ds.map((d) => (isDistInstance(d) ? stateToJSON(d)
+    : [d.mean, d.std, d.logpdf(0.3), d.cdf(0.3), d.quantile(0.1), d.quantile(0.9), d.crps(0.3)])));
+}
+
 function firstDiff(a, b) {
   let i = 0;
   while (i < a.length && i < b.length && a[i] === b[i]) i++;
@@ -115,7 +123,7 @@ function soak(name, f, series) {
       let dA, dB;
       [dA, sA] = f(y, sA);
       [dB, sB] = f(y, sB);
-      const da = enc(dA), db = enc(dB);
+      const da = encDists(dA), db = encDists(dB);
       if (da !== db) {
         fail(`${name} t=${t} +${m}: predictive differs after restore ${firstDiff(da, db)}`);
         return;
