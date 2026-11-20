@@ -10,7 +10,7 @@
 //
 // Constants and operation order mirror tails.py for 1e-6 parity.
 
-import { erf, Dist, registerDistDecoder, registerDistClass } from "./dist.mjs";
+import { erfc, Dist, registerDistDecoder, registerDistClass } from "./dist.mjs";
 
 const EPS = 1e-12;
 const LOG_SQRT2PI = 0.5 * Math.log(2.0 * Math.PI);
@@ -18,7 +18,7 @@ const REFIT_EVERY = 25;
 const SQRT2 = Math.sqrt(2.0);
 
 function phi(z) {
-  return 0.5 * (1.0 + erf(z / SQRT2));
+  return 0.5 * erfc(-z / SQRT2);   // erfc keeps relative accuracy in the lower tail (tails.py)
 }
 
 function phiLogpdf(z) {
@@ -113,6 +113,52 @@ function fitMl(exc, s1) {
   return [bestG, bestS];
 }
 
+// Below this tail mass the body quantile is solved on erfc sums (tails.py):
+// 0.5 * (1 + erf) cannot resolve a 1e-12 tail, so bisection on it stops on a
+// plateau set by the last bit of erf, which differs between libm and this port.
+const TAIL_U = 1e-8;
+
+// x with body mass t beyond it (below x, or above x when upper).
+function bodyTailQuantile(body, t, upper, tol, maxIter) {
+  const sign = upper ? -1.0 : 1.0;    // mirror the upper tail onto the lower
+  const comps = body.components.map(([w, m, s]) => [w, sign * m, s]);
+  const mass = (x) => {
+    let total = 0.0;
+    for (const [w, m, s] of comps) {
+      if (s > 0.0) total += w * 0.5 * erfc((m - x) / (s * SQRT2));
+      else if (x >= m) total += w;
+    }
+    return total;
+  };
+  const mu = sign * body.mean;
+  const sigma = Math.sqrt(body.var);
+  let scale = Infinity;
+  for (const [w, , s] of comps) if (w > 0 && s > 0) scale = Math.min(scale, s);
+  if (scale === Infinity) scale = 1.0;
+  const xTol = tol * Math.min(1.0, scale);
+  const seed = Math.max(8.0 * sigma, 1e-12 * Math.max(1.0, Math.abs(mu)));
+  let lo = mu - seed, hi = mu, width = seed;
+  for (let i = 0; i < 120; i++) {
+    if (mass(hi) >= t) break;
+    hi += width;
+    width *= 2.0;
+  }
+  width = seed;
+  for (let i = 0; i < 120; i++) {
+    if (mass(lo) < t) break;
+    lo -= width;
+    width *= 2.0;
+  }
+  for (let i = 0; i < maxIter; i++) {
+    if (hi - lo < xTol) break;
+    const mid = 0.5 * (lo + hi);
+    if (!(lo < mid && mid < hi)) break;
+    if (mass(mid) < t) lo = mid;
+    else hi = mid;
+  }
+  return sign * (0.5 * (lo + hi));
+}
+
 const GRID_N = 65;
 
 export class SplicedDist {
@@ -174,6 +220,10 @@ export class SplicedDist {
       const u = this._plo + (p - this.zetaLo) / this._c;
       z = phiInv(Math.min(Math.max(u, EPS), 1.0 - EPS));
     }
+    const t = Math.max(phi(-Math.abs(z)), EPS);   // body tail mass beyond the target
+    if (t < TAIL_U && Array.isArray(this.body.components)) {
+      return bodyTailQuantile(this.body, t, z > 0.0, tol, maxIter);
+    }
     const ub = Math.min(Math.max(phi(z), EPS), 1.0 - EPS);
     return this.body.quantile(ub, tol, maxIter);
   }
@@ -223,6 +273,16 @@ export class SplicedDist {
     if (a === 0) throw new Error("affine multiplier must be nonzero");
     const body = this.body.affine(a, b);
     if (a > 0) {
+      return new SplicedDist(body, this.tLo, this.tUp, this.zetaLo, this.zetaUp,
+                             this.gLo, this.sLo, this.gUp, this.sUp);
+    }
+    return new SplicedDist(body, -this.tUp, -this.tLo, this.zetaUp, this.zetaLo,
+                           this.gUp, this.sUp, this.gLo, this.sLo);
+  }
+
+  // The same splice around a new body; flip mirrors it (a negative map).
+  _withBody(body, flip) {
+    if (!flip) {
       return new SplicedDist(body, this.tLo, this.tUp, this.zetaLo, this.zetaUp,
                              this.gLo, this.sLo, this.gUp, this.sUp);
     }

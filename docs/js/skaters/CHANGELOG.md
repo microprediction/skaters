@@ -5,6 +5,25 @@ tracks the Python [`skaters`](https://pypi.org/project/skaters/) package and is
 kept numerically identical to it within `1e-6`, enforced by the parity checker on
 every release.
 
+## Unreleased
+
+- `powerTransform` and `yeoJohnson` no longer fail on laplace's tail-spliced
+  predictive: they emit its exact pushforward, a `PushforwardDist` (new module
+  `pushforward.mjs`, a port of `skaters/pushforward.py`). At k > 1,
+  `emaTransform`, `seasonalDifference` and `seasonalAnchor` widen the spliced
+  body and the GPD splice follows it. `SplicedDist` gains `_withBody`. Outputs
+  on Gaussian-mixture predictives are unchanged.
+- New transforms, matching `skaters/transform.py`: `gaussianize` (all guards
+  and the smooth mode), `seasonalScale`, `logTransform`, and the `exact` flag
+  on `powerTransform` and `yeoJohnson`. New `flesaker` in `api.mjs`.
+  `index.mjs` now exports `yeoJohnson`, `logTransform` and `flesaker`.
+- `erf` is a port of fdlibm's, and `erfc` is new. The old incomplete-gamma
+  `erf` was up to 6 ulps off near zero. The tail splice's normal CDF uses
+  `erfc`, as Python does, so it keeps relative precision in the lower tail.
+- `SplicedDist.quantile` solves deep-tail targets, below 1e-8 body mass, on
+  erfc sums, as Python now does. Quantiles at p below about 1e-8 used to
+  differ from Python by about 1.8e-6; they now agree to about 1e-14.
+
 ## 0.17.0
 
 - Gaussian-mixture quantiles in the stdlib, JavaScript and Rust cores use a

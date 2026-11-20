@@ -1,6 +1,6 @@
-# laplace(1) k=1 output digests after the scale-relative quantile change of #328 (Python 3.12); regenerate with parity/laplace_k1_signatures.py
+# laplace(1) k=1 output digests after the deep-tail spliced quantile fix, Python 3.12. Only regimes_spike moved, at q0.001 and q0.999. Regenerate with parity/laplace_k1_signatures.py
 benign          5aa73ad6129ff6e37a30e18b1bbe7d510b2008bf00390efe7eb41c183b217477
-regimes_spike   8dd5aceb0160a0d987c3b343ea3aa846d1178ba946ce9f758efba4317acab447
+regimes_spike   f1786788f33f815e9492b07a1081ff6f322aa7d984fbe504dab6e6055d4fdac7
 student_t3      4cc512f715d3a942b28e5c21e73417930ee1ea294275599bfac4b2ad7aed4e3e
 ar1_negative    6ee57c3e2fa41cbb090ad2c1c33882b51a43c00f26187eb9ab195a26dd0f9ac6
 sticky_lattice  27aae9eadae7c843dca5acbba168e905d7ceb6ba3fab1ab9b0ebf3dd8976b3ef
