@@ -425,24 +425,27 @@ def zbank(k: int = 3, sigmas: tuple = (0.03, 0.003),
         lambda sig: _laplace(k, scale_alpha=sig))
     fs = {sig: make(sig) for sig in sigmas}      # skaters are pure: one per sigma
 
+    # state["sub"] is a list of phase-copy lists, one per (sigma, stride) in
+    # sigma-major order: plain data, where a tuple-keyed dict would not
+    # survive JSON.
+    grid = [(sig, s) for sig in sigmas for s in strides]
+
     def _skater(y: float, state: dict | None):
         if state is None:
-            state = {"t": 0,
-                     "sub": {(sig, s): [None] * s
-                             for sig in sigmas for s in strides},
-                     "z": None}
+            state = {"t": 0, "sub": [[None] * s for _, s in grid], "z": None}
+        elif type(state["sub"]) is dict:          # pre-canonical checkpoint
+            state["sub"] = [state["sub"][g] for g in grid]
         t = state["t"]
         z = []
         dists_out = None
-        for sig in sigmas:
-            for s in strides:
-                copies = state["sub"][(sig, s)]
-                ph = t % s
-                dists, copies[ph] = fs[sig](y, copies[ph])
-                if sig == sigmas[0] and s == 1:
-                    dists_out = dists              # pass-through forecasts
-                cz = copies[ph].get("z") if isinstance(copies[ph], dict) else None
-                z.extend(cz if cz is not None else [None] * k)
+        for i, (sig, s) in enumerate(grid):
+            copies = state["sub"][i]
+            ph = t % s
+            dists, copies[ph] = fs[sig](y, copies[ph])
+            if sig == sigmas[0] and s == 1:
+                dists_out = dists              # pass-through forecasts
+            cz = copies[ph].get("z") if isinstance(copies[ph], dict) else None
+            z.extend(cz if cz is not None else [None] * k)
         state["z"] = z
         state["t"] = t + 1
         return dists_out, state

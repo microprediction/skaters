@@ -12,7 +12,6 @@ Run:  python parity/gen_vectors.py   (writes parity/vectors.json)
 
 from __future__ import annotations
 import json
-import pickle
 from collections import deque
 import math
 import os
@@ -26,7 +25,7 @@ from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, ou_transform, theta,
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
-    grouped_ar, yeo_johnson, seasonal_scale, log_transform, gaussianize,
+    grouped_ar, yeo_johnson, seasonal_scale, log_transform, gaussianize, seasonal_anchor,
 )
 from skaters.api import laplace
 from skaters.multiscale import multiscale
@@ -123,6 +122,26 @@ def build_scenarios():
         conjugate(leaf(k=1), ema_transform(0.1), k=1),
         k=1, level=0.9, nexc=50, warmup=100)))
 
+    # Tail-spliced predictives through the transforms that read components or
+    # map nonlinearly, and pushforwards through affine transforms.
+    def spliced(k):
+        return gpdtails(conjugate(leaf(k=k), ema_transform(0.1), k=k),
+                        k=k, level=0.9, nexc=50, warmup=100)
+    for k in (1, 3):
+        suf = "" if k == 1 else f"_k{k}"
+        s.append((f"spliced_power{suf}", k, conjugate(spliced(k), power_transform(0.5), k=k)))
+        s.append((f"spliced_yeojohnson{suf}", k, conjugate(spliced(k), yeo_johnson(0.5), k=k)))
+        s.append((f"spliced_gaussianize{suf}", k, conjugate(spliced(k), gaussianize(), k=k)))
+        s.append((f"spliced_log{suf}", k, conjugate(spliced(k), log_transform(lower=-15.0), k=k)))
+        s.append((f"spliced_ema_t{suf}", k, conjugate(spliced(k), ema_transform(0.1), k=k)))
+        s.append((f"spliced_seasonal{suf}", k, conjugate(spliced(k), seasonal_difference(2), k=k)))
+        s.append((f"spliced_anchor{suf}", k, conjugate(spliced(k), seasonal_anchor(2), k=k)))
+        s.append((f"spliced_sscale{suf}", k, conjugate(spliced(k), seasonal_scale(7), k=k)))
+        s.append((f"pf_affine_yj{suf}", k, conjugate(
+            conjugate(leaf(k=k), yeo_johnson(0.0, exact=True), k=k), standardize(), k=k)))
+        s.append((f"pf_affine_log{suf}", k, conjugate(
+            conjugate(leaf(k=k), log_transform(upper=200.0), k=k), seasonal_scale(7, 0.1, center=True), k=k)))
+
     # Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
     s.append(("scale_mixture_leaf", 1, scale_mixture_leaf(k=1)))
     s.append(("crps_leaf", 1, crps_leaf(k=1)))
@@ -194,9 +213,16 @@ def probe_dist(d):
              d.quantile(Q_LO), d.quantile(Q_HI), d.crps(PROBE))]
 
 
-# Skaters whose Python state cannot be pickled: search keeps recipe-built
-# closures in its pool (the JS port rebuilds them from the recipe instead).
-ROUNDTRIP_EXEMPT = {"search_default"}
+# Skaters exempt from the restore step. None: every state is plain data
+# (docs/STATE.md), search included, since its pool rebuilds closures from
+# recipes as the JS port does.
+ROUNDTRIP_EXEMPT: set = set()
+
+
+def json_restore(state):
+    """Checkpoint and restore through JSON, the cross-port contract."""
+    from skaters.state import state_to_json, state_from_json
+    return state_from_json(json.loads(json.dumps(state_to_json(state), allow_nan=False)))
 
 
 def state_snapshot(o):
@@ -244,9 +270,9 @@ def state_diff(a, b, path="$"):
 def run_scenario(skater, series, name=None):
     """Run the skater over the series and probe every post-burn-in predictive.
 
-    Serialise, deserialise, continue: at the burn-in step the state is pickled
-    and restored, and the restored copy is stepped beside the original for the
-    rest of the series. Both must agree exactly (state_snapshot equality of
+    Serialise, deserialise, continue: at the burn-in step the state is
+    written to JSON and restored, and the restored copy is stepped beside the
+    original for the rest of the series. Both must agree exactly (state_snapshot equality of
     every predictive and of the two states), or the vectors are not
     generated. The JS checker does the same through JSON on its side, so the
     parity check itself includes a restore in both ports.
@@ -259,12 +285,12 @@ def run_scenario(skater, series, name=None):
         if twin is not None:
             tdists, twin = skater(y, twin)
             if state_snapshot(tdists) != state_snapshot(dists):
-                raise AssertionError(f"{name}: predictive differs after pickle restore at step {i}")
+                raise AssertionError(f"{name}: predictive differs after JSON restore at step {i}")
             sa, sb = state_snapshot(state), state_snapshot(twin)
             if sa != sb:
-                raise AssertionError(f"{name}: state differs after pickle restore at step {i}: {state_diff(sa, sb)}")
+                raise AssertionError(f"{name}: state differs after JSON restore at step {i}: {state_diff(sa, sb)}")
         if i == BURN - 1 and name not in ROUNDTRIP_EXEMPT:
-            twin = pickle.loads(pickle.dumps(state))
+            twin = json_restore(state)
         if i >= BURN:
             out.append([probe_dist(d) for d in dists])
     return out

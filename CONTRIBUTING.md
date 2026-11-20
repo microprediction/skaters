@@ -43,7 +43,9 @@ digests at main are in `parity/laplace_k1_signatures.txt`.
 ## Ground rules
 
 - Pure stdlib in `src/skaters/`; dependencies belong in benchmarks only.
-- Skater state is pure data: picklable, resumable, no closures.
+- Skater state is plain JSON data in the layout of `docs/STATE.md`: no
+  closures, deques, sets or non-string keys. `tests/test_state_json.py`
+  checks every exported skater resumes exactly through JSON.
 - Strictly causal everywhere: score before update; nothing may read the
   future or whole-series statistics.
 - New estimators forget: prefer EWMA-style memory to cumulative counts.

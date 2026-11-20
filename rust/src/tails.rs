@@ -4,6 +4,7 @@
 
 use crate::dist::Dist;
 use crate::mathx::{fsum, LOG_SQRT2PI, SQRT2, SQRT2PI};
+use crate::pushforward::PushforwardDist;
 use crate::skater::Sk;
 use serde::{Deserialize, Serialize};
 
@@ -291,6 +292,50 @@ impl SplicedDist {
         }
     }
 
+    /// The same splice around a new body; `flip` mirrors it (a negative map).
+    pub fn with_body(&self, body: Dist, flip: bool) -> SplicedDist {
+        if !flip {
+            return SplicedDist::new(
+                body,
+                self.t_lo,
+                self.t_up,
+                self.zeta_lo,
+                self.zeta_up,
+                self.g_lo,
+                self.s_lo,
+                self.g_up,
+                self.s_up,
+            );
+        }
+        SplicedDist::new(
+            body,
+            -self.t_up,
+            -self.t_lo,
+            self.zeta_up,
+            self.zeta_lo,
+            self.g_up,
+            self.s_up,
+            self.g_lo,
+            self.s_lo,
+        )
+    }
+
+    /// x -> a*x + b. The splice lives in the body's PIT space, so only the
+    /// body moves; a negative `a` reflects the PIT and swaps the tails.
+    pub fn affine(&self, a: f64, b: f64) -> SplicedDist {
+        assert!(a != 0.0, "affine multiplier must be nonzero");
+        self.with_body(self.body.affine(a, b), a < 0.0)
+    }
+
+    pub fn shift(&self, delta: f64) -> SplicedDist {
+        self.with_body(self.body.shift(delta), false)
+    }
+
+    pub fn scale(&self, factor: f64) -> SplicedDist {
+        assert!(factor != 0.0, "scale factor must be nonzero");
+        self.with_body(self.body.scale(factor), factor < 0.0)
+    }
+
     fn z(&self, x: f64) -> f64 {
         let u = self.body.cdf(x).max(EPS).min(1.0 - EPS);
         phi_inv(u)
@@ -384,11 +429,13 @@ impl SplicedDist {
     }
 }
 
-/// A predictive that is either a plain Gaussian mixture or a tail-spliced one.
+/// A predictive: a plain Gaussian mixture, a tail-spliced one, or the exact
+/// pushforward of one through a monotone coordinate map.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PDist {
     Mix(Dist),
     Spliced(SplicedDist),
+    Push(Box<PushforwardDist>),
 }
 
 impl PDist {
@@ -396,36 +443,92 @@ impl PDist {
         match self {
             PDist::Mix(d) => d.mean(),
             PDist::Spliced(d) => d.mean(),
+            PDist::Push(d) => d.mean(),
+        }
+    }
+    pub fn var(&self) -> f64 {
+        match self {
+            PDist::Mix(d) => d.var(),
+            PDist::Spliced(d) => d.var(),
+            PDist::Push(d) => d.var(),
         }
     }
     pub fn std(&self) -> f64 {
         match self {
             PDist::Mix(d) => d.std(),
             PDist::Spliced(d) => d.std(),
+            PDist::Push(d) => d.std(),
         }
     }
     pub fn logpdf(&self, x: f64) -> f64 {
         match self {
             PDist::Mix(d) => d.logpdf(x),
             PDist::Spliced(d) => d.logpdf(x),
+            PDist::Push(d) => d.logpdf(x),
         }
     }
     pub fn cdf(&self, x: f64) -> f64 {
         match self {
             PDist::Mix(d) => d.cdf(x),
             PDist::Spliced(d) => d.cdf(x),
+            PDist::Push(d) => d.cdf(x),
         }
     }
     pub fn quantile(&self, p: f64) -> f64 {
+        self.quantile_tol(p, 1e-9, 2100)
+    }
+    pub fn quantile_tol(&self, p: f64, tol: f64, max_iter: usize) -> f64 {
         match self {
-            PDist::Mix(d) => d.quantile(p),
-            PDist::Spliced(d) => d.quantile(p),
+            PDist::Mix(d) => d.quantile_tol(p, tol, max_iter),
+            PDist::Spliced(d) => d.quantile_tol(p, tol, max_iter),
+            PDist::Push(d) => d.quantile_tol(p, tol, max_iter),
         }
     }
     pub fn crps(&self, x: f64) -> f64 {
         match self {
             PDist::Mix(d) => d.crps(x),
             PDist::Spliced(d) => d.crps(x),
+            PDist::Push(d) => d.crps(x),
+        }
+    }
+    pub fn shift(&self, delta: f64) -> PDist {
+        match self {
+            PDist::Mix(d) => PDist::Mix(d.shift(delta)),
+            PDist::Spliced(d) => PDist::Spliced(d.shift(delta)),
+            PDist::Push(d) => PDist::Push(Box::new(d.shift(delta))),
+        }
+    }
+    pub fn scale(&self, factor: f64) -> PDist {
+        match self {
+            PDist::Mix(d) => PDist::Mix(d.scale(factor)),
+            PDist::Spliced(d) => PDist::Spliced(d.scale(factor)),
+            PDist::Push(d) => PDist::Push(Box::new(d.scale(factor))),
+        }
+    }
+    pub fn affine(&self, a: f64, b: f64) -> PDist {
+        match self {
+            PDist::Mix(d) => PDist::Mix(d.affine(a, b)),
+            PDist::Spliced(d) => PDist::Spliced(d.affine(a, b)),
+            PDist::Push(d) => PDist::Push(Box::new(d.affine(a, b))),
+        }
+    }
+    /// Mixture components, as Python's `.components`: a pushforward gives its
+    /// moment-matched compatibility view, a spliced law has none.
+    pub fn components(&self) -> Option<Vec<(f64, f64, f64)>> {
+        match self {
+            PDist::Mix(d) => Some(d.components.clone()),
+            PDist::Spliced(_) => None,
+            PDist::Push(d) => Some(d.components()),
+        }
+    }
+    /// The plain mixture a component-reading consumer sees.
+    pub fn to_mix(&self) -> Dist {
+        match self {
+            PDist::Mix(d) => d.clone(),
+            PDist::Spliced(_) => panic!("a tail-spliced predictive has no mixture components"),
+            PDist::Push(d) => Dist {
+                components: d.components(),
+            },
         }
     }
 }

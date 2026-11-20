@@ -21,8 +21,8 @@ no information is lost.
 
 from __future__ import annotations
 import math
-from collections import deque
 from skaters.dist import Dist
+from skaters.state import _unqueue
 
 
 def bayesian_ensemble(
@@ -71,11 +71,13 @@ def bayesian_ensemble(
             state = {
                 "sub": [None] * n,
                 # Per-model, per-horizon: queued Dist predictions awaiting resolution
-                "queues": [[deque() for _ in range(k)] for _ in range(n)],
+                "queues": [[[] for _ in range(k)] for _ in range(n)],
                 # Per-model, per-horizon: cumulative log-weight
                 "log_w": [[prior_log_weights[i]] * k for i in range(n)],
                 "n_obs": 0,
             }
+        elif state["queues"] and not isinstance(state["queues"][0][0], list):
+            state["queues"] = _unqueue(state["queues"])     # pre-canonical checkpoint
 
         state["n_obs"] += 1
 
@@ -94,7 +96,7 @@ def bayesian_ensemble(
                 q = state["queues"][i][h]
                 q.append(all_dists[i][h])
                 if len(q) > h + 1:
-                    past_dist = q.popleft()
+                    past_dist = q.pop(0)
                     lp = past_dist.logpdf(y)
                     # Bounded loss (the "mixability" trick from online learning):
                     # clamp to a finite band so neither a -inf (y far from every

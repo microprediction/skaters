@@ -12,8 +12,8 @@ lost during combination.
 
 from __future__ import annotations
 import math
-from collections import deque
 from skaters.dist import Dist
+from skaters.state import _unqueue
 from skaters.runstats import running_var_init, running_var_update, running_mse_get
 
 
@@ -35,9 +35,11 @@ def precision_weighted_ensemble(skaters: list, k: int = 1, floor: float = 1e-6):
         if state is None:
             state = {
                 "sub": [None] * n,
-                "queues": [[deque() for _ in range(k)] for _ in range(n)],
+                "queues": [[[] for _ in range(k)] for _ in range(n)],
                 "stats": [[running_var_init() for _ in range(k)] for _ in range(n)],
             }
+        elif state["queues"] and not isinstance(state["queues"][0][0], list):
+            state["queues"] = _unqueue(state["queues"])     # pre-canonical checkpoint
 
         # Run all sub-models and collect distributional predictions
         all_dists = []
@@ -54,7 +56,7 @@ def precision_weighted_ensemble(skaters: list, k: int = 1, floor: float = 1e-6):
                 q = state["queues"][i][h]
                 q.append(all_dists[i][h].mean)
                 if len(q) > h + 1:
-                    pred_mean = q.popleft()
+                    pred_mean = q.pop(0)
                     error = y - pred_mean
                     state["stats"][i][h] = running_var_update(state["stats"][i][h], error)
 

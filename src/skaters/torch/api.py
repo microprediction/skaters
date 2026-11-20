@@ -62,3 +62,22 @@ def laplace(k: int = 1, objective: str = "crps", sticky: bool = True, leaf=None,
 def dantzig(k: int = 1, **kwargs):
     from skaters.torch.search import search
     return search(k=k, **kwargs)
+
+
+def flesaker(k: int = 1, lower=None, upper=None, **laplace_kwargs):
+    """Torch twin of :func:`skaters.api.flesaker`: laplace on log(y - lower)
+    (or -log(upper - y)), mapped back by the exact change of variables."""
+    from skaters.torch.transforms_shape import LogTransform
+    T = LogTransform(lower=lower, upper=upper)
+    inner = laplace(k=k, **laplace_kwargs)
+
+    def _flesaker(y, state=None):
+        yp, _ = T(y, None)
+        dists, state = inner(yp, state)
+        return T.inverse_k(dists, {}), state
+
+    bound = f"upper={upper}" if upper is not None else f"lower={0.0 if lower is None else lower}"
+    _flesaker.__name__ = f"flesaker(k={k}, {bound})"
+    _flesaker.transform = T
+    _flesaker.inner = inner
+    return _flesaker
