@@ -14,6 +14,20 @@ pub const EPS: f64 = 1e-12;
 // plateau set by the last bit of erf, which differs between libm builds.
 const TAIL_U: f64 = 1e-8;
 
+/// Body mass below x, or above x when `upper`, from erfc sums.
+fn body_tail_mass(body: &Dist, x: f64, upper: bool) -> f64 {
+    let sign = if upper { -1.0 } else { 1.0 };
+    let mut total = 0.0;
+    for &(w, m, s) in &body.components {
+        if s > 0.0 {
+            total += w * 0.5 * libm::erfc(sign * (m - x) / (s * SQRT2));
+        } else if sign * (x - m) >= 0.0 {
+            total += w;
+        }
+    }
+    total
+}
+
 /// x with body mass t beyond it (below x, or above x when `upper`).
 fn body_tail_quantile(body: &Dist, t: f64, upper: bool, tol: f64, max_iter: usize) -> f64 {
     let sign = if upper { -1.0 } else { 1.0 }; // mirror the upper tail onto the lower
@@ -292,8 +306,14 @@ impl SplicedDist {
     }
 
     fn z(&self, x: f64) -> f64 {
-        let u = self.body.cdf(x).max(EPS).min(1.0 - EPS);
-        phi_inv(u)
+        let u = self.body.cdf(x);
+        if u.min(1.0 - u) < TAIL_U {
+            // deep tail: read the smaller tail mass from erfc sums (tails.py)
+            let upper = u > 0.5;
+            let z = phi_inv(body_tail_mass(&self.body, x, upper).max(EPS).min(0.5));
+            return if upper { -z } else { z };
+        }
+        phi_inv(u.max(EPS).min(1.0 - EPS))
     }
 
     pub fn cdf(&self, x: f64) -> f64 {
