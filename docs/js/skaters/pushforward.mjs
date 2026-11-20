@@ -240,6 +240,48 @@ export class PushforwardDist {
     return total;
   }
 
+  // --- affine maps ---
+
+  // The law of a*Y + b, still a pushforward of (a reflection of) the same
+  // inner. a > 0 composes the map; a < 0 reflects the inner with
+  // inner.scale(-1) so the composed map stays increasing.
+  affine(a, b) {
+    a = Number(a); b = Number(b);
+    if (a === 0.0 || !Number.isFinite(a) || !Number.isFinite(b)) {
+      throw new Error("affine needs a finite nonzero a and a finite b");
+    }
+    const r = a > 0 ? 1.0 : -1.0;
+    const inner = r > 0 ? this.inner : this.inner.scale(-1.0);
+    const inv = this.invFn, fwd = this.fwdFn, lj = this.logJacobianFn;
+    const cmf = this.componentMomentsFn, sinv = this.scaledInvFn;
+    const logA = Math.log(Math.abs(a));
+    let ys = null, zs = null;
+    if (this.ys !== null) {
+      ys = this.ys.map((y) => a * y + b);
+      zs = this.zs.map((z) => r * z);
+      if (r < 0) { ys.reverse(); zs.reverse(); }
+    }
+    return new PushforwardDist(inner, ys, zs, {
+      invFn: inv === null ? null : (z) => a * inv(r * z) + b,
+      fwdFn: fwd === null ? null : (y) => r * fwd((y - b) / a),
+      logJacobianFn: lj === null ? null : (z) => lj(r * z) - logA,
+      componentMomentsFn: cmf === null ? null : (m, s) => {
+        const [m0, s0] = cmf(r * m, s);
+        return [a * m0 + b, Math.abs(a) * s0];
+      },
+      scaledInvFn: sinv === null ? null : (z, w) => a * sinv(r * z, w) + w * b,
+    });
+  }
+
+  shift(delta) {
+    return this.affine(1.0, delta);
+  }
+
+  scale(factor) {
+    if (factor === 0) throw new Error("scale factor must be nonzero");
+    return this.affine(factor, 0.0);
+  }
+
   // --- Dist-compatibility shim ---
 
   // Moment-matched mixture components in y-space (lazy, cached). A spliced or

@@ -43,10 +43,22 @@
   `yeoJohnson`, `logTransform` and `flesaker`, as `skaters/__init__.py` does.
   The JavaScript `erf` is now fdlibm's, with `erfc`, and the tail splice's
   normal CDF uses `erfc` as `tails.py` does. Parity vectors cover every new
-  transform. The Rust crate does not have these transforms yet; its parity
-  gate lists them in `NOT_IN_RUST`. `skaters.torch` has `seasonal_scale`,
-  now in its parity check, and lacks the exact pushforward and `gaussianize`,
-  listed in `NOT_IN_TORCH`.
+  transform.
+- The Rust crate and `skaters.torch` match the transform surface too. Rust
+  gains `gaussianize`, `seasonal_scale`, `log_transform`, the `exact` flag
+  (`power_transform_exact`, `yeo_johnson_exact`), `PushforwardDist` with
+  `affine`, `shift` and `scale` (its map is serde data, so a predictive stays
+  serializable), `flesaker`, and `conjugate_f`, a conjugate around any
+  `Forecaster` whose inverse sees tail-spliced and pushforward predictives. The
+  Rust transforms take every predictive kind through one generic inverse, with
+  the Gaussian-mixture path unchanged. `skaters.torch` gains
+  `TorchPushforwardDist`, the exact inverses, `log_transform`, `gaussianize`,
+  `flesaker`, and the spliced handling in `ema_transform`,
+  `seasonal_difference`, `seasonal_anchor`, `power_transform` and
+  `yeo_johnson`; its `logpdf`, `cdf` and `quantile` differentiate through the
+  map. Parity vectors add tail-spliced predictives through each
+  component-reading transform and pushforwards through affine transforms, and
+  every port runs every scenario.
 
 ## 0.17.0
 

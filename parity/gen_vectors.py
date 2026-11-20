@@ -25,7 +25,7 @@ from skaters.bayesian import bayesian_ensemble
 from skaters.transform import (
     difference, fractional_difference, standardize, ema_transform, ou_transform, theta,
     drift, holt_linear, garch, seasonal_difference, power_transform, ar,
-    grouped_ar, yeo_johnson, seasonal_scale, log_transform, gaussianize,
+    grouped_ar, yeo_johnson, seasonal_scale, log_transform, gaussianize, seasonal_anchor,
 )
 from skaters.api import laplace
 from skaters.multiscale import multiscale
@@ -121,6 +121,26 @@ def build_scenarios():
     s.append(("gpd_tails", 1, gpdtails(
         conjugate(leaf(k=1), ema_transform(0.1), k=1),
         k=1, level=0.9, nexc=50, warmup=100)))
+
+    # Tail-spliced predictives through the transforms that read components or
+    # map nonlinearly, and pushforwards through affine transforms.
+    def spliced(k):
+        return gpdtails(conjugate(leaf(k=k), ema_transform(0.1), k=k),
+                        k=k, level=0.9, nexc=50, warmup=100)
+    for k in (1, 3):
+        suf = "" if k == 1 else f"_k{k}"
+        s.append((f"spliced_power{suf}", k, conjugate(spliced(k), power_transform(0.5), k=k)))
+        s.append((f"spliced_yeojohnson{suf}", k, conjugate(spliced(k), yeo_johnson(0.5), k=k)))
+        s.append((f"spliced_gaussianize{suf}", k, conjugate(spliced(k), gaussianize(), k=k)))
+        s.append((f"spliced_log{suf}", k, conjugate(spliced(k), log_transform(lower=-15.0), k=k)))
+        s.append((f"spliced_ema_t{suf}", k, conjugate(spliced(k), ema_transform(0.1), k=k)))
+        s.append((f"spliced_seasonal{suf}", k, conjugate(spliced(k), seasonal_difference(2), k=k)))
+        s.append((f"spliced_anchor{suf}", k, conjugate(spliced(k), seasonal_anchor(2), k=k)))
+        s.append((f"spliced_sscale{suf}", k, conjugate(spliced(k), seasonal_scale(7), k=k)))
+        s.append((f"pf_affine_yj{suf}", k, conjugate(
+            conjugate(leaf(k=k), yeo_johnson(0.0, exact=True), k=k), standardize(), k=k)))
+        s.append((f"pf_affine_log{suf}", k, conjugate(
+            conjugate(leaf(k=k), log_transform(upper=200.0), k=k), seasonal_scale(7, 0.1, center=True), k=k)))
 
     # Scale-mixture leaf (the discrepancy-from-N(0,1) residual model)
     s.append(("scale_mixture_leaf", 1, scale_mixture_leaf(k=1)))

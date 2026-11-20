@@ -42,8 +42,8 @@ import skaters.torch.spec  # noqa: F401
 
 from skaters.torch.trunk import TerminalLeafEnsemble
 from skaters.torch.pool import pool_spec, build_pool
-from skaters.torch.api import laplace, dantzig
+from skaters.torch.api import laplace, dantzig, flesaker
 from skaters.torch.learned import learned, LearnedLaplace
 
 __all__ = ["learned", "LearnedLaplace", "TorchDist", "TorchTransform", "REGISTRY", "from_reference", "register",
-           "TerminalLeafEnsemble", "pool_spec", "build_pool", "laplace", "dantzig"]
+           "TerminalLeafEnsemble", "pool_spec", "build_pool", "laplace", "dantzig", "flesaker"]

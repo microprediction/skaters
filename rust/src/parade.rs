@@ -108,6 +108,7 @@ impl Parade {
                 let (mp, sp) = match d1 {
                     PDist::Mix(d) => (d.mean(), d.std()),
                     PDist::Spliced(s) => (s.body.mean(), s.body.std()),
+                    PDist::Push(p) => (p.mean(), p.std()),
                 };
                 if mp.is_finite() && sp.is_finite() {
                     let w = 1e12 * (1.0 + mp.abs() + sp);

@@ -9,7 +9,8 @@ is `cargo test --release` against `parity/vectors.json` at 1e-6.
 | dist (mixture type, ulp-tolerant prune) | dist.py | DONE |
 | runstats (Welford) | runstats.py | DONE |
 | leaf, scale_mixture_leaf, crps_leaf, garch_leaf | leaf.py | DONE |
-| transforms (diff, frac, standardize, ema, ou, theta, drift, holt, garch, seasonal, power, yeo-johnson, ar, grouped_ar) | transform.py | DONE |
+| transforms (diff, frac, standardize, ema, ou, theta, drift, holt, garch, seasonal, seasonal_anchor, seasonal_scale, power, yeo-johnson with `exact`, log_transform, gaussianize, ar, grouped_ar) | transform.py | DONE |
+| PushforwardDist (maps as serde data, affine/shift/scale) | pushforward.py | DONE |
 | conjugate | conjugate.py | DONE |
 | ema skater | ema.py | DONE |
 | precision-weighted ensemble | ensemble.py | DONE |
@@ -19,7 +20,7 @@ is `cargo test --release` against `parity/vectors.json` at 1e-6.
 | terminal-leaf ensemble | terminal.py | DONE |
 | tails (Acklam phi_inv, censored-ML GPD, SplicedDist, gpdtails) | tails.py | DONE |
 | parade (PIT/z state, finite-input gate) | parade.py | DONE |
-| laplace composition, candidate population | api.py | DONE |
+| laplace composition, candidate population, flesaker | api.py | DONE |
 | adaptive search (dantzig) | search.py | DONE |
 | spec build path | spec.py | DONE |
 | periodicity detector | periodicity.py | DONE |

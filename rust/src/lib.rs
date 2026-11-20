@@ -16,11 +16,13 @@ pub mod skater;
 pub mod search;
 pub mod spec;
 pub mod tails;
+pub mod pushforward;
 pub mod parade;
 pub mod api;
 pub mod granger;
 
-pub use api::{build_candidates, laplace, Forecaster};
+pub use api::{build_candidates, conjugate_f, flesaker, laplace, FConj, Forecaster};
+pub use pushforward::{CoordMap, PushforwardDist};
 pub use granger::{Granger, GrangerParams, Mixture};
 pub use cov::{EmaCov, LedoitWolfCov, RunningCov};
 pub use dist::Dist;
