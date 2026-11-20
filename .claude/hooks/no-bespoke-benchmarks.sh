@@ -14,6 +14,13 @@ set -uo pipefail
 cmd="$(jq -r '.tool_input.command // empty' 2>/dev/null)" || exit 0
 [ -n "$cmd" ] || exit 0
 
+# Writing a code file into scratch/tmp or a benchmark tree from the shell
+# (cat > x.py <<EOF, tee, cp, echo >) dodges the Write guard: same rule.
+if printf '%s' "$cmd" | grep -qE '(>|tee[[:space:]]+(-a[[:space:]]+)?|cp[[:space:]]+[^[:space:]]+[[:space:]]+)[[:space:]]*[^[:space:]|;&]*(/tmp/|/private/tmp/|scratchpad/)[^[:space:]|;&]*\.(py|sh|R|jl|ipynb)'; then
+  jq -n --arg r "Blocked: writing a code file into a scratch/tmp directory from the shell. NO bespoke studies, simulations or prototypes. Use week_study -> run_arm -> summarize_canonical -> site build.py, extend an existing file, or STOP and tell the user what is missing." '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+  exit 0
+fi
+
 # Never inspect commands whose job is text, not execution. A git commit message
 # or a doc that quotes the pipeline would otherwise match its own description.
 # First line only: a heredoc body would otherwise contribute its own words.
@@ -24,6 +31,17 @@ esac
 
 # Only ever interested in commands that actually run python.
 printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_/])(python3?(\.[0-9]+)?|[A-Za-z0-9_./-]*/bin/python3?(\.[0-9]+)?)([[:space:]]|$)' || exit 0
+
+# Running a script from a scratch/tmp directory is a bespoke study by definition.
+if printf '%s' "$cmd" | grep -qE '(python3?(\.[0-9]+)?|/bin/python3?(\.[0-9]+)?)[[:space:]]+(-[A-Za-z]+[[:space:]]+)*[^[:space:]]*(/tmp/|/private/tmp/|scratchpad/)[^[:space:]]*\.py'; then
+  jq -n --arg r "Blocked: running a python script from a scratch/tmp directory. NO bespoke studies, simulations or prototypes; use week_study -> run_arm -> summarize_canonical -> site build.py, or STOP and tell the user what the pipeline is missing." '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+  exit 0
+fi
+# Inline python (heredoc / -c) that simulates or re-derives results from the store.
+if printf '%s' "$cmd" | grep -qE 'python3?[^|;&]*(<<|[[:space:]]-c[[:space:]])' && printf '%s' "$cmd" | grep -qE 'default_rng|np\.random|preds/|preds_[a-z]|canonical_[a-z_]*\.csv|logpdf|crps|dm_contest'; then
+  jq -n --arg r "Blocked: inline python that simulates or re-derives results. NO bespoke studies; summarize_canonical.py (CANON_* options) derives results, site build.py aggregates them. If an option is missing, extend the existing file or STOP and tell the user." '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
+  exit 0
+fi
 
 # Sanctioned entry points: the pipeline, and the paper's own constant scripts.
 if printf '%s' "$cmd" | grep -qE 'benchmarks/(run_arm|study|summarize_canonical|horserace_summary|bench|foundation_study|nozzle_study|refresh_figures)\.py|papers/[A-Za-z0-9_-]+/(constants|verify_paper)\.py|-m[[:space:]]+pytest|tests/'; then
