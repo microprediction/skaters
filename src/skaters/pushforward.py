@@ -256,6 +256,45 @@ class PushforwardDist:
                 total += abs(weighted_q - weight * x)
         return total
 
+    # --- affine maps ----------------------------------------------------------
+
+    def affine(self, a: float, b: float) -> "PushforwardDist":
+        """The law of a*Y + b, still a pushforward of (a reflection of) the
+        same inner. a > 0 composes the map; a < 0 reflects the inner with
+        ``inner.scale(-1)`` so the composed map stays increasing."""
+        a, b = float(a), float(b)
+        if a == 0.0 or not math.isfinite(a) or not math.isfinite(b):
+            raise ValueError("affine needs a finite nonzero a and a finite b")
+        r = 1.0 if a > 0 else -1.0          # z' = r * z
+        inner = self.inner if r > 0 else self.inner.scale(-1.0)
+        inv, fwd, lj = self.inv_fn, self.fwd_fn, self.log_jacobian_fn
+        cmf, sinv = self.component_moments_fn, self.scaled_inv_fn
+        log_a = math.log(abs(a))
+        ys = zs = None
+        if self.ys is not None:
+            ys = [a * y + b for y in self.ys]
+            zs = [r * z for z in self.zs]
+            if r < 0:
+                ys.reverse()
+                zs.reverse()
+        return PushforwardDist(
+            inner, ys, zs,
+            inv_fn=None if inv is None else (lambda z: a * inv(r * z) + b),
+            fwd_fn=None if fwd is None else (lambda y: r * fwd((y - b) / a)),
+            log_jacobian_fn=None if lj is None else (lambda z: lj(r * z) - log_a),
+            component_moments_fn=None if cmf is None else (
+                lambda m, s: (lambda ms: (a * ms[0] + b, abs(a) * ms[1]))(cmf(r * m, s))),
+            scaled_inv_fn=None if sinv is None else (
+                lambda z, w: a * sinv(r * z, w) + w * b))
+
+    def shift(self, delta: float) -> "PushforwardDist":
+        return self.affine(1.0, delta)
+
+    def scale(self, factor: float) -> "PushforwardDist":
+        if factor == 0:
+            raise ValueError("scale factor must be nonzero")
+        return self.affine(factor, 0.0)
+
     # --- Dist-compatibility shim ---------------------------------------------
 
     @property
