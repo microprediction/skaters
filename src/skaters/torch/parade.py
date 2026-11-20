@@ -13,7 +13,6 @@ the exact identity on ordinary data and keeps the graph.
 from __future__ import annotations
 
 import math
-from collections import deque
 
 import torch
 from torch import nn
@@ -43,7 +42,7 @@ class Parade(nn.Module):
     def forward(self, y, state=None):
         k = self.k
         if state is None:
-            state = {"base": None, "pending": deque(maxlen=k),
+            state = {"base": None, "pending": [],
                      "pit": [None] * k, "z": [None] * k, "skipped": 0}
         pend = state["pending"]
         n = len(pend)
@@ -56,6 +55,8 @@ class Parade(nn.Module):
             prev = pend[-1]
             shifted = [prev[min(h, len(prev) - 1)] for h in range(1, k + 1)]
             pend.append(shifted)
+            if len(pend) > k:                 # a queue of the last k issued fans
+                del pend[0]
             return shifted, state
         yt = _t(y)
         yv = float(yt.detach())
@@ -64,7 +65,7 @@ class Parade(nn.Module):
         for m in range(1, k + 1):
             if m <= n:
                 d = pend[n - m][m - 1]
-                u = float(d.cdf(yv))
+                u = float(_t(d.cdf(yv)).detach())
                 if not math.isfinite(u):
                     continue
                 u = min(max(u, _EPS), 1.0 - _EPS)
@@ -82,6 +83,8 @@ class Parade(nn.Module):
                     y_fed = torch.minimum(torch.maximum(y_fed, mp - w), mp + w)
         dists, state["base"] = self.base(y_fed, state["base"])
         pend.append(list(dists))
+        if len(pend) > k:
+            del pend[0]
         state["pit"] = pit
         state["z"] = z
         return dists, state

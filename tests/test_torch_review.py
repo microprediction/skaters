@@ -64,9 +64,10 @@ def test_search_state_deepcopy_shares_the_live_modules():
         for y in SERIES:
             _, state = f(y, state)
     copied = copy.deepcopy(state)
+    # modules live in the skater, keyed by recipe; the state holds only the recipe
     for a, b in zip(state["pool"], copied["pool"]):
-        assert a["mods"] is b["mods"]
-        for m1, m2 in zip(a["mods"], b["mods"]):
+        assert "mods" not in b and "f" not in b
+        for m1, m2 in zip(f.modules_for(a, state), f.modules_for(b, copied)):
             assert m1 is m2
 
 

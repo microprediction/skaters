@@ -20,6 +20,9 @@ def reference_skater(skater):
     """Adapt a reference skater ``(y, state) -> (list[Dist], state)`` so it
     takes a float or 0-d tensor and returns TorchDist constants."""
     def run(y, state=None):
+        if state is not None:
+            from skaters.torch.state import floats
+            state = floats(state)       # a state restored by skaters.torch.state_from_json holds tensors
         dists, state = skater(float(_t(y).detach()), state)
         return [TorchDist.from_reference(d) for d in dists], state
     run.__name__ = f"reference({getattr(skater, '__name__', '?')})"

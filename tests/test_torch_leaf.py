@@ -14,7 +14,10 @@ torch = pytest.importorskip("torch")
 import importlib                                                # noqa: E402
 rl = importlib.import_module("skaters.leaf")   # the package re-exports a `leaf` function that shadows the module
 from skaters.ema import ema as ref_ema                          # noqa: E402
-import skaters.torch.leaf as tl                                  # noqa: E402
+import importlib  # noqa: E402
+
+# the module, not the ``leaf`` factory that skaters.torch exports under the same name
+tl = importlib.import_module("skaters.torch.leaf")
 from skaters.torch.ema import ema as tor_ema                    # noqa: E402
 from skaters.torch.parity import random_series                  # noqa: E402
 
