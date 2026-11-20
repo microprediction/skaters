@@ -7,6 +7,26 @@ every release.
 
 ## Unreleased
 
+- State uses the canonical layout of `docs/STATE.md`, the one Python writes, so
+  a checkpoint moves between the ports in either direction. Keys renamed:
+  `tState` to `t_state`, `sState` to `s_state`, `leafState` to `leaf_state`,
+  `leafPred` to `leaf_pred`, `meanQ` to `mean_q`, `phiUsed` to `phi_used`.
+  `terminalLeafEnsemble` state gains `adapt` (`null` unless adaptive temperature
+  is on). `stateFromJSON` renames the old keys on read, so a checkpoint written
+  by an earlier version still resumes. Code that read these keys out of a state
+  object must use the new names.
+- New, matching Python: `homogenize`, `homogenizeCandidates` and
+  `HomogenizedDist` (`homogenize.mjs`); `residualTransform`,
+  `ResidualDiagnostics` and `CorrectedDist` (`residual_transform.mjs`);
+  `dantzig(k, opts)` in `api.mjs`; `terminalLeafEnsemble` options
+  `adaptiveTemperature`, `tempRho`, `tempBand`; a seventh `laplace` argument,
+  `leaf`, a terminal-leaf factory such as `garchLeaf`; and a `leafFn` argument
+  to `buildCandidates`.
+- `toJson(spec)` is byte-identical to Python's `to_json`: Python's float
+  formatting (`1e-05`, `1.0` for the float fields `alpha`, `d`, `floor`) and
+  ASCII escaping. `specName` formats floats as Python's `%.6g`; it wrote
+  `ema(0.00001)` where Python writes `ema(1e-05)`.
+
 - `powerTransform` and `yeoJohnson` no longer fail on laplace's tail-spliced
   predictive: they emit its exact pushforward, a `PushforwardDist` (new module
   `pushforward.mjs`, a port of `skaters/pushforward.py`). At k > 1,

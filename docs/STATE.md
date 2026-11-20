@@ -21,7 +21,8 @@ dists, state = f(next_y, state)
 ```
 
 JS has the same pair, `stateToJSON` and `stateFromJSON` in
-`docs/js/skaters/state.mjs`.
+`docs/js/skaters/state.mjs`, and writes the same layout, so a checkpoint
+written by either port resumes in the other.
 
 ## Values
 
@@ -103,13 +104,21 @@ between `gpdtails` and `sticky` when `k > 1`).
 | `search` / `dantzig` | `pool`: list of entries `{s, depth, recipe, cost, age, warmed, log_w, queues, dists}`; `n_obs`; `buffer`: queue bounded by `replay_buffer`; `pd_state`; `detected_periods`: list in detection order. A pool skater is rebuilt from its `recipe`; no closure is stored |
 | `period_detector` | `buffer`, `n`, `mean`, `var`; `cross`: object keyed by lag string |
 | `granger` | `lap`, `learned`: child states; `pend`: queue (bound `k`) of `[laplace predictives, learned predictives]` pairs; `cum`, `t`, `z`, `repeat_frac`, `abs_z_mean`, `n`, `last_y` |
-| `homogenize` | `base`, `raw`, `pending` (queue, bound `k`), `cell`, `correction` |
-| `residual_transform` | `base`, `raw`, `z`, `learner`, `theta` |
+| `homogenize` | `base`, `raw`, `pending` (queue, bound `k`); `cell`: per horizon, `null` or `{dynamic, issued, n}` with `dynamic` one `{q, log_weight, guard_run}` per candidate; `correction`: per horizon, `null` or `{weights, scales}` |
+| `residual_transform` | `base`, `raw`, `z`; `learner`: `null` for `m0`, else `{ell, a, c, ea, ec, g2a, g2c}` plus `b`, `eb`, `g2b` for `m2`; `theta` |
 | `zbank` | `t`; `sub`: one list of phase copies per (sigma, stride), sigma-major; `z` |
 
 Transforms keep their own small objects under `t_state`; see each transform's
 source. `gaussianize` stores its knots as a list `[cs, zs, ts]`, `ts` being
 `null` for the unsmoothed variant.
+
+## Old JS checkpoints
+
+Before this layout, the JS port wrote six keys in camelCase: `tState`,
+`sState`, `leafState`, `leafPred`, `meanQ` and `phiUsed`, and
+`terminalLeafEnsemble` state had no `adapt`. `stateFromJSON` renames the keys
+on read and the ensemble adds `adapt: null` on its next step, so those
+checkpoints still resume.
 
 ## Old Python checkpoints
 
@@ -125,7 +134,12 @@ pickle-only; `state_to_json` refuses them until they have been stepped.
 - `tests/test_state_json.py`: every exported skater is checkpointed through
   JSON at several points, including after laplace's GPD splice is live, and
   must resume bit-exactly; old layouts must resume.
-- `parity/roundtrip.mjs`: the same gate for the JS port.
+- `parity/roundtrip.mjs`: the same gate for the JS port, plus an old
+  camelCase JS checkpoint that must resume.
+- `tests/test_js_state_resume.py`: Python checkpoints every exported skater
+  JS has at several points, JS resumes them and must match Python's next 20
+  outputs to 1e-6, and Python resumes JS's checkpoints likewise. JS state must
+  have exactly Python's key layout.
 - `parity/gen_vectors.py` restores through JSON at the burn-in step of every
   parity scenario.
 

@@ -151,31 +151,34 @@ def build_scenarios():
     return s
 
 
-def build_wave2_scenarios():
-    """Scenarios for the second-wave surface (homogenize, residual_transform,
-    the terminal ensemble's adaptive temperature, dantzig). Written to their own
-    block, ``wave2_scenarios``, read by the Rust and torch gates; names must
-    match theirs."""
-    from skaters.homogenize import homogenize
+def build_wrapper_scenarios():
+    """Wrappers on a skater's own PIT residuals, the adaptive temperature,
+    the named search policy, and laplace with a custom terminal leaf. Part of the
+    main scenario block: every port (JS, Rust, torch) builds them. Names must
+    match scenarios.mjs buildWrapperScenarios()."""
+    s = []
+    from skaters.api import dantzig
+    from skaters.homogenize import homogenize, make_candidates
     from skaters.residual_transform import residual_transform
     from skaters.terminal import terminal_leaf_ensemble
-    from skaters.api import dantzig
-    s = []
-    for k in (1, 3):
-        suf = "" if k == 1 else f"_k{k}"
-        def base(kk=k):
-            return conjugate(leaf(k=kk), ema_transform(0.1), k=kk)
-        s.append((f"homogenize{suf}", k, homogenize(base(), k=k)))
-        if k > 1:
-            for mode in ("weights", "state", "shared"):
-                s.append((f"homogenize_{mode}{suf}", k, homogenize(base(), k=k, couple=mode)))
-        if k == 1:                      # residual_transform supports k=1 only
-            for model in ("m0", "m1", "m2"):
-                s.append((f"residual_{model}", k, residual_transform(base(), model=model, k=k)))
-        s.append((f"terminal_adapt{suf}", k, terminal_leaf_ensemble(
-            [ema(0.05, k=k), conjugate(leaf(k=k), difference(), k=k)],
-            k=k, learning_rate=0.5, adaptive_temperature=True)))
-    s.append(("dantzig", 1, dantzig(k=1, expand_interval=50)))
+    ema_c = lambda kk: conjugate(leaf(k=kk), ema_transform(0.1), k=kk)  # noqa: E731
+    s.append(("homogenize", 1, homogenize(ema_c(1))))
+    s.append(("homogenize_k2_weights", 2, homogenize(ema_c(2), k=2, couple="weights")))
+    s.append(("homogenize_k2_state", 2, homogenize(ema_c(2), k=2, couple="state", lam=0.5)))
+    s.append(("homogenize_k2_shared", 2, homogenize(ema_c(2), k=2, couple="shared")))
+    s.append(("homogenize_small_grid", 1, homogenize(
+        ema_c(1), candidates=make_candidates(rho_grid=(0.0, 0.9), gain_grid=(0.1,), delta_grid=(0.0, 0.5)))))
+    for model in ("m0", "m1", "m2"):
+        s.append((f"residual_transform_{model}", 1, residual_transform(ema_c(1), model=model)))
+    s.append(("residual_transform_m2_lr", 1, residual_transform(ema_c(1), model="m2", lr=0.05)))
+    s.append(("terminal_adaptive", 1, terminal_leaf_ensemble(
+        [ema(0.05, k=1), conjugate(leaf(k=1), difference(), k=1)], k=1, depths=[0, 1],
+        adaptive_temperature=True, temp_rho=0.1)))
+    s.append(("terminal_adaptive_k3", 3, terminal_leaf_ensemble(
+        [ema(0.05, k=3), conjugate(leaf(k=3), difference(), k=3)], k=3, depths=[0, 1],
+        adaptive_temperature=True, forget=0.99)))
+    s.append(("pol_dantzig", 1, dantzig(k=1, expand_interval=50)))
+    s.append(("pol_laplace_garch_leaf", 1, laplace(k=1, leaf=garch_leaf)))
     return s
 
 
@@ -343,6 +346,8 @@ def main():
                "q_lo": Q_LO, "q_hi": Q_HI, "scenarios": {}}
     for name, k, skater in build_scenarios():
         vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
+    for name, k, skater in build_wrapper_scenarios():
+        vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
 
     # Periodicity detector: dump the ranked (lag, acf) scores per step.
     pd = period_detector()
@@ -408,11 +413,6 @@ def main():
         structure[str(kk)] = {"n_candidates": len(cands), "depths": list(depths)}
     vectors["structure"] = structure
 
-    # Second-wave surface, its own block (the JS gate does not read it yet).
-    vectors["wave2_scenarios"] = {
-        name: {"k": k, "out": run_scenario(sk, series, name)}
-        for name, k, sk in build_wave2_scenarios()
-    }
     # Spec JSON: the port must read each string, rebuild, and write it back.
     vectors["spec_json"] = [{"json": S.to_json(sp), "name": S.name(sp)} for sp in spec_examples()]
 

@@ -46,13 +46,16 @@ function inferK(spec) {
 // --- canonical name ---
 
 function fmt(x) {
-  // Mimic Python's "%.6g" with integer collapse.
-  if (x === Math.trunc(x)) return String(Math.trunc(x));
-  let s = x.toPrecision(6);
-  if (s.indexOf(".") >= 0 && s.indexOf("e") < 0 && s.indexOf("E") < 0) {
-    s = s.replace(/0+$/, "").replace(/\.$/, "");
+  // Python's _fmt: str(int(x)) when integral, else "%.6g".
+  if (x === Math.trunc(x)) return Math.abs(x) < 1e21 ? String(Math.trunc(x)) : BigInt(x).toString();
+  const [mant, expStr] = x.toExponential(5).split("e");   // 6 significant digits
+  const exp = Number(expStr);
+  const strip = (t) => (t.indexOf(".") >= 0 ? t.replace(/0+$/, "").replace(/\.$/, "") : t);
+  if (exp < -4 || exp >= 6) {
+    const e = Math.abs(exp) < 10 ? `0${Math.abs(exp)}` : `${Math.abs(exp)}`;
+    return `${strip(mant)}e${exp < 0 ? "-" : "+"}${e}`;
   }
-  return s;
+  return strip(x.toFixed(5 - exp));
 }
 
 export function name(spec) {
@@ -78,8 +81,70 @@ function transformName(spec) {
 
 // --- serialization ---
 
+// Python's json.dumps(spec, separators=(",", ":")), byte for byte. JSON.stringify
+// differs in two ways: number formatting (Python writes 1e-05 and 0.1 where JS
+// writes 0.00001 and 0.1, and 1.0 where JS writes 1), and non-ASCII escaping.
+// JS numbers carry no int/float distinction, so the spec grammar decides: the
+// float fields (alpha, d, floor) are written as Python floats, every other
+// integral number as an int.
+const FLOAT_FIELDS = new Set(["alpha", "d", "floor"]);
+
+export function pyFloatRepr(x) {
+  if (Number.isNaN(x)) return "NaN";
+  if (x === Infinity) return "Infinity";
+  if (x === -Infinity) return "-Infinity";
+  if (x === 0) return Object.is(x, -0) ? "-0.0" : "0.0";
+  // Shortest round-trip digits, as both languages choose them.
+  const [mant, expStr] = x.toExponential().split("e");
+  const exp = Number(expStr);
+  const neg = mant.startsWith("-");
+  const digits = mant.replace("-", "").replace(".", "");
+  const sign = neg ? "-" : "";
+  if (exp >= -4 && exp < 16) {
+    if (exp >= digits.length - 1) return `${sign}${digits}${"0".repeat(exp - digits.length + 1)}.0`;
+    if (exp >= 0) return `${sign}${digits.slice(0, exp + 1)}.${digits.slice(exp + 1)}`;
+    return `${sign}0.${"0".repeat(-exp - 1)}${digits}`;
+  }
+  const m = digits.length > 1 ? `${digits[0]}.${digits.slice(1)}` : digits;
+  const e = Math.abs(exp) < 10 ? `0${Math.abs(exp)}` : `${Math.abs(exp)}`;
+  return `${sign}${m}e${exp < 0 ? "-" : "+"}${e}`;
+}
+
+function pyString(str) {
+  let out = '"';
+  for (const ch of str) {
+    const c = ch.codePointAt(0);
+    if (ch === '"') out += '\\"';
+    else if (ch === "\\") out += "\\\\";
+    else if (ch === "\n") out += "\\n";
+    else if (ch === "\r") out += "\\r";
+    else if (ch === "\t") out += "\\t";
+    else if (ch === "\b") out += "\\b";
+    else if (ch === "\f") out += "\\f";
+    else if (c < 0x20 || (c > 0x7e && c <= 0xffff)) out += "\\u" + c.toString(16).padStart(4, "0");
+    else if (c > 0xffff) {
+      const v = c - 0x10000;
+      out += "\\u" + (0xd800 + (v >> 10)).toString(16) + "\\u" + (0xdc00 + (v & 0x3ff)).toString(16);
+    } else out += ch;
+  }
+  return out + '"';
+}
+
+function pyDumps(v, key) {
+  if (v === null || v === undefined) return "null";
+  if (v === true) return "true";
+  if (v === false) return "false";
+  if (typeof v === "number") {
+    if (Number.isInteger(v) && !FLOAT_FIELDS.has(key)) return String(v);
+    return pyFloatRepr(v);
+  }
+  if (typeof v === "string") return pyString(v);
+  if (Array.isArray(v)) return "[" + v.map((x) => pyDumps(x, key)).join(",") + "]";
+  return "{" + Object.keys(v).map((kk) => `${pyString(kk)}:${pyDumps(v[kk], kk)}`).join(",") + "}";
+}
+
 export function toJson(spec) {
-  return JSON.stringify(spec);
+  return pyDumps(spec, null);
 }
 
 export function fromJson(s) {

@@ -2,7 +2,7 @@
 layout (docs/STATE.md), that another port must resume.
 
 For every parity scenario (``gen_vectors.build_scenarios`` and
-``build_wave2_scenarios``) the skater runs over a fixed series; at each
+``build_wrapper_scenarios``) the skater runs over a fixed series; at each
 checkpoint time t (the state after t observations) the state is written with
 ``state_to_json``, together with the probes of the next STEPS predictives
 (mean, std, logpdf, cdf, two quantiles, crps, as in gen_vectors). A port
@@ -25,7 +25,7 @@ import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gen_vectors import (build_scenarios, build_wave2_scenarios, probe_dist,  # noqa: E402
+from gen_vectors import (build_scenarios, build_wrapper_scenarios, probe_dist,  # noqa: E402
                          PROBE, Q_LO, Q_HI)
 from skaters.state import state_to_json  # noqa: E402
 
@@ -46,7 +46,7 @@ def make_resume_series(n: int = TIMES[-1] + STEPS + 1, seed: int = 2027):
 
 
 def all_scenarios():
-    return list(build_scenarios()) + list(build_wave2_scenarios())
+    return list(build_scenarios()) + list(build_wrapper_scenarios())
 
 
 def run_checkpoints(skater, series):

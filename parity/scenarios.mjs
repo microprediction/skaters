@@ -10,7 +10,10 @@ import {
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
   seasonalScale, logTransform, gaussianize, seasonalAnchor,
 } from "../docs/js/skaters/transform.mjs";
-import { laplace, flesaker } from "../docs/js/skaters/api.mjs";
+import { laplace, flesaker, dantzig } from "../docs/js/skaters/api.mjs";
+import { homogenize, makeCandidates } from "../docs/js/skaters/homogenize.mjs";
+import { residualTransform } from "../docs/js/skaters/residual_transform.mjs";
+import { terminalLeafEnsemble } from "../docs/js/skaters/terminal.mjs";
 import { multiscale } from "../docs/js/skaters/multiscale.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
@@ -100,6 +103,32 @@ export function buildScenarios() {
   s.push(["crps_leaf", 1, crpsLeaf(1)]);
   s.push(["garch_leaf", 1, garchLeaf(1)]);
   s.push(["scalemix_ema", 1, conjugate(scaleMixtureLeaf(1), emaTransform(0.1), 1)]);
+  return s;
+}
+
+// Wrappers on a skater's own PIT residuals, the adaptive temperature, the
+// named search policy, and laplace with a custom terminal leaf. Must match
+// parity/gen_vectors.py build_wrapper_scenarios(), part of the main "scenarios" block.
+export function buildWrapperScenarios() {
+  const s = [];
+  const emaC = (kk) => conjugate(leaf(kk), emaTransform(0.1), kk);
+  s.push(["homogenize", 1, homogenize(emaC(1))]);
+  s.push(["homogenize_k2_weights", 2, homogenize(emaC(2), null, 2, "weights")]);
+  s.push(["homogenize_k2_state", 2, homogenize(emaC(2), null, 2, "state", 0.5)]);
+  s.push(["homogenize_k2_shared", 2, homogenize(emaC(2), null, 2, "shared")]);
+  s.push(["homogenize_small_grid", 1, homogenize(emaC(1), makeCandidates([0.0, 0.9], [0.1], [0.0, 0.5]))]);
+  for (const model of ["m0", "m1", "m2"]) {
+    s.push([`residual_transform_${model}`, 1, residualTransform(emaC(1), model)]);
+  }
+  s.push(["residual_transform_m2_lr", 1, residualTransform(emaC(1), "m2", 0.05)]);
+  s.push(["terminal_adaptive", 1, terminalLeafEnsemble(
+    [ema(0.05, 1), conjugate(leaf(1), difference(), 1)],
+    { k: 1, depths: [0, 1], adaptiveTemperature: true, tempRho: 0.1 })]);
+  s.push(["terminal_adaptive_k3", 3, terminalLeafEnsemble(
+    [ema(0.05, 3), conjugate(leaf(3), difference(), 3)],
+    { k: 3, depths: [0, 1], adaptiveTemperature: true, forget: 0.99 })]);
+  s.push(["pol_dantzig", 1, dantzig(1, { expandInterval: 50 })]);
+  s.push(["pol_laplace_garch_leaf", 1, laplace(1, "crps", true, null, 0.03, "gpd", garchLeaf)]);
   return s;
 }
 

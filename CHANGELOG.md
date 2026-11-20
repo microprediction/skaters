@@ -11,7 +11,24 @@
   and `search`/`dantzig` rebuild pool skaters from recipes instead of storing
   closures. Numerics are unchanged. Old Python checkpoints still resume.
   `tests/test_state_json.py` gates every exported skater on an exact JSON resume.
-  The JS, R and Julia ports will adopt the same layout in follow-up work.
+  The JS port writes the same layout (below); R and Julia will follow.
+- The JavaScript port writes the canonical state layout. Its camelCase keys
+  (`tState`, `sState`, `leafState`, `leafPred`, `meanQ`, `phiUsed`) are now
+  `t_state`, `s_state`, `leaf_state`, `leaf_pred`, `mean_q`, `phi_used`, and
+  `terminalLeafEnsemble` state carries `adapt`. `stateFromJSON` renames the old
+  keys on read, so earlier JS checkpoints still resume. A checkpoint written by
+  either port resumes in the other: `tests/test_js_state_resume.py` checkpoints
+  every exported skater JS has at t = 60, 250 and 530 in each direction, holds
+  the next 20 outputs to 1e-6, and requires JS state to have Python's key layout.
+- The JavaScript port covers the rest of the Python API: `homogenize`,
+  `homogenizeCandidates`, `HomogenizedDist`, `residualTransform`,
+  `ResidualDiagnostics`, `CorrectedDist`, `dantzig`, the adaptive temperature of
+  `terminalLeafEnsemble` (`adaptiveTemperature`, `tempRho`, `tempBand`), and
+  `laplace`'s custom terminal `leaf`. Spec `toJson` writes Python's
+  `json.dumps(spec, separators=(",", ":"))` byte for byte, and `specName`
+  formats floats as Python's `%.6g` does (it wrote `ema(0.00001)` for
+  `ema(1e-05)`). Parity vectors gain a `wrapper_scenarios` block for these,
+  which the JS checker reads; the Rust and torch gates do not read it yet.
 
 - `PushforwardDist` gains `affine`, `shift` and `scale`, so an exact pushforward
   predictive can be wrapped by `standardize`, `seasonal_scale` and the other affine

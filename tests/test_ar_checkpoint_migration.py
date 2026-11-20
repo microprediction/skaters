@@ -79,7 +79,7 @@ def test_js_port_resumes_from_a_checkpoint_without_the_cache(tmp_path):
 import { ar, groupedAr } from "./transform.mjs";
 const ys = Array.from({length: 60}, (_, i) => Math.sin(i) + 0.1 * Math.cos(3 * i));
 const strip = (o) => Array.isArray(o) ? o.map(strip)
-  : (o && typeof o === "object") ? Object.fromEntries(Object.entries(o).filter(([k]) => k !== "phiUsed").map(([k, v]) => [k, strip(v)]))
+  : (o && typeof o === "object") ? Object.fromEntries(Object.entries(o).filter(([k]) => k !== "phi_used").map(([k, v]) => [k, strip(v)]))
   : o;
 for (const [name, mk] of [["ar3", () => ar(3)], ["groupedAr8", () => groupedAr(8)]]) {
   const t = mk();
@@ -87,13 +87,13 @@ for (const [name, mk] of [["ar3", () => ar(3)], ["groupedAr8", () => groupedAr(8
   for (const y of ys.slice(0, 30)) { const r = t.forward(y, st); st = r[1]; }
   let full = JSON.parse(JSON.stringify(st));
   let old = strip(JSON.parse(JSON.stringify(st)));
-  if (old.phiUsed !== undefined) throw new Error("strip failed");
+  if (old.phi_used !== undefined) throw new Error("strip failed");
   for (const y of ys.slice(30)) {
     const a = t.forward(y, full); full = a[1];
     const b = t.forward(y, old); old = b[1];
     if (a[0] !== b[0]) throw new Error(name + ": emission differs after migration");
   }
-  if (JSON.stringify(old.phiUsed) !== JSON.stringify(full.phiUsed)) throw new Error(name + ": cache differs");
+  if (JSON.stringify(old.phi_used) !== JSON.stringify(full.phi_used)) throw new Error(name + ": cache differs");
 }
 console.log("ok");
 """

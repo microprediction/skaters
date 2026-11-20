@@ -84,14 +84,31 @@ function isDistDict(v) {
   return keys.length === 1 && keys[0] === "components" && Array.isArray(v.components);
 }
 
+// Keys older JS checkpoints wrote in camelCase. The canonical layout
+// (docs/STATE.md) is Python's snake_case; stateFromJSON renames these on read
+// so a checkpoint written before the layout was fixed still resumes.
+const LEGACY_KEYS = {
+  tState: "t_state",
+  sState: "s_state",
+  leafState: "leaf_state",
+  leafPred: "leaf_pred",
+  meanQ: "mean_q",
+  phiUsed: "phi_used",
+};
+
 // Inverse of stateToJSON. A {components: [[w, m, s], ...]} object becomes a
 // Dist without renormalising (Dist.trusted), a {spliced: true, ...}
-// object becomes a SplicedDist; everything else is copied as is.
+// object becomes a SplicedDist; everything else is copied as is, except that
+// the camelCase keys of old JS checkpoints are renamed to the canonical ones.
 export function stateFromJSON(obj) {
   if (obj === null || typeof obj !== "object") return obj;
   if (Array.isArray(obj)) return obj.map(stateFromJSON);
   if (isDistDict(obj)) return Dist.fromDict(obj);
   const out = {};
-  for (const k of Object.keys(obj)) out[k] = stateFromJSON(obj[k]);
+  for (const k of Object.keys(obj)) {
+    const key = Object.prototype.hasOwnProperty.call(LEGACY_KEYS, k) && !(LEGACY_KEYS[k] in obj)
+      ? LEGACY_KEYS[k] : k;
+    out[key] = stateFromJSON(obj[k]);
+  }
   return out;
 }

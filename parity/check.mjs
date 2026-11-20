@@ -4,7 +4,7 @@
 // Exits non-zero if any scenario diverges beyond tolerance.
 
 import { readFileSync } from "fs";
-import { buildScenarios, buildRepeatScenarios, buildGapScenarios } from "./scenarios.mjs";
+import { buildScenarios, buildWrapperScenarios, buildRepeatScenarios, buildGapScenarios } from "./scenarios.mjs";
 import { periodDetector } from "../docs/js/skaters/periodicity.mjs";
 import { buildCandidates } from "../docs/js/skaters/api.mjs";
 import { runningCov, emaCov, ledoitWolfCov } from "../docs/js/skaters/cov.mjs";
@@ -50,14 +50,16 @@ function runScenario(skater, series, burn, probe, qLo, qHi, restoreAt = -1) {
 function main() {
   const vectors = JSON.parse(readFileSync(new URL("./vectors.json", import.meta.url)));
   const { series, burn, probe, q_lo: qLo, q_hi: qHi } = vectors;
-  const scenarios = new Map(buildScenarios().map(([name, k, skater]) => [name, { k, skater }]));
+  const scenarios = new Map([...buildScenarios(), ...buildWrapperScenarios()]
+    .map(([name, k, skater]) => [name, { k, skater }]));
 
   const LABELS = ["mean", "std", "logpdf", "cdf", "qlo", "qhi", "crps"];
   let failures = 0;
   let checked = 0;
   const missing = [];
 
-  for (const [name, expected] of Object.entries(vectors.scenarios)) {
+  const allScenarios = vectors.scenarios;
+  for (const [name, expected] of Object.entries(allScenarios)) {
     const sc = scenarios.get(name);
     if (!sc) {
       missing.push(name);
@@ -232,7 +234,7 @@ function main() {
     }
   }
 
-  console.log(`\n${checked} values checked across ${Object.keys(vectors.scenarios).length} scenarios`);
+  console.log(`\n${checked} values checked across ${Object.keys(allScenarios).length} scenarios`);
   if (failures > 0) {
     console.error(`PARITY FAILED: ${failures} mismatches`);
     process.exit(1);
