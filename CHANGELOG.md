@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Fix: `SplicedDist` gains `shift` and `scale`, so `ema_transform`, `seasonal_difference`,
+  `seasonal_anchor` and `ou_transform` conjugated around
+  `laplace` no longer raise `AttributeError` once the tail splice is live. The
+  0.17.0 entry said `ema_transform` was covered by the `affine` fix; it was not.
+  The JavaScript `SplicedDist` gains `affine`, `shift` and `scale` (it had none).
+  Julia and R take the same fix in their own repositories. Still open: transforms
+  that read `.components` directly (`power_transform` and `yeo_johnson` without
+  `exact=True`, `gaussianize`, and the k > 1 horizons of `ema_transform`,
+  `seasonal_difference` and `seasonal_anchor`) fail on a spliced predictive.
+
 ## 0.17.0
 
 - `skaters-fast` (the PyO3 backend) is published to PyPI for the first time, so
