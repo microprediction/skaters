@@ -36,6 +36,9 @@ def period_detector(
         lags = list(DEFAULT_LAGS)
 
     max_lag = max(lags)
+    # ``cross`` is keyed by the lag as a decimal string: JSON object keys are
+    # strings, and the JS port's object keys the same way.
+    lag_keys = [(L, str(L)) for L in lags]
 
     def _detect(y: float, state: dict | None) -> tuple[list[tuple[int, float]], dict]:
         if state is None:
@@ -45,8 +48,10 @@ def period_detector(
                 "mean": 0.0,
                 "var": 0.0,
                 # Per-lag: running EMA of (y_t - mu) * (y_{t-L} - mu)
-                "cross": {L: 0.0 for L in lags},
+                "cross": {key: 0.0 for _, key in lag_keys},
             }
+        elif lag_keys[0][1] not in state["cross"]:      # pre-canonical checkpoint: int keys
+            state["cross"] = {str(L): v for L, v in state["cross"].items()}
 
         buf = state["buffer"]
         buf.append(y)
@@ -61,11 +66,12 @@ def period_detector(
         var = state["var"]
 
         # Update cross-correlation for each lag
-        for L in lags:
+        cr = state["cross"]
+        for L, key in lag_keys:
             if len(buf) > L:
                 y_lagged = buf[-(L + 1)]
                 cross = (y - mu) * (y_lagged - mu)
-                state["cross"][L] = (1 - alpha) * state["cross"][L] + alpha * cross
+                cr[key] = (1 - alpha) * cr[key] + alpha * cross
 
         # Trim buffer
         if len(buf) > max_lag + 1:
@@ -76,9 +82,9 @@ def period_detector(
             return [], state
 
         scores = []
-        for L in lags:
+        for L, key in lag_keys:
             if state["n"] > L:
-                acf = state["cross"][L] / var if var > 0 else 0.0
+                acf = cr[key] / var if var > 0 else 0.0
                 scores.append((L, acf))
 
         # Sort by |acf| descending
