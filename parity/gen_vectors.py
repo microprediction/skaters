@@ -151,6 +151,47 @@ def build_scenarios():
     return s
 
 
+def build_wave2_scenarios():
+    """Scenarios for the second-wave surface (homogenize, residual_transform,
+    the terminal ensemble's adaptive temperature, dantzig). Written to their own
+    block, ``wave2_scenarios``, read by the Rust and torch gates; names must
+    match theirs."""
+    from skaters.homogenize import homogenize
+    from skaters.residual_transform import residual_transform
+    from skaters.terminal import terminal_leaf_ensemble
+    from skaters.api import dantzig
+    s = []
+    for k in (1, 3):
+        suf = "" if k == 1 else f"_k{k}"
+        def base(kk=k):
+            return conjugate(leaf(k=kk), ema_transform(0.1), k=kk)
+        s.append((f"homogenize{suf}", k, homogenize(base(), k=k)))
+        if k > 1:
+            for mode in ("weights", "state", "shared"):
+                s.append((f"homogenize_{mode}{suf}", k, homogenize(base(), k=k, couple=mode)))
+        if k == 1:                      # residual_transform supports k=1 only
+            for model in ("m0", "m1", "m2"):
+                s.append((f"residual_{model}", k, residual_transform(base(), model=model, k=k)))
+        s.append((f"terminal_adapt{suf}", k, terminal_leaf_ensemble(
+            [ema(0.05, k=k), conjugate(leaf(k=k), difference(), k=k)],
+            k=k, learning_rate=0.5, adaptive_temperature=True)))
+    s.append(("dantzig", 1, dantzig(k=1, expand_interval=50)))
+    return s
+
+
+def spec_examples():
+    """Spec dicts whose to_json/name the ports must reproduce and read back."""
+    return [
+        S.leaf_spec(1),
+        S.ema_spec(0.05, 1),
+        S.ensemble_spec(S.ema_spec(0.01, 1), S.ema_spec(0.1, 1), k=1),
+        S.conjugate_spec(S.ensemble_spec(S.ema_spec(0.01, 1), S.ema_spec(0.1, 1), k=1), S.diff_spec()),
+        S.conjugate_spec(S.leaf_spec(3), S.frac_spec(0.3, 40)),
+        S.conjugate_spec(S.leaf_spec(1), S.std_spec(0.02)),
+        S.conjugate_spec(S.leaf_spec(1), S.ema_t_spec(0.2)),
+    ]
+
+
 def make_vec_series(n=120, seed=7):
     random.seed(seed)
     out = []
@@ -366,6 +407,14 @@ def main():
         cands, depths, _ = _build_candidates(kk)
         structure[str(kk)] = {"n_candidates": len(cands), "depths": list(depths)}
     vectors["structure"] = structure
+
+    # Second-wave surface, its own block (the JS gate does not read it yet).
+    vectors["wave2_scenarios"] = {
+        name: {"k": k, "out": run_scenario(sk, series, name)}
+        for name, k, sk in build_wave2_scenarios()
+    }
+    # Spec JSON: the port must read each string, rebuild, and write it back.
+    vectors["spec_json"] = [{"json": S.to_json(sp), "name": S.name(sp)} for sp in spec_examples()]
 
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "vectors.json")
