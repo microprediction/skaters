@@ -8,8 +8,9 @@ import { bayesianEnsemble } from "../docs/js/skaters/bayesian.mjs";
 import {
   difference, fractionalDifference, standardize, emaTransform, ouTransform, theta, drift,
   holtLinear, garch, seasonalDifference, powerTransform, ar, groupedAr, yeoJohnson,
+  seasonalScale, logTransform, gaussianize,
 } from "../docs/js/skaters/transform.mjs";
-import { laplace } from "../docs/js/skaters/api.mjs";
+import { laplace, flesaker } from "../docs/js/skaters/api.mjs";
 import { multiscale } from "../docs/js/skaters/multiscale.mjs";
 import { sticky } from "../docs/js/skaters/sticky.mjs";
 import { search } from "../docs/js/skaters/search.mjs";
@@ -40,6 +41,16 @@ export function buildScenarios() {
     s.push([`yeojohnson_half${suf}`, k, conjugate(leaf(k), yeoJohnson(0.5), k)]);
     s.push([`ou${suf}`, k, conjugate(leaf(k), ouTransform(0.1), k)]);
     s.push([`ou_sqrt${suf}`, k, conjugate(conjugate(leaf(k), ouTransform(0.1), k), yeoJohnson(0.5), k)]);
+    s.push([`seasonal_scale${suf}`, k, conjugate(leaf(k), seasonalScale(7), k)]);
+    s.push([`seasonal_scale_c${suf}`, k, conjugate(leaf(k), seasonalScale(7, 0.1, true), k)]);
+    s.push([`power_exact${suf}`, k, conjugate(leaf(k), powerTransform(0.5, true), k)]);
+    s.push([`yeojohnson_exact${suf}`, k, conjugate(leaf(k), yeoJohnson(0.5, true), k)]);
+    s.push([`log_lower${suf}`, k, conjugate(leaf(k), logTransform(-15.0), k)]);
+    s.push([`log_upper${suf}`, k, conjugate(leaf(k), logTransform(null, 15.0), k)]);
+    s.push([`gaussianize${suf}`, k, conjugate(leaf(k), gaussianize(), k)]);
+    s.push([`gaussianize_smooth${suf}`, k, conjugate(leaf(k), gaussianize(39, 30, 9, true), k)]);
+    s.push([`gaussianize_delete${suf}`, k, conjugate(leaf(k), gaussianize(15, 30, 9, false, 1.5, 8.0, "delete"), k)]);
+    s.push([`gaussianize_emin${suf}`, k, conjugate(leaf(k), gaussianize(15, 30, 9, false, 1.5, 8.0, "emin"), k)]);
     s.push([`ema_skater${suf}`, k, ema(0.05, k)]);
     s.push([`pw_ensemble${suf}`, k,
       precisionWeightedEnsemble([ema(0.05, k), ema(0.2, k)], k)]);
@@ -53,6 +64,7 @@ export function buildScenarios() {
   s.push(["pol_laplace", 1, laplace(1)]);
   // laplace at k>1 exercises the multi-step mean-reversion group (gated on k>1).
   s.push(["pol_laplace_k3", 3, laplace(3)]);
+  s.push(["pol_flesaker", 1, flesaker(1, -15.0)]);
 
   // Adaptive-search engine (still public via skaters.search)
   s.push(["search_default", 1, search({ k: 1, expandInterval: 50 })]);

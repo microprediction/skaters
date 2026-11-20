@@ -23,6 +23,13 @@ import sys
 import torch
 
 ATOL = RTOL = 1e-6
+
+# Scenarios for transforms skaters.torch does not port: the exact pushforward
+# (power_transform/yeo_johnson exact=True, log_transform, flesaker) and
+# gaussianize. Listed, so each is named in the output rather than hidden.
+NOT_IN_TORCH = {"power_exact", "yeojohnson_exact", "log_lower", "log_upper",
+                "gaussianize", "gaussianize_smooth", "gaussianize_delete",
+                "gaussianize_emin", "pol_flesaker"}
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -106,6 +113,8 @@ def build_scenarios():
         s[f"grouped_ar{suf}"] = (k, tx("grouped_ar", max_lag=8))
         s[f"yeojohnson_log{suf}"] = (k, tx("yeo_johnson", lmbda=0.0))
         s[f"yeojohnson_half{suf}"] = (k, tx("yeo_johnson", lmbda=0.5))
+        s[f"seasonal_scale{suf}"] = (k, tx("seasonal_scale", period=7))
+        s[f"seasonal_scale_c{suf}"] = (k, tx("seasonal_scale", period=7, alpha=0.1, center=True))
         s[f"ou{suf}"] = (k, tx("ou_transform", kappa=0.1))
         s[f"ou_sqrt{suf}"] = (k, lambda kk=k: M.conj(M.conj(M.leaf(k=kk), M.T("ou_transform", kappa=0.1), k=kk),
                                                      M.T("yeo_johnson", lmbda=0.5), k=kk))
@@ -177,6 +186,9 @@ def main(argv):
     for name, expected in vectors["scenarios"].items():
         if only and name not in only:
             continue
+        base = name[:-3] if name.endswith("_k3") else name
+        if base in NOT_IN_TORCH:
+            print(f"skip {name} (not in skaters.torch)"); continue
         if name not in scenarios:
             print(f"MISSING {name} (no builder)"); missing += 1; continue
         k, build = scenarios[name]
