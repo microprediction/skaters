@@ -131,6 +131,39 @@ def build_scenarios():
     return s
 
 
+def build_wrapper_scenarios():
+    """Wrappers on a skater's own PIT residuals, the adaptive temperature,
+    the named search policy, and laplace with a custom terminal leaf. Kept in
+    their own block, "wrapper_scenarios", because the Rust and torch gates
+    panic on a scenario they cannot build and these are not ported there
+    yet; the JS checker reads both blocks. Names must match
+    scenarios.mjs buildWrapperScenarios()."""
+    s = []
+    from skaters.api import dantzig
+    from skaters.homogenize import homogenize, make_candidates
+    from skaters.residual_transform import residual_transform
+    from skaters.terminal import terminal_leaf_ensemble
+    ema_c = lambda kk: conjugate(leaf(k=kk), ema_transform(0.1), k=kk)  # noqa: E731
+    s.append(("homogenize", 1, homogenize(ema_c(1))))
+    s.append(("homogenize_k2_weights", 2, homogenize(ema_c(2), k=2, couple="weights")))
+    s.append(("homogenize_k2_state", 2, homogenize(ema_c(2), k=2, couple="state", lam=0.5)))
+    s.append(("homogenize_k2_shared", 2, homogenize(ema_c(2), k=2, couple="shared")))
+    s.append(("homogenize_small_grid", 1, homogenize(
+        ema_c(1), candidates=make_candidates(rho_grid=(0.0, 0.9), gain_grid=(0.1,), delta_grid=(0.0, 0.5)))))
+    for model in ("m0", "m1", "m2"):
+        s.append((f"residual_transform_{model}", 1, residual_transform(ema_c(1), model=model)))
+    s.append(("residual_transform_m2_lr", 1, residual_transform(ema_c(1), model="m2", lr=0.05)))
+    s.append(("terminal_adaptive", 1, terminal_leaf_ensemble(
+        [ema(0.05, k=1), conjugate(leaf(k=1), difference(), k=1)], k=1, depths=[0, 1],
+        adaptive_temperature=True, temp_rho=0.1)))
+    s.append(("terminal_adaptive_k3", 3, terminal_leaf_ensemble(
+        [ema(0.05, k=3), conjugate(leaf(k=3), difference(), k=3)], k=3, depths=[0, 1],
+        adaptive_temperature=True, forget=0.99)))
+    s.append(("pol_dantzig", 1, dantzig(k=1, expand_interval=50)))
+    s.append(("pol_laplace_garch_leaf", 1, laplace(k=1, leaf=garch_leaf)))
+    return s
+
+
 def make_vec_series(n=120, seed=7):
     random.seed(seed)
     out = []
@@ -279,9 +312,11 @@ def run_scenario(skater, series, name=None):
 def main():
     series = make_series()
     vectors = {"series": series, "burn": BURN, "probe": PROBE,
-               "q_lo": Q_LO, "q_hi": Q_HI, "scenarios": {}}
+               "q_lo": Q_LO, "q_hi": Q_HI, "scenarios": {}, "wrapper_scenarios": {}}
     for name, k, skater in build_scenarios():
         vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
+    for name, k, skater in build_wrapper_scenarios():
+        vectors["wrapper_scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
 
     # Periodicity detector: dump the ranked (lag, acf) scores per step.
     pd = period_detector()
@@ -351,7 +386,7 @@ def main():
     path = os.path.join(here, "vectors.json")
     with open(path, "w") as f:
         json.dump(vectors, f, allow_nan=False)
-    print(f"wrote {path}: {len(vectors['scenarios'])} scenarios, "
+    print(f"wrote {path}: {len(vectors['scenarios']) + len(vectors['wrapper_scenarios'])} scenarios, "
           f"{len(series) - BURN} scored steps each")
 
 

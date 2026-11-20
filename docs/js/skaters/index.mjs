@@ -20,12 +20,16 @@ export { terminalLeafEnsemble } from "./terminal.mjs";
 export { search, TRANSFORMS } from "./search.mjs";
 export { periodDetector, topPeriods, DEFAULT_LAGS } from "./periodicity.mjs";
 export {
-  buildCandidates, laplace, flesaker,
+  buildCandidates, laplace, flesaker, dantzig,
 } from "./api.mjs";
 export { granger, loadGrangerParams, validateGrangerParams, MixtureDist } from "./granger.mjs";
 export { multiscale } from "./multiscale.mjs";
 export { parade } from "./parade.mjs";
 export { sticky } from "./sticky.mjs";
+export {
+  homogenize, makeCandidates as homogenizeCandidates, HomogenizedDist,
+} from "./homogenize.mjs";
+export { residualTransform, ResidualDiagnostics, CorrectedDist } from "./residual_transform.mjs";
 export {
   build, name as specName, toJson, fromJson,
   leafSpec, emaSpec, ensembleSpec, conjugateSpec,

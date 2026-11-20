@@ -15,10 +15,12 @@
 
 import { execFileSync } from "child_process";
 import { readFileSync } from "fs";
-import { buildScenarios, buildRepeatScenarios } from "./scenarios.mjs";
+import { buildScenarios, buildWrapperScenarios, buildRepeatScenarios } from "./scenarios.mjs";
 import { stateToJSON, stateFromJSON, assertPlainState } from "../docs/js/skaters/state.mjs";
 import { Dist, isDistInstance } from "../docs/js/skaters/dist.mjs";
-import { laplace } from "../docs/js/skaters/api.mjs";
+import { laplace, dantzig } from "../docs/js/skaters/api.mjs";
+import { homogenize } from "../docs/js/skaters/homogenize.mjs";
+import { residualTransform } from "../docs/js/skaters/residual_transform.mjs";
 import { parade } from "../docs/js/skaters/parade.mjs";
 import { gpdtails } from "../docs/js/skaters/tails.mjs";
 import { terminalLeafEnsemble } from "../docs/js/skaters/terminal.mjs";
@@ -206,6 +208,43 @@ function bareImportsAreDeclared() {
   }
 }
 
+// JS checkpoints written before the canonical layout used camelCase keys
+// (tState, sState, leafState, leafPred, meanQ, phiUsed) and had no `adapt`.
+// stateFromJSON renames them on read; the resumed stream must match the
+// original bit for bit, and its state must re-encode in the canonical layout.
+const OLD_KEYS = {
+  t_state: "tState", s_state: "sState", leaf_state: "leafState", leaf_pred: "leafPred",
+  mean_q: "meanQ", phi_used: "phiUsed",
+};
+function toOldLayout(o) {
+  if (Array.isArray(o)) return o.map(toOldLayout);
+  if (o === null || typeof o !== "object" || "components" in o || o.spliced === true) return o;
+  const out = {};
+  for (const k of Object.keys(o)) {
+    if (k === "adapt" && o[k] === null) continue;
+    out[OLD_KEYS[k] || k] = toOldLayout(o[k]);
+  }
+  return out;
+}
+function legacyCamelCaseResumes(series) {
+  const f = laplace(1);
+  let state = null;
+  for (let t = 0; t < 530; t++) [, state] = f(series[t], state);
+  const old = JSON.stringify(toOldLayout(stateToJSON(state)));
+  if (!old.includes('"leafPred"') || !old.includes('"tState"') || !old.includes('"phiUsed"')) {
+    fail("legacy layout: the rewrite did not produce camelCase keys");
+    return;
+  }
+  let a = state, b = stateFromJSON(JSON.parse(old));
+  for (let t = 530; t < 560; t++) {
+    let da, db;
+    [da, a] = f(series[t], a);
+    [db, b] = f(series[t], b);
+    if (encDists(da) !== encDists(db)) { fail(`legacy layout t=${t}: predictive differs`); return; }
+  }
+  if (enc(a) !== enc(b)) fail(`legacy layout: state differs after resume ${firstDiff(enc(a), enc(b))}`);
+}
+
 function main() {
   distRoundTrip();
   coldStartDecode();
@@ -213,8 +252,9 @@ function main() {
 
   const series = makeSeries(N, 12345);
   const repeat = makeRepeatSeries(N, 99);
+  legacyCamelCaseResumes(series);
 
-  const scenarios = buildScenarios().map(([name, , f]) => [name, f, series]);
+  const scenarios = [...buildScenarios(), ...buildWrapperScenarios()].map(([name, , f]) => [name, f, series]);
   for (const [name, , f] of buildRepeatScenarios()) scenarios.push([name, f, repeat]);
 
   // Paths the parity roster does not cover but a checkpoint will meet.
@@ -232,6 +272,9 @@ function main() {
   scenarios.push(["seasonal_anchor", conjugate(leaf(1), seasonalAnchor(7), 1), series]);
   scenarios.push(["sticky_laplace_repeat", laplace(1), repeat]);
   scenarios.push(["sticky_ema_series", sticky(conjugate(leaf(1), emaTransform(0.1), 1), 1), series]);
+  scenarios.push(["homogenize_laplace", homogenize(laplace(1)), series]);           // SplicedDist in raw/pending
+  scenarios.push(["residual_transform_laplace", residualTransform(laplace(1)), series]);
+  scenarios.push(["dantzig_k2", dantzig(2, { expandInterval: 40, maxPool: 12 }), series]);
 
   const t0 = Date.now();
   for (const [name, f, ys] of scenarios) soak(name, f, ys);
