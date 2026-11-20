@@ -114,8 +114,9 @@
       from a log score at the output through every stage.</p>
     <p>It is held to the same parity vectors as the other ports at 1e-6, so a model initialised at the
       reference's values is <code>laplace</code>. This port is the substrate on which <code>granger</code>'s
-      parameters are trained. <code>import skaters</code> does not import torch. Not ported:
-      <code>gaussianize</code>, the covariance estimators and the <code>exact=True</code> pushforward.</p>
+      parameters are trained. <code>import skaters</code> does not import torch. Its state is the
+      canonical JSON layout (<code>skaters.torch.state_to_json</code>), so a checkpoint resumes in Python,
+      Rust or JS. Not ported: the covariance estimators, <code>mahalanobis</code> and <code>zbank</code>.</p>
 
     <h2>Links</h2>
     <table>

@@ -4,10 +4,7 @@ series, probed (mean, std, logpdf, cdf, two quantiles, crps) at every
 post-burn-in step and horizon, and compared at ATOL = RTOL = 1e-6, the
 gate every other port passes. The repeat-series (sticky), gap-series
 (missing observations), periodicity and pool-structure sections are checked
-too, and so are the second-wave scenarios (``wave2_scenarios``: homogenize,
-residual_transform, the adaptive temperature, dantzig, and the wrapper
-scenarios of ``build_wrapper_scenarios`` when the vectors carry them) and
-the spec JSON strings (read, rebuilt, written back exactly). The
+too, and so are the spec JSON strings (read, rebuilt, written back exactly). The
 restore-and-continue leg writes the state at the burn-in step to JSON with
 ``skaters.torch.state_to_json`` and reads it back with ``state_from_json``,
 the canonical layout of docs/STATE.md.
@@ -177,9 +174,10 @@ def build_scenarios():
     return s
 
 
-def build_wave2_scenarios():
-    """{name: (k, builder)} for gen_vectors.build_wave2_scenarios and, under
-    their own names, build_wrapper_scenarios."""
+def build_wrapper_scenarios():
+    """{name: (k, builder)} for gen_vectors.build_wrapper_scenarios (homogenize,
+    residual_transform, the adaptive temperature, dantzig, laplace with a
+    custom leaf), plus a few extra horizons of the same wrappers."""
     M = _mods()
     s = {}
 
@@ -219,8 +217,8 @@ def build_wave2_scenarios():
 
 
 def build_all_scenarios():
-    """Every named torch builder: the standard block plus the second wave."""
-    return {**build_scenarios(), **build_wave2_scenarios()}
+    """Every named torch builder: the standard scenarios plus the wrappers."""
+    return {**build_scenarios(), **build_wrapper_scenarios()}
 
 
 def build_repeat_scenarios():
@@ -268,9 +266,6 @@ def main(argv):
 
     scenarios = build_all_scenarios()
     blocks = [("", vectors["scenarios"])]
-    for block in ("wave2_scenarios", "wrapper_scenarios"):
-        if vectors.get(block):
-            blocks.append((block.split("_")[0] + ":", vectors[block]))
     n_scen = 0
     for prefix, block in blocks:
         for name, expected in block.items():

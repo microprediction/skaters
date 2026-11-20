@@ -1,6 +1,6 @@
 """Cross-language resume between the reference and the torch port, both
 directions, for every parity scenario (gen_vectors.build_scenarios and
-build_wave2_scenarios), as parity/check_torch_resume.py runs it.
+build_wrapper_scenarios), as parity/check_torch_resume.py runs it.
 
 Per scenario the reference runs the resume series (gen_resume.py) and is
 checkpointed at t = 60, 250 and 530 in the canonical layout (docs/STATE.md).

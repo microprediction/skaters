@@ -1,7 +1,6 @@
 //! Scenario builders shared by the parity and resume gates. Every name in
 //! parity/gen_vectors.py's scenario blocks (`build_scenarios`,
-//! `build_wave2_scenarios`, the repeat and gap blocks, and the wrapper
-//! scenarios of the JS state branch) builds here, configured exactly as the
+//! `build_wrapper_scenarios`, the repeat and gap blocks) builds here, configured exactly as the
 //! Python factory call that names it.
 
 #![allow(dead_code)]
@@ -172,7 +171,7 @@ fn build_base(name: &str, k: usize) -> Forecaster {
 /// Wave-2 and wrapper scenarios, by full name. None for any other name.
 fn build_wrapper(full: &str) -> Option<(Forecaster, usize)> {
     let r = match full {
-        // gen_vectors.build_wave2_scenarios
+        // extra horizons of the wrappers
         "homogenize" => (homogenize(ema_c(1), None, 1, "none", 0.25), 1),
         "homogenize_k3" => (homogenize(ema_c(3), None, 3, "none", 0.25), 3),
         "homogenize_weights_k3" => (homogenize(ema_c(3), None, 3, "weights", 0.25), 3),
@@ -184,7 +183,7 @@ fn build_wrapper(full: &str) -> Option<(Forecaster, usize)> {
         "terminal_adapt" => (terminal_adaptive(1, vec![0.0, 0.0], 1.0, 0.03), 1),
         "terminal_adapt_k3" => (terminal_adaptive(3, vec![0.0, 0.0], 1.0, 0.03), 3),
         "dantzig" | "pol_dantzig" => (dantzig_f(1, 50), 1),
-        // the JS state branch's build_wrapper_scenarios
+        // gen_vectors.build_wrapper_scenarios
         "homogenize_k2_weights" => (homogenize(ema_c(2), None, 2, "weights", 0.25), 2),
         "homogenize_k2_state" => (homogenize(ema_c(2), None, 2, "state", 0.5), 2),
         "homogenize_k2_shared" => (homogenize(ema_c(2), None, 2, "shared", 0.25), 2),

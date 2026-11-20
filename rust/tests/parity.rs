@@ -259,13 +259,6 @@ fn parity_vectors() {
             .collect();
         n_scenarios += run_block("gap", gap, &gap_series, burn, &mut checked, &mut failures);
     }
-    // The second-wave surface (homogenize, residual_transform, the adaptive
-    // temperature, dantzig) and the wrapper block of the JS state branch.
-    for blk in ["wave2_scenarios", "wrapper_scenarios"] {
-        if let Some(b) = v[blk].as_object() {
-            n_scenarios += run_block(blk, b, &series, burn, &mut checked, &mut failures);
-        }
-    }
     // Spec JSON: from_json then to_json must give back the string exactly, and
     // the canonical name must match Python's.
     if let Some(specs) = v["spec_json"].as_array() {
