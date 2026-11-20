@@ -1,0 +1,4 @@
+study,model,n_series,win,draw,loss,med_dLL,q25_dLL,q75_dLL,med_crps_ratio
+m4-hourly:econ,laplace,414,20,250,144,-0.0572,-0.4052,0.0309,1.0229
+m4-hourly:econ,laplace(+orbit),414,28,241,145,-0.0564,-0.3961,0.0420,1.0223
+m4-hourly:econ,orbit-leaf,414,22,114,278,-0.4328,-1.3289,-0.2002,1.4397

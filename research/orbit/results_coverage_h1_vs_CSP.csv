@@ -1,0 +1,5 @@
+study,method,n_steps,cov_central90,cal_median
+m4-hourly:econ,CSP,26496,0.9336,0.5138
+m4-hourly:econ,laplace,26496,0.8914,0.4952
+m4-hourly:econ,laplace(+orbit),26496,0.8920,0.4847
+m4-hourly:econ,orbit-leaf,26496,0.9466,0.4865
