@@ -222,6 +222,28 @@ class TorchSplicedDist:
         t2 = 2.0 * torch.sum(q * (2.0 * (idx + 0.5) / n - 1.0)) / n
         return t1 - t2 * 0.5
 
+    # --- affine maps (the splice lives in the body's PIT space) ------------
+
+    def _with_body(self, body, flip: bool) -> "TorchSplicedDist":
+        if not flip:
+            return TorchSplicedDist(body, self.t_lo, self.t_up, self.zeta_lo, self.zeta_up,
+                                    self.g_lo, self.s_lo, self.g_up, self.s_up)
+        return TorchSplicedDist(body, -self.t_up, -self.t_lo, self.zeta_up, self.zeta_lo,
+                                self.g_up, self.s_up, self.g_lo, self.s_lo)
+
+    def affine(self, a, b) -> "TorchSplicedDist":
+        if float(_t(a)) == 0:
+            raise ValueError("affine multiplier must be nonzero")
+        return self._with_body(self.body.affine(a, b), float(_t(a)) < 0)
+
+    def shift(self, delta) -> "TorchSplicedDist":
+        return self._with_body(self.body.shift(delta), False)
+
+    def scale(self, factor) -> "TorchSplicedDist":
+        if float(_t(factor)) == 0:
+            raise ValueError("scale factor must be nonzero")
+        return self._with_body(self.body.scale(factor), float(_t(factor)) < 0)
+
     def __repr__(self) -> str:
         return (f"TorchSplicedDist(zeta=({self.zeta_lo:.4f},{self.zeta_up:.4f}), "
                 f"gamma=({self.g_lo:.3f},{self.g_up:.3f}), body={self.body!r})")

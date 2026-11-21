@@ -129,7 +129,7 @@ def test_search_pool_recipes_track_the_reference():
             _, s1 = ref_f(y, s1)
             _, s2 = tor_f(y, s2)
     assert [e["recipe"] for e in s1["pool"]] == [e["recipe"] for e in s2["pool"]]
-    assert s1["detected_periods"] == s2["detected_periods"]
+    assert set(s1["detected_periods"]) == set(s2["detected_periods"])   # a list in the reference, a set in torch
     assert len(s1["pool"]) > 1
 
 

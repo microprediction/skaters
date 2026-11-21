@@ -11,6 +11,17 @@
             "statusMessage": "checking benchmark pipeline discipline"
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/no-bespoke-files.sh",
+            "timeout": 10,
+            "statusMessage": "checking for bespoke study files"
+          }
+        ]
       }
     ]
   }

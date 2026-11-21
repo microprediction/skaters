@@ -58,7 +58,10 @@ the full candidate population with a CRPS terminal leaf, the lattice
 projection for repeating values, GPD tail splicing, and PIT/z calibration
 state (`Parade::pit`, `Parade::z`). At k > 1 it runs multi-scale over
 decimated clocks. Building blocks (`conjugate`, transforms, leaves,
-ensembles) are exported for composition.
+ensembles) are exported for composition. `conjugate` keeps Gaussian mixtures
+throughout; `conjugate_f` wraps any `Forecaster`, so a transform's inverse sees
+the full predictive (tail-spliced, or a `PushforwardDist` from `exact`
+inverses, `log_transform` and `flesaker`).
 
 ## Python backend (skaters-fast)
 

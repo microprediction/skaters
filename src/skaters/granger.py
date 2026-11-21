@@ -44,7 +44,6 @@ from __future__ import annotations
 import json
 import math
 import os
-from collections import deque
 
 from skaters.api import laplace
 from skaters.conjugate import conjugate
@@ -311,10 +310,12 @@ def granger(k: int = 1, frequency: str = "monthly", params: dict | None = None):
 
     def _skater(y, state):
         if state is None:
-            state = {"lap": None, "learned": None, "pend": deque(maxlen=k),
+            state = {"lap": None, "learned": None, "pend": [],
                      "cum": [[[0.0, 0.0] for _ in range(k)] for _ in range(k)],
                      "t": 0, "z": [None] * k, "repeat_frac": 0.0, "abs_z_mean": 0.0,
                      "n": 0, "last_y": None}
+        elif type(state["pend"]) is not list:   # pre-canonical checkpoint: a deque of tuples
+            state["pend"] = [list(p) for p in state["pend"]]
         yv = float("nan") if y is None else float(y)
         finite = math.isfinite(yv)
         t = state["t"]
@@ -343,7 +344,9 @@ def granger(k: int = 1, frequency: str = "monthly", params: dict | None = None):
         finally:
             _current["offset"] = None
         lap, state["lap"] = ref(yv, state["lap"])
-        state["pend"].append((lap, lrn))
+        state["pend"].append([lap, lrn])
+        if len(state["pend"]) > k:               # the last k issued pairs
+            del state["pend"][0]
         # 3. descriptors for the next step's gate
         pz = state["learned"].get("z") if isinstance(state["learned"], dict) else None
         state["z"] = list(pz) if pz is not None else [None] * k
