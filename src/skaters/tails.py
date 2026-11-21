@@ -97,6 +97,18 @@ _TAIL_U = 1e-8
 _SQRT2 = math.sqrt(2.0)
 
 
+def _body_tail_mass(body, x: float, upper: bool) -> float:
+    """Body mass below x, or above x when ``upper``, from erfc sums."""
+    sign = -1.0 if upper else 1.0
+    total = 0.0
+    for w, m, s in body.components:
+        if s > 0.0:
+            total += w * 0.5 * math.erfc(sign * (m - x) / (s * _SQRT2))
+        elif sign * (x - m) >= 0.0:
+            total += w
+    return total
+
+
 def _body_tail_quantile(body, t: float, upper: bool, tol: float, max_iter: int) -> float:
     """x with body mass t beyond it (below x, or above x when ``upper``)."""
     sign = -1.0 if upper else 1.0       # mirror the upper tail onto the lower
@@ -248,8 +260,15 @@ class SplicedDist:
         self._c = max(1.0 - zeta_lo - zeta_up, 1e-12) / interior
 
     def _z(self, x: float) -> float:
-        u = min(max(self.body.cdf(x), _EPS), 1.0 - _EPS)
-        return _phi_inv(u)
+        u = self.body.cdf(x)
+        if min(u, 1.0 - u) < _TAIL_U and getattr(self.body, "components", None) is not None:
+            # deep tail: read the smaller tail mass from erfc sums, which keep
+            # relative precision where 0.5 * (1 + erf) is down to its last bits
+            upper = u > 0.5
+            t = _body_tail_mass(self.body, x, upper)
+            z = _phi_inv(min(max(t, _EPS), 0.5))
+            return -z if upper else z
+        return _phi_inv(min(max(u, _EPS), 1.0 - _EPS))
 
     def cdf(self, x: float) -> float:
         z = self._z(x)
