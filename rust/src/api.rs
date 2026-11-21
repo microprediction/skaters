@@ -294,6 +294,25 @@ pub enum Forecaster {
     Sk(Sk),
     Gpd(Box<GpdTails>),
     Parade(Box<Parade>),
+    Conj(Box<FConj>),
+}
+
+/// conjugate around any forecaster: the transform's inverse sees the full
+/// predictive (mixture, tail-spliced or pushforward), as Python's duck-typed
+/// conjugate does. `Sk`'s conjugate keeps mixtures throughout.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FConj {
+    pub k: usize,
+    pub transform: Transform,
+    pub inner: Forecaster,
+}
+
+pub fn conjugate_f(inner: Forecaster, transform: Transform, k: usize) -> Forecaster {
+    Forecaster::Conj(Box::new(FConj {
+        k,
+        transform,
+        inner,
+    }))
 }
 
 impl Forecaster {
@@ -302,6 +321,12 @@ impl Forecaster {
             Forecaster::Sk(s) => s.step(y).into_iter().map(PDist::Mix).collect(),
             Forecaster::Gpd(g) => g.step(y),
             Forecaster::Parade(p) => p.step(y),
+            Forecaster::Conj(c) => {
+                let y_prime = c.transform.forward(y);
+                let dists_prime = c.inner.step(y_prime);
+                assert_eq!(dists_prime.len(), c.k, "conjugate k must match the wrapped forecaster");
+                c.transform.inverse_k_p(&dists_prime)
+            }
         }
     }
 }
@@ -312,4 +337,11 @@ pub fn laplace(k: usize) -> Forecaster {
     let f = multiscale(|kk| laplace_single_scale(kk, 0.03), k, None);
     let g = gpdtails(f, k, 0.98, 500, 500);
     Forecaster::Parade(Box::new(parade(ParadeBase::Gpd(g), k)))
+}
+
+/// `laplace` for a series that never crosses a known bound. Experimental, as
+/// in Python: laplace on log(y - lower) (or -log(upper - y)), mapped back by
+/// the exact change of variables. Give one bound; neither means lower = 0.
+pub fn flesaker(k: usize, lower: Option<f64>, upper: Option<f64>) -> Forecaster {
+    conjugate_f(laplace(k), crate::transform::log_transform(lower, upper), k)
 }

@@ -17,6 +17,9 @@ every release.
   and the smooth mode), `seasonalScale`, `logTransform`, and the `exact` flag
   on `powerTransform` and `yeoJohnson`. New `flesaker` in `api.mjs`.
   `index.mjs` now exports `yeoJohnson`, `logTransform` and `flesaker`.
+- `PushforwardDist` gains `affine`, `shift` and `scale`, as in Python, so an
+  exact pushforward can be wrapped by `standardize`, `seasonalScale` and the
+  other affine transforms.
 - `erf` is a port of fdlibm's, and `erfc` is new. The old incomplete-gamma
   `erf` was up to 6 ulps off near zero. The tail splice's normal CDF uses
   `erfc`, as Python does, so it keeps relative precision in the lower tail.

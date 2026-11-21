@@ -1,8 +1,7 @@
 //! The gate: replay every scenario over the embedded series and compare the
 //! seven probes (mean, std, logpdf@0.3, cdf@0.3, q0.1, q0.9, crps@0.3)
 //! against parity/vectors.json at atol = rtol = 1e-6, plus the cov and
-//! periodicity blocks. Every scenario is covered except the transforms listed
-//! in NOT_IN_RUST, which the Python and JS ports have and this crate does not.
+//! periodicity blocks. Full library coverage: nothing is skipped.
 
 use serde_json::Value;
 
@@ -31,7 +30,7 @@ fn digest_push(v: f64) {
     );
 }
 
-use skaters::api::{laplace, Forecaster};
+use skaters::api::{conjugate_f, flesaker, laplace, Forecaster};
 use skaters::cov::{EmaCov, LedoitWolfCov, RunningCov};
 use skaters::periodicity::PeriodDetector;
 use skaters::search::search;
@@ -43,8 +42,9 @@ use skaters::skater::{
 use skaters::tails::gpdtails;
 use skaters::transform::{
     ar, ar_default, difference, drift, ema_transform, fractional_difference, garch_default,
-    grouped_ar, holt_linear, ou_transform, power_transform, seasonal_difference, standardize,
-    theta, yeo_johnson,
+    gaussianize, gaussianize_default, grouped_ar, holt_linear, log_transform, ou_transform,
+    power_transform, power_transform_exact, seasonal_anchor, seasonal_difference, seasonal_scale,
+    standardize, theta, yeo_johnson, yeo_johnson_exact,
 };
 
 const ATOL: f64 = 1e-6;
@@ -102,6 +102,17 @@ fn close(a: f64, b: f64) -> bool {
     (a - b).abs() <= ATOL + RTOL * b.abs()
 }
 
+/// The fast-warm-up GPD splice the gpd_tails scenario uses, at horizon k.
+fn spliced(k: usize) -> Forecaster {
+    Forecaster::Gpd(Box::new(gpdtails(
+        conjugate(leaf(k), ema_transform(0.1), k),
+        k,
+        0.9,
+        50,
+        100,
+    )))
+}
+
 fn build(name: &str, k: usize) -> Forecaster {
     let f = |sk: Sk| Forecaster::Sk(sk);
     match name {
@@ -127,6 +138,47 @@ fn build(name: &str, k: usize) -> Forecaster {
             yeo_johnson(0.5),
             k,
         )),
+        "seasonal_scale" => f(conjugate(leaf(k), seasonal_scale(7, 0.05, false, 1e-8), k)),
+        "seasonal_scale_c" => f(conjugate(leaf(k), seasonal_scale(7, 0.1, true, 1e-8), k)),
+        "power_exact" => conjugate_f(f(leaf(k)), power_transform_exact(0.5, true), k),
+        "yeojohnson_exact" => conjugate_f(f(leaf(k)), yeo_johnson_exact(0.5, true), k),
+        "log_lower" => conjugate_f(f(leaf(k)), log_transform(Some(-15.0), None), k),
+        "log_upper" => conjugate_f(f(leaf(k)), log_transform(None, Some(15.0)), k),
+        "gaussianize" => f(conjugate(leaf(k), gaussianize_default(), k)),
+        "gaussianize_smooth" => f(conjugate(
+            leaf(k),
+            gaussianize(39, 30, 9, true, 20.0, 8.0, "move"),
+            k,
+        )),
+        "gaussianize_delete" => f(conjugate(
+            leaf(k),
+            gaussianize(15, 30, 9, false, 1.5, 8.0, "delete"),
+            k,
+        )),
+        "gaussianize_emin" => f(conjugate(
+            leaf(k),
+            gaussianize(15, 30, 9, false, 1.5, 8.0, "emin"),
+            k,
+        )),
+        "spliced_power" => conjugate_f(spliced(k), power_transform(0.5), k),
+        "spliced_yeojohnson" => conjugate_f(spliced(k), yeo_johnson(0.5), k),
+        "spliced_gaussianize" => conjugate_f(spliced(k), gaussianize_default(), k),
+        "spliced_log" => conjugate_f(spliced(k), log_transform(Some(-15.0), None), k),
+        "spliced_ema_t" => conjugate_f(spliced(k), ema_transform(0.1), k),
+        "spliced_seasonal" => conjugate_f(spliced(k), seasonal_difference(2), k),
+        "spliced_anchor" => conjugate_f(spliced(k), seasonal_anchor(2, 0.2, 0.5), k),
+        "spliced_sscale" => conjugate_f(spliced(k), seasonal_scale(7, 0.05, false, 1e-8), k),
+        "pf_affine_yj" => conjugate_f(
+            conjugate_f(f(leaf(k)), yeo_johnson_exact(0.0, true), k),
+            standardize(0.05, 1e-8),
+            k,
+        ),
+        "pf_affine_log" => conjugate_f(
+            conjugate_f(f(leaf(k)), log_transform(None, Some(200.0)), k),
+            seasonal_scale(7, 0.1, true, 1e-8),
+            k,
+        ),
+        "pol_flesaker" => flesaker(1, Some(-15.0), None),
         "ema_skater" => f(ema(0.05, k)),
         "pw_ensemble" => f(precision_weighted_ensemble(
             vec![ema(0.05, k), ema(0.2, k)],
@@ -176,28 +228,8 @@ fn build(name: &str, k: usize) -> Forecaster {
     }
 }
 
-/// Scenarios for transforms not yet in this crate (seasonal_scale, the exact
-/// pushforward inverses, log_transform and flesaker, gaussianize).
-const NOT_IN_RUST: &[&str] = &[
-    "seasonal_scale",
-    "seasonal_scale_c",
-    "power_exact",
-    "yeojohnson_exact",
-    "log_lower",
-    "log_upper",
-    "gaussianize",
-    "gaussianize_smooth",
-    "gaussianize_delete",
-    "gaussianize_emin",
-    "pol_flesaker",
-];
-
 fn scenario_name(full: &str) -> Option<(&str, usize)> {
     // returns (base_name, k) for names we implement.
-    let base = full.strip_suffix("_k3").unwrap_or(full);
-    if NOT_IN_RUST.contains(&base) {
-        return None;
-    }
     if full == "pol_laplace" {
         return Some(("pol_laplace", 1));
     }

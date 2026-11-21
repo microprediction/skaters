@@ -50,21 +50,38 @@ def sticky(base, k: int = 1, propensity_alpha: float = 0.05,
 
     def _skater(y: float, state: dict | None) -> tuple[list[Dist], dict]:
         if state is None:
-            state = {"base": None, "counts": {}}
+            state = {"base": None, "counts": []}
 
         dists, state["base"] = base(y, state["base"])
 
-        # recency-weighted frequency table of exact values (sums to ~1).
+        # recency-weighted frequency table of exact values (sums to ~1), a list
+        # of [value, weight] pairs in first-seen order: decay, prune in place
+        # (order kept), then credit y. An existing entry keeps its slot; a new
+        # or just-pruned value goes to the end, as a dict would. Pairs, not a
+        # float-keyed dict, so the table survives JSON (keys must be strings).
         c = state["counts"]
-        for key in list(c):
-            c[key] *= (1.0 - propensity_alpha)
-            if c[key] < prune_eps:
-                del c[key]
-        c[y] = c.get(y, 0.0) + propensity_alpha
+        if type(c) is dict:                   # pre-canonical checkpoint
+            c = state["counts"] = [[v, w] for v, w in c.items()]
+        keep = 1.0 - propensity_alpha
+        j = 0
+        for pair in c:
+            w = pair[1] * keep
+            if w < prune_eps:
+                continue
+            pair[1] = w
+            c[j] = pair
+            j += 1
+        del c[j:]
+        for pair in c:
+            if pair[0] == y:
+                pair[1] += propensity_alpha
+                break
+        else:
+            c.append([y, propensity_alpha])
 
         # lattice atoms = revisited values (above the noise floor), top by weight.
         thr = thresh_mult * propensity_alpha
-        atoms = sorted(((v, w) for v, w in c.items() if w > thr),
+        atoms = sorted(((v, w) for v, w in c if w > thr),
                        key=lambda t: -t[1])[:max_atoms]
 
         out = []

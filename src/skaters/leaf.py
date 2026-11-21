@@ -236,7 +236,6 @@ def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
         window: trailing window (observations) used for the refit.
         scales: the fixed scale dictionary, relative to the conditional sd.
     """
-    from collections import deque
     C = tuple(scales)
     K = len(C)
     one_idx = min(range(K), key=lambda i: abs(C[i] - 1.0))
@@ -246,8 +245,10 @@ def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
             w = [1e-6] * K
             w[one_idx] = 1.0
             state = {"h": 0.0, "s2": 0.0, "n": 0, "omega": 0.0, "alpha": 0.05,
-                     "beta": 0.90, "buf": deque(maxlen=window), "w": w, "last_r2": 0.0}
+                     "beta": 0.90, "buf": [], "w": w, "last_r2": 0.0}
         s = state
+        if type(s["buf"]) is not list:          # pre-canonical checkpoint: a deque
+            s["buf"] = list(s["buf"])
         s["n"] += 1
         a0 = 0.02 if 0.02 > 1.0 / s["n"] else 1.0 / s["n"]
         s["s2"] = (1 - a0) * s["s2"] + a0 * y * y
@@ -262,7 +263,10 @@ def garch_leaf(k: int = 1, gamma: float = 0.02, refit_every: int = 40,
             h = s["s2"]
         s["h"] = h
         s["last_r2"] = y * y
-        s["buf"].append(y)
+        buf = s["buf"]
+        buf.append(y)
+        if len(buf) > window:                    # trailing window of residuals
+            del buf[0]
 
         if s["n"] >= min_obs and s["n"] % refit_every == 0 and len(s["buf"]) >= min_obs:
             resid = list(s["buf"])
