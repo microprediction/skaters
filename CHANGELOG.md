@@ -20,7 +20,11 @@
   `laplace` with a custom terminal leaf, and, in torch, `granger` and the
   spec helpers. The wrapper scenarios join the main parity block, so JS, Rust
   and torch all run every scenario.
-
+- Fix: `SplicedDist.cdf` and `logpdf` read the splice coordinate from erfc sums
+  once the body's tail mass falls below 1e-8, as the quantile already did. The
+  old read went through `0.5 * (1 + erf)` and plateaued in the far tail. Python,
+  Torch, JavaScript and Rust share the change. Laplace's k=1 signatures are
+  unchanged.
 - Skater state is now plain JSON data with one documented layout
   (`docs/STATE.md`), so a Python checkpoint can be written with
   `json.dumps(state_to_json(state))` and read back with `state_from_json`.
@@ -30,7 +34,7 @@
   and `search`/`dantzig` rebuild pool skaters from recipes instead of storing
   closures. Numerics are unchanged. Old Python checkpoints still resume.
   `tests/test_state_json.py` gates every exported skater on an exact JSON resume.
-  The JS port writes the same layout (below); R and Julia will follow.
+  The JS, R and Julia ports read and write the same layout.
 - The JavaScript port writes the canonical state layout. Its camelCase keys
   (`tState`, `sState`, `leafState`, `leafPred`, `meanQ`, `phiUsed`) are now
   `t_state`, `s_state`, `leaf_state`, `leaf_pred`, `mean_q`, `phi_used`, and
@@ -48,7 +52,6 @@
   formats floats as Python's `%.6g` does (it wrote `ema(0.00001)` for
   `ema(1e-05)`). Parity vectors gain a `wrapper_scenarios` block for these,
   which the JS checker reads; the Rust and torch gates do not read it yet.
-
 - `PushforwardDist` gains `affine`, `shift` and `scale`, so an exact pushforward
   predictive can be wrapped by `standardize`, `seasonal_scale` and the other affine
   transforms. A negative multiplier reflects the inner law so the map stays

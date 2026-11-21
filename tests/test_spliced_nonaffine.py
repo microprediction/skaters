@@ -105,3 +105,21 @@ def test_deep_tail_quantile_is_resolved():
             hit += 1
             assert mass == pytest.approx(t, rel=1e-6)
     assert hit >= 2
+
+
+def test_deep_tail_cdf_and_logpdf_are_resolved():
+    """Beyond 1e-8 body mass the splice coordinate z is read from erfc sums,
+    so cdf and logpdf agree with the exact body tail, not the last bits of erf."""
+    from skaters.dist import Dist
+    from skaters.tails import _phi_inv
+    body = Dist([(0.7, 0.0, 1.0), (0.3, 0.5, 2.0)])
+    d = SplicedDist(body, -2.0, 2.0, 0.03, 0.03, 0.2, 0.6, 0.25, 0.7)
+    for x in (12.0, 13.5):
+        t = sum(w * 0.5 * math.erfc((x - m) / (s * math.sqrt(2.0))) for w, m, s in body.components)
+        assert d._z(x) == pytest.approx(-_phi_inv(t), rel=1e-12)
+        assert d._z(-x) == pytest.approx(_phi_inv(sum(
+            w * 0.5 * math.erfc((x + m) / (s * math.sqrt(2.0))) for w, m, s in body.components)), rel=1e-12)
+    # monotone in the far tail, where the old 0.5 * (1 + erf) read plateaued
+    xs = [11.0 + 0.05 * i for i in range(60)]
+    cs = [d.cdf(x) for x in xs]
+    assert all(a < b for a, b in zip(cs, cs[1:]))

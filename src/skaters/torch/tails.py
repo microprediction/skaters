@@ -127,8 +127,20 @@ class TorchSplicedDist:
     # --- queries ------------------------------------------------------------
 
     def _z(self, x):
-        u = torch.clamp(self.body.cdf(x), _EPS, 1.0 - _EPS)
-        return _phi_inv_t(u)
+        u = self.body.cdf(x)
+        uf = float(u)
+        if min(uf, 1.0 - uf) < ref._TAIL_U:
+            # deep tail: read the smaller tail mass from erfc sums (tails.py)
+            b = self.body
+            sign = -1.0 if uf > 0.5 else 1.0
+            live = b.s > 0
+            s = torch.where(live, b.s, torch.ones_like(b.s))
+            tail = 0.5 * torch.erfc(sign * (b.m - x) / (s * _SQRT2))
+            step = (sign * (x - b.m) >= 0).to(DTYPE)
+            t = torch.clamp(torch.sum(b.w * torch.where(live, tail, step)), _EPS, 0.5)
+            z = _phi_inv_t(t)
+            return -z if sign < 0 else z
+        return _phi_inv_t(torch.clamp(u, _EPS, 1.0 - _EPS))
 
     def cdf(self, x):
         x = _t(x)
