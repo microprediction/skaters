@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: `SplicedDist.cdf` and `logpdf` read the splice coordinate from erfc sums
+  once the body's tail mass falls below 1e-8, as the quantile already did. The
+  old read went through `0.5 * (1 + erf)` and plateaued in the far tail. Python,
+  Torch, JavaScript and Rust share the change. Laplace's k=1 signatures are
+  unchanged.
 - Skater state is now plain JSON data with one documented layout
   (`docs/STATE.md`), so a Python checkpoint can be written with
   `json.dumps(state_to_json(state))` and read back with `state_from_json`.

@@ -118,6 +118,17 @@ function fitMl(exc, s1) {
 // plateau set by the last bit of erf, which differs between libm and this port.
 const TAIL_U = 1e-8;
 
+// Body mass below x, or above x when upper, from erfc sums.
+function bodyTailMass(body, x, upper) {
+  const sign = upper ? -1.0 : 1.0;
+  let total = 0.0;
+  for (const [w, m, s] of body.components) {
+    if (s > 0.0) total += w * 0.5 * erfc(sign * (m - x) / (s * SQRT2));
+    else if (sign * (x - m) >= 0.0) total += w;
+  }
+  return total;
+}
+
 // x with body mass t beyond it (below x, or above x when upper).
 function bodyTailQuantile(body, t, upper, tol, maxIter) {
   const sign = upper ? -1.0 : 1.0;    // mirror the upper tail onto the lower
@@ -176,8 +187,14 @@ export class SplicedDist {
   }
 
   _z(x) {
-    const u = Math.min(Math.max(this.body.cdf(x), EPS), 1.0 - EPS);
-    return phiInv(u);
+    const u = this.body.cdf(x);
+    if (Math.min(u, 1.0 - u) < TAIL_U && Array.isArray(this.body.components)) {
+      // deep tail: read the smaller tail mass from erfc sums (tails.py)
+      const upper = u > 0.5;
+      const z = phiInv(Math.min(Math.max(bodyTailMass(this.body, x, upper), EPS), 0.5));
+      return upper ? -z : z;
+    }
+    return phiInv(Math.min(Math.max(u, EPS), 1.0 - EPS));
   }
 
   cdf(x) {
