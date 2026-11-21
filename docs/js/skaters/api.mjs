@@ -5,6 +5,7 @@
 import { leaf, scaleMixtureLeaf, crpsLeaf } from "./leaf.mjs";
 import { conjugate } from "./conjugate.mjs";
 import { terminalLeafEnsemble } from "./terminal.mjs";
+import { search } from "./search.mjs";
 import { bayesianEnsemble } from "./bayesian.mjs";
 import { sticky as project } from "./sticky.mjs";
 import { multiscale } from "./multiscale.mjs";
@@ -20,7 +21,10 @@ import {
 // Shared candidate population
 // ---------------------------------------------------------------------------
 
-export function buildCandidates(k) {
+// Each candidate's own residual model is `leafFn` (the plain Gaussian leaf by
+// default), as in api._build_candidates; laplace's final residual model is
+// the terminal leaf, chosen separately.
+export function buildCandidates(k, leafFn = leaf) {
   const candidates = [];
   const depths = [];
   const groups = {};
@@ -33,83 +37,83 @@ export function buildCandidates(k) {
   };
 
   // Depth 0: baseline noise
-  push(leaf(k), 0, "baseline");
+  push(leafFn(k), 0, "baseline");
 
   // Depth 1: single EMA at various speeds
-  for (const alpha of [0.01, 0.05, 0.1, 0.3]) push(conjugate(leaf(k), emaTransform(alpha), k), 1, "EMA");
+  for (const alpha of [0.01, 0.05, 0.1, 0.3]) push(conjugate(leafFn(k), emaTransform(alpha), k), 1, "EMA");
 
   // Depth 1: differencing (pure random walk)
   groups.diff = [];
-  groups.diff.push(push(conjugate(leaf(k), difference(), k), 1, "random walk"));
+  groups.diff.push(push(conjugate(leafFn(k), difference(), k), 1, "random walk"));
 
   // Depth 1: drift (random walk with adaptive drift)
   groups.drift = [];
   for (const [a, s] of [[0.05, 0.01], [0.01, 0.002], [0.002, 0.001], [0.0005, 0.0002]]) {
-    groups.drift.push(push(conjugate(leaf(k), drift(a, s), k), 1, "drift"));
+    groups.drift.push(push(conjugate(leafFn(k), drift(a, s), k), 1, "drift"));
   }
 
   // Depth 1: Theta
-  for (const a of [0.05, 0.1, 0.3]) push(conjugate(leaf(k), theta(a), k), 1, "Theta");
+  for (const a of [0.05, 0.1, 0.3]) push(conjugate(leafFn(k), theta(a), k), 1, "Theta");
 
   // Depth 1: AR
-  push(conjugate(leaf(k), ar(1), k), 1, "AR");
-  push(conjugate(leaf(k), ar(2, 0.99, 1.0, 1), k), 1, "AR");
+  push(conjugate(leafFn(k), ar(1), k), 1, "AR");
+  push(conjugate(leafFn(k), ar(2, 0.99, 1.0, 1), k), 1, "AR");
 
   // Depth 1: Holt linear
   groups.holt = [];
   for (const [a, b] of [[0.1, 0.02], [0.1, 0.05], [0.3, 0.1]]) {
-    groups.holt.push(push(conjugate(leaf(k), holtLinear(a, b), k), 1, "Holt trend"));
+    groups.holt.push(push(conjugate(leafFn(k), holtLinear(a, b), k), 1, "Holt trend"));
   }
 
   // Depth 1: Seasonal differencing
-  for (const period of [7, 12, 24]) push(conjugate(leaf(k), seasonalDifference(period), k), 1, "seasonal");
+  for (const period of [7, 12, 24]) push(conjugate(leafFn(k), seasonalDifference(period), k), 1, "seasonal");
 
   // Depth 1: Hedged seasonal anchor — phase-EMA blended 50/50 with the
   // seasonal-naive (mirrors api.py; see comparisons/laplace-vs-csp/).
-  for (const period of [7, 12, 24]) push(conjugate(leaf(k), seasonalAnchor(period), k), 1, "seasonal anchor");
+  for (const period of [7, 12, 24]) push(conjugate(leafFn(k), seasonalAnchor(period), k), 1, "seasonal anchor");
 
   // Depth 2: Seasonal differencing + EMA
   for (const period of [7, 12, 24]) {
     for (const alpha of [0.05, 0.1]) {
-      push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), seasonalDifference(period), k), 2, "seasonal → EMA");
+      push(conjugate(conjugate(leafFn(k), emaTransform(alpha), k), seasonalDifference(period), k), 2, "seasonal → EMA");
     }
   }
 
   // Depth 2: differencing + EMA
   for (const alpha of [0.05, 0.1, 0.3]) {
-    groups.diff.push(push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), difference(), k), 2, "random walk → EMA"));
+    groups.diff.push(push(conjugate(conjugate(leafFn(k), emaTransform(alpha), k), difference(), k), 2, "random walk → EMA"));
   }
 
   // Depth 2: standardize + EMA
   for (const alpha of [0.05, 0.1]) {
-    push(conjugate(conjugate(leaf(k), emaTransform(alpha), k), standardize(), k), 2, "standardize → EMA");
+    push(conjugate(conjugate(leafFn(k), emaTransform(alpha), k), standardize(), k), 2, "standardize → EMA");
   }
 
   // Depth 2: fractional diff + EMA
   groups.frac = [];
   for (const d of [0.2, 0.4]) {
-    groups.frac.push(push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), fractionalDifference(d, 30), k), 2, "frac-diff → EMA"));
+    groups.frac.push(push(conjugate(conjugate(leafFn(k), emaTransform(0.1), k), fractionalDifference(d, 30), k), 2, "frac-diff → EMA"));
   }
 
   // Depth 2: drift + EMA
   for (const [aDrift, sDrift] of [[0.002, 0.001], [0.0005, 0.0002]]) {
     for (const aEma of [0.05, 0.1]) {
-      groups.drift.push(push(conjugate(conjugate(leaf(k), emaTransform(aEma), k), drift(aDrift, sDrift), k), 2, "drift → EMA"));
+      groups.drift.push(push(conjugate(conjugate(leafFn(k), emaTransform(aEma), k), drift(aDrift, sDrift), k), 2, "drift → EMA"));
     }
   }
 
   // Depth 2: drift + Holt linear
   {
-    const idx = push(conjugate(conjugate(leaf(k), holtLinear(0.1, 0.05), k), drift(0.001, 0.0005), k), 2, "drift → Holt");
+    const idx = push(conjugate(conjugate(leafFn(k), holtLinear(0.1, 0.05), k), drift(0.001, 0.0005), k), 2, "drift → Holt");
     groups.drift.push(idx);
     groups.holt.push(idx);
   }
 
   // Depth 2: GARCH + EMA
-  push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), garch(), k), 2, "GARCH vol → EMA");
+  push(conjugate(conjugate(leafFn(k), emaTransform(0.1), k), garch(), k), 2, "GARCH vol → EMA");
 
   // Depth 2: power transform + EMA
-  push(conjugate(conjugate(leaf(k), emaTransform(0.1), k), powerTransform(0.5), k), 2, "power → EMA");
+  push(conjugate(conjugate(leafFn(k), emaTransform(0.1), k), powerTransform(0.5), k), 2, "power → EMA");
 
   // Depth 2: thinking fast and slow (fast tracker outside, slow scale inside)
   const fastTrackers = () => [
@@ -118,7 +122,7 @@ export function buildCandidates(k) {
   groups.fast_slow = [];
   for (const scaleAlpha of [0.02, 0.05]) {
     for (const tracker of fastTrackers()) {
-      groups.fast_slow.push(push(conjugate(conjugate(leaf(k), standardize(scaleAlpha), k), tracker, k), 2, "fast/slow"));
+      groups.fast_slow.push(push(conjugate(conjugate(leafFn(k), standardize(scaleAlpha), k), tracker, k), 2, "fast/slow"));
     }
   }
 
@@ -126,7 +130,7 @@ export function buildCandidates(k) {
   groups.coordinate = [];
   for (const L of [0.0, 0.5]) {
     for (const innerTx of [difference(), emaTransform(0.1)]) {
-      groups.coordinate.push(push(conjugate(conjugate(leaf(k), innerTx, k), yeoJohnson(L), k), 2, "coordinate (Yeo-Johnson)"));
+      groups.coordinate.push(push(conjugate(conjugate(leafFn(k), innerTx, k), yeoJohnson(L), k), 2, "coordinate (Yeo-Johnson)"));
     }
   }
 
@@ -137,7 +141,7 @@ export function buildCandidates(k) {
     for (const L of [0.0, 0.5]) {
       for (const kappa of [0.03, 0.1, 0.3]) {
         groups.mean_revert.push(push(
-          conjugate(conjugate(leaf(k), ouTransform(kappa, 0.02), k), yeoJohnson(L), k), 2, "mean reversion (OU)"));
+          conjugate(conjugate(leafFn(k), ouTransform(kappa, 0.02), k), yeoJohnson(L), k), 2, "mean reversion (OU)"));
       }
     }
   }
@@ -155,10 +159,10 @@ function objectiveLeaf(objective, scaleAlpha) {
   throw new Error(`objective must be 'crps' or 'likelihood', got ${objective}`);
 }
 
-function laplaceSingleScale(k, objective, sticky, scaleAlpha) {
+function laplaceSingleScale(k, objective, sticky, scaleAlpha, leafFactory) {
   const [candidates, depths] = buildCandidates(k);
   let f = terminalLeafEnsemble(candidates, {
-    k, leafFn: objectiveLeaf(objective, scaleAlpha), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
+    k, leafFn: leafFactory !== null && leafFactory !== undefined ? leafFactory : objectiveLeaf(objective, scaleAlpha), learningRate: 0.8, complexityPenalty: 0.005, depths, maxComponents: 20,
     forget: 0.99,
   });
   if (sticky) f = project(f, k);
@@ -173,10 +177,17 @@ function laplaceSingleScale(k, objective, sticky, scaleAlpha) {
 // predictive scale tracks volatility). Default 0.03 beats the older 0.01 on
 // held-out log-likelihood AND CRPS across the continuous FRED universe; pass
 // scaleAlpha = 0.01 to reproduce the earlier default.
-export function laplace(k = 1, objective = "crps", sticky = true, scales = null, scaleAlpha = 0.03, tails = "gpd") {
+//
+// leaf optionally overrides the objective's terminal leaf with a factory
+// leaf(k) -> skater, e.g. laplace(1, "crps", true, null, 0.03, "gpd", garchLeaf)
+// (Python's laplace(leaf=garch_leaf)). It comes last so the existing
+// positional order is unchanged; scaleAlpha is ignored when it is given.
+export function laplace(k = 1, objective = "crps", sticky = true, scales = null, scaleAlpha = 0.03, tails = "gpd",
+  leaf = null) {
+  if (tails !== "gpd" && tails !== "gaussian") throw new Error(`tails must be 'gpd' or 'gaussian', got ${tails}`);
   // conditional tail fit (body -> region -> tail), then parade reads PIT/z
   // against the spliced predictive (see tails.mjs, parade.mjs)
-  let f = multiscale((kk) => laplaceSingleScale(kk, objective, sticky, scaleAlpha), k, { scales });
+  let f = multiscale((kk) => laplaceSingleScale(kk, objective, sticky, scaleAlpha, leaf), k, { scales });
   if (tails === "gpd") f = gpdtails(f, k);
   f = parade(f, k);
   f.skaterName = `laplace(k=${k})`;
@@ -201,4 +212,14 @@ export function flesaker(k = 1, lower = null, upper = null, ...laplaceArgs) {
     ? `upper=${upper}` : `lower=${lower === null || lower === undefined ? 0.0 : lower}`;
   skater.skaterName = `flesaker(k=${k}, ${bound})`;
   return skater;
+}
+
+// Adaptive-search skater: grow the model space online instead of fixing it
+// (api.dantzig). Beam search over the transform grammar, with replay so new
+// candidates join warm. Accepts search's options ({ expandInterval, maxPool,
+// costBudget, ... }); k is the forecast horizon.
+export function dantzig(k = 1, opts = {}) {
+  const f = search({ ...opts, k });
+  f.skaterName = `dantzig(k=${k})`;
+  return f;
 }

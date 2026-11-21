@@ -908,22 +908,22 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
 
   function forward(y, state) {
     if (state === null || state === undefined) {
-      state = { buffer: [], phi: new Array(p).fill(0.0), phiUsed: new Array(p).fill(0.0), P: initP(), n: 0 };
+      state = { buffer: [], phi: new Array(p).fill(0.0), phi_used: new Array(p).fill(0.0), P: initP(), n: 0 };
     }
     const buf = state.buffer;
     const phi = state.phi;
-    if (state.phiUsed === undefined) state.phiUsed = arStationary(phi.slice());   // pre-#235 checkpoint
+    if (state.phi_used === undefined) state.phi_used = arStationary(phi.slice());   // pre-#235 checkpoint
     state.n += 1;
     let residual;
     if (buf.length >= p) {
       const x = new Array(p);
       for (let i = 0; i < p; i++) x[i] = buf[buf.length - 1 - i];
 
-      // Emitted residual uses `phiUsed` -- the stationarity-projected
+      // Emitted residual uses `phi_used` -- the stationarity-projected
       // coefficients as of the end of the previous tick -- not the raw RLS
       // estimate, so forward's emission and inverseK's reconstruction always
       // agree on which predictor produced the residual (skaters#232).
-      const phiUsed = state.phiUsed;
+      const phiUsed = state.phi_used;
       const prediction = fsum(Array.from({ length: p }, (_, i) => phiUsed[i] * x[i]));
       residual = y - prediction;
 
@@ -957,7 +957,7 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
       }
       // Re-project after every update so forward's next emission and
       // inverseK always agree on the same constrained coefficients.
-      state.phiUsed = arStationary(phi.slice());
+      state.phi_used = arStationary(phi.slice());
     } else {
       residual = y;
     }
@@ -971,7 +971,7 @@ export function ar(order = 2, lam = 0.99, ridge = 1.0, decay = 0.0) {
     // Same coefficients forward() already emitted residuals under
     // (skaters#232) -- maintained incrementally there, not re-derived here,
     // except for a pre-#235 checkpoint that has no cache yet.
-    const phi = state.phiUsed !== undefined ? state.phiUsed : arStationary(state.phi.slice());
+    const phi = state.phi_used !== undefined ? state.phi_used : arStationary(state.phi.slice());
     const H = dists.length;
     // Impulse responses psi_0..psi_{H-1}: psi_0 = 1, psi_i = sum_j phi_j psi_{i-j}.
     const psi = [1.0];
@@ -1039,12 +1039,12 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
 
   function forward(y, state) {
     if (state === null || state === undefined) {
-      state = { buffer: [], theta: new Array(nGroups).fill(0.0), phiUsed: new Array(maxLag).fill(0.0), P: eye(nGroups, ridge), n: 0 };
+      state = { buffer: [], theta: new Array(nGroups).fill(0.0), phi_used: new Array(maxLag).fill(0.0), P: eye(nGroups, ridge), n: 0 };
     }
     const buf = state.buffer;
     const th = state.theta;
-    if (state.phiUsed === undefined) {   // pre-#235 checkpoint
-      state.phiUsed = arStationary(Array.from({ length: maxLag }, (_, j) => th[groups[j]]));
+    if (state.phi_used === undefined) {   // pre-#235 checkpoint
+      state.phi_used = arStationary(Array.from({ length: maxLag }, (_, j) => th[groups[j]]));
     }
     state.n += 1;
     let residual;
@@ -1053,7 +1053,7 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
 
       // Emitted residual uses the previous tick's stationarity-projected,
       // per-lag coefficients -- same fix as ar() (skaters#232).
-      const phiUsed = state.phiUsed;
+      const phiUsed = state.phi_used;
       const lagX = new Array(maxLag);
       for (let j = 0; j < maxLag; j++) lagX[j] = buf[buf.length - 1 - j];
       const prediction = fsum(Array.from({ length: maxLag }, (_, j) => phiUsed[j] * lagX[j]));
@@ -1087,7 +1087,7 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
       }
       const rawPhi = [];
       for (let j = 0; j < maxLag; j++) rawPhi.push(th[groups[j]]);
-      state.phiUsed = arStationary(rawPhi);
+      state.phi_used = arStationary(rawPhi);
     } else {
       residual = y;
     }
@@ -1101,8 +1101,8 @@ export function groupedAr(maxLag = 16, lam = 0.99, ridge = 1.0) {
     // Same coefficients forward() already emitted residuals under
     // (skaters#232) -- maintained incrementally there, not re-derived here,
     // except for a pre-#235 checkpoint that has no cache yet.
-    const phi = state.phiUsed !== undefined
-      ? state.phiUsed
+    const phi = state.phi_used !== undefined
+      ? state.phi_used
       : arStationary(Array.from({ length: maxLag }, (_, j) => state.theta[groups[j]]));
     const H = dists.length;
     const psi = [1.0];

@@ -9,13 +9,13 @@ export function conjugate(skater, transform, k = 1) {
 
   function _conjugated(y, state) {
     if (state === null || state === undefined) {
-      state = { tState: null, sState: null };
+      state = { t_state: null, s_state: null };
     }
-    const [yPrime, tState] = forward(y, state.tState);
-    state.tState = tState;
-    const [distsPrime, sState] = skater(yPrime, state.sState);
-    state.sState = sState;
-    const dists = inverseK(distsPrime, state.tState);
+    const [yPrime, tState] = forward(y, state.t_state);
+    state.t_state = tState;
+    const [distsPrime, sState] = skater(yPrime, state.s_state);
+    state.s_state = sState;
+    const dists = inverseK(distsPrime, state.t_state);
     return [dists, state];
   }
   _conjugated.skaterName = `conjugate(${skater.skaterName || "?"})`;

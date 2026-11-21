@@ -131,5 +131,41 @@ def test_js_spliced_nonaffine(tmp_path):
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_spec_json_is_byte_identical():
+    """JS toJson(spec) must be Python's to_json(spec) byte for byte, and
+    specName must agree, so a spec hashes the same in both ports."""
+    import json
+    from skaters import spec as S
+    specs = [
+        S.leaf_spec(1),
+        S.ema_spec(0.05, 1),
+        S.ema_spec(1.0, 3),
+        S.ema_spec(1e-05, 1),
+        S.std_spec(0.0001),
+        S.frac_spec(0.4, 30),
+        S.frac_spec(1.5e-07, 50),
+        S.conjugate_spec(S.ensemble_spec(S.ema_spec(0.01, 1), S.ema_spec(0.1, 1), k=1), S.diff_spec()),
+        S.conjugate_spec(S.conjugate_spec(S.leaf_spec(2), S.ema_t_spec(0.3)), S.frac_spec(0.25, 20)),
+        {"op": "ensemble", "k": 2, "floor": 1e-06, "skaters": [S.ema_spec(123.456, 2), S.leaf_spec(2)]},
+    ]
+    from pathlib import Path
+    url = Path(ROOT, "docs", "js", "skaters", "spec.mjs").as_uri()
+    src = (
+        f"import {{ toJson, fromJson, name }} from '{url}';"
+        "import { readFileSync } from 'node:fs';"
+        "const specs = JSON.parse(readFileSync(0, 'utf8'));"
+        "process.stdout.write(JSON.stringify(specs.map((t) => {"
+        "  const s = fromJson(t); let n = null; try { n = name(s); } catch (e) {}"
+        "  return [toJson(s), n]; })));"
+    )
+    texts = [S.to_json(s) for s in specs]
+    result = subprocess.run(["node", "--input-type=module", "-e", src], input=json.dumps(texts),
+                            capture_output=True, text=True, cwd=ROOT, check=True)
+    for spec, text, (js_text, js_name) in zip(specs, texts, json.loads(result.stdout)):
+        assert js_text == text, f"toJson differs: {js_text} vs {text}"
+        if spec["op"] in ("leaf", "ema", "ensemble", "conjugate"):     # transform specs have no name
+            assert js_name == S.name(spec)
+
+
 def test_js_pushforward_affine():
     subprocess.run(["node", os.path.join(ROOT, "parity", "pushforward_affine.mjs")], check=True, cwd=ROOT)
