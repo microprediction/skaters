@@ -4,17 +4,18 @@ series, probed (mean, std, logpdf, cdf, two quantiles, crps) at every
 post-burn-in step and horizon, and compared at ATOL = RTOL = 1e-6, the
 gate every other port passes. The repeat-series (sticky), gap-series
 (missing observations), periodicity and pool-structure sections are checked
-too. The restore-and-continue leg uses a deep copy of the state at the
-burn-in step, the torch analogue of the JSON/pickle round trip.
+too, and so are the spec JSON strings (read, rebuilt, written back exactly). The
+restore-and-continue leg writes the state at the burn-in step to JSON with
+``skaters.torch.state_to_json`` and reads it back with ``state_from_json``,
+the canonical layout of docs/STATE.md.
 
     PYTHONPATH=src .venv-kumo/bin/python parity/check_torch.py [--only name,...]
 
-Exits non-zero on any mismatch. Scenarios whose torch module is not yet
-ported are reported as MISSING, not silently skipped.
+Exits non-zero on any mismatch. A scenario without a torch builder is
+reported as MISSING and fails the gate; there is no skip list.
 """
 from __future__ import annotations
 
-import copy
 import json
 import math
 import os
@@ -54,10 +55,16 @@ def run_scenario(skater, series, burn, probe, q_lo, q_hi, restore_at=-1):
             y = decode(y)
             dists, state = skater(y, state)
             if i == restore_at:
-                state = copy.deepcopy(state)
+                state = json_restore(state)
             if i >= burn:
                 out.append([probe_dist(d, probe, q_lo, q_hi) for d in dists])
     return out
+
+
+def json_restore(state):
+    """Checkpoint through JSON in the canonical layout and read it back."""
+    from skaters.torch.state import state_to_json, state_from_json
+    return state_from_json(json.loads(json.dumps(state_to_json(state), allow_nan=False)))
 
 
 def _mods():
@@ -75,7 +82,11 @@ def _mods():
                 "bayesian_ensemble": ("skaters.torch.bayesian", "bayesian_ensemble"),
                 "multiscale": ("skaters.torch.multiscale", "multiscale"), "gpdtails": ("skaters.torch.tails", "gpdtails"),
                 "adaptive_search": ("skaters.torch.search", "search"), "S": ("skaters.torch", "spec"),
-                "laplace": ("skaters.torch.api", "laplace"), "flesaker": ("skaters.torch.api", "flesaker"), "sticky": ("skaters.torch.sticky", "sticky"),
+                "laplace": ("skaters.torch.api", "laplace"), "dantzig": ("skaters.torch.api", "dantzig"),
+                "homogenize": ("skaters.torch.homogenize", "homogenize"),
+                "make_candidates": ("skaters.torch.homogenize", "make_candidates"),
+                "residual_transform": ("skaters.torch.residual_transform", "residual_transform"),
+                "terminal_leaf_ensemble": ("skaters.torch.trunk", "terminal_leaf_ensemble"), "flesaker": ("skaters.torch.api", "flesaker"), "sticky": ("skaters.torch.sticky", "sticky"),
             }[name]
             m = importlib.import_module(mod)
             return getattr(m, attr) if attr != "spec" else importlib.import_module("skaters.torch.spec")
@@ -163,6 +174,53 @@ def build_scenarios():
     return s
 
 
+def build_wrapper_scenarios():
+    """{name: (k, builder)} for gen_vectors.build_wrapper_scenarios (homogenize,
+    residual_transform, the adaptive temperature, dantzig, laplace with a
+    custom leaf), plus a few extra horizons of the same wrappers."""
+    M = _mods()
+    s = {}
+
+    def base(kk):
+        return M.conj(M.leaf(k=kk), M.T("ema_transform", alpha=0.1), k=kk)
+
+    def two(kk):
+        return [M.ema(0.05, k=kk), M.conj(M.leaf(k=kk), M.T("difference"), k=kk)]
+    for k in (1, 3):
+        suf = "" if k == 1 else f"_k{k}"
+        s[f"homogenize{suf}"] = (k, lambda kk=k: M.homogenize(base(kk), k=kk))
+        if k > 1:
+            for mode in ("weights", "state", "shared"):
+                s[f"homogenize_{mode}{suf}"] = (k, lambda kk=k, m=mode: M.homogenize(base(kk), k=kk, couple=m))
+        if k == 1:
+            for model in ("m0", "m1", "m2"):
+                s[f"residual_{model}"] = (1, lambda m=model: M.residual_transform(base(1), model=m, k=1))
+        s[f"terminal_adapt{suf}"] = (k, lambda kk=k: M.terminal_leaf_ensemble(
+            two(kk), k=kk, learning_rate=0.5, adaptive_temperature=True))
+    s["dantzig"] = (1, lambda: M.dantzig(k=1, expand_interval=50))
+    # build_wrapper_scenarios (PR #396 names)
+    s["homogenize_k2_weights"] = (2, lambda: M.homogenize(base(2), k=2, couple="weights"))
+    s["homogenize_k2_state"] = (2, lambda: M.homogenize(base(2), k=2, couple="state", lam=0.5))
+    s["homogenize_k2_shared"] = (2, lambda: M.homogenize(base(2), k=2, couple="shared"))
+    s["homogenize_small_grid"] = (1, lambda: M.homogenize(base(1), candidates=M.make_candidates(
+        rho_grid=(0.0, 0.9), gain_grid=(0.1,), delta_grid=(0.0, 0.5))))
+    for model in ("m0", "m1", "m2"):
+        s[f"residual_transform_{model}"] = (1, lambda m=model: M.residual_transform(base(1), model=m))
+    s["residual_transform_m2_lr"] = (1, lambda: M.residual_transform(base(1), model="m2", lr=0.05))
+    s["terminal_adaptive"] = (1, lambda: M.terminal_leaf_ensemble(
+        two(1), k=1, depths=[0, 1], adaptive_temperature=True, temp_rho=0.1))
+    s["terminal_adaptive_k3"] = (3, lambda: M.terminal_leaf_ensemble(
+        two(3), k=3, depths=[0, 1], adaptive_temperature=True, forget=0.99))
+    s["pol_dantzig"] = (1, lambda: M.dantzig(k=1, expand_interval=50))
+    s["pol_laplace_garch_leaf"] = (1, lambda: M.laplace(k=1, leaf=M.garch_leaf))
+    return s
+
+
+def build_all_scenarios():
+    """Every named torch builder: the standard scenarios plus the wrappers."""
+    return {**build_scenarios(), **build_wrapper_scenarios()}
+
+
 def build_repeat_scenarios():
     M = _mods()
     return {"sticky_ema": (1, lambda: M.sticky(M.conj(M.leaf(k=1), M.T("ema_transform", alpha=0.1), k=1), k=1))}
@@ -200,26 +258,45 @@ def main(argv):
     if "--only" in argv:
         only = set(argv[argv.index("--only") + 1].split(","))
     verbose = "-q" not in argv
-    vectors = json.load(open(os.path.join(HERE, "vectors.json")))
+    path = argv[argv.index("--vectors") + 1] if "--vectors" in argv else os.path.join(HERE, "vectors.json")
+    vectors = json.load(open(path))
     series, burn, probe = vectors["series"], vectors["burn"], vectors["probe"]
     q_lo, q_hi = vectors["q_lo"], vectors["q_hi"]
     failures = checked = missing = 0
 
-    scenarios = build_scenarios()
-    for name, expected in vectors["scenarios"].items():
-        if only and name not in only:
-            continue
-        if name not in scenarios:
-            print(f"MISSING {name} (no builder)"); missing += 1; continue
-        k, build = scenarios[name]
-        try:
-            sk = build()
-        except Exception as e:  # noqa: BLE001
-            print(f"MISSING {name}: {type(e).__name__}: {str(e)[:90]}"); missing += 1; continue
-        for leg, restore in (("", -1), ("+restore", burn - 1)):
-            out = run_scenario(sk, series, burn, probe, q_lo, q_hi, restore)
-            failures += compare(name + leg, expected["out"], out, failures, verbose)
-            checked += sum(len(r) * 7 for r in out)
+    scenarios = build_all_scenarios()
+    blocks = [("", vectors["scenarios"])]
+    n_scen = 0
+    for prefix, block in blocks:
+        for name, expected in block.items():
+            if only and name not in only:
+                continue
+            n_scen += 1
+            if name not in scenarios:
+                print(f"MISSING {prefix}{name} (no builder)"); missing += 1; continue
+            k, build = scenarios[name]
+            try:
+                sk = build()
+            except Exception as e:  # noqa: BLE001
+                print(f"MISSING {prefix}{name}: {type(e).__name__}: {str(e)[:90]}"); missing += 1; continue
+            for leg, restore in (("", -1), ("+restore", burn - 1)):
+                out = run_scenario(sk, series, burn, probe, q_lo, q_hi, restore)
+                failures += compare(prefix + name + leg, expected["out"], out, failures, verbose)
+                checked += sum(len(r) * 7 for r in out)
+
+    if vectors.get("spec_json") and not only:
+        from skaters.torch import spec as TS
+        bad = 0
+        for ex in vectors["spec_json"]:
+            sp = TS.from_json(ex["json"])
+            if TS.to_json(sp) != ex["json"] or TS.name(sp) != ex["name"]:
+                bad += 1
+                print(f"FAIL spec_json {ex['name']}: {TS.to_json(sp)} / {TS.name(sp)}")
+            else:
+                TS.build(sp)            # the spec must also materialise in torch
+        failures += bad
+        if not bad and verbose:
+            print(f"ok   spec_json ({len(vectors['spec_json'])} specs)")
 
     if vectors.get("repeat_scenarios") and not only:
         rep = vectors["repeat_series"]
@@ -266,7 +343,7 @@ def main(argv):
             elif verbose:
                 print(f"ok   structure k={kk}")
 
-    print(f"\n{checked} values checked across {len(vectors['scenarios'])} scenarios"
+    print(f"\n{checked} values checked across {n_scen} scenarios"
           + (f"; {missing} MISSING" if missing else ""))
     print("PARITY OK" if failures == 0 and missing == 0 else f"PARITY FAILED ({failures} mismatches, {missing} missing)")
     return 0 if failures == 0 and missing == 0 else 1

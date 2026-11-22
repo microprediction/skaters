@@ -280,10 +280,12 @@ pub fn build_candidates(k: usize) -> (Vec<Sk>, Vec<f64>) {
 /// One laplace instance on one clock: likelihood-weighted trunk with a CRPS
 /// terminal leaf, plus the lattice projection.
 fn laplace_single_scale(k: usize, scale_alpha: f64) -> Sk {
+    laplace_single_scale_leaf(k, &|| Sk::Crps(CrpsLeaf::new(1, 1.0, scale_alpha)))
+}
+
+fn laplace_single_scale_leaf(k: usize, leaf_fn: &dyn Fn() -> Sk) -> Sk {
     let (candidates, depths) = build_candidates(k);
-    let tleafs: Vec<Sk> = (0..k)
-        .map(|_| Sk::Crps(CrpsLeaf::new(1, 1.0, scale_alpha)))
-        .collect();
+    let tleafs: Vec<Sk> = (0..k).map(|_| leaf_fn()).collect();
     let f = terminal_leaf_ensemble(candidates, tleafs, k, 0.8, 0.005, depths, 20, 0.99);
     sticky(f, k)
 }
@@ -295,6 +297,10 @@ pub enum Forecaster {
     Gpd(Box<GpdTails>),
     Parade(Box<Parade>),
     Conj(Box<FConj>),
+    /// homogenize around any forecaster
+    Homog(Box<crate::homogenize::Homogenize>),
+    /// residual_transform around any forecaster
+    Residual(Box<crate::residual::ResidualTransform>),
 }
 
 /// conjugate around any forecaster: the transform's inverse sees the full
@@ -305,6 +311,10 @@ pub struct FConj {
     pub k: usize,
     pub transform: Transform,
     pub inner: Forecaster,
+    /// true for flesaker, whose Python state is the inner laplace's state
+    /// itself (its log map is stateless and applied outside the state).
+    #[serde(default)]
+    pub bare: bool,
 }
 
 pub fn conjugate_f(inner: Forecaster, transform: Transform, k: usize) -> Forecaster {
@@ -312,6 +322,7 @@ pub fn conjugate_f(inner: Forecaster, transform: Transform, k: usize) -> Forecas
         k,
         transform,
         inner,
+        bare: false,
     }))
 }
 
@@ -327,6 +338,8 @@ impl Forecaster {
                 assert_eq!(dists_prime.len(), c.k, "conjugate k must match the wrapped forecaster");
                 c.transform.inverse_k_p(&dists_prime)
             }
+            Forecaster::Homog(h) => h.step(y),
+            Forecaster::Residual(r) => r.step(y),
         }
     }
 }
@@ -339,9 +352,37 @@ pub fn laplace(k: usize) -> Forecaster {
     Forecaster::Parade(Box::new(parade(ParadeBase::Gpd(g), k)))
 }
 
+/// `laplace(k, leaf=...)`: laplace with a custom terminal leaf, given as a
+/// factory of a k = 1 leaf, e.g. `|| Sk::GarchLeaf(GarchLeaf::new(1))` for
+/// Python's `laplace(leaf=garch_leaf)`.
+pub fn laplace_with_leaf<F: Fn() -> Sk>(k: usize, leaf_fn: F) -> Forecaster {
+    let f = multiscale(|kk| laplace_single_scale_leaf(kk, &leaf_fn), k, None);
+    let g = gpdtails(f, k, 0.98, 500, 500);
+    Forecaster::Parade(Box::new(parade(ParadeBase::Gpd(g), k)))
+}
+
+/// `dantzig(k)`: the adaptive-search policy (Python's `dantzig`, which is
+/// `search` under its roster name). Adjust the returned search's public knobs
+/// (e.g. `expand_interval`) before the first step, as Python's keyword
+/// arguments do.
+pub fn dantzig(k: usize) -> crate::search::Search {
+    crate::search::search(k)
+}
+
+/// `dantzig(k, expand_interval=...)` as a forecaster.
+pub fn dantzig_f(k: usize, expand_interval: u64) -> Forecaster {
+    let mut s = dantzig(k);
+    s.expand_interval = expand_interval;
+    Forecaster::Sk(Sk::Search(Box::new(s)))
+}
+
 /// `laplace` for a series that never crosses a known bound. Experimental, as
 /// in Python: laplace on log(y - lower) (or -log(upper - y)), mapped back by
 /// the exact change of variables. Give one bound; neither means lower = 0.
 pub fn flesaker(k: usize, lower: Option<f64>, upper: Option<f64>) -> Forecaster {
-    conjugate_f(laplace(k), crate::transform::log_transform(lower, upper), k)
+    let mut f = conjugate_f(laplace(k), crate::transform::log_transform(lower, upper), k);
+    if let Forecaster::Conj(c) = &mut f {
+        c.bare = true;
+    }
+    f
 }

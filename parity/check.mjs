@@ -58,7 +58,7 @@ function main() {
   let checked = 0;
   const missing = [];
 
-  const allScenarios = { ...vectors.scenarios, ...(vectors.wrapper_scenarios || {}) };
+  const allScenarios = vectors.scenarios;
   for (const [name, expected] of Object.entries(allScenarios)) {
     const sc = scenarios.get(name);
     if (!sc) {

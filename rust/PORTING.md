@@ -25,6 +25,12 @@ is `cargo test --release` against `parity/vectors.json` at 1e-6.
 | spec build path | spec.py | DONE |
 | periodicity detector | periodicity.py | DONE |
 | covariance estimators | cov/ | DONE |
+| terminal ensemble adaptive temperature (`adapt`) | terminal.py | DONE |
+| homogenize, make_candidates, HomogenizedDist (all couple modes) | homogenize.py | DONE |
+| residual_transform (m0, m1, m2), CorrectedDist, ResidualDiagnostics | residual_transform.py | DONE |
+| dantzig, laplace(leaf=...) | api.py | DONE |
+| canonical state (state_to_json, load_state) | state.py, docs/STATE.md | DONE |
+| mahalanobis, zbank | anomaly.py | not ported |
 
 Porting notes specific to Rust:
 
@@ -62,6 +68,26 @@ clamp catching NaN. A detected seasonal period injects a second grammar
 entry that can shadow a base `seas(p)` by name; recipe rebuilds resolve
 names last-wins, as Python's dict comprehension does. The infinite default
 cost budget round-trips JSON as null.
+
+Canonical state lives in `src/state.rs`, one `State` impl per skater, kept
+apart from the structs so the native serde layout is unchanged. A Rust
+struct holds configuration and state together; the impl writes only the
+state part, with Python's keys, integer fields as JSON integers and floats
+as floats, and `null` for a fresh skater (Python's `None`). Loading `null`
+resets to fresh. A search pool entry is rebuilt from its recipe with the
+grammar in force (the base table plus `seas(p)` per detected period, in
+detection order), then its `s` is loaded. `flesaker`'s state is the inner
+laplace's state itself, as in Python (`FConj::bare`). theta writes `slope`
+from its second observation on, as Python does. Rust's own state reached
+from scratch matches Python's field by field to 1e-4 in `tests/resume.rs`:
+running sums over hundreds of steps (homogenize's discounted log weights)
+collect the ports' last-bit differences in erf, exp and log to a few 1e-6,
+while every probe stays within 1e-6.
+
+`homogenize` and `residual_transform` wrap any `Forecaster` and emit new
+`PDist` kinds (`Homog`, `Corrected`). Like Python's duck-typed classes they
+have no affine, shift or components; a transform that needs them panics
+where Python raises.
 
 Parity vectors provenance: `parity/vectors.json` is copied from
 microprediction/skaters (`parity/vectors.json` there); refresh by rerunning

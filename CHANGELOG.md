@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Rust and `skaters.torch` read and write the canonical state layout, so a
+  checkpoint from any port resumes in any other. Rust gains a `State` trait
+  (`state_to_json`, `load_state`) on every skater; `skaters-fast` writes the
+  canonical layout and still reads its old serde format, and `Granger` gains
+  `state_json`/`from_state_json`. `skaters.torch` exports `state_to_json`,
+  `state_from_json` and `assert_plain_state`; its state lost its deques and
+  sets and has Python's keys. `parity/gen_resume.py` checkpoints every parity
+  scenario at t = 60, 250 and 530, and Rust and torch resume them and match
+  Python's next 20 predictives to 1e-6; Python resumes their checkpoints
+  likewise (`parity/check_resume.py`, `tests/test_rust_resume.py`,
+  `tests/test_torch_resume.py`).
+- Rust and `skaters.torch` cover the rest of the Python API except
+  `mahalanobis` and `zbank`: `homogenize` (with `homogenize_candidates` and
+  `HomogenizedDist`), `residual_transform` (with `ResidualDiagnostics` and
+  `CorrectedDist`), `dantzig`, the terminal ensemble's adaptive temperature,
+  `laplace` with a custom terminal leaf, and, in torch, `granger` and the
+  spec helpers. The wrapper scenarios join the main parity block, so JS, Rust
+  and torch all run every scenario.
 - Fix: `SplicedDist.cdf` and `logpdf` read the splice coordinate from erfc sums
   once the body's tail mass falls below 1e-8, as the quantile already did. The
   old read went through `0.5 * (1 + erf)` and plateaued in the far tail. Python,

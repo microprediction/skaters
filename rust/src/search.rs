@@ -152,7 +152,7 @@ fn make_entry(sk: Sk, depth: usize, recipe: Vec<String>, k: usize, cost: f64) ->
     }
 }
 
-fn build_from_recipe(recipe: &[String], k: usize, transforms: &[GrammarEntry]) -> Sk {
+pub(crate) fn build_from_recipe(recipe: &[String], k: usize, transforms: &[GrammarEntry]) -> Sk {
     let mut f = Sk::Leaf(Leaf::new(k));
     for t_name in recipe {
         // Python's dict lookup: last entry with this name wins.

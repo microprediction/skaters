@@ -20,7 +20,9 @@ use serde_json::{Map, Value};
 use crate::api::{laplace, Forecaster};
 use crate::leaf::{CrpsLeaf, Leaf};
 use crate::parade::{parade, Parade, ParadeBase};
-use crate::skater::{conjugate, sticky, terminal_leaf_ensemble, Sk, TerminalEnsemble};
+use crate::skater::{
+    conjugate, sticky, terminal_leaf_ensemble, with_prior_log_weights, Sk, TerminalEnsemble,
+};
 use crate::tails::{gpdtails, PDist};
 use crate::transform::{
     ar, difference, drift, ema_transform, fractional_difference, garch, holt_linear,
@@ -231,13 +233,11 @@ fn expert(p: &GrangerParams) -> Parade {
         .collect();
     let depths: Vec<f64> = p.candidates.iter().map(|c| c.depth).collect();
     let tleafs = vec![Sk::Crps(CrpsLeaf::new(1, p.tleaf.eta, p.tleaf.scale_alpha))];
-    let mut f = terminal_leaf_ensemble(
+    let f = terminal_leaf_ensemble(
         cands, tleafs, 1, p.trunk.learning_rate, p.trunk.complexity_penalty, depths, 20,
         p.trunk.forget,
     );
-    if let Sk::Terminal(t) = &mut f {
-        t.log_w = p.trunk.prior_log_weights.clone();
-    }
+    let f = with_prior_log_weights(f, p.trunk.prior_log_weights.clone());
     let f = sticky(f, 1);
     let g = gpdtails(f, 1, 0.98, 500, 500);
     parade(ParadeBase::Gpd(g), 1)
@@ -381,15 +381,15 @@ pub struct Granger {
     pub params: GrangerParams,
     pub lap: Forecaster,
     pub expert: Parade,
-    pend: Option<(PDist, PDist)>,
-    cum: [f64; 2],
+    pub(crate) pend: Option<(PDist, PDist)>,
+    pub(crate) cum: [f64; 2],
     log_prior: [f64; 2],
     pub t: u64,
     pub z: Option<f64>,
-    repeat_frac: f64,
-    abs_z_mean: f64,
-    n: u64,
-    last_y: Option<f64>,
+    pub(crate) repeat_frac: f64,
+    pub(crate) abs_z_mean: f64,
+    pub(crate) n: u64,
+    pub(crate) last_y: Option<f64>,
 }
 
 impl Granger {
