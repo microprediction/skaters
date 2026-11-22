@@ -116,8 +116,10 @@
       Every implementation is verified against the Python reference by a
       parity suite: the same fixed series through every scenario, with
       roughly 100,000 distributional probe values required to agree to
-      1e-6 before anything ships. A model trained in one language resumes
-      bit-compatibly in another; the state is pure data.
+      1e-6 before anything ships. The state is plain JSON with one
+      <a href="https://github.com/microprediction/skaters/blob/main/docs/STATE.md">documented layout</a>,
+      so a model trained in one language resumes in another, matching to
+      1e-6.
     </p>
 
     <h2>Python (reference)</h2>
