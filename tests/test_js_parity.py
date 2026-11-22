@@ -131,6 +131,11 @@ def test_js_spliced_nonaffine(tmp_path):
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_js_pushforward_affine():
+    subprocess.run(["node", os.path.join(ROOT, "parity", "pushforward_affine.mjs")], check=True, cwd=ROOT)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 def test_js_spec_json_is_byte_identical():
     """JS toJson(spec) must be Python's to_json(spec) byte for byte, and
     specName must agree, so a spec hashes the same in both ports."""
@@ -165,7 +170,3 @@ def test_js_spec_json_is_byte_identical():
         assert js_text == text, f"toJson differs: {js_text} vs {text}"
         if spec["op"] in ("leaf", "ema", "ensemble", "conjugate"):     # transform specs have no name
             assert js_name == S.name(spec)
-
-
-def test_js_pushforward_affine():
-    subprocess.run(["node", os.path.join(ROOT, "parity", "pushforward_affine.mjs")], check=True, cwd=ROOT)

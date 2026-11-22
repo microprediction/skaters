@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import bisect
 import math
-from collections import deque
 
 import torch
 from torch import nn
@@ -226,7 +225,7 @@ class GarchLeaf(nn.Module):
         w = [_c(1e-6) for _ in self.C]
         w[self.one_idx] = _c(1.0)
         return {"h": _zero(), "s2": _zero(), "n": 0, "omega": _zero(), "alpha": _c(0.05),
-                "beta": _c(0.90), "buf": deque(maxlen=self.window), "w": w, "last_r2": _zero()}
+                "beta": _c(0.90), "buf": [], "w": w, "last_r2": _zero()}
 
     def forward(self, y, state=None):
         y = _t(y)
@@ -247,6 +246,8 @@ class GarchLeaf(nn.Module):
         s["h"] = h
         s["last_r2"] = y * y
         s["buf"].append(y)
+        if len(s["buf"]) > self.window:      # trailing window, a list as in the reference
+            del s["buf"][0]
 
         if s["n"] >= self.min_obs and s["n"] % self.refit_every == 0 and len(s["buf"]) >= self.min_obs:
             resid = list(s["buf"])

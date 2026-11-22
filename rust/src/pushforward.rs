@@ -711,10 +711,13 @@ impl Pred for PDist {
             PDist::Mix(d) => Cow::Borrowed(&d.components),
             PDist::Push(d) => Cow::Owned(d.components()),
             PDist::Spliced(_) => panic!("a tail-spliced predictive has no mixture components"),
+            PDist::Homog(_) | PDist::Corrected(_) => {
+                panic!("a homogenize or residual_transform predictive has no mixture components")
+            }
         }
     }
     fn has_components(&self) -> bool {
-        !matches!(self, PDist::Spliced(_))
+        matches!(self, PDist::Mix(_) | PDist::Push(_))
     }
     fn from_mix(d: Dist) -> Self {
         PDist::Mix(d)
@@ -730,6 +733,9 @@ impl Pred for PDist {
                 delta,
                 add,
             )),
+            PDist::Homog(_) | PDist::Corrected(_) => {
+                panic!("a homogenize or residual_transform predictive cannot be widened")
+            }
         }
     }
     fn push(&self, map: CoordMap) -> Self {

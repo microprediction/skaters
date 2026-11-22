@@ -19,20 +19,37 @@ and the lattice/tail wrappers, which stay in the reference (``laplace`` is
 this module is the ``terminal_leaf_ensemble`` inside, at one scale).
 ``learning_rate``, ``forget`` and ``complexity_penalty`` are parameters so
 the mixing policy itself can be trained; ``prior_log_weights`` likewise.
+
+``adaptive_temperature`` (with ``temp_rho`` and ``temp_band``) is the
+reference's: eta moves in log space from the issued predictive's PIT
+dispersion and log-score trend, inside a band around ``learning_rate``. The
+direction of each move is decided on floats, as in the reference; eta itself
+is a tensor in ``learning_rate``, so the gradient reaches it. The state is
+the reference's layout (docs/STATE.md), ``adapt`` included.
 """
 
 from __future__ import annotations
 
 import math
-from collections import deque
 
 import torch
 from torch import nn
 
 from skaters.leaf import crps_leaf
+from skaters.terminal import (_PIT_DISPERSION_TARGET, _PIT_EWMA_DECAY, _LOSS_FAST_DECAY,
+                              _LOSS_SLOW_DECAY, _TEMP_AMBIG_EPS)
 from skaters.torch.dist import TorchDist, DTYPE, _t
 
 _LOGPDF_LO, _LOGPDF_HI = -20.0, 20.0
+
+
+class _LogW(list):
+    """The per-candidate log weights, a plain list in the state (it is written
+    to JSON as one), carrying ``decay = forget**t`` as an attribute so the
+    prior's exact gradient survives the one-step truncation of the weight
+    recursion. A list restored from JSON has no attribute: a restored state
+    is a constant, so the carried weights then contribute no prior gradient."""
+    __slots__ = ("decay",)
 
 
 def _clamp_lp(lp):
@@ -49,8 +66,12 @@ class TerminalLeafEnsemble(nn.Module):
 
     def __init__(self, skaters, k: int = 1, leaf_fn=crps_leaf, learning_rate: float = 0.5,
                  complexity_penalty: float = 0.0, depths=None, prior_log_weights=None,
-                 max_components: int = 20, forget: float = 1.0):
+                 max_components: int = 20, forget: float = 1.0, adaptive_temperature: bool = False,
+                 temp_rho: float = 0.03, temp_band: float = 3.0):
         super().__init__()
+        self.adaptive_temperature = bool(adaptive_temperature)
+        self.temp_rho = float(temp_rho)
+        self.temp_band = float(temp_band)
         n = len(skaters)
         assert n > 0
         self.skaters = list(skaters)
@@ -86,38 +107,98 @@ class TerminalLeafEnsemble(nn.Module):
         if state is None:
             state = {
                 "sub": [None] * n,
-                "qdist": [deque() for _ in range(n)],
+                "qdist": [[] for _ in range(n)],
                 "log_w": [self.prior_log_weights[i] for i in range(n)],
-                "decay": torch.ones((), dtype=DTYPE),      # forget^t, the prior's exact weight
                 "leaf_state": [None] * k,
                 "leaf_pred": [None] * k,
-                "mean_q": [deque() for _ in range(k)],
+                "mean_q": [[] for _ in range(k)],
+                "adapt": {
+                    "log_eta": torch.log(self.learning_rate),
+                    "pit_ewma": torch.as_tensor(_PIT_DISPERSION_TARGET, dtype=DTYPE),
+                    "loss_fast": None,
+                    "loss_slow": None,
+                    "pred_q": [],
+                } if self.adaptive_temperature else None,
             }
+            fresh = True
+        else:
+            fresh = False
         all_dists = []
         for i, f in enumerate(self.skaters):
             di, state["sub"][i] = f(y, state["sub"][i])
             all_dists.append(di)
 
+        # adaptive selection temperature: the reference's signal on the issued
+        # predictive, with eta a tensor in learning_rate (the band is too)
+        eta_t = self.learning_rate
+        if self.adaptive_temperature:
+            ad = state.get("adapt")
+            if ad is None:                       # a state written without adaptation
+                ad = state["adapt"] = {"log_eta": torch.log(self.learning_rate),
+                                       "pit_ewma": torch.as_tensor(_PIT_DISPERSION_TARGET, dtype=DTYPE),
+                                       "loss_fast": None, "loss_slow": None, "pred_q": []}
+            pq = ad["pred_q"]
+            if pq:
+                prev_pred = pq.pop(0)
+                with torch.no_grad():
+                    lp_c = _t(prev_pred.logpdf(y))
+                    if not bool(lp_c >= -20.0):
+                        lp_c = torch.as_tensor(-20.0, dtype=DTYPE)
+                    elif bool(lp_c > 20.0):
+                        lp_c = torch.as_tensor(20.0, dtype=DTYPE)
+                    u = _t(prev_pred.cdf(y))
+                    if not (0.0 <= float(u) <= 1.0):
+                        u = torch.as_tensor(0.5, dtype=DTYPE)
+                    ad["pit_ewma"] = (_PIT_EWMA_DECAY * _t(ad["pit_ewma"])
+                                      + (1.0 - _PIT_EWMA_DECAY) * (u - 0.5) ** 2)
+                    if ad["loss_fast"] is None:
+                        ad["loss_fast"] = ad["loss_slow"] = lp_c
+                    else:
+                        ad["loss_fast"] = _LOSS_FAST_DECAY * _t(ad["loss_fast"]) + (1.0 - _LOSS_FAST_DECAY) * lp_c
+                        ad["loss_slow"] = _LOSS_SLOW_DECAY * _t(ad["loss_slow"]) + (1.0 - _LOSS_SLOW_DECAY) * lp_c
+                    e_t = float(ad["pit_ewma"]) - _PIT_DISPERSION_TARGET
+                    dloss_t = float(ad["loss_fast"]) - float(ad["loss_slow"])
+                if abs(e_t) > _TEMP_AMBIG_EPS:
+                    direction = -1.0 if e_t > 0.0 else 1.0
+                else:
+                    direction = 1.0 if dloss_t > 0.0 else (-1.0 if dloss_t < 0.0 else 0.0)
+                le = _t(ad["log_eta"]).detach() + self.temp_rho * direction
+                lo = torch.log(self.learning_rate / self.temp_band)
+                hi = torch.log(self.learning_rate * self.temp_band)
+                # clamp with the band's gradient when a bound binds
+                if bool(le < lo):
+                    le = lo
+                elif bool(le > hi):
+                    le = hi
+                else:
+                    # inside the band log_eta is log(lr) plus a sum of constant steps
+                    base = torch.log(self.learning_rate)
+                    le = le + (base - base.detach())
+                ad["log_eta"] = le
+            eta_t = torch.exp(_t(ad["log_eta"]))
+
         # weight update from the resolved one-step predictive
-        log_w = list(state["log_w"])
-        decay = state.get("decay", torch.ones((), dtype=DTYPE))
+        log_w = _LogW(state["log_w"])
+        prev = state["log_w"]
+        decay = getattr(prev, "decay", None)
+        if decay is None:
+            decay = torch.ones((), dtype=DTYPE) if fresh else torch.zeros((), dtype=DTYPE)
         updated = False
         for i in range(n):
             q = state["qdist"][i]
             if q:
-                lp = _clamp_lp(q.popleft().logpdf(y))
+                lp = _clamp_lp(q.pop(0).logpdf(y))
                 carried = _t(log_w[i])
                 if self.detach_carry:
                     # truncate the recursion's graph at one step, but keep the prior's
                     # exact gradient (d log_w_t / d prior = forget^t) through a value-zero term
                     pr = decay * self.prior_log_weights[i]
                     carried = carried.detach() + (pr - pr.detach())
-                log_w[i] = (self.forget * carried + self.learning_rate * lp
+                log_w[i] = (self.forget * carried + eta_t * lp
                             - self.complexity_penalty * self.depths[i])
                 updated = True
             q.append(all_dists[i][0])
-        if updated:
-            state["decay"] = (self.forget * decay).detach()
+        log_w.decay = (self.forget * decay).detach() if updated else decay
         state["log_w"] = log_w
         lw = torch.stack([_t(v).reshape(()) for v in log_w])
         self.last_log_w = lw.detach()
@@ -127,14 +208,19 @@ class TerminalLeafEnsemble(nn.Module):
         w = torch.exp(lw - max_lw)
         tot = torch.sum(w)
 
+        ref_leaf = not isinstance(self.tleafs[0], nn.Module)
         combined = []
         for h in range(k):
             means = torch.stack([all_dists[i][h].mean.reshape(()) for i in range(n)])
             mu_h = torch.sum(w * means) / tot
             mq = state["mean_q"][h]
             if len(mq) >= h + 1:
-                r = float(y.detach()) - float(mq.popleft().detach())     # leaf sees a constant residual
-                ld, state["leaf_state"][h] = self.tleafs[h](r, state["leaf_state"][h])
+                r = float(y.detach()) - float(_t(mq.pop(0)).detach())     # leaf sees a constant residual
+                ls = state["leaf_state"][h]
+                if ref_leaf and ls is not None:
+                    from skaters.torch.state import floats
+                    ls = floats(ls)                 # a reference leaf keeps floats
+                ld, state["leaf_state"][h] = self.tleafs[h](r, ls)
                 state["leaf_pred"][h] = ld[0]
             if state["leaf_pred"][h] is not None:
                 pred = TorchDist.from_reference(state["leaf_pred"][h]).shift(mu_h)
@@ -144,6 +230,8 @@ class TerminalLeafEnsemble(nn.Module):
                     pred = _prune(pred, self.max_components)
             combined.append(pred)
             mq.append(mu_h)
+        if self.adaptive_temperature:
+            state["adapt"]["pred_q"].append(combined[0])
         return combined, state
 
 
@@ -151,3 +239,20 @@ def _prune(d: TorchDist, max_components: int) -> TorchDist:
     """``TorchDist.prune``: the reference's merge path on detached floats, the
     merged moments as tensors, so the warm-up predictive keeps its gradient."""
     return d.prune(max_components)
+
+
+def terminal_leaf_ensemble(skaters, leaf_fn=None, k: int = 1, learning_rate: float = 0.5,
+                           complexity_penalty: float = 0.0, depths=None, prior_log_weights=None,
+                           max_components: int = 20, forget: float = 1.0,
+                           adaptive_temperature: bool = False, temp_rho: float = 0.03,
+                           temp_band: float = 3.0) -> TerminalLeafEnsemble:
+    """Factory with the reference's name and signature. The default terminal
+    leaf is the torch ``crps_leaf``."""
+    if leaf_fn is None:
+        from skaters.torch.leaf import crps_leaf as torch_crps_leaf
+        leaf_fn = torch_crps_leaf
+    return TerminalLeafEnsemble(skaters, k=k, leaf_fn=leaf_fn, learning_rate=learning_rate,
+                                complexity_penalty=complexity_penalty, depths=depths,
+                                prior_log_weights=prior_log_weights, max_components=max_components,
+                                forget=forget, adaptive_temperature=adaptive_temperature,
+                                temp_rho=temp_rho, temp_band=temp_band)

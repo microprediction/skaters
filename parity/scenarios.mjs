@@ -108,7 +108,7 @@ export function buildScenarios() {
 
 // Wrappers on a skater's own PIT residuals, the adaptive temperature, the
 // named search policy, and laplace with a custom terminal leaf. Must match
-// parity/gen_vectors.py build_wrapper_scenarios() (vectors "wrapper_scenarios").
+// parity/gen_vectors.py build_wrapper_scenarios(), part of the main "scenarios" block.
 export function buildWrapperScenarios() {
   const s = [];
   const emaC = (kk) => conjugate(leaf(kk), emaTransform(0.1), kk);

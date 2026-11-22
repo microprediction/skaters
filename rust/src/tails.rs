@@ -456,6 +456,17 @@ pub enum PDist {
     Mix(Dist),
     Spliced(SplicedDist),
     Push(Box<PushforwardDist>),
+    /// homogenize's reshaped predictive
+    Homog(Box<crate::homogenize::HomogenizedDist>),
+    /// residual_transform's reshaped predictive
+    Corrected(Box<crate::residual::CorrectedDist>),
+}
+
+/// Python's wrapper predictives (HomogenizedDist, CorrectedDist) have no
+/// location-scale methods or components; a transform that needs them raises
+/// there, and panics here.
+fn no_affine(what: &str) -> ! {
+    panic!("a homogenize or residual_transform predictive has no {what} (as in Python)")
 }
 
 impl PDist {
@@ -464,6 +475,8 @@ impl PDist {
             PDist::Mix(d) => d.mean(),
             PDist::Spliced(d) => d.mean(),
             PDist::Push(d) => d.mean(),
+            PDist::Homog(d) => d.mean(),
+            PDist::Corrected(d) => d.mean(),
         }
     }
     pub fn var(&self) -> f64 {
@@ -471,6 +484,8 @@ impl PDist {
             PDist::Mix(d) => d.var(),
             PDist::Spliced(d) => d.var(),
             PDist::Push(d) => d.var(),
+            PDist::Homog(d) => d.var(),
+            PDist::Corrected(d) => d.var(),
         }
     }
     pub fn std(&self) -> f64 {
@@ -478,6 +493,8 @@ impl PDist {
             PDist::Mix(d) => d.std(),
             PDist::Spliced(d) => d.std(),
             PDist::Push(d) => d.std(),
+            PDist::Homog(d) => d.std(),
+            PDist::Corrected(d) => d.std(),
         }
     }
     pub fn logpdf(&self, x: f64) -> f64 {
@@ -485,6 +502,8 @@ impl PDist {
             PDist::Mix(d) => d.logpdf(x),
             PDist::Spliced(d) => d.logpdf(x),
             PDist::Push(d) => d.logpdf(x),
+            PDist::Homog(d) => d.logpdf(x),
+            PDist::Corrected(d) => d.logpdf(x),
         }
     }
     pub fn cdf(&self, x: f64) -> f64 {
@@ -492,6 +511,8 @@ impl PDist {
             PDist::Mix(d) => d.cdf(x),
             PDist::Spliced(d) => d.cdf(x),
             PDist::Push(d) => d.cdf(x),
+            PDist::Homog(d) => d.cdf(x),
+            PDist::Corrected(d) => d.cdf(x),
         }
     }
     pub fn quantile(&self, p: f64) -> f64 {
@@ -502,6 +523,8 @@ impl PDist {
             PDist::Mix(d) => d.quantile_tol(p, tol, max_iter),
             PDist::Spliced(d) => d.quantile_tol(p, tol, max_iter),
             PDist::Push(d) => d.quantile_tol(p, tol, max_iter),
+            PDist::Homog(d) => d.quantile_tol(p, tol, max_iter),
+            PDist::Corrected(d) => d.quantile_tol(p, tol, max_iter),
         }
     }
     pub fn crps(&self, x: f64) -> f64 {
@@ -509,6 +532,8 @@ impl PDist {
             PDist::Mix(d) => d.crps(x),
             PDist::Spliced(d) => d.crps(x),
             PDist::Push(d) => d.crps(x),
+            PDist::Homog(d) => d.crps(x),
+            PDist::Corrected(d) => d.crps(x),
         }
     }
     pub fn shift(&self, delta: f64) -> PDist {
@@ -516,6 +541,7 @@ impl PDist {
             PDist::Mix(d) => PDist::Mix(d.shift(delta)),
             PDist::Spliced(d) => PDist::Spliced(d.shift(delta)),
             PDist::Push(d) => PDist::Push(Box::new(d.shift(delta))),
+            PDist::Homog(_) | PDist::Corrected(_) => no_affine("shift"),
         }
     }
     pub fn scale(&self, factor: f64) -> PDist {
@@ -523,6 +549,7 @@ impl PDist {
             PDist::Mix(d) => PDist::Mix(d.scale(factor)),
             PDist::Spliced(d) => PDist::Spliced(d.scale(factor)),
             PDist::Push(d) => PDist::Push(Box::new(d.scale(factor))),
+            PDist::Homog(_) | PDist::Corrected(_) => no_affine("scale"),
         }
     }
     pub fn affine(&self, a: f64, b: f64) -> PDist {
@@ -530,6 +557,7 @@ impl PDist {
             PDist::Mix(d) => PDist::Mix(d.affine(a, b)),
             PDist::Spliced(d) => PDist::Spliced(d.affine(a, b)),
             PDist::Push(d) => PDist::Push(Box::new(d.affine(a, b))),
+            PDist::Homog(_) | PDist::Corrected(_) => no_affine("affine"),
         }
     }
     /// Mixture components, as Python's `.components`: a pushforward gives its
@@ -537,7 +565,7 @@ impl PDist {
     pub fn components(&self) -> Option<Vec<(f64, f64, f64)>> {
         match self {
             PDist::Mix(d) => Some(d.components.clone()),
-            PDist::Spliced(_) => None,
+            PDist::Spliced(_) | PDist::Homog(_) | PDist::Corrected(_) => None,
             PDist::Push(d) => Some(d.components()),
         }
     }
@@ -546,6 +574,7 @@ impl PDist {
         match self {
             PDist::Mix(d) => d.clone(),
             PDist::Spliced(_) => panic!("a tail-spliced predictive has no mixture components"),
+            PDist::Homog(_) | PDist::Corrected(_) => no_affine("mixture components"),
             PDist::Push(d) => Dist {
                 components: d.components(),
             },

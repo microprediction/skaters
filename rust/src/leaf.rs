@@ -16,7 +16,7 @@ pub const FINE: [f64; 15] = [
     7.7371, 9.9035, 12.6765,
 ];
 
-fn one_idx(scales: &[f64]) -> usize {
+pub(crate) fn one_idx(scales: &[f64]) -> usize {
     let mut best = 0usize;
     for i in 1..scales.len() {
         if (scales[i] - 1.0).abs() < (scales[best] - 1.0).abs() {

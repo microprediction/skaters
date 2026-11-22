@@ -20,8 +20,16 @@ pub mod pushforward;
 pub mod parade;
 pub mod api;
 pub mod granger;
+pub mod homogenize;
+pub mod residual;
+pub mod state;
 
-pub use api::{build_candidates, conjugate_f, flesaker, laplace, FConj, Forecaster};
+pub use api::{
+    build_candidates, conjugate_f, dantzig, flesaker, laplace, laplace_with_leaf, FConj, Forecaster,
+};
+pub use homogenize::{homogenize, make_candidates as homogenize_candidates, HomogenizedDist};
+pub use residual::{residual_transform, CorrectedDist, ResidualDiagnostics};
+pub use state::{state_from_json, state_to_json, State};
 pub use pushforward::{CoordMap, PushforwardDist};
 pub use granger::{Granger, GrangerParams, Mixture};
 pub use cov::{EmaCov, LedoitWolfCov, RunningCov};
@@ -31,6 +39,6 @@ pub use search::{search, Search};
 pub use spec::{Spec, TransformSpec};
 pub use skater::{
     bayesian_ensemble, conjugate, ema, multiscale, precision_weighted_ensemble, sticky,
-    terminal_leaf_ensemble, Sk,
+    terminal_leaf_ensemble, with_adaptive_temperature, with_prior_log_weights, Sk,
 };
 pub use tails::{gpdtails, PDist, SplicedDist};

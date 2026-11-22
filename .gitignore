@@ -289,3 +289,6 @@ papers/stronger-benchmark/*.blg
 papers/stronger-benchmark/*.out
 benchmarks/learned_ckpt/
 benchmarks/data/giftpre/
+parity/resume_vectors.json
+parity/resume_*.json
+parity/granger_resume.json

@@ -153,11 +153,9 @@ def build_scenarios():
 
 def build_wrapper_scenarios():
     """Wrappers on a skater's own PIT residuals, the adaptive temperature,
-    the named search policy, and laplace with a custom terminal leaf. Kept in
-    their own block, "wrapper_scenarios", because the Rust and torch gates
-    panic on a scenario they cannot build and these are not ported there
-    yet; the JS checker reads both blocks. Names must match
-    scenarios.mjs buildWrapperScenarios()."""
+    the named search policy, and laplace with a custom terminal leaf. Part of the
+    main scenario block: every port (JS, Rust, torch) builds them. Names must
+    match scenarios.mjs buildWrapperScenarios()."""
     s = []
     from skaters.api import dantzig
     from skaters.homogenize import homogenize, make_candidates
@@ -182,6 +180,19 @@ def build_wrapper_scenarios():
     s.append(("pol_dantzig", 1, dantzig(k=1, expand_interval=50)))
     s.append(("pol_laplace_garch_leaf", 1, laplace(k=1, leaf=garch_leaf)))
     return s
+
+
+def spec_examples():
+    """Spec dicts whose to_json/name the ports must reproduce and read back."""
+    return [
+        S.leaf_spec(1),
+        S.ema_spec(0.05, 1),
+        S.ensemble_spec(S.ema_spec(0.01, 1), S.ema_spec(0.1, 1), k=1),
+        S.conjugate_spec(S.ensemble_spec(S.ema_spec(0.01, 1), S.ema_spec(0.1, 1), k=1), S.diff_spec()),
+        S.conjugate_spec(S.leaf_spec(3), S.frac_spec(0.3, 40)),
+        S.conjugate_spec(S.leaf_spec(1), S.std_spec(0.02)),
+        S.conjugate_spec(S.leaf_spec(1), S.ema_t_spec(0.2)),
+    ]
 
 
 def make_vec_series(n=120, seed=7):
@@ -332,11 +343,11 @@ def run_scenario(skater, series, name=None):
 def main():
     series = make_series()
     vectors = {"series": series, "burn": BURN, "probe": PROBE,
-               "q_lo": Q_LO, "q_hi": Q_HI, "scenarios": {}, "wrapper_scenarios": {}}
+               "q_lo": Q_LO, "q_hi": Q_HI, "scenarios": {}}
     for name, k, skater in build_scenarios():
         vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
     for name, k, skater in build_wrapper_scenarios():
-        vectors["wrapper_scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
+        vectors["scenarios"][name] = {"k": k, "out": run_scenario(skater, series, name)}
 
     # Periodicity detector: dump the ranked (lag, acf) scores per step.
     pd = period_detector()
@@ -402,11 +413,14 @@ def main():
         structure[str(kk)] = {"n_candidates": len(cands), "depths": list(depths)}
     vectors["structure"] = structure
 
+    # Spec JSON: the port must read each string, rebuild, and write it back.
+    vectors["spec_json"] = [{"json": S.to_json(sp), "name": S.name(sp)} for sp in spec_examples()]
+
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "vectors.json")
     with open(path, "w") as f:
         json.dump(vectors, f, allow_nan=False)
-    print(f"wrote {path}: {len(vectors['scenarios']) + len(vectors['wrapper_scenarios'])} scenarios, "
+    print(f"wrote {path}: {len(vectors['scenarios'])} scenarios, "
           f"{len(series) - BURN} scored steps each")
 
 

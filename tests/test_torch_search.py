@@ -129,7 +129,7 @@ def test_search_pool_recipes_track_the_reference():
             _, s1 = ref_f(y, s1)
             _, s2 = tor_f(y, s2)
     assert [e["recipe"] for e in s1["pool"]] == [e["recipe"] for e in s2["pool"]]
-    assert set(s1["detected_periods"]) == set(s2["detected_periods"])   # a list in the reference, a set in torch
+    assert s1["detected_periods"] == s2["detected_periods"]   # a list in detection order in both
     assert len(s1["pool"]) > 1
 
 
@@ -145,7 +145,7 @@ def test_gradient_reaches_a_transform_inside_the_pool():
     loss.backward()
     grads = []
     for e in state["pool"]:
-        for m in e["mods"]:
+        for m in f.modules_for(e, state):
             for p in m.parameters():
                 if p.grad is not None:
                     grads.append(float(p.grad))

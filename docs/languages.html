@@ -142,9 +142,12 @@
     <p>
       The library on <code>torch</code> tensors: transforms, leaves,
       ensembles, the lattice projection, the GPD tail splice, the parade,
-      search, <code>laplace</code> and <code>dantzig</code>, in the same
-      arithmetic order as the reference. Not ported: <code>gaussianize</code>,
-      the covariance estimators and the <code>exact=True</code> pushforward.
+      search, <code>laplace</code>, <code>dantzig</code>, <code>flesaker</code>,
+      <code>granger</code>, <code>homogenize</code>, <code>residual_transform</code>
+      and the exact pushforward, in the same arithmetic order as the reference.
+      Its state is the canonical JSON layout, so a checkpoint resumes in any
+      port. Not ported: the covariance estimators, <code>mahalanobis</code> and
+      <code>zbank</code>.
       The continuous hyperparameters of transforms, leaves, ensembles and the
       trunk are <code>nn.Parameter</code>s reachable from
       <code>laplace(k).parameters()</code>; gradients flow from a log score at

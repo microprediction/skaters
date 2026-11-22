@@ -14,7 +14,6 @@ tensors (Welford's update, sample variance, ``mse = mean^2 + var``).
 
 from __future__ import annotations
 
-from collections import deque
 
 import torch
 from torch import nn
@@ -62,7 +61,7 @@ class PrecisionWeightedEnsemble(nn.Module):
         if state is None:
             state = {
                 "sub": [None] * n,
-                "queues": [[deque() for _ in range(k)] for _ in range(n)],
+                "queues": [[[] for _ in range(k)] for _ in range(n)],
                 "stats": [[_running_var_init() for _ in range(k)] for _ in range(n)],
             }
         all_dists = []
@@ -74,7 +73,7 @@ class PrecisionWeightedEnsemble(nn.Module):
                 q = state["queues"][i][h]
                 q.append(all_dists[i][h].mean)
                 if len(q) > h + 1:
-                    error = y - q.popleft()
+                    error = y - q.pop(0)
                     state["stats"][i][h] = _running_var_update(state["stats"][i][h], error)
         combined = []
         for h in range(k):

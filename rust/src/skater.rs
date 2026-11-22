@@ -256,6 +256,57 @@ pub struct TerminalEnsemble {
     /// before each step by the caller; laplace never sets it. Not state.
     #[serde(skip)]
     pub gate_offset: Option<Vec<f64>>,
+    /// Initial log weights (Python's `prior_log_weights`); empty means zeros.
+    /// Configuration, used when the state is reset.
+    #[serde(default)]
+    pub prior_log_weights: Vec<f64>,
+    /// Adaptive selection temperature (Python's `adaptive_temperature`).
+    #[serde(default)]
+    pub adaptive_temperature: bool,
+    #[serde(default = "default_temp_rho")]
+    pub temp_rho: f64,
+    #[serde(default = "default_temp_band")]
+    pub temp_band: f64,
+    /// The adaptive-temperature state; `None` when the option is off.
+    #[serde(default)]
+    pub adapt: Option<Adapt>,
+}
+
+fn default_temp_rho() -> f64 {
+    0.03
+}
+
+fn default_temp_band() -> f64 {
+    3.0
+}
+
+const PIT_DISPERSION_TARGET: f64 = 1.0 / 12.0;
+const PIT_EWMA_DECAY: f64 = 0.98;
+const LOSS_FAST_DECAY: f64 = 0.90;
+const LOSS_SLOW_DECAY: f64 = 0.995;
+const TEMP_AMBIG_EPS: f64 = 0.15 * PIT_DISPERSION_TARGET;
+
+/// State of the terminal ensemble's adaptive temperature (terminal.py, `adapt`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Adapt {
+    pub log_eta: f64,
+    pub pit_ewma: f64,
+    pub loss_fast: Option<f64>,
+    pub loss_slow: Option<f64>,
+    /// The issued one-step predictive, resolved on the next step.
+    pub pred_q: VecDeque<Dist>,
+}
+
+impl Adapt {
+    pub fn new(learning_rate: f64) -> Adapt {
+        Adapt {
+            log_eta: libm::log(learning_rate),
+            pit_ewma: PIT_DISPERSION_TARGET,
+            loss_fast: None,
+            loss_slow: None,
+            pred_q: VecDeque::new(),
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -285,7 +336,39 @@ pub fn terminal_leaf_ensemble(
         leaf_pred: vec![None; k],
         mean_q: vec![VecDeque::new(); k],
         gate_offset: None,
+        prior_log_weights: Vec::new(),
+        adaptive_temperature: false,
+        temp_rho: default_temp_rho(),
+        temp_band: default_temp_band(),
+        adapt: None,
     }))
+}
+
+/// Turn on the adaptive selection temperature of a terminal ensemble built by
+/// [`terminal_leaf_ensemble`] (Python's `adaptive_temperature=True`,
+/// `temp_rho`, `temp_band`). Call before the first step.
+pub fn with_adaptive_temperature(mut sk: Sk, temp_rho: f64, temp_band: f64) -> Sk {
+    if let Sk::Terminal(t) = &mut sk {
+        t.adaptive_temperature = true;
+        t.temp_rho = temp_rho;
+        t.temp_band = temp_band;
+        t.adapt = Some(Adapt::new(t.learning_rate));
+    } else {
+        panic!("with_adaptive_temperature needs a terminal_leaf_ensemble");
+    }
+    sk
+}
+
+/// Set a terminal ensemble's prior log weights (Python's `prior_log_weights`).
+pub fn with_prior_log_weights(mut sk: Sk, prior: Vec<f64>) -> Sk {
+    if let Sk::Terminal(t) = &mut sk {
+        assert_eq!(prior.len(), t.subs.len(), "one prior log weight per sub-model");
+        t.log_w = prior.clone();
+        t.prior_log_weights = prior;
+    } else {
+        panic!("with_prior_log_weights needs a terminal_leaf_ensemble");
+    }
+    sk
 }
 
 impl TerminalEnsemble {
@@ -293,6 +376,61 @@ impl TerminalEnsemble {
         let n = self.subs.len();
         let k = self.k;
         let all_dists: Vec<Vec<Dist>> = self.subs.iter_mut().map(|f| f.step(y)).collect();
+
+        // Adaptive selection temperature (skaters#213/#215): resolve the issued
+        // predictive from one step ago against this y and turn its PIT
+        // dispersion (or, in the dead band, its logpdf trend) into a heat/cool
+        // signal for this step's weight update. Mirrors terminal.py.
+        let mut eta_t = self.learning_rate;
+        if self.adaptive_temperature {
+            let lr = self.learning_rate;
+            let (rho, band) = (self.temp_rho, self.temp_band);
+            let ad = self.adapt.get_or_insert_with(|| Adapt::new(lr));
+            if let Some(prev_pred) = ad.pred_q.pop_front() {
+                let mut lp_c = prev_pred.logpdf(y);
+                if !(lp_c >= -20.0) {
+                    lp_c = -20.0;
+                } else if lp_c > 20.0 {
+                    lp_c = 20.0;
+                }
+                let mut u = prev_pred.cdf(y);
+                if !((0.0..=1.0).contains(&u)) {
+                    u = 0.5;
+                }
+                ad.pit_ewma = PIT_EWMA_DECAY * ad.pit_ewma
+                    + (1.0 - PIT_EWMA_DECAY) * ((u - 0.5) * (u - 0.5));
+                match (ad.loss_fast, ad.loss_slow) {
+                    (Some(f), Some(s)) => {
+                        ad.loss_fast = Some(LOSS_FAST_DECAY * f + (1.0 - LOSS_FAST_DECAY) * lp_c);
+                        ad.loss_slow = Some(LOSS_SLOW_DECAY * s + (1.0 - LOSS_SLOW_DECAY) * lp_c);
+                    }
+                    _ => {
+                        ad.loss_fast = Some(lp_c);
+                        ad.loss_slow = Some(lp_c);
+                    }
+                }
+                let e_t = ad.pit_ewma - PIT_DISPERSION_TARGET;
+                let dloss_t = ad.loss_fast.unwrap() - ad.loss_slow.unwrap();
+                let direction = if e_t.abs() > TEMP_AMBIG_EPS {
+                    if e_t > 0.0 {
+                        -1.0
+                    } else {
+                        1.0
+                    }
+                } else if dloss_t > 0.0 {
+                    1.0
+                } else if dloss_t < 0.0 {
+                    -1.0
+                } else {
+                    0.0
+                };
+                ad.log_eta += rho * direction;
+                let lo = libm::log(lr / band);
+                let hi = libm::log(lr * band);
+                ad.log_eta = ad.log_eta.max(lo).min(hi);
+            }
+            eta_t = libm::exp(ad.log_eta);
+        }
 
         for i in 0..n {
             let q = &mut self.qdist[i];
@@ -303,7 +441,7 @@ impl TerminalEnsemble {
                 } else if !(lp >= -20.0) {
                     lp = -20.0;
                 }
-                self.log_w[i] = self.forget * self.log_w[i] + self.learning_rate * lp
+                self.log_w[i] = self.forget * self.log_w[i] + eta_t * lp
                     - self.complexity_penalty * self.depths[i];
             }
             q.push_back(all_dists[i][0].clone());
@@ -340,6 +478,11 @@ impl TerminalEnsemble {
             };
             combined.push(pred);
             self.mean_q[h].push_back(mu_h);
+        }
+        if self.adaptive_temperature {
+            if let Some(ad) = self.adapt.as_mut() {
+                ad.pred_q.push_back(combined[0].clone());
+            }
         }
         combined
     }

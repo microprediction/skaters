@@ -17,18 +17,23 @@ for y in stream:
     print(d.mean, d.std, d.logpdf(y))
     print(f.pit, f.z)          # parade calibration state after the step
 
-s = f.state_json()             # checkpoint
-g = skaters_fast.from_state_json(s, 1)   # bit-exact resume
+s = f.state_json()             # checkpoint, the canonical layout (docs/STATE.md)
+g = skaters_fast.Laplace.from_state_json(s, 1)   # bit-exact resume
 ```
 
 ## Guarantees
 
 - Cross-backend agreement is 1e-6. The same series through pure Python and
   through skaters-fast agrees to that tolerance.
-- Within-backend resume is bit-exact. `state_json()` round-trips through
-  `from_state_json()` with no drift.
-- Do not switch backends mid-stream. Resume a saved state into the same backend
-  that wrote it.
+- `state_json()` writes the canonical state layout that pure Python's
+  `state_to_json` writes (docs/STATE.md), so a checkpoint resumes in either
+  backend. `state_from_json(json.loads(f.state_json()))` is a Python state for
+  `laplace(k)`, and `Laplace.from_state_json(json.dumps(state_to_json(state)), k)`
+  resumes a Python state here. `Granger` has the same pair.
+- Within a backend the resume is bit-exact. Across backends it is as exact as
+  the backends' arithmetic, the same 1e-6.
+- `Laplace.from_state_json` also reads the native layout earlier releases of
+  skaters-fast wrote.
 
 ## Build
 
