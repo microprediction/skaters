@@ -48,14 +48,21 @@ MODELS = {
     "TiRex":                  ("TiRex(wide)", "TiRex", "NX-AI--TiRex", "fm"),
     "Chronos-Bolt-small":     ("Chronos(wide)", "Chronos-Bolt-small", "amazon--chronos-bolt-small", "fm"),
     "TimeH2O-v1":             ("TimeH2O-v1(wide)", "TimeH2O-v1", "h2oai--timeh2o-v1", "fm"),
+    "Chronos-2":              ("Chronos-2", "Chronos-2", "amazon--chronos-2", "fm"),
+    "TiRex-2":                ("TiRex-2(wide)", "TiRex-2", "NX-AI--TiRex-2", "fm"),
+    "Toto 2.0 2.5B":          ("Toto2-2.5B(wide)", "Toto 2.0 2.5B", "Datadog--Toto-2.0-2.5B", "fm"),
+    "Toto 2.0 313M":          ("Toto2-313m(wide)", "Toto 2.0 313M", "Datadog--Toto-2.0-313m", "fm"),
+    "TTM-R3":                 ("TTM-R3(wide)", "TTM-R3", "ibm-granite--granite-timeseries-ttm-r3", "fm"),
+    "Moirai 2.0 small":       ("Moirai-2.0-small(wide)", "Moirai 2.0 small", "Salesforce--moirai-2.0-R-small", "fm"),
+    "TinyCast":               ("TinyCast(wide)", "TinyCast", "raws-labs--tinycast", "fm"),
     # classical rows refit every step; footprint is the installed package alone
     "AutoARIMA":              ("AutoARIMA", "ARIMA (order fixed, refit)", "pkg:statsforecast", "classical"),
     "AutoETS":                ("AutoETS", "AutoETS (refit)", "pkg:statsforecast", "classical"),
     "AutoTheta":              ("AutoTheta", "AutoTheta (refit)", "pkg:statsforecast", "classical"),
     "GARCH-t":                ("GARCH-t", "GARCH-t (refit)", "pkg:arch", "classical"),
-    # laplace++: the run shown on each stratum; it has no daily run, so its
-    # accuracy pools weekly and monthly only (the label says so)
-    "laplace++ (weekly, monthly)": ({"weekly:econ": "learned(gpswa)", "monthly:econ": "learned(swa5)"},
+    # granger (laplace++ until November 2026): the run shown on each stratum; it
+    # has no daily run, so its accuracy pools weekly and monthly only (the label says so)
+    "granger (weekly, monthly)": ({"weekly:econ": "learned(gpswa)", "monthly:econ": "learned(swa5)"},
                                     "laplace++ (torch) k=1", "ckpt:learned_ckpt/monthly_k1_swa5.pt", "laplace"),
 }
 PKG_PY = os.path.join(ROOT, ".venv-sota", "bin", "python")
@@ -75,12 +82,11 @@ WEIGHT_EXT = (".safetensors", ".bin", ".pt", ".pth", ".ckpt")
 
 
 def weight_bytes(repo):
-    snap = os.path.join(HUB, f"models--{repo}", "snapshots")
-    total = 0
-    for p in glob.glob(os.path.join(snap, "*", "**", "*"), recursive=True):
-        if p.endswith(WEIGHT_EXT):
-            total += os.stat(p).st_size      # follows the blob symlink
-    return total or None
+    """Weight bytes of the one cached snapshot the arm loads (footprint.py);
+    repo@revision is accepted for older entries and the revision ignored,
+    since the snapshot rule there picks a single revision and format."""
+    import footprint
+    return footprint.weight_bytes(repo.split("@")[0])
 
 
 def accuracy(store):
@@ -97,6 +103,31 @@ def accuracy(store):
         out.setdefault((study, m), []).append(sc._series_mean(d["logpdf"], -20.0)
                                               - sc._series_mean(bl["logpdf"], -20.0))
     return out
+
+
+def accuracy_per_series(path):
+    """The same {(study, method): [dLL, ...]} read from the summarizer's
+    canonical_per_series.csv (CANON_PER_SERIES=1), which already holds each
+    series' dLL vs laplace; no per-step store load."""
+    import csv
+    out = {}
+    with open(path) as fh:
+        for r in csv.DictReader(fh):
+            if r["study"] in STRATA and r["model"] != "laplace":
+                try:
+                    out.setdefault((r["study"], r["model"]), []).append(float(r["dLL"]))
+                except ValueError:
+                    continue
+    return out
+
+
+def _ckpt_path(rel):
+    """A checkpoint beside this file, else beside the per-step store (a worktree
+    reaches the store through a symlink and carries no checkpoints of its own)."""
+    here = os.path.join(HERE, rel)
+    if os.path.exists(here):
+        return here
+    return os.path.join(os.path.dirname(os.path.realpath(os.path.join(HERE, "preds"))), rel)
 
 
 def pooled(acc, method):
@@ -121,10 +152,20 @@ def main():
         # layout-only rebuild: keep the measured points, re-render the script
         prev = json.load(open(jp))
         points = prev["points"]
+        for p in points:                     # sizes are cheap to re-measure; accuracy and timing are kept
+            repo = MODELS.get(p["name"], (None, None, None))[2]
+            if repo and ":" not in repo and weight_bytes(repo):
+                p["mb"] = weight_bytes(repo) / 1e6
         print(f"[frontier3d] reusing {len(points)} points from frontier3d.json", flush=True)
     else:
-        print("[frontier3d] loading per-step store ...", flush=True)
-        acc = accuracy(sc.load_all())
+        ps = os.path.join(HERE, "canonical_per_series.csv")
+        if os.path.exists(ps):
+            print(f"[frontier3d] accuracy from {os.path.basename(ps)}", flush=True)
+            acc = accuracy_per_series(ps)
+        else:
+            print("[frontier3d] no canonical_per_series.csv: loading the whole per-step store "
+                  "(tens of GB, about an hour) ...", flush=True)
+            acc = accuracy(sc.load_all())
         points = []
     for name, (method, pmodel, repo, group) in ([] if points else MODELS.items()):
         a = pooled(acc, method) if method != "laplace" else {"med_dll": 0.0, "q25": 0.0, "q75": 0.0,
@@ -136,7 +177,7 @@ def main():
             mb = package_bytes(repo[4:]) / 1e6
             foot = f"the installed {repo[4:]} package, dependencies not counted"
         elif repo and repo.startswith("ckpt:"):
-            mb = (fp["wheel_bytes"] + os.path.getsize(os.path.join(HERE, repo[5:]))) / 1e6
+            mb = (fp["wheel_bytes"] + os.path.getsize(_ckpt_path(repo[5:]))) / 1e6
             foot = "published wheel plus the 4,202-parameter checkpoint; runs on PyTorch, not counted"
         elif repo:
             mb = weight_bytes(repo) / 1e6
@@ -147,7 +188,7 @@ def main():
         else:
             mb = fp["wheel_bytes"] / 1e6
             foot = "published wheel, no dependencies"
-        points.append({"name": name, "group": group, "method": method if isinstance(method, str) else "laplace++", "ms": warm[pmodel],
+        points.append({"name": name, "group": group, "method": method if isinstance(method, str) else "granger", "ms": warm[pmodel],
                        "mb": mb, "footprint_how": foot, **a})
     meta = {"date": time.strftime("%Y-%m-%d"), "strata": list(STRATA),
             "perf_meta": perf.get("meta", {}), "footprint_date": fp["meta"]["date"]}
@@ -168,9 +209,12 @@ def main():
                f"laplace's bytes and the fastest takes {fastest_fm['ms'] / lap['ms']:,.0f}× as long "
                f"per new observation. Speed is one machine, CPU, streaming regime "
                f"(benchmarks/perf_results.json); footprint is the weight files as cached "
-               f"({meta['date']}). The {n_cls} classical models refit at every step; their footprint is the "
-               f"installed package without its dependencies. laplace++ has no daily run, so its accuracy pools "
-               f"weekly and monthly only. " + OMITTED)
+               f"({meta['date']}). "
+               + (f"The {n_cls} classical models refit at every step; their footprint is the "
+                  f"installed package without its dependencies. " if n_cls else "")
+               + ("granger has no daily run, so its accuracy pools weekly and monthly only. "
+                  if any("granger" in p["name"] for p in points) else "")
+               + OMITTED)
     js = f"""// generated by benchmarks/make_frontier3d.py on {meta['date']}; do not edit by hand
 (function () {{
   var P = {json.dumps(points)};
@@ -179,7 +223,7 @@ def main():
   function trace(group, color, symbol) {{
     var pts = P.filter(function (p) {{ return p.group === group; }});
     return {{
-      type: 'scatter3d', mode: 'markers+text', name: group === 'laplace' ? 'laplace and laplace++' : group === 'classical' ? 'classical, refit every step' : 'foundation models',
+      type: 'scatter3d', mode: 'markers+text', name: group === 'laplace' ? 'laplace and granger' : group === 'classical' ? 'classical, refit every step' : 'foundation models',
       x: pts.map(function (p) {{ return p.mb; }}), y: pts.map(function (p) {{ return p.ms; }}),
       z: pts.map(function (p) {{ return p.med_dll; }}),
       text: pts.map(function (p) {{ return p.name; }}), textposition: 'top center',

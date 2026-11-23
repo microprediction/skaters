@@ -50,6 +50,8 @@ CORPORA = os.environ.get("WEEK_CORPORA", "daily weekly monthly m4-hourly").split
 
 DURATION_DAYS = float(os.environ.get("WEEK_DAYS", "7"))
 MAX_ROUNDS = int(os.environ.get("WEEK_MAX_ROUNDS", "0"))   # 0 = unbounded
+START_ROUND = int(os.environ.get("WEEK_START_ROUND", "1"))  # resume a killed driver at the round it was on,
+                                                           # so covered rounds are not re-walked and re-summarized
 PAR = int(os.environ.get("WEEK_PAR", "4"))        # parallel (model,corpus) jobs
 COMMIT_EVERY = int(os.environ.get("WEEK_COMMIT_EVERY", "1"))
 BATCH_A = int(os.environ.get("WEEK_BATCH_A", "300"))   # Tier A series added / round
@@ -264,7 +266,7 @@ def main():
     print(f"[week] models={list(models)} corpora={CORPORA} CTX={CTX} TEST={TEST} "
           f"device={DEVICE} par={PAR} days={DURATION_DAYS}", flush=True)
     t_end = time.time() + DURATION_DAYS * 86400
-    rnd = 0
+    rnd = START_ROUND - 1
     while time.time() < t_end and not os.path.exists(STOP):
         if MAX_ROUNDS and rnd >= MAX_ROUNDS:
             break

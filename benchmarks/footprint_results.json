@@ -6,7 +6,7 @@
  "js_lines": 3449,
  "rust_bytes": 170115,
  "rust_lines": 5355,
- "fast_so_bytes": null,
+ "fast_so_bytes": 1526480,
  "dependencies": "[]",
  "pypi_version": "0.16.0",
  "wheel_bytes": 108353,
@@ -22,5 +22,302 @@
   "python": "3.12.13",
   "machine": "arm64",
   "commit": "38c4939"
- }
+ },
+ "models": [
+  {
+   "name": "Chronos-Bolt-small",
+   "slug": "chronos",
+   "bytes": 190888824,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:amazon--chronos-bolt-small"
+  },
+  {
+   "name": "Chronos-2",
+   "slug": "chronos2",
+   "bytes": 477930472,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:amazon--chronos-2"
+  },
+  {
+   "name": "ci-proto",
+   "slug": "ciproto",
+   "bytes": 668895231,
+   "footprint_how": "model.ckpt as cached from the Hub",
+   "source": "hub:ContinuousIntelligence--ci-proto:model.ckpt"
+  },
+  {
+   "name": "CITRAS-FM",
+   "slug": "citras",
+   "bytes": 28896400,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:hitachi-nlp--citras-fm"
+  },
+  {
+   "name": "Hirondel-7M",
+   "slug": "hirondel",
+   "bytes": 29863660,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Tncrd--Hirondel-7M"
+  },
+  {
+   "name": "iAmTime-base",
+   "slug": "iamtime",
+   "bytes": 1208610280,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:anishsaha--iAmTime-base-forecast"
+  },
+  {
+   "name": "Kairos-50m",
+   "slug": "kairos",
+   "bytes": 200551636,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:mldi-lab--Kairos_50m"
+  },
+  {
+   "name": "Moirai 2.0 small",
+   "slug": "moirai2",
+   "bytes": 45557824,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Salesforce--moirai-2.0-R-small"
+  },
+  {
+   "name": "PatchTST-FM-r2",
+   "slug": "patchtstfm",
+   "bytes": 1538470688,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:ibm-granite--granite-timeseries-patchtst-fm-r2"
+  },
+  {
+   "name": "Simons-297M",
+   "slug": "simons",
+   "bytes": 1188934440,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:abel-lab--Simons-297M"
+  },
+  {
+   "name": "Simons-178M",
+   "slug": "simons",
+   "bytes": 710996944,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:abel-lab--Simons-178M"
+  },
+  {
+   "name": "Simons-60M",
+   "slug": "simons",
+   "bytes": 241284792,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:abel-lab--Simons-60M"
+  },
+  {
+   "name": "Simons-25M",
+   "slug": "simons",
+   "bytes": 100498032,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:abel-lab--Simons-25M"
+  },
+  {
+   "name": "t0-gamma",
+   "slug": "t0gamma",
+   "bytes": 1022492908,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:theforecastingcompany--t0-gamma"
+  },
+  {
+   "name": "Tabby-Pretrain",
+   "slug": "tabby",
+   "bytes": 583399760,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:paris-noah--Tabby-Pretrain"
+  },
+  {
+   "name": "Tafsut-base",
+   "slug": "tafsut",
+   "bytes": 421277120,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Tafsut-FM--tafsut-univariate-base"
+  },
+  {
+   "name": "TimeH2O-v1",
+   "slug": "timeh2o",
+   "bytes": 435111800,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:h2oai--timeh2o-v1"
+  },
+  {
+   "name": "TimeH2O-v1-tiny",
+   "slug": "timeh2o",
+   "bytes": 23316064,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:h2oai--timeh2o-v1-tiny"
+  },
+  {
+   "name": "Timer-S1",
+   "slug": "timers1",
+   "bytes": 16607887000,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:bytedance-research--Timer-S1"
+  },
+  {
+   "name": "TimesFM 2.5",
+   "slug": "timesfm",
+   "bytes": 925181104,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:google--timesfm-2.5-200m-pytorch"
+  },
+  {
+   "name": "TimesFM 3.0",
+   "slug": "timesfm3",
+   "bytes": 1322898824,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:google--timesfm-3.0-pytorch"
+  },
+  {
+   "name": "TimeSSM-2.5M",
+   "slug": "timessm",
+   "bytes": 10112728,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:IUseAMouse--timessm-2.5m"
+  },
+  {
+   "name": "Timestral-209M",
+   "slug": "timestral",
+   "bytes": 837271648,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:mistralai--Timestral-209M"
+  },
+  {
+   "name": "Timestral-123M",
+   "slug": "timestral",
+   "bytes": 490445904,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:mistralai--Timestral-123M"
+  },
+  {
+   "name": "Timestral-28M",
+   "slug": "timestral",
+   "bytes": 111296464,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:mistralai--Timestral-28M"
+  },
+  {
+   "name": "Timestral-5M",
+   "slug": "timestral",
+   "bytes": 20843960,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:mistralai--Timestral-5M"
+  },
+  {
+   "name": "TinyCast",
+   "slug": "tinycast",
+   "bytes": 602044,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:raws-labs--tinycast"
+  },
+  {
+   "name": "TiRex",
+   "slug": "tirex",
+   "bytes": 141230262,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:NX-AI--TiRex"
+  },
+  {
+   "name": "TiRex-2",
+   "slug": "tirex2",
+   "bytes": 330038664,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:NX-AI--TiRex-2"
+  },
+  {
+   "name": "Toto 2.0 2.5B",
+   "slug": "toto2",
+   "bytes": 9817176960,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Datadog--Toto-2.0-2.5B"
+  },
+  {
+   "name": "Toto 2.0 1B",
+   "slug": "toto2",
+   "bytes": 4164169600,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Datadog--Toto-2.0-1B"
+  },
+  {
+   "name": "Toto 2.0 313M",
+   "slug": "toto2",
+   "bytes": 1250763568,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Datadog--Toto-2.0-313m"
+  },
+  {
+   "name": "Toto 2.0 22M",
+   "slug": "toto2",
+   "bytes": 87669368,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Datadog--Toto-2.0-22m"
+  },
+  {
+   "name": "Toto 2.0 4M",
+   "slug": "toto2",
+   "bytes": 16582848,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:Datadog--Toto-2.0-4m"
+  },
+  {
+   "name": "TS-ICL",
+   "slug": "tsicl",
+   "bytes": 219150987,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:taharnbl--TS-ICL"
+  },
+  {
+   "name": "TTM-R3",
+   "slug": "ttm3",
+   "bytes": 5995496,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:ibm-granite--granite-timeseries-ttm-r3"
+  },
+  {
+   "name": "Yug",
+   "slug": "yug",
+   "bytes": 1087434752,
+   "footprint_how": "weight files as cached from the Hub",
+   "source": "hub:birlaailabs--yug"
+  },
+  {
+   "name": "CSP",
+   "slug": "csp",
+   "bytes": 70626,
+   "footprint_how": "the installed csp_forecaster package, dependencies not counted",
+   "source": "pkg:.venv-csp:csp_forecaster"
+  },
+  {
+   "name": "AutoARIMA",
+   "slug": "autoarima",
+   "bytes": 1827326,
+   "footprint_how": "the installed statsforecast package, dependencies not counted",
+   "source": "pkg:.venv-sota:statsforecast"
+  },
+  {
+   "name": "AutoETS",
+   "slug": "autoets",
+   "bytes": 1827326,
+   "footprint_how": "the installed statsforecast package, dependencies not counted",
+   "source": "pkg:.venv-sota:statsforecast"
+  },
+  {
+   "name": "AutoTheta",
+   "slug": "autotheta",
+   "bytes": 1827326,
+   "footprint_how": "the installed statsforecast package, dependencies not counted",
+   "source": "pkg:.venv-sota:statsforecast"
+  },
+  {
+   "name": "GARCH-t",
+   "slug": "garcht",
+   "bytes": 4350875,
+   "footprint_how": "the installed arch package, dependencies not counted",
+   "source": "pkg:.venv-sota:arch"
+  }
+ ],
+ "models_date": "2026-11-23"
 }

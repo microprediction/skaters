@@ -9,6 +9,11 @@ on the page is typed.
 
     PYTHONPATH=src python benchmarks/footprint.py
     ... writes benchmarks/footprint_results.json and docs/footprint.html
+
+    python benchmarks/footprint.py --models
+    ... refreshes only the "models" list in footprint_results.json: the bytes
+    every other arm carries (MODEL_SIZES below), which needs no accuracy or
+    timing run, so an arm has a size as soon as its weights are cached
 """
 from __future__ import annotations
 
@@ -25,6 +30,121 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+
+
+HUB = os.path.expanduser("~/.cache/huggingface/hub")
+WEIGHT_EXT = (".safetensors", ".bin", ".pt", ".pth", ".ckpt")
+
+# (display name, model-page slug, source). Sources:
+#   hub:<org>--<repo>[:<file>]  weight files of the one cached snapshot the arm
+#                               loads; <file> when the repo ships several
+#                               checkpoints and the adapter reads one
+#   pkg:<venv>:<module>         the installed package directory, dependencies
+#                               not counted (arms that refit and carry no weights)
+MODEL_SIZES = [
+    ("Chronos-Bolt-small", "chronos", "hub:amazon--chronos-bolt-small"),
+    ("Chronos-2", "chronos2", "hub:amazon--chronos-2"),
+    ("ci-proto", "ciproto", "hub:ContinuousIntelligence--ci-proto:model.ckpt"),
+    ("CITRAS-FM", "citras", "hub:hitachi-nlp--citras-fm"),
+    ("Hirondel-7M", "hirondel", "hub:Tncrd--Hirondel-7M"),
+    ("iAmTime-base", "iamtime", "hub:anishsaha--iAmTime-base-forecast"),
+    ("Kairos-50m", "kairos", "hub:mldi-lab--Kairos_50m"),
+    ("Moirai 2.0 small", "moirai2", "hub:Salesforce--moirai-2.0-R-small"),
+    ("PatchTST-FM-r2", "patchtstfm", "hub:ibm-granite--granite-timeseries-patchtst-fm-r2"),
+    ("Simons-297M", "simons", "hub:abel-lab--Simons-297M"),
+    ("Simons-178M", "simons", "hub:abel-lab--Simons-178M"),
+    ("Simons-60M", "simons", "hub:abel-lab--Simons-60M"),
+    ("Simons-25M", "simons", "hub:abel-lab--Simons-25M"),
+    ("t0-gamma", "t0gamma", "hub:theforecastingcompany--t0-gamma"),
+    ("Tabby-Pretrain", "tabby", "hub:paris-noah--Tabby-Pretrain"),
+    ("Tafsut-base", "tafsut", "hub:Tafsut-FM--tafsut-univariate-base"),
+    ("TimeH2O-v1", "timeh2o", "hub:h2oai--timeh2o-v1"),
+    ("TimeH2O-v1-tiny", "timeh2o", "hub:h2oai--timeh2o-v1-tiny"),
+    ("Timer-S1", "timers1", "hub:bytedance-research--Timer-S1"),
+    ("TimesFM 2.5", "timesfm", "hub:google--timesfm-2.5-200m-pytorch"),
+    ("TimesFM 3.0", "timesfm3", "hub:google--timesfm-3.0-pytorch"),
+    ("TimeSSM-2.5M", "timessm", "hub:IUseAMouse--timessm-2.5m"),
+    ("Timestral-209M", "timestral", "hub:mistralai--Timestral-209M"),
+    ("Timestral-123M", "timestral", "hub:mistralai--Timestral-123M"),
+    ("Timestral-28M", "timestral", "hub:mistralai--Timestral-28M"),
+    ("Timestral-5M", "timestral", "hub:mistralai--Timestral-5M"),
+    ("TinyCast", "tinycast", "hub:raws-labs--tinycast"),
+    ("TiRex", "tirex", "hub:NX-AI--TiRex"),
+    ("TiRex-2", "tirex2", "hub:NX-AI--TiRex-2"),
+    ("Toto 2.0 2.5B", "toto2", "hub:Datadog--Toto-2.0-2.5B"),
+    ("Toto 2.0 1B", "toto2", "hub:Datadog--Toto-2.0-1B"),
+    ("Toto 2.0 313M", "toto2", "hub:Datadog--Toto-2.0-313m"),
+    ("Toto 2.0 22M", "toto2", "hub:Datadog--Toto-2.0-22m"),
+    ("Toto 2.0 4M", "toto2", "hub:Datadog--Toto-2.0-4m"),
+    ("TS-ICL", "tsicl", "hub:taharnbl--TS-ICL"),
+    ("TTM-R3", "ttm3", "hub:ibm-granite--granite-timeseries-ttm-r3"),
+    ("Yug", "yug", "hub:birlaailabs--yug"),
+    ("CSP", "csp", "pkg:.venv-csp:csp_forecaster"),
+    ("AutoARIMA", "autoarima", "pkg:.venv-sota:statsforecast"),
+    ("AutoETS", "autoets", "pkg:.venv-sota:statsforecast"),
+    ("AutoTheta", "autotheta", "pkg:.venv-sota:statsforecast"),
+    ("GARCH-t", "garcht", "pkg:.venv-sota:arch"),
+]
+
+
+def weight_bytes(repo, only=None):
+    """Bytes of the weight files in ONE cached snapshot of a Hub repo, or None.
+
+    A cache can hold several snapshots of a repo (revisions fetched over time)
+    and a snapshot several formats of the same weights; summing them counts
+    the model more than once. The snapshot is refs/main when that snapshot
+    holds weights, else one holding safetensors, else the newest; within it
+    safetensors are counted when present, else the other weight formats."""
+    base = os.path.join(HUB, f"models--{repo}")
+    cands = []
+    for snap in sorted(glob.glob(os.path.join(base, "snapshots", "*"))):
+        files = [p for p in glob.glob(os.path.join(snap, "**", "*"), recursive=True) if os.path.isfile(p)]
+        if only:
+            w = [p for p in files if os.path.relpath(p, snap) == only]
+        else:
+            st = [p for p in files if p.endswith(".safetensors")]
+            w = st or [p for p in files if p.endswith(WEIGHT_EXT)]
+        if w:
+            cands.append((snap, w))
+    if not cands:
+        return None
+    ref = os.path.join(base, "refs", "main")
+    main = open(ref).read().strip() if os.path.exists(ref) else None
+    cands.sort(key=lambda c: (os.path.basename(c[0]) == main,
+                              any(p.endswith(".safetensors") for p in c[1]),
+                              os.path.getmtime(c[0])))
+    return sum(os.stat(p).st_size for p in cands[-1][1])     # stat follows the blob symlink
+
+
+def package_bytes(venv, module):
+    """Installed size of one package directory in a study venv, or None."""
+    py = os.path.join(ROOT, venv, "bin", "python")
+    cp = subprocess.run([py, "-c", f"import {module}, os; print(os.path.dirname({module}.__file__))"],
+                        capture_output=True, text=True, timeout=300)
+    d = cp.stdout.strip().splitlines()[-1] if cp.returncode == 0 and cp.stdout.strip() else None
+    if not d or not os.path.isdir(d):
+        return None
+    return sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(d) for f in fs)
+
+
+def measure_models():
+    """One record per MODEL_SIZES entry that can be measured on this machine."""
+    out = []
+    for name, slug, src in MODEL_SIZES:
+        kind, _, rest = src.partition(":")
+        if kind == "hub":
+            repo, _, only = rest.partition(":")
+            b = weight_bytes(repo, only or None)
+            how = (f"{only} as cached from the Hub" if only else "weight files as cached from the Hub")
+        else:
+            venv, _, module = rest.partition(":")
+            b = package_bytes(venv, module)
+            how = f"the installed {module} package, dependencies not counted"
+        if b is None:
+            print(f"[footprint] no size for {name}: {src} not found")
+            continue
+        out.append({"name": name, "slug": slug, "bytes": b, "footprint_how": how, "source": src})
+    return out
 
 
 def _bytes_lines(paths):
@@ -47,6 +167,18 @@ def _pypi_json():
         return json.loads(cp.stdout)
 
 
+def fast_so_bytes():
+    """Size of the compiled skaters_fast extension in a study venv, or None. A
+    worktree has no venvs of its own, so the checkout holding the per-step
+    store (reached through the benchmarks/preds symlink) is searched as well."""
+    roots = [ROOT, os.path.dirname(os.path.dirname(os.path.realpath(os.path.join(HERE, "preds"))))]
+    for root in dict.fromkeys(roots):
+        so = sorted(glob.glob(os.path.join(root, ".venv*", "lib", "python*", "site-packages", "skaters_fast", "*.so")))
+        if so:
+            return os.path.getsize(so[0])
+    return None
+
+
 def measure():
     out = {}
     py = [p for p in glob.glob(os.path.join(ROOT, "src", "skaters", "**", "*.py"), recursive=True)
@@ -57,8 +189,7 @@ def measure():
     out["js_bytes"], out["js_lines"] = _bytes_lines(js)
     rs = glob.glob(os.path.join(ROOT, "rust", "src", "**", "*.rs"), recursive=True)
     out["rust_bytes"], out["rust_lines"] = _bytes_lines(rs)
-    so = glob.glob(os.path.join(ROOT, ".venv*", "lib", "python*", "site-packages", "skaters_fast", "*.so"))
-    out["fast_so_bytes"] = os.path.getsize(so[0]) if so else None
+    out["fast_so_bytes"] = fast_so_bytes()
 
     # declared dependencies: pyproject's [project] dependencies list
     deps = None
@@ -194,7 +325,21 @@ def render(r):
 
 
 def main():
+    path = os.path.join(HERE, "footprint_results.json")
+    if "--models" in sys.argv:
+        r = json.load(open(path))
+        r["models"] = measure_models()
+        r["models_date"] = time.strftime("%Y-%m-%d")
+        if r.get("fast_so_bytes") is None:           # a record written where no venv held the extension
+            r["fast_so_bytes"] = fast_so_bytes()
+        with open(path, "w") as fh:
+            json.dump(r, fh, indent=1)
+        for m in sorted(r["models"], key=lambda m: m["bytes"]):
+            print(f"  {m['name']:22s} {m['bytes'] / 1e6:10.1f} MB")
+        return
     r = measure()
+    r["models"] = measure_models()
+    r["models_date"] = r["meta"]["date"]
     with open(os.path.join(HERE, "footprint_results.json"), "w") as fh:
         json.dump(r, fh, indent=1)
     with open(os.path.join(ROOT, "docs", "footprint.html"), "w") as fh:
