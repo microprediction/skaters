@@ -934,7 +934,8 @@ def _wdl_cell(r):
         return '<td class="num">&ndash;</td><td class="num">&ndash;</td>'
     n = int(r["n_series"]) or 1
     return (f'<td class="num">{float(r["med_dLL"]):+.3f}</td>'
-            f'<td class="num">{fmt_pct(int(r["loss"]) / n)}</td>')
+            f'<td class="num">{fmt_pct(int(r["loss"]) / n)}<br><span style="font-size:.78rem;color:var(--muted)">'
+            f'{int(r["loss"]):,} of {n:,}</span></td>')
 
 
 def combined_section(model, vs, cov):
@@ -964,10 +965,13 @@ def combined_section(model, vs, cov):
     legend = "".join(f'<li><code>{a}</code>: {d}.</li>' for a, d in SANDWICH_ARMS)
     return f"""<h2>Collaborative use</h2>
     <p>Four sandwich arms wrap {model['name']}'s own predictive on this same base
-      (<code>{base}</code>), each paired with the standalone run on identical series and windows.
-      Each cell gives the median per-series &Delta; log-likelihood against Laplace in nats
-      (positive means better than Laplace) and the fraction of series where the arm loses to
-      Laplace by the <a href="/draws.html">Diebold&ndash;Mariano test</a>.</p>
+      (<code>{base}</code>). Each arm is scored against Laplace on the series that arm has
+      covered so far, on identical windows. Each cell gives the median per-series &Delta;
+      log-likelihood against Laplace in nats (positive means better than Laplace) and the
+      fraction of series where the arm loses to Laplace by the
+      <a href="/draws.html">Diebold&ndash;Mariano test</a>, with the counts beneath. The series
+      counts differ between columns, so each rate describes its own sample, and the difference
+      between two columns mixes the wrap's effect with the change of sample.</p>
     <ul>
       {legend}
     </ul>
@@ -979,7 +983,7 @@ def combined_section(model, vs, cov):
       </tbody>
     </table>
     <p>Central-90% coverage (0.90 target) of the standalone model, its <code>@lap</code> and
-      <code>&amp;lap</code> wraps, and Laplace on the same windows:</p>
+      <code>&amp;lap</code> wraps, and Laplace, each over the series that arm covers:</p>
     <table>
       <thead><tr><th>stratum</th><th class="num">standalone</th><th class="num">@lap</th>
       <th class="num">&amp;lap</th><th class="num">laplace</th></tr></thead>
@@ -1204,15 +1208,17 @@ def sidecar_fairbase_section(vs, cov):
                 cells.append(f'<td class="num">{float(r["med_dLL"]):+.3f} <span style="color:var(--muted)">({int(r["n_series"]):,})</span></td>'
                              if r else '<td class="num">&ndash;</td>')
             t1.append(f'<tr><td>{long}</td><td>{FAIR_SHORT[b]}</td>{"".join(cells)}</tr>')
-    # table 2: loss rate standalone -> &lap, every stratum x base
+    # table 2: loss rate of standalone and of &lap, each with its own series count, every stratum x base
     t2 = []
     for k, _s, long in STRATA:
         cells = []
         for b in FAIR_BASES:
             r, q = vs.get((k, b)), vs.get((k, b + "&lap"))
             if r and q:
-                cells.append(f'<td class="num">{fmt_pct(int(r["loss"]) / (int(r["n_series"]) or 1))} &rarr; '
-                             f'{fmt_pct(int(q["loss"]) / (int(q["n_series"]) or 1))}</td>')
+                cells.append(f'<td class="num">{fmt_pct(int(r["loss"]) / (int(r["n_series"]) or 1))} '
+                             f'<span style="color:var(--muted)">of {int(r["n_series"]):,}</span><br>'
+                             f'{fmt_pct(int(q["loss"]) / (int(q["n_series"]) or 1))} '
+                             f'<span style="color:var(--muted)">of {int(q["n_series"]):,}</span></td>')
             else:
                 cells.append('<td class="num">&ndash;</td>')
         t2.append(f'<tr><td>{long}</td>{"".join(cells)}</tr>')
@@ -1237,6 +1243,8 @@ def sidecar_fairbase_section(vs, cov):
              if (k, b + "&lap") in vs and (k, b) in vs and lossrate(k, b + "&lap") > lossrate(k, b)]
     worse_amp = len(worse)
     worse_txt = "; ".join(f"{FAIR_SHORT[b]} on {longname[k]}" for k, b in worse) or "none"
+    uneq = sum(1 for k, _s, _l in STRATA for b in FAIR_BASES
+               if (k, b + "&lap") in vs and (k, b) in vs and vs[(k, b + "&lap")]["n_series"] != vs[(k, b)]["n_series"])
     cells_total = sum(1 for k, _s, _l in STRATA for b in FAIR_BASES if (k, b + "&lap") in vs and (k, b) in vs)
     heads = "".join(f"<th>{FAIR_SHORT[b]}</th>" for b in FAIR_BASES)
     # the reverse sandwich: laplace as the base, PyMC on laplace's normal scores
@@ -1252,9 +1260,10 @@ def sidecar_fairbase_section(vs, cov):
       reconstruction. The same four sandwiches have now been run on the fair bases: Timestral-209M and
       t0-gamma on their native 21 levels, and TimesFM 3.0, TimesFM 2.5, TiRex and Chronos through the
       generous reconstruction, plus the PyMC-forecast model (a Student-t regression on lagged
-      changes, fit by ADVI) on the monthly stratum. Each arm is paired with its standalone run on
-      identical series and windows; <code>~lap</code> and <code>@lap</code> need a longer warm-up
-      window, so their series counts are smaller. Median per-series &Delta; log-likelihood against
+      changes, fit by ADVI) on the monthly stratum. Each arm is scored against Laplace on the series
+      that arm has covered, on identical windows. Series counts differ between columns
+      (<code>~lap</code> and <code>@lap</code> also need a longer warm-up window), so a difference
+      between two columns mixes the wrap's effect with the change of sample. Median per-series &Delta; log-likelihood against
       Laplace, in nats, positive meaning better than Laplace, with the number of series:</p>
     <table>
       <thead><tr><th>stratum</th><th>base</th><th class="num">standalone</th><th class="num">+lap</th>
@@ -1263,28 +1272,33 @@ def sidecar_fairbase_section(vs, cov):
       {chr(10).join(t1)}
       </tbody>
     </table>
-    <p>With no reconstruction defect to repair, the wraps mostly cost accuracy. Replacing the model's
-      scale with Laplace's residual scale (<code>~lap</code>) lowers the median in {dr[4]} of {dr[5]}
+    <p>With no reconstruction defect to repair, the wraps mostly read below their bases. The
+      comparisons in this paragraph are differences between two medians, each over its own series.
+      With the model's scale replaced by Laplace's residual scale (<code>~lap</code>) the median is
+      lower than the standalone base's in {dr[4]} of {dr[5]}
       economic cells, by {dr[0]:+.2f} ({FAIR_SHORT[dr[2][1]]}, {longname[dr[2][0]]}) to
       {dr[1]:+.2f} nats ({FAIR_SHORT[dr[3][1]]}, {longname[dr[3][0]]}). Forecasting the model's normal
-      scores (<code>@lap</code>) lowers it in {dp[4]} of {dp[5]}, from {dp[0]:+.2f}
+      scores (<code>@lap</code>) reads lower in {dp[4]} of {dp[5]}, from {dp[0]:+.2f}
       ({FAIR_SHORT[dp[2][1]]}, {longname[dp[2][0]]}) to {dp[1]:+.2f}
-      ({FAIR_SHORT[dp[3][1]]}, {longname[dp[3][0]]}): it still helps the weakest base and costs the
+      ({FAIR_SHORT[dp[3][1]]}, {longname[dp[3][0]]}): above the weakest base and below the
       strongest. The standalone fair bases cover {cs[0]:.2f} to {cs[1]:.2f} at the 90% level;
-      <code>@lap</code> pushes that to {ca[0]:.2f} to {ca[1]:.2f}, past the target, and
-      <code>&amp;lap</code> sits at {cp[0]:.2f} to {cp[1]:.2f}. Loss rate against Laplace,
-      standalone &rarr; <code>&amp;lap</code>:</p>
+      <code>@lap</code> covers {ca[0]:.2f} to {ca[1]:.2f}, past the target, and
+      <code>&amp;lap</code> {cp[0]:.2f} to {cp[1]:.2f}. Loss rate against Laplace, standalone
+      on the first line and <code>&amp;lap</code> on the second, each with its series count:</p>
     <table>
       <thead><tr><th>stratum</th>{heads}</tr></thead>
       <tbody>
       {chr(10).join(t2)}
       </tbody>
     </table>
-    <p>The portfolio lowers the loss rate in {cells_total - worse_amp} of {cells_total} base-stratum
-      cells; the exceptions are {worse_txt}. Its median moves by {da[0]:+.2f} ({FAIR_SHORT[da[2][1]]}, {longname[da[2][0]]}) to
-      {da[1]:+.2f} nats ({FAIR_SHORT[da[3][1]]}, {longname[da[3][0]]}) against the standalone base:
-      a strong base gives up part of its lead for the lower loss rate, a weak base is pulled most of
-      the way back to Laplace. The reading for the strongest base is on
+    <p>The portfolio's loss rate is lower than its standalone base's in {cells_total - worse_amp} of
+      {cells_total} base-stratum cells; the exceptions are {worse_txt}. In {uneq} of {cells_total} cells the two
+      rates come from different numbers of series, and there the size of the reduction is open
+      until the standalone rows are restricted to the portfolio's series. The portfolio's median sits
+      {da[0]:+.2f} ({FAIR_SHORT[da[2][1]]}, {longname[da[2][0]]}) to
+      {da[1]:+.2f} nats ({FAIR_SHORT[da[3][1]]}, {longname[da[3][0]]}) from the standalone base's.
+      If that holds on matched series, a strong base gives up part of its lead for the lower loss
+      rate and a weak base is pulled most of the way back to Laplace. The reading for the strongest base is on
       <a href="/foundation/timestral.html">Timestral's page</a>: no sandwich improves it at the
       median, and the portfolio is the safe way to run it. Each model's page carries the full
       per-stratum table with loss rates and coverage.</p>

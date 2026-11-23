@@ -207,10 +207,13 @@
 
     <h2>Collaborative use</h2>
     <p>Four sandwich arms wrap TimesFM3's own predictive on this same base
-      (<code>TimesFM3(wide)</code>), each paired with the standalone run on identical series and windows.
-      Each cell gives the median per-series &Delta; log-likelihood against Laplace in nats
-      (positive means better than Laplace) and the fraction of series where the arm loses to
-      Laplace by the <a href="/draws.html">Diebold&ndash;Mariano test</a>.</p>
+      (<code>TimesFM3(wide)</code>). Each arm is scored against Laplace on the series that arm has
+      covered so far, on identical windows. Each cell gives the median per-series &Delta;
+      log-likelihood against Laplace in nats (positive means better than Laplace) and the
+      fraction of series where the arm loses to Laplace by the
+      <a href="/draws.html">Diebold&ndash;Mariano test</a>, with the counts beneath. The series
+      counts differ between columns, so each rate describes its own sample, and the difference
+      between two columns mixes the wrap's effect with the change of sample.</p>
     <ul>
       <li><code>+lap</code>: vincentize with Laplace.</li><li><code>~lap</code>: model location, Laplace residual scale.</li><li><code>@lap</code>: Laplace on the model's normal scores.</li><li><code>&amp;lap</code>: online portfolio with Laplace.</li>
     </ul>
@@ -218,15 +221,15 @@
       <thead><tr><th rowspan="2">stratum</th><th class="num" colspan="2">standalone</th><th class="num" colspan="2">+lap</th><th class="num" colspan="2">~lap</th><th class="num" colspan="2">@lap</th><th class="num" colspan="2">&amp;lap</th></tr>
       <tr><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th><th class="num">&Delta;LL</th><th class="num">loss</th></tr></thead>
       <tbody>
-      <tr><td>economic change-series, business-daily</td><td class="num">-0.081</td><td class="num">28%</td><td class="num">-0.261</td><td class="num">32%</td><td class="num">-0.274</td><td class="num">34%</td><td class="num">-0.210</td><td class="num">38%</td><td class="num">-0.091</td><td class="num">32%</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">+0.001</td><td class="num">21%</td><td class="num">-0.128</td><td class="num">30%</td><td class="num">-0.256</td><td class="num">37%</td><td class="num">-0.089</td><td class="num">30%</td><td class="num">-0.002</td><td class="num">15%</td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">+0.048</td><td class="num">11%</td><td class="num">-0.055</td><td class="num">14%</td><td class="num">-0.245</td><td class="num">37%</td><td class="num">-0.002</td><td class="num">13%</td><td class="num">+0.003</td><td class="num">5%</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">-0.015</td><td class="num">32%</td><td class="num">-0.067</td><td class="num">19%</td><td class="num">-0.174</td><td class="num">33%</td><td class="num">-0.082</td><td class="num">31%</td><td class="num">+0.013</td><td class="num">0%</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">-0.008</td><td class="num">2%</td><td class="num">-0.047</td><td class="num">1%</td><td class="num">-0.042</td><td class="num">5%</td><td class="num">-0.055</td><td class="num">25%</td><td class="num">-0.011</td><td class="num">5%</td></tr>
+      <tr><td>economic change-series, business-daily</td><td class="num">-0.081</td><td class="num">28%<br><span style="font-size:.78rem;color:var(--muted)">622 of 2,210</span></td><td class="num">-0.261</td><td class="num">32%<br><span style="font-size:.78rem;color:var(--muted)">718 of 2,210</span></td><td class="num">-0.274</td><td class="num">34%<br><span style="font-size:.78rem;color:var(--muted)">744 of 2,210</span></td><td class="num">-0.210</td><td class="num">38%<br><span style="font-size:.78rem;color:var(--muted)">848 of 2,210</span></td><td class="num">-0.091</td><td class="num">32%<br><span style="font-size:.78rem;color:var(--muted)">701 of 2,210</span></td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">+0.001</td><td class="num">21%<br><span style="font-size:.78rem;color:var(--muted)">628 of 3,013</span></td><td class="num">-0.128</td><td class="num">30%<br><span style="font-size:.78rem;color:var(--muted)">890 of 3,013</span></td><td class="num">-0.256</td><td class="num">37%<br><span style="font-size:.78rem;color:var(--muted)">1,122 of 3,011</span></td><td class="num">-0.089</td><td class="num">30%<br><span style="font-size:.78rem;color:var(--muted)">894 of 3,011</span></td><td class="num">-0.002</td><td class="num">15%<br><span style="font-size:.78rem;color:var(--muted)">457 of 3,011</span></td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">+0.048</td><td class="num">11%<br><span style="font-size:.78rem;color:var(--muted)">612 of 5,600</span></td><td class="num">-0.055</td><td class="num">14%<br><span style="font-size:.78rem;color:var(--muted)">767 of 5,600</span></td><td class="num">-0.245</td><td class="num">37%<br><span style="font-size:.78rem;color:var(--muted)">1,921 of 5,219</span></td><td class="num">-0.002</td><td class="num">13%<br><span style="font-size:.78rem;color:var(--muted)">667 of 5,219</span></td><td class="num">+0.003</td><td class="num">5%<br><span style="font-size:.78rem;color:var(--muted)">258 of 5,219</span></td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">-0.015</td><td class="num">32%<br><span style="font-size:.78rem;color:var(--muted)">131 of 414</span></td><td class="num">-0.067</td><td class="num">19%<br><span style="font-size:.78rem;color:var(--muted)">80 of 414</span></td><td class="num">-0.174</td><td class="num">33%<br><span style="font-size:.78rem;color:var(--muted)">137 of 414</span></td><td class="num">-0.082</td><td class="num">31%<br><span style="font-size:.78rem;color:var(--muted)">128 of 414</span></td><td class="num">+0.013</td><td class="num">0%<br><span style="font-size:.78rem;color:var(--muted)">1 of 414</span></td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">-0.008</td><td class="num">2%<br><span style="font-size:.78rem;color:var(--muted)">204 of 8,703</span></td><td class="num">-0.047</td><td class="num">1%<br><span style="font-size:.78rem;color:var(--muted)">78 of 8,703</span></td><td class="num">-0.042</td><td class="num">5%<br><span style="font-size:.78rem;color:var(--muted)">406 of 8,703</span></td><td class="num">-0.055</td><td class="num">25%<br><span style="font-size:.78rem;color:var(--muted)">2,206 of 8,703</span></td><td class="num">-0.011</td><td class="num">5%<br><span style="font-size:.78rem;color:var(--muted)">421 of 8,703</span></td></tr>
       </tbody>
     </table>
     <p>Central-90% coverage (0.90 target) of the standalone model, its <code>@lap</code> and
-      <code>&amp;lap</code> wraps, and Laplace on the same windows:</p>
+      <code>&amp;lap</code> wraps, and Laplace, each over the series that arm covers:</p>
     <table>
       <thead><tr><th>stratum</th><th class="num">standalone</th><th class="num">@lap</th>
       <th class="num">&amp;lap</th><th class="num">laplace</th></tr></thead>

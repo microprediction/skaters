@@ -138,8 +138,8 @@
 
     <p><span class="snapshot">Two generations</span> &nbsp;The sections through "Why this shape" report
       the arms built on the tight nine-decile reconstruction, where cell counts differ between arms.
-      The fair-base section reports the same four arms on the native-level and generous bases, with
-      every arm paired to its standalone run.</p>
+      The fair-base section reports the same four arms on the native-level and generous bases. There
+      too each arm's counts are its own, and the tables print them.</p>
 
     <h2>The setup</h2>
     <p>
@@ -364,9 +364,10 @@
       reconstruction. The same four sandwiches have now been run on the fair bases: Timestral-209M and
       t0-gamma on their native 21 levels, and TimesFM 3.0, TimesFM 2.5, TiRex and Chronos through the
       generous reconstruction, plus the PyMC-forecast model (a Student-t regression on lagged
-      changes, fit by ADVI) on the monthly stratum. Each arm is paired with its standalone run on
-      identical series and windows; <code>~lap</code> and <code>@lap</code> need a longer warm-up
-      window, so their series counts are smaller. Median per-series &Delta; log-likelihood against
+      changes, fit by ADVI) on the monthly stratum. Each arm is scored against Laplace on the series
+      that arm has covered, on identical windows. Series counts differ between columns
+      (<code>~lap</code> and <code>@lap</code> also need a longer warm-up window), so a difference
+      between two columns mixes the wrap's effect with the change of sample. Median per-series &Delta; log-likelihood against
       Laplace, in nats, positive meaning better than Laplace, with the number of series:</p>
     <table>
       <thead><tr><th>stratum</th><th>base</th><th class="num">standalone</th><th class="num">+lap</th>
@@ -387,32 +388,37 @@
 <tr><td>economic change-series, monthly (annual cycle)</td><td>PyMC-forecast</td><td class="num">-0.061 <span style="color:var(--muted)">(471)</span></td><td class="num">-0.060 <span style="color:var(--muted)">(471)</span></td><td class="num">-0.348 <span style="color:var(--muted)">(354)</span></td><td class="num">-0.097 <span style="color:var(--muted)">(354)</span></td><td class="num">-0.010 <span style="color:var(--muted)">(354)</span></td></tr>
       </tbody>
     </table>
-    <p>With no reconstruction defect to repair, the wraps mostly cost accuracy. Replacing the model's
-      scale with Laplace's residual scale (<code>~lap</code>) lowers the median in 19 of 19
+    <p>With no reconstruction defect to repair, the wraps mostly read below their bases. The
+      comparisons in this paragraph are differences between two medians, each over its own series.
+      With the model's scale replaced by Laplace's residual scale (<code>~lap</code>) the median is
+      lower than the standalone base's in 19 of 19
       economic cells, by -0.35 (t0-gamma, weekly) to
       -0.13 nats (Chronos, weekly). Forecasting the model's normal
-      scores (<code>@lap</code>) lowers it in 17 of 19, from -0.15
+      scores (<code>@lap</code>) reads lower in 17 of 19, from -0.15
       (TiRex, daily econ) to +0.13
-      (Chronos, weekly): it still helps the weakest base and costs the
+      (Chronos, weekly): above the weakest base and below the
       strongest. The standalone fair bases cover 0.82 to 0.91 at the 90% level;
-      <code>@lap</code> pushes that to 0.93 to 0.96, past the target, and
-      <code>&amp;lap</code> sits at 0.91 to 0.94. Loss rate against Laplace,
-      standalone &rarr; <code>&amp;lap</code>:</p>
+      <code>@lap</code> covers 0.93 to 0.96, past the target, and
+      <code>&amp;lap</code> 0.91 to 0.94. Loss rate against Laplace, standalone
+      on the first line and <code>&amp;lap</code> on the second, each with its series count:</p>
     <table>
       <thead><tr><th>stratum</th><th>Timestral</th><th>t0-gamma</th><th>TimesFM3</th><th>TimesFM</th><th>TiRex</th><th>Chronos</th><th>PyMC-forecast</th></tr></thead>
       <tbody>
-      <tr><td>economic change-series, business-daily</td><td class="num">27% &rarr; 31%</td><td class="num">32% &rarr; 31%</td><td class="num">28% &rarr; 32%</td><td class="num">31% &rarr; 31%</td><td class="num">34% &rarr; 32%</td><td class="num">39% &rarr; 32%</td><td class="num">&ndash;</td></tr>
-<tr><td>economic change-series, weekly</td><td class="num">24% &rarr; 14%</td><td class="num">29% &rarr; 14%</td><td class="num">21% &rarr; 15%</td><td class="num">24% &rarr; 15%</td><td class="num">32% &rarr; 15%</td><td class="num">38% &rarr; 16%</td><td class="num">&ndash;</td></tr>
-<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">7% &rarr; 5%</td><td class="num">10% &rarr; 5%</td><td class="num">11% &rarr; 5%</td><td class="num">14% &rarr; 6%</td><td class="num">12% &rarr; 6%</td><td class="num">19% &rarr; 6%</td><td class="num">22% &rarr; 6%</td></tr>
-<tr><td>M4 hourly, strongly seasonal</td><td class="num">10% &rarr; 0%</td><td class="num">27% &rarr; 0%</td><td class="num">32% &rarr; 0%</td><td class="num">25% &rarr; 0%</td><td class="num">22% &rarr; 0%</td><td class="num">30% &rarr; 0%</td><td class="num">&ndash;</td></tr>
-<tr><td>asset prices and returns, daily</td><td class="num">4% &rarr; 4%</td><td class="num">1% &rarr; 5%</td><td class="num">2% &rarr; 5%</td><td class="num">4% &rarr; 6%</td><td class="num">3% &rarr; 6%</td><td class="num">9% &rarr; 6%</td><td class="num">&ndash;</td></tr>
+      <tr><td>economic change-series, business-daily</td><td class="num">27% <span style="color:var(--muted)">of 2,210</span><br>31% <span style="color:var(--muted)">of 2,210</span></td><td class="num">32% <span style="color:var(--muted)">of 2,210</span><br>31% <span style="color:var(--muted)">of 2,210</span></td><td class="num">28% <span style="color:var(--muted)">of 2,210</span><br>32% <span style="color:var(--muted)">of 2,210</span></td><td class="num">31% <span style="color:var(--muted)">of 2,023</span><br>31% <span style="color:var(--muted)">of 1,381</span></td><td class="num">34% <span style="color:var(--muted)">of 2,023</span><br>32% <span style="color:var(--muted)">of 1,381</span></td><td class="num">39% <span style="color:var(--muted)">of 2,023</span><br>32% <span style="color:var(--muted)">of 1,386</span></td><td class="num">&ndash;</td></tr>
+<tr><td>economic change-series, weekly</td><td class="num">24% <span style="color:var(--muted)">of 3,013</span><br>14% <span style="color:var(--muted)">of 3,011</span></td><td class="num">29% <span style="color:var(--muted)">of 3,013</span><br>14% <span style="color:var(--muted)">of 3,011</span></td><td class="num">21% <span style="color:var(--muted)">of 3,013</span><br>15% <span style="color:var(--muted)">of 3,011</span></td><td class="num">24% <span style="color:var(--muted)">of 3,013</span><br>15% <span style="color:var(--muted)">of 2,918</span></td><td class="num">32% <span style="color:var(--muted)">of 3,013</span><br>15% <span style="color:var(--muted)">of 2,918</span></td><td class="num">38% <span style="color:var(--muted)">of 3,013</span><br>16% <span style="color:var(--muted)">of 2,928</span></td><td class="num">&ndash;</td></tr>
+<tr><td>economic change-series, monthly (annual cycle)</td><td class="num">7% <span style="color:var(--muted)">of 5,600</span><br>5% <span style="color:var(--muted)">of 5,219</span></td><td class="num">10% <span style="color:var(--muted)">of 5,600</span><br>5% <span style="color:var(--muted)">of 5,219</span></td><td class="num">11% <span style="color:var(--muted)">of 5,600</span><br>5% <span style="color:var(--muted)">of 5,219</span></td><td class="num">14% <span style="color:var(--muted)">of 5,600</span><br>6% <span style="color:var(--muted)">of 2,700</span></td><td class="num">12% <span style="color:var(--muted)">of 5,600</span><br>6% <span style="color:var(--muted)">of 2,700</span></td><td class="num">19% <span style="color:var(--muted)">of 5,600</span><br>6% <span style="color:var(--muted)">of 2,710</span></td><td class="num">22% <span style="color:var(--muted)">of 471</span><br>6% <span style="color:var(--muted)">of 354</span></td></tr>
+<tr><td>M4 hourly, strongly seasonal</td><td class="num">10% <span style="color:var(--muted)">of 414</span><br>0% <span style="color:var(--muted)">of 414</span></td><td class="num">27% <span style="color:var(--muted)">of 414</span><br>0% <span style="color:var(--muted)">of 414</span></td><td class="num">32% <span style="color:var(--muted)">of 414</span><br>0% <span style="color:var(--muted)">of 414</span></td><td class="num">25% <span style="color:var(--muted)">of 414</span><br>0% <span style="color:var(--muted)">of 414</span></td><td class="num">22% <span style="color:var(--muted)">of 414</span><br>0% <span style="color:var(--muted)">of 414</span></td><td class="num">30% <span style="color:var(--muted)">of 414</span><br>0% <span style="color:var(--muted)">of 414</span></td><td class="num">&ndash;</td></tr>
+<tr><td>asset prices and returns, daily</td><td class="num">4% <span style="color:var(--muted)">of 8,703</span><br>4% <span style="color:var(--muted)">of 8,703</span></td><td class="num">1% <span style="color:var(--muted)">of 8,703</span><br>5% <span style="color:var(--muted)">of 8,703</span></td><td class="num">2% <span style="color:var(--muted)">of 8,703</span><br>5% <span style="color:var(--muted)">of 8,703</span></td><td class="num">4% <span style="color:var(--muted)">of 4,977</span><br>6% <span style="color:var(--muted)">of 1,539</span></td><td class="num">3% <span style="color:var(--muted)">of 4,977</span><br>6% <span style="color:var(--muted)">of 1,539</span></td><td class="num">9% <span style="color:var(--muted)">of 4,977</span><br>6% <span style="color:var(--muted)">of 1,544</span></td><td class="num">&ndash;</td></tr>
       </tbody>
     </table>
-    <p>The portfolio lowers the loss rate in 24 of 31 base-stratum
-      cells; the exceptions are Timestral on daily econ; TimesFM3 on daily econ; Timestral on price; t0-gamma on price; TimesFM3 on price; TimesFM on price; TiRex on price. Its median moves by -0.08 (Timestral, monthly) to
-      +0.21 nats (Chronos, weekly) against the standalone base:
-      a strong base gives up part of its lead for the lower loss rate, a weak base is pulled most of
-      the way back to Laplace. The reading for the strongest base is on
+    <p>The portfolio's loss rate is lower than its standalone base's in 24 of
+      31 base-stratum cells; the exceptions are Timestral on daily econ; TimesFM3 on daily econ; Timestral on price; t0-gamma on price; TimesFM3 on price; TimesFM on price; TiRex on price. In 19 of 31 cells the two
+      rates come from different numbers of series, and there the size of the reduction is open
+      until the standalone rows are restricted to the portfolio's series. The portfolio's median sits
+      -0.08 (Timestral, monthly) to
+      +0.21 nats (Chronos, weekly) from the standalone base's.
+      If that holds on matched series, a strong base gives up part of its lead for the lower loss
+      rate and a weak base is pulled most of the way back to Laplace. The reading for the strongest base is on
       <a href="/foundation/timestral.html">Timestral's page</a>: no sandwich improves it at the
       median, and the portfolio is the safe way to run it. Each model's page carries the full
       per-stratum table with loss rates and coverage.</p>
