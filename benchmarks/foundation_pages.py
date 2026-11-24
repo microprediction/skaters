@@ -594,6 +594,25 @@ MODELS = {
                     links=[("Model card", "https://huggingface.co/bytedance-research/Timer-S1")],
                     arch="Mixture-of-experts decoder, nine native deciles.",
                     variants=[("Timer-S1(wide)", "wide")]),
+    "kumo": dict(name="Kumo Tabular", key="Kumo-large-reg(q99)", tight_key="Kumo-large-reg(q99)",
+                 recon="native99", vendor="NVIDIA", version="large (215M)", license="OpenMDW-1.1", arms=False,
+                 blurb="Kumo Tabular (September 2026) is a tabular in-context model, not a forecaster. "
+                       "It is scored here by arranging each context window as a table of lagged changes, "
+                       "and its regressor returns 999 quantiles per row.",
+                 note="Run zero-shot on CPU through structured-data-models 0.2.1, which loads weights tag "
+                      "v1.0.1 (commit 3c3e10b). The 128-change context becomes a table of eight lags, "
+                      "refreshed every ten test steps, with four ensemble members. The classifier arms "
+                      "repeat the TabFM decile-bin protocol. The Apple GPU path returned a different "
+                      "median on the same block and is not used.",
+                 links=[("Model card", "https://huggingface.co/nvidia/Kumo-Tabular")],
+                 arch="Tabular in-context transformer. The regressor emits 999 quantiles; the headline arm "
+                      "takes every percentile from 1% to 99%.",
+                 variants=[("Kumo-large-reg(q99)", "large, 99 levels"),
+                           ("Kumo-large-reg(q21)", "large, 21 levels"),
+                           ("Kumo-large-clf8", "large, decile-bin classifier"),
+                           ("Kumo-small-reg(q99)", "small (28M), 99 levels"),
+                           ("Kumo-small-reg(q21)", "small (28M), 21 levels"),
+                           ("Kumo-small-clf8", "small (28M), decile-bin classifier")]),
 }
 
 # NAV comes from docs/sweep_nav.py, the single source of truth. This file used
