@@ -93,6 +93,7 @@ CANONICAL = """  <header class="site-header">
                 <a href="/foundation/tabby.html">Tabby</a>
                 <a href="/foundation/citras.html">CITRAS-FM</a>
                 <a href="/foundation/tsicl.html">TS-ICL</a>
+                <a href="/foundation/kumo.html">Kumo Tabular</a>
               </span>
             </span>
           </span>
